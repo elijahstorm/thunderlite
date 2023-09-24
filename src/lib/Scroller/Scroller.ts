@@ -74,14 +74,14 @@ type ScrollerOptions = {
 }
 
 /**
- * @param pos {Number} position between 0 (start of effect) and 1 (end of effect)
+ * @param pos position between 0 (start of effect) and 1 (end of effect)
  **/
 const easeOutCubic = function (pos: number) {
 	return Math.pow(pos - 1, 3) + 1
 }
 
 /**
- * @param pos {Number} position between 0 (start of effect) and 1 (end of effect)
+ * @param pos position between 0 (start of effect) and 1 (end of effect)
  **/
 const easeInOutCubic = function (pos: number) {
 	if ((pos /= 0.5) < 1) {
@@ -196,36 +196,36 @@ const scrollerMembers = function () {
 				INTERNAL FIELDS :: STATUS
 			---------------------------------------------------------------------------
 			*/
-		/** {boolean} Whether only a single finger is used in touch handling */
+		/** Whether only a single finger is used in touch handling */
 		__isSingleTouch: false,
 
-		/** {Boolean} Whether a touch event sequence is in progress */
+		/** Whether a touch event sequence is in progress */
 		__isTracking: false,
 
-		/** {Boolean} Whether a deceleration animation went to completion. */
+		/** Whether a deceleration animation went to completion. */
 		__didDecelerationComplete: false,
 
 		/**
-		 * {Boolean} Whether a gesture zoom/rotate event is in progress. Activates when
+		 * Whether a gesture zoom/rotate event is in progress. Activates when
 		 * a gesturestart event happens. This has higher priority than dragging.
 		 */
 		__isGesturing: false,
 
 		/**
-		 * {Boolean} Whether the user has moved by such a distance that we have enabled
+		 * Whether the user has moved by such a distance that we have enabled
 		 * dragging mode. Hint: It's only enabled after some pixels of movement to
 		 * not interrupt with clicks etc.
 		 */
 		__isDragging: false,
 
 		/**
-		 * {Number} Not touching and dragging anymore, and smoothly animating the
+		 * Not touching and dragging anymore, and smoothly animating the
 		 * touch sequence using deceleration.
 		 */
 		__isDecelerating: 0,
 
 		/**
-		 * {Number} Smoothly animating the currently configured change
+		 * Smoothly animating the currently configured change
 		 */
 		__isAnimating: 0,
 
@@ -234,67 +234,67 @@ const scrollerMembers = function () {
 				INTERNAL FIELDS :: DIMENSIONS
 			---------------------------------------------------------------------------
 			*/
-		/** {Integer} Available outer left position (from document perspective) */
+		/** Available outer left position (from document perspective) */
 		__clientLeft: 0,
 
-		/** {Integer} Available outer top position (from document perspective) */
+		/** Available outer top position (from document perspective) */
 		__clientTop: 0,
 
-		/** {Integer} Available outer width */
+		/** Available outer width */
 		__clientWidth: 0,
 
-		/** {Integer} Available outer height */
+		/** Available outer height */
 		__clientHeight: 0,
 
-		/** {Integer} Outer width of content */
+		/** Outer width of content */
 		__contentWidth: 0,
 
-		/** {Integer} Outer height of content */
+		/** Outer height of content */
 		__contentHeight: 0,
 
-		/** {Integer} Snapping width for content */
+		/** Snapping width for content */
 		__snapWidth: 100,
 
-		/** {Integer} Snapping height for content */
+		/** Snapping height for content */
 		__snapHeight: 100,
 
-		/** {Integer} Height to assign to refresh area */
+		/** Height to assign to refresh area */
 		__refreshHeight: null,
 
-		/** {Boolean} Whether the refresh process is enabled when the event is released now */
+		/** Whether the refresh process is enabled when the event is released now */
 		__refreshActive: false,
 
-		/** {Function} Callback to execute on activation. This is for signalling the user about a refresh is about to happen when he release */
+		/** Callback to execute on activation. This is for signalling the user about a refresh is about to happen when he release */
 		__refreshActivate: null,
 
-		/** {Function} Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled */
+		/** Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled */
 		__refreshDeactivate: null,
 
-		/** {Function} Callback to execute to start the actual refresh. Call {@link #refreshFinish} when done */
+		/** Callback to execute to start the actual refresh. Call {@link #refreshFinish} when done */
 		__refreshStart: null,
 
-		/** {Number} Zoom level */
+		/** Zoom level */
 		__zoomLevel: 1,
 
-		/** {Number} Scroll position on x-axis */
+		/** Scroll position on x-axis */
 		__scrollLeft: 0,
 
-		/** {Number} Scroll position on y-axis */
+		/** Scroll position on y-axis */
 		__scrollTop: 0,
 
-		/** {Integer} Maximum allowed scroll position on x-axis */
+		/** Maximum allowed scroll position on x-axis */
 		__maxScrollLeft: 0,
 
-		/** {Integer} Maximum allowed scroll position on y-axis */
+		/** Maximum allowed scroll position on y-axis */
 		__maxScrollTop: 0,
 
-		/* {Number} Scheduled left position (final position when animating) */
+		/* Scheduled left position (final position when animating) */
 		__scheduledLeft: 0,
 
-		/* {Number} Scheduled top position (final position when animating) */
+		/* Scheduled top position (final position when animating) */
 		__scheduledTop: 0,
 
-		/* {Number} Scheduled zoom level (final scale when animating) */
+		/* Scheduled zoom level (final scale when animating) */
 		__scheduledZoom: 0,
 
 		/*
@@ -302,16 +302,16 @@ const scrollerMembers = function () {
 				INTERNAL FIELDS :: LAST POSITIONS
 			---------------------------------------------------------------------------
 			*/
-		/** {Number} Left position of finger at start */
+		/** Left position of finger at start */
 		__lastTouchLeft: null,
 
-		/** {Number} Top position of finger at start */
+		/** Top position of finger at start */
 		__lastTouchTop: null,
 
-		/** {Date} Timestamp of last move of finger. Used to limit tracking range for deceleration speed. */
+		/** Timestamp of last move of finger. Used to limit tracking range for deceleration speed. */
 		__lastTouchMove: null,
 
-		/** {Array} List of positions, uses three indexes for each state: left, top, timestamp */
+		/** List of positions, uses three indexes for each state: left, top, timestamp */
 		__positions: [],
 
 		/*
@@ -319,22 +319,22 @@ const scrollerMembers = function () {
 				INTERNAL FIELDS :: DECELERATION SUPPORT
 			---------------------------------------------------------------------------
 			*/
-		/** {Integer} Minimum left scroll position during deceleration */
+		/** Minimum left scroll position during deceleration */
 		__minDecelerationScrollLeft: null,
 
-		/** {Integer} Minimum top scroll position during deceleration */
+		/** Minimum top scroll position during deceleration */
 		__minDecelerationScrollTop: null,
 
-		/** {Integer} Maximum left scroll position during deceleration */
+		/** Maximum left scroll position during deceleration */
 		__maxDecelerationScrollLeft: null,
 
-		/** {Integer} Maximum top scroll position during deceleration */
+		/** Maximum top scroll position during deceleration */
 		__maxDecelerationScrollTop: null,
 
-		/** {Number} Current factor to modify horizontal scroll position with on every step */
+		/** Current factor to modify horizontal scroll position with on every step */
 		__decelerationVelocityX: null,
 
-		/** {Number} Current factor to modify vertical scroll position with on every step */
+		/** Current factor to modify vertical scroll position with on every step */
 		__decelerationVelocityY: null,
 		setPosition: function (left: number, top: number): void {},
 		setDimensions: function (
@@ -440,10 +440,10 @@ const scrollerMembers = function () {
 	 * Requires the available space for the outer element and the outer size of the inner element.
 	 * All values which are falsy (null or zero etc.) are ignored and the old value is kept.
 	 *
-	 * @param clientWidth {Integer ? null} Inner width of outer element
-	 * @param clientHeight {Integer ? null} Inner height of outer element
-	 * @param contentWidth {Integer ? null} Outer width of inner element
-	 * @param contentHeight {Integer ? null} Outer height of inner element
+	 * @param clientWidth Inner width of outer element
+	 * @param clientHeight Inner height of outer element
+	 * @param contentWidth Outer width of inner element
+	 * @param contentHeight Outer height of inner element
 	 */
 	scroller.setDimensions = function (
 		clientWidth: number,
@@ -478,8 +478,8 @@ const scrollerMembers = function () {
 	/**
 	 * Sets the client coordinates in relation to the document.
 	 *
-	 * @param left {Integer ? 0} Left position of outer element
-	 * @param top {Integer ? 0} Top position of outer element
+	 * @param left Left position of outer element
+	 * @param top Top position of outer element
 	 */
 	scroller.setPosition = function (left: number, top: number) {
 		scroller.__clientLeft = left || 0
@@ -489,8 +489,8 @@ const scrollerMembers = function () {
 	/**
 	 * Configures the snapping (when snapping is active)
 	 *
-	 * @param width {Integer} Snapping width
-	 * @param height {Integer} Snapping height
+	 * @param width Snapping width
+	 * @param height Snapping height
 	 */
 	scroller.setSnapSize = function (width: number, height: number) {
 		scroller.__snapWidth = width
@@ -502,10 +502,10 @@ const scrollerMembers = function () {
 	 * the user event is released during visibility of this zone. This was introduced by some apps on iOS like
 	 * the official Twitter client.
 	 *
-	 * @param height {Integer} Height of pull-to-refresh zone on top of rendered list
-	 * @param activateCallback {Function} Callback to execute on activation. This is for signalling the user about a refresh is about to happen when he release.
-	 * @param deactivateCallback {Function} Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled.
-	 * @param startCallback {Function} Callback to execute to start the real async refresh action. Call {@link #finishPullToRefresh} after finish of refresh.
+	 * @param height Height of pull-to-refresh zone on top of rendered list
+	 * @param activateCallback Callback to execute on activation. This is for signalling the user about a refresh is about to happen when he release.
+	 * @param deactivateCallback Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled.
+	 * @param startCallback Callback to execute to start the real async refresh action. Call {@link #finishPullToRefresh} after finish of refresh.
 	 */
 	;(scroller.activatePullToRefresh = function (
 		height: number,
@@ -549,7 +549,7 @@ const scrollerMembers = function () {
 		/**
 		 * Returns the scroll position and zooming values
 		 *
-		 * @return {Map} `left` and `top` scroll position and `zoom` level
+		 * @return `left` and `top` scroll position and `zoom` level
 		 */
 		(scroller.getValues = function () {
 			return {
@@ -561,7 +561,7 @@ const scrollerMembers = function () {
 		/**
 		 * Returns the maximum scroll values
 		 *
-		 * @return {Map} `left` and `top` maximum scroll values
+		 * @return `left` and `top` maximum scroll values
 		 */
 		(scroller.getScrollMax = function () {
 			return {
@@ -573,11 +573,11 @@ const scrollerMembers = function () {
 		 * Zooms to the given level. Supports optional animation. Zooms
 		 * the center when no coordinates are given.
 		 *
-		 * @param level {Number} Level to zoom to
-		 * @param animate {Boolean ? false} Whether to use animation
-		 * @param originLeft {Number ? null} Zoom in at given left coordinate
-		 * @param originTop {Number ? null} Zoom in at given top coordinate
-		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
+		 * @param level Level to zoom to
+		 * @param animate Whether to use animation
+		 * @param originLeft Zoom in at given left coordinate
+		 * @param originTop Zoom in at given top coordinate
+		 * @param callback A callback that gets fired when the zoom is complete.
 		 */
 		(scroller.zoomTo = function (
 			level: number,
@@ -645,11 +645,11 @@ const scrollerMembers = function () {
 		/**
 		 * Zooms the content by the given factor.
 		 *
-		 * @param factor {Number} Zoom by given factor
-		 * @param animate {Boolean ? false} Whether to use animation
-		 * @param originLeft {Number ? 0} Zoom in at given left coordinate
-		 * @param originTop {Number ? 0} Zoom in at given top coordinate
-		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
+		 * @param factor Zoom by given factor
+		 * @param animate Whether to use animation
+		 * @param originLeft Zoom in at given left coordinate
+		 * @param originTop Zoom in at given top coordinate
+		 * @param callback A callback that gets fired when the zoom is complete.
 		 */
 		(scroller.zoomBy = function (
 			factor: number,
@@ -663,10 +663,10 @@ const scrollerMembers = function () {
 		/**
 		 * Scrolls to the given position. Respect limitations and snapping automatically.
 		 *
-		 * @param left {Number?null} Horizontal scroll position, keeps current if value is <code>null</code>
-		 * @param top {Number?null} Vertical scroll position, keeps current if value is <code>null</code>
-		 * @param animate {Boolean?false} Whether the scrolling should happen using an animation
-		 * @param zoom {Number?null} Zoom level to go to
+		 * @param left Horizontal scroll position, keeps current if value is <code>null</code>
+		 * @param top Vertical scroll position, keeps current if value is <code>null</code>
+		 * @param animate Whether the scrolling should happen using an animation
+		 * @param zoom Zoom level to go to
 		 */
 		(scroller.scrollTo = function (left: number, top: number, animate?: boolean, zoom?: number) {
 			// Stop deceleration
@@ -676,7 +676,7 @@ const scrollerMembers = function () {
 			}
 
 			// Correct coordinates based on new zoom level
-			if (zoom != null && zoom !== scroller.__zoomLevel) {
+			if (zoom && zoom !== scroller.__zoomLevel) {
 				if (!scroller.options.zooming) {
 					return
 				}
@@ -729,9 +729,9 @@ const scrollerMembers = function () {
 		/**
 		 * Scroll by the given offset
 		 *
-		 * @param left {Number ? 0} Scroll x-axis by given offset
-		 * @param top {Number ? 0} Scroll x-axis by given offset
-		 * @param animate {Boolean ? false} Whether to animate the given change
+		 * @param left Scroll x-axis by given offset
+		 * @param top Scroll x-axis by given offset
+		 * @param animate Whether to animate the given change
 		 */
 		(scroller.scrollBy = function (left: number, top: number, animate: boolean) {
 			const startLeft = scroller.__isAnimating ? scroller.__scheduledLeft : scroller.__scrollLeft
@@ -1155,9 +1155,9 @@ const scrollerMembers = function () {
 	/**
 	 * Applies the scroll position to the content element
 	 *
-	 * @param left {Number} Left scroll position
-	 * @param top {Number} Top scroll position
-	 * @param animate {Boolean?false} Whether animation should be used to move to the new coordinates
+	 * @param left Left scroll position
+	 * @param top Top scroll position
+	 * @param animate Whether animation should be used to move to the new coordinates
 	 */
 	scroller.__publish = function (left: number, top: number, zoom: number, animate?: boolean) {
 		// Remember whether we had an animation, then we try to continue based on the current "drive" of the animation
@@ -1337,7 +1337,7 @@ const scrollerMembers = function () {
 	/**
 	 * Called on every step of the animation
 	 *
-	 * @param render {Boolean?false} Whether to not render the current step, but keep it in memory only. Used internally only!
+	 * @param render Whether to not render the current step, but keep it in memory only. Used internally only!
 	 */
 	scroller.__stepThroughDeceleration = function (render: boolean) {
 		if (!scroller.__decelerationVelocityY || !scroller.__decelerationVelocityX) {
