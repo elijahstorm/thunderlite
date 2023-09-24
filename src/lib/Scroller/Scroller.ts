@@ -3,58 +3,6 @@
 import { Animate } from './Animate'
 
 type RenderFunction = (left: number, top: number, zoom: number) => void
-
-const NOOP = function () {}
-
-const DEFAULT_OPTIONS = {
-	/** Enable scrolling on x-axis */
-	scrollingX: true,
-
-	/** Enable scrolling on y-axis */
-	scrollingY: true,
-
-	/** Enable animations for deceleration, snap back, zooming and scrolling */
-	animating: true,
-
-	/** duration for animations triggered by scrollTo/zoomTo */
-	animationDuration: 250,
-
-	/** Enable bouncing (content can be slowly moved outside and jumps back after releasing) */
-	bouncing: true,
-
-	/** Enable locking to the main axis if user moves only slightly on one of them at start */
-	locking: true,
-
-	/** Enable pagination mode (switching between full page content panes) */
-	paging: false,
-
-	/** Enable snapping of content to a configured pixel grid */
-	snapping: false,
-
-	/** Enable zooming of content via API, fingers and mouse wheel */
-	zooming: false,
-
-	/** Minimum zoom level */
-	minZoom: 0.5,
-
-	/** Maximum zoom level */
-	maxZoom: 3,
-
-	/** Multiply or decrease scrolling speed **/
-	speedMultiplier: 1,
-
-	/** Callback that is fired on the later of touch end or deceleration end,
-			provided that another scrolling action has not begun. Used to know
-			when to fade out a scrollbar. */
-	scrollingComplete: NOOP,
-
-	/** This configures the amount of change applied to deceleration when reaching boundaries  **/
-	penetrationDeceleration: 0.03,
-
-	/** This configures the amount of change applied to acceleration when reaching boundaries  **/
-	penetrationAcceleration: 0.08,
-}
-
 type ScrollerOptions = {
 	scrollingX?: boolean
 	scrollingY?: boolean
@@ -68,7 +16,7 @@ type ScrollerOptions = {
 	minZoom?: number
 	maxZoom?: number
 	speedMultiplier?: number
-	scrollingComplete?: typeof NOOP
+	scrollingComplete?: VoidFunction
 	penetrationDeceleration?: number
 	penetrationAcceleration?: number
 }
@@ -188,7 +136,7 @@ const scrollerMembers = function () {
 		doTouchMove: (touches: TouchList, timeStamp: Date | number | null, scale: number) => void
 		doTouchEnd: (timeStampe: Date | number) => void
 		__startDeceleration: VoidFunction
-		__callback: (left: number, top: number, zoom: number) => void
+		customRender: (left: number, top: number, zoom: number) => void
 		__stepThroughDeceleration: (render: boolean) => void
 	} = {
 		/*
@@ -425,7 +373,7 @@ const scrollerMembers = function () {
 		): void {},
 		doTouchEnd: function (timeStampe: number | Date): void {},
 		__startDeceleration: () => {},
-		__callback: function (left: number, top: number, zoom: number): void {},
+		customRender: function (left: number, top: number, zoom: number): void {},
 		__stepThroughDeceleration: function (render: boolean): void {},
 	}
 
@@ -1188,8 +1136,8 @@ const scrollerMembers = function () {
 					scroller.__zoomLevel = oldZoom + diffZoom * percent
 
 					// Push values out
-					if (scroller.__callback) {
-						scroller.__callback(scroller.__scrollLeft, scroller.__scrollTop, scroller.__zoomLevel)
+					if (scroller.customRender) {
+						scroller.customRender(scroller.__scrollLeft, scroller.__scrollTop, scroller.__zoomLevel)
 					}
 				}
 			}
@@ -1230,9 +1178,11 @@ const scrollerMembers = function () {
 			scroller.__scheduledTop = scroller.__scrollTop = top
 			scroller.__scheduledZoom = scroller.__zoomLevel = zoom
 
+			console.log(scroller.customRender)
 			// Push values out
-			if (scroller.__callback) {
-				scroller.__callback(left, top, zoom)
+			if (scroller.customRender) {
+				console.log('sgagj')
+				scroller.customRender(left, top, zoom)
 			}
 
 			// Fix max scroll ranges
@@ -1458,19 +1408,75 @@ const scrollerMembers = function () {
 	return scroller
 }
 
+const DEFAULT_OPTIONS = {
+	/** Enable scrolling on x-axis */
+	scrollingX: true,
+
+	/** Enable scrolling on y-axis */
+	scrollingY: true,
+
+	/** Enable animations for deceleration, snap back, zooming and scrolling */
+	animating: true,
+
+	/** duration for animations triggered by scrollTo/zoomTo */
+	animationDuration: 250,
+
+	/** Enable bouncing (content can be slowly moved outside and jumps back after releasing) */
+	bouncing: true,
+
+	/** Enable locking to the main axis if user moves only slightly on one of them at start */
+	locking: true,
+
+	/** Enable pagination mode (switching between full page content panes) */
+	paging: false,
+
+	/** Enable snapping of content to a configured pixel grid */
+	snapping: false,
+
+	/** Enable zooming of content via API, fingers and mouse wheel */
+	zooming: false,
+
+	/** Minimum zoom level */
+	minZoom: 0.5,
+
+	/** Maximum zoom level */
+	maxZoom: 3,
+
+	/** Multiply or decrease scrolling speed **/
+	speedMultiplier: 1,
+
+	/** Callback that is fired on the later of touch end or deceleration end,
+			provided that another scrolling action has not begun. Used to know
+			when to fade out a scrollbar. */
+	scrollingComplete: () => {},
+
+	/** This configures the amount of change applied to deceleration when reaching boundaries  **/
+	penetrationDeceleration: 0.03,
+
+	/** This configures the amount of change applied to acceleration when reaching boundaries  **/
+	penetrationAcceleration: 0.08,
+}
+
 export type Scroller = ReturnType<typeof scrollerMembers> & {
-	callback: RenderFunction
+	customRender: RenderFunction
 	options: ScrollerOptions
 }
 
 /**
  * A pure logic 'component' for 'virtual' scrolling/zooming.
  */
-export const MakeScroller = function (callback: RenderFunction, options: ScrollerOptions) {
+export const MakeScroller = function (
+	customRender: RenderFunction,
+	options: ScrollerOptions
+): Scroller {
 	options = {
 		...DEFAULT_OPTIONS,
 		...options,
 	}
 
-	return { ...scrollerMembers(), callback, options } as Scroller
+	const scroller = scrollerMembers()
+	scroller.customRender = customRender
+	scroller.options = options
+
+	return scroller
 }
