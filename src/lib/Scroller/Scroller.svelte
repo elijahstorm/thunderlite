@@ -22,10 +22,6 @@
 	let scroller: Scroller
 
 	onMount(() => {
-		if (!container) {
-			return
-		}
-
 		const _context = content.getContext('2d')
 		if (_context) {
 			context = _context
