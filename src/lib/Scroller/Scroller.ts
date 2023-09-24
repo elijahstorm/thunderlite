@@ -2,8 +2,7 @@
 
 import { Animate } from './Animate'
 
-type RenderFunction =  (left: number, top: number, zoom: number) => void
-
+type RenderFunction = (left: number, top: number, zoom: number) => void
 
 const NOOP = function () {}
 
@@ -54,28 +53,25 @@ const DEFAULT_OPTIONS = {
 
 	/** This configures the amount of change applied to acceleration when reaching boundaries  **/
 	penetrationAcceleration: 0.08,
-
 }
 
- type ScrollerOptions = {
-	scrollingX?: boolean,
-	scrollingY?: boolean,
-	animating?: boolean,
-	animationDuration?: number,
-	bouncing?: boolean,
-	locking?: boolean,
-	paging?: boolean,
-	snapping?: boolean,
-	zooming?: boolean,
-	minZoom?: number,
-	maxZoom?: number,
-	speedMultiplier?: number,
-	scrollingComplete?: typeof NOOP,
-	penetrationDeceleration?:number,
-	penetrationAcceleration?: number,
+type ScrollerOptions = {
+	scrollingX?: boolean
+	scrollingY?: boolean
+	animating?: boolean
+	animationDuration?: number
+	bouncing?: boolean
+	locking?: boolean
+	paging?: boolean
+	snapping?: boolean
+	zooming?: boolean
+	minZoom?: number
+	maxZoom?: number
+	speedMultiplier?: number
+	scrollingComplete?: typeof NOOP
+	penetrationDeceleration?: number
+	penetrationAcceleration?: number
 }
-
-
 
 /**
  * @param pos {Number} position between 0 (start of effect) and 1 (end of effect)
@@ -95,10 +91,8 @@ const easeInOutCubic = function (pos: number) {
 	return 0.5 * (Math.pow(pos - 2, 3) + 2)
 }
 
-const scrollerMembers = function() {
-
-
-	const scroller:  {
+const scrollerMembers = function () {
+	const scroller: {
 		setPosition: (left: number, top: number) => void
 		__isSingleTouch: boolean
 		__isTracking: boolean
@@ -115,11 +109,11 @@ const scrollerMembers = function() {
 		__contentHeight: number
 		__snapWidth: number
 		__snapHeight: number
-		__refreshHeight: number|null
+		__refreshHeight: number | null
 		__refreshActive: boolean
-		__refreshActivate: VoidFunction|null
-		__refreshDeactivate: VoidFunction|null
-		__refreshStart: VoidFunction|null
+		__refreshActivate: VoidFunction | null
+		__refreshDeactivate: VoidFunction | null
+		__refreshStart: VoidFunction | null
 		__zoomLevel: number
 		__scrollLeft: number
 		__scrollTop: number
@@ -128,40 +122,62 @@ const scrollerMembers = function() {
 		__scheduledLeft: number
 		__scheduledTop: number
 		__scheduledZoom: number
-		__lastTouchLeft: number|null
-		__lastTouchTop: number|null
-		__lastTouchMove: Date|null
+		__lastTouchLeft: number | null
+		__lastTouchTop: number | null
+		__lastTouchMove: Date | null
 		__positions: number[]
-		__minDecelerationScrollLeft: number|null
-		__minDecelerationScrollTop: number|null
-		__maxDecelerationScrollLeft: number|null
-		__maxDecelerationScrollTop: number|null
-		__decelerationVelocityX: number|null
-		__decelerationVelocityY: number|null
-		setDimensions: (clientWidth: number, clientHeight: number, contentWidth: number, contentHeight: number) => void
-		__computeScrollMax: (zoomLevel?: number ) => void
-		scrollTo: (left: number, top: number, animate?: boolean, zoom?: number) =>void
-		setSnapSize: (width: number, height: number)=>void
-		activatePullToRefresh: (height: number, activateCallback: VoidFunction, deactivateCallback: VoidFunction, startCallback: VoidFunction)=>void
+		__minDecelerationScrollLeft: number | null
+		__minDecelerationScrollTop: number | null
+		__maxDecelerationScrollLeft: number | null
+		__maxDecelerationScrollTop: number | null
+		__decelerationVelocityX: number | null
+		__decelerationVelocityY: number | null
+		setDimensions: (
+			clientWidth: number,
+			clientHeight: number,
+			contentWidth: number,
+			contentHeight: number
+		) => void
+		__computeScrollMax: (zoomLevel?: number) => void
+		scrollTo: (left: number, top: number, animate?: boolean, zoom?: number) => void
+		setSnapSize: (width: number, height: number) => void
+		activatePullToRefresh: (
+			height: number,
+			activateCallback: VoidFunction,
+			deactivateCallback: VoidFunction,
+			startCallback: VoidFunction
+		) => void
 		triggerPullToRefresh: VoidFunction
 		finishPullToRefresh: VoidFunction
-		getValues: ()=>{
+		getValues: () => {
 			left: number
 			top: number
 			zoom: number
 		}
-		getScrollMax: ()=>{
+		getScrollMax: () => {
 			left: number
 			top: number
 		}
-		zoomTo: (level: number, animate?: boolean, originLeft?: number | null, originTop?: number | null, callback?: VoidFunction|null)=>void
+		zoomTo: (
+			level: number,
+			animate?: boolean,
+			originLeft?: number | null,
+			originTop?: number | null,
+			callback?: VoidFunction | null
+		) => void
 		options: ScrollerOptions
-		__zoomComplete: VoidFunction|null
-		__publish: (left: number, top: number, zoom: number, animate?: boolean) =>void
-		zoomBy: (factor: number, animate?: boolean, originLeft?: number, originTop?: number, callback?: VoidFunction|null) =>void
-		scrollBy: (left: number, top: number, animate: boolean) =>void
-		doMouseZoom: (wheelDelta: number, timeStamp: unknown, pageX: number, pageY: number) =>void
-		doTouchStart: (touches: TouchList, timeStamp: Date | number | null) =>void
+		__zoomComplete: VoidFunction | null
+		__publish: (left: number, top: number, zoom: number, animate?: boolean) => void
+		zoomBy: (
+			factor: number,
+			animate?: boolean,
+			originLeft?: number,
+			originTop?: number,
+			callback?: VoidFunction | null
+		) => void
+		scrollBy: (left: number, top: number, animate: boolean) => void
+		doMouseZoom: (wheelDelta: number, timeStamp: unknown, pageX: number, pageY: number) => void
+		doTouchStart: (touches: TouchList, timeStamp: Date | number | null) => void
 		__interruptedAnimation: boolean
 		__initialTouchLeft: number
 		__initialTouchTop: number
@@ -169,11 +185,11 @@ const scrollerMembers = function() {
 		__lastScale: number
 		__enableScrollX: boolean
 		__enableScrollY: boolean
-		doTouchMove: (touches:TouchList, timeStamp: Date | number | null, scale: number ) =>void
-		doTouchEnd: (timeStampe: Date|number)=>void
+		doTouchMove: (touches: TouchList, timeStamp: Date | number | null, scale: number) => void
+		doTouchEnd: (timeStampe: Date | number) => void
 		__startDeceleration: VoidFunction
-		__callback: (left:number, top:number, zoom:number)=>void
-		__stepThroughDeceleration: (render: boolean)=>void
+		__callback: (left: number, top: number, zoom: number) => void
+		__stepThroughDeceleration: (render: boolean) => void
 	} = {
 		/*
 			---------------------------------------------------------------------------
@@ -320,35 +336,42 @@ const scrollerMembers = function() {
 
 		/** {Number} Current factor to modify vertical scroll position with on every step */
 		__decelerationVelocityY: null,
-		setPosition: function (left: number, top: number): void {
-			
-		},
-		setDimensions: function (clientWidth: number, clientHeight: number, contentWidth: number, contentHeight: number): void {
-			
-		},
-		__computeScrollMax: function (zoomLevel?: number | undefined): void {
-			
-		},
-		scrollTo: function (left: number, top: number, animate?: boolean | undefined, zoom?: number | undefined): void {
-			
-		},
-		setSnapSize: function (width: number, height: number): void {
-			
-		},
-		activatePullToRefresh: function (height: number, activateCallback: VoidFunction, deactivateCallback: VoidFunction, startCallback: VoidFunction): void {
-			
-		},
-		triggerPullToRefresh: ()=>{},
-		finishPullToRefresh: ()=>{},
+		setPosition: function (left: number, top: number): void {},
+		setDimensions: function (
+			clientWidth: number,
+			clientHeight: number,
+			contentWidth: number,
+			contentHeight: number
+		): void {},
+		__computeScrollMax: function (zoomLevel?: number | undefined): void {},
+		scrollTo: function (
+			left: number,
+			top: number,
+			animate?: boolean | undefined,
+			zoom?: number | undefined
+		): void {},
+		setSnapSize: function (width: number, height: number): void {},
+		activatePullToRefresh: function (
+			height: number,
+			activateCallback: VoidFunction,
+			deactivateCallback: VoidFunction,
+			startCallback: VoidFunction
+		): void {},
+		triggerPullToRefresh: () => {},
+		finishPullToRefresh: () => {},
 		getValues: function (): { left: number; top: number; zoom: number } {
-			return { left:0, top:0, zoom:0,}
+			return { left: 0, top: 0, zoom: 0 }
 		},
-		getScrollMax: function (): { left:number, top:number,} {
-			return { left:0, top:0,}
+		getScrollMax: function (): { left: number; top: number } {
+			return { left: 0, top: 0 }
 		},
-		zoomTo: function (level: number, animate?: boolean, originLeft?: number | null, originTop?: number | null, callback?: VoidFunction | null | undefined): void {
-			
-		},
+		zoomTo: function (
+			level: number,
+			animate?: boolean,
+			originLeft?: number | null,
+			originTop?: number | null,
+			callback?: VoidFunction | null | undefined
+		): void {},
 		options: {
 			scrollingX: undefined,
 			scrollingY: undefined,
@@ -364,24 +387,30 @@ const scrollerMembers = function() {
 			speedMultiplier: undefined,
 			scrollingComplete: undefined,
 			penetrationDeceleration: undefined,
-			penetrationAcceleration: undefined
+			penetrationAcceleration: undefined,
 		},
 		__zoomComplete: null,
-		__publish: function (left: number, top: number, zoom: number, animate?: boolean | undefined): void {
-			
-		},
-		zoomBy: function (factor: number, animate?: boolean, originLeft?: number, originTop?: number, callback?: VoidFunction | null | undefined): void {
-			
-		},
-		scrollBy: function (left: number, top: number, animate: boolean): void {
-			
-		},
-		doMouseZoom: function (wheelDelta: number, timeStamp: unknown, pageX: number, pageY: number): void {
-			
-		},
-		doTouchStart: function (touches: TouchList, timeStamp: number | Date | null): void {
-			
-		},
+		__publish: function (
+			left: number,
+			top: number,
+			zoom: number,
+			animate?: boolean | undefined
+		): void {},
+		zoomBy: function (
+			factor: number,
+			animate?: boolean,
+			originLeft?: number,
+			originTop?: number,
+			callback?: VoidFunction | null | undefined
+		): void {},
+		scrollBy: function (left: number, top: number, animate: boolean): void {},
+		doMouseZoom: function (
+			wheelDelta: number,
+			timeStamp: unknown,
+			pageX: number,
+			pageY: number
+		): void {},
+		doTouchStart: function (touches: TouchList, timeStamp: number | Date | null): void {},
 		__interruptedAnimation: false,
 		__initialTouchLeft: 0,
 		__initialTouchTop: 0,
@@ -389,21 +418,16 @@ const scrollerMembers = function() {
 		__lastScale: 0,
 		__enableScrollX: false,
 		__enableScrollY: false,
-		doTouchMove: function (touches: TouchList, timeStamp: number | Date | null, scale: number): void {
-			
-		},
-		doTouchEnd: function (timeStampe: number | Date): void {
-			
-		},
-		__startDeceleration: ()=>{},
-		__callback: function (left: number, top: number, zoom: number): void {
-			
-		},
-		__stepThroughDeceleration: function (render: boolean): void {
-			
-		}
+		doTouchMove: function (
+			touches: TouchList,
+			timeStamp: number | Date | null,
+			scale: number
+		): void {},
+		doTouchEnd: function (timeStampe: number | Date): void {},
+		__startDeceleration: () => {},
+		__callback: function (left: number, top: number, zoom: number): void {},
+		__stepThroughDeceleration: function (render: boolean): void {},
 	}
-
 
 	/*
 		---------------------------------------------------------------------------
@@ -421,8 +445,12 @@ const scrollerMembers = function() {
 	 * @param contentWidth {Integer ? null} Outer width of inner element
 	 * @param contentHeight {Integer ? null} Outer height of inner element
 	 */
-	scroller.setDimensions = function (clientWidth: number, clientHeight: number, contentWidth: number, contentHeight: number) {
-
+	scroller.setDimensions = function (
+		clientWidth: number,
+		clientHeight: number,
+		contentWidth: number,
+		contentHeight: number
+	) {
 		// Only update values which are defined
 		if (clientWidth === +clientWidth) {
 			scroller.__clientWidth = clientWidth
@@ -453,8 +481,7 @@ const scrollerMembers = function() {
 	 * @param left {Integer ? 0} Left position of outer element
 	 * @param top {Integer ? 0} Top position of outer element
 	 */
-	scroller.setPosition= function (left: number, top: number) {
-
+	scroller.setPosition = function (left: number, top: number) {
 		scroller.__clientLeft = left || 0
 		scroller.__clientTop = top || 0
 	}
@@ -465,8 +492,7 @@ const scrollerMembers = function() {
 	 * @param width {Integer} Snapping width
 	 * @param height {Integer} Snapping height
 	 */
-	scroller.setSnapSize= function (width: number, height: number) {
-
+	scroller.setSnapSize = function (width: number, height: number) {
 		scroller.__snapWidth = width
 		scroller.__snapHeight = height
 	}
@@ -481,229 +507,238 @@ const scrollerMembers = function() {
 	 * @param deactivateCallback {Function} Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled.
 	 * @param startCallback {Function} Callback to execute to start the real async refresh action. Call {@link #finishPullToRefresh} after finish of refresh.
 	 */
-	scroller.activatePullToRefresh= function (height: number, activateCallback: VoidFunction|null, deactivateCallback: VoidFunction|null, startCallback: VoidFunction|null) {
-
+	;(scroller.activatePullToRefresh = function (
+		height: number,
+		activateCallback: VoidFunction | null,
+		deactivateCallback: VoidFunction | null,
+		startCallback: VoidFunction | null
+	) {
 		scroller.__refreshHeight = height
 		scroller.__refreshActivate = activateCallback
 		scroller.__refreshDeactivate = deactivateCallback
 		scroller.__refreshStart = startCallback
-	},
+	}),
+		/**
+		 * Starts pull-to-refresh manually.
+		 */
+		(scroller.triggerPullToRefresh = function () {
+			// Use publish instead of scrollTo to allow scrolling to out of boundary position
+			// We don't need to normalize scrollLeft, zoomLevel, etc. here because we only y-scrolling when pull-to-refresh is enabled
+			scroller.__publish(
+				scroller.__scrollLeft,
+				scroller.__refreshHeight ? -scroller.__refreshHeight : 0,
+				scroller.__zoomLevel,
+				true
+			)
 
-	/**
-	 * Starts pull-to-refresh manually.
-	 */
-	scroller.triggerPullToRefresh= function () {
-		// Use publish instead of scrollTo to allow scrolling to out of boundary position
-		// We don't need to normalize scrollLeft, zoomLevel, etc. here because we only y-scrolling when pull-to-refresh is enabled
-		scroller.__publish(scroller.__scrollLeft,scroller.__refreshHeight? -scroller.__refreshHeight:0, scroller.__zoomLevel, true)
+			if (scroller.__refreshStart) {
+				scroller.__refreshStart()
+			}
+		}),
+		/**
+		 * Signalizes that pull-to-refresh is finished.
+		 */
+		(scroller.finishPullToRefresh = function () {
+			scroller.__refreshActive = false
+			if (scroller.__refreshDeactivate) {
+				scroller.__refreshDeactivate()
+			}
 
-		if (scroller.__refreshStart) {
-			scroller.__refreshStart()
-		}
-	},
-
-	/**
-	 * Signalizes that pull-to-refresh is finished.
-	 */
-	scroller.finishPullToRefresh= function () {
-
-		scroller.__refreshActive = false
-		if (scroller.__refreshDeactivate) {
-			scroller.__refreshDeactivate()
-		}
-
-		scroller.scrollTo(scroller.__scrollLeft, scroller.__scrollTop, true)
-	},
-
-	/**
-	 * Returns the scroll position and zooming values
-	 *
-	 * @return {Map} `left` and `top` scroll position and `zoom` level
-	 */
-	scroller.getValues= function () {
-
-		return {
-			left: scroller.__scrollLeft,
-			top: scroller.__scrollTop,
-			zoom: scroller.__zoomLevel,
-		}
-	},
-
-	/**
-	 * Returns the maximum scroll values
-	 *
-	 * @return {Map} `left` and `top` maximum scroll values
-	 */
-	scroller.getScrollMax= function () {
-
-		return {
-			left: scroller.__maxScrollLeft,
-			top: scroller.__maxScrollTop,
-		}
-	},
-
-	/**
-	 * Zooms to the given level. Supports optional animation. Zooms
-	 * the center when no coordinates are given.
-	 *
-	 * @param level {Number} Level to zoom to
-	 * @param animate {Boolean ? false} Whether to use animation
-	 * @param originLeft {Number ? null} Zoom in at given left coordinate
-	 * @param originTop {Number ? null} Zoom in at given top coordinate
-	 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
-	 */
-	scroller.zoomTo= function (level: number, animate?: boolean, originLeft?: number | null, originTop?: number | null, callback?: VoidFunction|null) {
-
-		if (!scroller.options.zooming) {
-			return
-		}
-
-		// Add callback if exists
-		if (callback) {
-			scroller.__zoomComplete = callback
-		}
-
-		// Stop deceleration
-		if (scroller.__isDecelerating) {
-			Animate.stop(scroller.__isDecelerating )
-			scroller.__isDecelerating = 0
-		}
-
-		const oldLevel = scroller.__zoomLevel
-
-		// Normalize input origin to center of viewport if not defined
-		if (originLeft == null) {
-			originLeft = scroller.__clientWidth / 2
-		}
-
-		if (originTop == null) {
-			originTop = scroller.__clientHeight / 2
-		}
-
-		// Limit level according to configuration
-		level = Math.max(Math.min(level, scroller.options.maxZoom??3), scroller.options.minZoom??0.5)
-
-		// Recompute maximum values while temporary tweaking maximum scroll ranges
-		scroller.__computeScrollMax(level)
-
-		// Recompute left and top coordinates based on new zoom level
-		let left = ((originLeft + scroller.__scrollLeft) * level) / oldLevel - originLeft
-		let top = ((originTop + scroller.__scrollTop) * level) / oldLevel - originTop
-
-		// Limit x-axis
-		if (left > scroller.__maxScrollLeft) {
-			left = scroller.__maxScrollLeft
-		} else if (left < 0) {
-			left = 0
-		}
-
-		// Limit y-axis
-		if (top > scroller.__maxScrollTop) {
-			top = scroller.__maxScrollTop
-		} else if (top < 0) {
-			top = 0
-		}
-
-		// Push values out
-		scroller.__publish(left, top, level, animate)
-	},
-
-	/**
-	 * Zooms the content by the given factor.
-	 *
-	 * @param factor {Number} Zoom by given factor
-	 * @param animate {Boolean ? false} Whether to use animation
-	 * @param originLeft {Number ? 0} Zoom in at given left coordinate
-	 * @param originTop {Number ? 0} Zoom in at given top coordinate
-	 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
-	 */
-	scroller.zoomBy= function (factor: number, animate?: boolean, originLeft?: number, originTop?: number, callback?: VoidFunction|null) {
-
-		scroller.zoomTo(scroller.__zoomLevel * factor, animate, originLeft, originTop, callback)
-	},
-
-	/**
-	 * Scrolls to the given position. Respect limitations and snapping automatically.
-	 *
-	 * @param left {Number?null} Horizontal scroll position, keeps current if value is <code>null</code>
-	 * @param top {Number?null} Vertical scroll position, keeps current if value is <code>null</code>
-	 * @param animate {Boolean?false} Whether the scrolling should happen using an animation
-	 * @param zoom {Number?null} Zoom level to go to
-	 */
-	scroller.scrollTo= function (left: number, top: number, animate?: boolean, zoom?: number ) {
-
-		// Stop deceleration
-		if (scroller.__isDecelerating) {
-			Animate.stop(scroller.__isDecelerating)
-			scroller.__isDecelerating = 0
-		}
-
-		// Correct coordinates based on new zoom level
-		if (zoom != null && zoom !== scroller.__zoomLevel) {
+			scroller.scrollTo(scroller.__scrollLeft, scroller.__scrollTop, true)
+		}),
+		/**
+		 * Returns the scroll position and zooming values
+		 *
+		 * @return {Map} `left` and `top` scroll position and `zoom` level
+		 */
+		(scroller.getValues = function () {
+			return {
+				left: scroller.__scrollLeft,
+				top: scroller.__scrollTop,
+				zoom: scroller.__zoomLevel,
+			}
+		}),
+		/**
+		 * Returns the maximum scroll values
+		 *
+		 * @return {Map} `left` and `top` maximum scroll values
+		 */
+		(scroller.getScrollMax = function () {
+			return {
+				left: scroller.__maxScrollLeft,
+				top: scroller.__maxScrollTop,
+			}
+		}),
+		/**
+		 * Zooms to the given level. Supports optional animation. Zooms
+		 * the center when no coordinates are given.
+		 *
+		 * @param level {Number} Level to zoom to
+		 * @param animate {Boolean ? false} Whether to use animation
+		 * @param originLeft {Number ? null} Zoom in at given left coordinate
+		 * @param originTop {Number ? null} Zoom in at given top coordinate
+		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
+		 */
+		(scroller.zoomTo = function (
+			level: number,
+			animate?: boolean,
+			originLeft?: number | null,
+			originTop?: number | null,
+			callback?: VoidFunction | null
+		) {
 			if (!scroller.options.zooming) {
 				return
 			}
 
-			left *= zoom
-			top *= zoom
+			// Add callback if exists
+			if (callback) {
+				scroller.__zoomComplete = callback
+			}
+
+			// Stop deceleration
+			if (scroller.__isDecelerating) {
+				Animate.stop(scroller.__isDecelerating)
+				scroller.__isDecelerating = 0
+			}
+
+			const oldLevel = scroller.__zoomLevel
+
+			// Normalize input origin to center of viewport if not defined
+			if (originLeft == null) {
+				originLeft = scroller.__clientWidth / 2
+			}
+
+			if (originTop == null) {
+				originTop = scroller.__clientHeight / 2
+			}
+
+			// Limit level according to configuration
+			level = Math.max(
+				Math.min(level, scroller.options.maxZoom ?? 3),
+				scroller.options.minZoom ?? 0.5
+			)
 
 			// Recompute maximum values while temporary tweaking maximum scroll ranges
-			scroller.__computeScrollMax(zoom)
-		} else {
-			// Keep zoom when not defined
-			zoom = scroller.__zoomLevel
-		}
+			scroller.__computeScrollMax(level)
 
-		if (!scroller.options.scrollingX) {
-			left = scroller.__scrollLeft
-		} else {
-			if (scroller.options.paging) {
-				left = Math.round(left / scroller.__clientWidth) * scroller.__clientWidth
-			} else if (scroller.options.snapping) {
-				left = Math.round(left / scroller.__snapWidth) * scroller.__snapWidth
+			// Recompute left and top coordinates based on new zoom level
+			let left = ((originLeft + scroller.__scrollLeft) * level) / oldLevel - originLeft
+			let top = ((originTop + scroller.__scrollTop) * level) / oldLevel - originTop
+
+			// Limit x-axis
+			if (left > scroller.__maxScrollLeft) {
+				left = scroller.__maxScrollLeft
+			} else if (left < 0) {
+				left = 0
 			}
-		}
 
-		if (!scroller.options.scrollingY) {
-			top = scroller.__scrollTop
-		} else {
-			if (scroller.options.paging) {
-				top = Math.round(top / scroller.__clientHeight) * scroller.__clientHeight
-			} else if (scroller.options.snapping) {
-				top = Math.round(top / scroller.__snapHeight) * scroller.__snapHeight
+			// Limit y-axis
+			if (top > scroller.__maxScrollTop) {
+				top = scroller.__maxScrollTop
+			} else if (top < 0) {
+				top = 0
 			}
-		}
 
-		// Limit for allowed ranges
-		left = Math.max(Math.min(scroller.__maxScrollLeft, left), 0)
-		top = Math.max(Math.min(scroller.__maxScrollTop, top), 0)
+			// Push values out
+			scroller.__publish(left, top, level, animate)
+		}),
+		/**
+		 * Zooms the content by the given factor.
+		 *
+		 * @param factor {Number} Zoom by given factor
+		 * @param animate {Boolean ? false} Whether to use animation
+		 * @param originLeft {Number ? 0} Zoom in at given left coordinate
+		 * @param originTop {Number ? 0} Zoom in at given top coordinate
+		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
+		 */
+		(scroller.zoomBy = function (
+			factor: number,
+			animate?: boolean,
+			originLeft?: number,
+			originTop?: number,
+			callback?: VoidFunction | null
+		) {
+			scroller.zoomTo(scroller.__zoomLevel * factor, animate, originLeft, originTop, callback)
+		}),
+		/**
+		 * Scrolls to the given position. Respect limitations and snapping automatically.
+		 *
+		 * @param left {Number?null} Horizontal scroll position, keeps current if value is <code>null</code>
+		 * @param top {Number?null} Vertical scroll position, keeps current if value is <code>null</code>
+		 * @param animate {Boolean?false} Whether the scrolling should happen using an animation
+		 * @param zoom {Number?null} Zoom level to go to
+		 */
+		(scroller.scrollTo = function (left: number, top: number, animate?: boolean, zoom?: number) {
+			// Stop deceleration
+			if (scroller.__isDecelerating) {
+				Animate.stop(scroller.__isDecelerating)
+				scroller.__isDecelerating = 0
+			}
 
-		// Don't animate when no change detected, still call publish to make sure
-		// that rendered position is really in-sync with internal data
-		if (left === scroller.__scrollLeft && top === scroller.__scrollTop) {
-			animate = false
-		}
+			// Correct coordinates based on new zoom level
+			if (zoom != null && zoom !== scroller.__zoomLevel) {
+				if (!scroller.options.zooming) {
+					return
+				}
 
-		// Publish new values
-		if (!scroller.__isTracking) {
-			scroller.__publish(left, top, zoom, animate)
-		}
-	},
+				left *= zoom
+				top *= zoom
 
-	/**
-	 * Scroll by the given offset
-	 *
-	 * @param left {Number ? 0} Scroll x-axis by given offset
-	 * @param top {Number ? 0} Scroll x-axis by given offset
-	 * @param animate {Boolean ? false} Whether to animate the given change
-	 */
-	scroller.scrollBy= function (left: number, top: number, animate: boolean) {
+				// Recompute maximum values while temporary tweaking maximum scroll ranges
+				scroller.__computeScrollMax(zoom)
+			} else {
+				// Keep zoom when not defined
+				zoom = scroller.__zoomLevel
+			}
 
-		const startLeft = scroller.__isAnimating ? scroller.__scheduledLeft : scroller.__scrollLeft
-		const startTop = scroller.__isAnimating ? scroller.__scheduledTop : scroller.__scrollTop
+			if (!scroller.options.scrollingX) {
+				left = scroller.__scrollLeft
+			} else {
+				if (scroller.options.paging) {
+					left = Math.round(left / scroller.__clientWidth) * scroller.__clientWidth
+				} else if (scroller.options.snapping) {
+					left = Math.round(left / scroller.__snapWidth) * scroller.__snapWidth
+				}
+			}
 
-		scroller.scrollTo(startLeft + (left || 0), startTop + (top || 0), animate)
-	}
+			if (!scroller.options.scrollingY) {
+				top = scroller.__scrollTop
+			} else {
+				if (scroller.options.paging) {
+					top = Math.round(top / scroller.__clientHeight) * scroller.__clientHeight
+				} else if (scroller.options.snapping) {
+					top = Math.round(top / scroller.__snapHeight) * scroller.__snapHeight
+				}
+			}
+
+			// Limit for allowed ranges
+			left = Math.max(Math.min(scroller.__maxScrollLeft, left), 0)
+			top = Math.max(Math.min(scroller.__maxScrollTop, top), 0)
+
+			// Don't animate when no change detected, still call publish to make sure
+			// that rendered position is really in-sync with internal data
+			if (left === scroller.__scrollLeft && top === scroller.__scrollTop) {
+				animate = false
+			}
+
+			// Publish new values
+			if (!scroller.__isTracking) {
+				scroller.__publish(left, top, zoom, animate)
+			}
+		}),
+		/**
+		 * Scroll by the given offset
+		 *
+		 * @param left {Number ? 0} Scroll x-axis by given offset
+		 * @param top {Number ? 0} Scroll x-axis by given offset
+		 * @param animate {Boolean ? false} Whether to animate the given change
+		 */
+		(scroller.scrollBy = function (left: number, top: number, animate: boolean) {
+			const startLeft = scroller.__isAnimating ? scroller.__scheduledLeft : scroller.__scrollLeft
+			const startTop = scroller.__isAnimating ? scroller.__scheduledTop : scroller.__scrollTop
+
+			scroller.scrollTo(startLeft + (left || 0), startTop + (top || 0), animate)
+		})
 
 	/*
 		---------------------------------------------------------------------------
@@ -714,10 +749,15 @@ const scrollerMembers = function() {
 	/**
 	 * Mouse wheel handler for zooming support
 	 */
-	scroller.doMouseZoom= function (wheelDelta: number, timeStamp: unknown, pageX: number, pageY: number) {
+	scroller.doMouseZoom = function (
+		wheelDelta: number,
+		timeStamp: unknown,
+		pageX: number,
+		pageY: number
+	) {
 		const change = wheelDelta > 0 ? 0.97 : 1.03
 
-		 scroller.zoomTo(
+		scroller.zoomTo(
 			scroller.__zoomLevel * change,
 			false,
 			pageX - scroller.__clientLeft,
@@ -728,7 +768,7 @@ const scrollerMembers = function() {
 	/**
 	 * Touch start handler for scrolling support
 	 */
-	scroller.doTouchStart= function (touches: TouchList, timeStamp: Date | number | null) {
+	scroller.doTouchStart = function (touches: TouchList, timeStamp: Date | number | null) {
 		// Array-like check is enough here
 		if (touches.length == null) {
 			throw new Error('Invalid touch list: ' + touches)
@@ -740,7 +780,6 @@ const scrollerMembers = function() {
 		if (typeof timeStamp !== 'number') {
 			throw new Error('Invalid timestamp value: ' + timeStamp)
 		}
-
 
 		// Reset interruptedAnimation flag
 		scroller.__interruptedAnimation = true
@@ -788,8 +827,8 @@ const scrollerMembers = function() {
 		scroller.__lastScale = 1
 
 		// Reset locking flags
-		scroller.__enableScrollX = !isSingleTouch && scroller.options.scrollingX || false
-		scroller.__enableScrollY = !isSingleTouch && scroller.options.scrollingY || false
+		scroller.__enableScrollX = (!isSingleTouch && scroller.options.scrollingX) || false
+		scroller.__enableScrollY = (!isSingleTouch && scroller.options.scrollingY) || false
 
 		// Reset tracking flag
 		scroller.__isTracking = true
@@ -810,7 +849,11 @@ const scrollerMembers = function() {
 	/**
 	 * Touch move handler for scrolling support
 	 */
-	scroller.doTouchMove= function (touches:TouchList, timeStamp: Date | number | null, scale: number ) {
+	scroller.doTouchMove = function (
+		touches: TouchList,
+		timeStamp: Date | number | null,
+		scale: number
+	) {
 		// Array-like check is enough here
 		if (touches.length == null) {
 			throw new Error('Invalid touch list: ' + touches)
@@ -822,7 +865,6 @@ const scrollerMembers = function() {
 		if (typeof timeStamp !== 'number') {
 			throw new Error('Invalid timestamp value: ' + timeStamp)
 		}
-
 
 		// Ignore event when tracking is not enabled (event might be outside of element)
 		if (!scroller.__isTracking) {
@@ -861,7 +903,10 @@ const scrollerMembers = function() {
 				level = (level / scroller.__lastScale) * scale
 
 				// Limit level according to configuration
-				level = Math.max(Math.min(level, scroller.options.maxZoom??3), scroller.options.minZoom??0.5)
+				level = Math.max(
+					Math.min(level, scroller.options.maxZoom ?? 3),
+					scroller.options.minZoom ?? 0.5
+				)
 
 				// Only do further compution when change happened
 				if (oldLevel !== level) {
@@ -945,8 +990,10 @@ const scrollerMembers = function() {
 			const distanceX = Math.abs(currentTouchLeft - scroller.__initialTouchLeft)
 			const distanceY = Math.abs(currentTouchTop - scroller.__initialTouchTop)
 
-			scroller.__enableScrollX = (scroller.options.scrollingX && distanceX >= minimumTrackingForScroll) as boolean
-			scroller.__enableScrollY =( scroller.options.scrollingY && distanceY >= minimumTrackingForScroll)as boolean
+			scroller.__enableScrollX = (scroller.options.scrollingX &&
+				distanceX >= minimumTrackingForScroll) as boolean
+			scroller.__enableScrollY = (scroller.options.scrollingY &&
+				distanceY >= minimumTrackingForScroll) as boolean
 
 			positions?.push(scroller.__scrollLeft, scroller.__scrollTop, timeStamp)
 
@@ -968,14 +1015,13 @@ const scrollerMembers = function() {
 	/**
 	 * Touch end handler for scrolling support
 	 */
-	scroller.doTouchEnd= function (timeStamp: Date | number) {
+	scroller.doTouchEnd = function (timeStamp: Date | number) {
 		if (timeStamp instanceof Date) {
 			timeStamp = timeStamp.valueOf()
 		}
 		if (typeof timeStamp !== 'number') {
 			throw new Error('Invalid timestamp value: ' + timeStamp)
 		}
-
 
 		// Ignore event when tracking is not enabled (no touchstart event on element)
 		// This is required as this listener ('touchmove') sits on the document and not on the element itself.
@@ -997,7 +1043,7 @@ const scrollerMembers = function() {
 			if (
 				scroller.__isSingleTouch &&
 				scroller.options.animating &&
-				scroller.__lastTouchMove && 
+				scroller.__lastTouchMove &&
 				timeStamp - scroller.__lastTouchMove.getMilliseconds() <= 100
 			) {
 				// Then figure out what the scroll position was about 100ms ago
@@ -1006,7 +1052,11 @@ const scrollerMembers = function() {
 				let startPos = endPos
 
 				// Move pointer to position measured 100ms ago
-				for (let i = endPos; i > 0 && positions[i] > scroller.__lastTouchMove.getMilliseconds() - 100; i -= 3) {
+				for (
+					let i = endPos;
+					i > 0 && positions[i] > scroller.__lastTouchMove.getMilliseconds() - 100;
+					i -= 3
+				) {
 					startPos = i
 				}
 
@@ -1023,7 +1073,8 @@ const scrollerMembers = function() {
 					scroller.__decelerationVelocityY = (movedTop / timeOffset) * (1000 / 60)
 
 					// How much velocity is required to start the deceleration
-					const minVelocityToStartDeceleration = scroller.options.paging || scroller.options.snapping ? 4 : 1
+					const minVelocityToStartDeceleration =
+						scroller.options.paging || scroller.options.snapping ? 4 : 1
 
 					// Verify that we have enough velocity to start deceleration
 					if (
@@ -1035,13 +1086,22 @@ const scrollerMembers = function() {
 							scroller.__startDeceleration()
 						}
 					} else {
-						if(scroller.options.scrollingComplete){scroller.options.scrollingComplete()}
+						if (scroller.options.scrollingComplete) {
+							scroller.options.scrollingComplete()
+						}
 					}
 				} else {
-					if(scroller.options.scrollingComplete){scroller.options.scrollingComplete()}
+					if (scroller.options.scrollingComplete) {
+						scroller.options.scrollingComplete()
+					}
 				}
-			} else if (scroller.__lastTouchMove && timeStamp - scroller.__lastTouchMove.getMilliseconds() > 100) {
-				if(scroller.options.scrollingComplete){scroller.options.scrollingComplete()}
+			} else if (
+				scroller.__lastTouchMove &&
+				timeStamp - scroller.__lastTouchMove.getMilliseconds() > 100
+			) {
+				if (scroller.options.scrollingComplete) {
+					scroller.options.scrollingComplete()
+				}
 			}
 		}
 
@@ -1054,14 +1114,21 @@ const scrollerMembers = function() {
 			if (scroller.__refreshActive && scroller.__refreshStart) {
 				// Use publish instead of scrollTo to allow scrolling to out of boundary position
 				// We don't need to normalize scrollLeft, zoomLevel, etc. here because we only y-scrolling when pull-to-refresh is enabled
-				scroller.__publish(scroller.__scrollLeft, scroller.__refreshHeight?-scroller.__refreshHeight:0, scroller.__zoomLevel, true)
+				scroller.__publish(
+					scroller.__scrollLeft,
+					scroller.__refreshHeight ? -scroller.__refreshHeight : 0,
+					scroller.__zoomLevel,
+					true
+				)
 
 				if (scroller.__refreshStart) {
 					scroller.__refreshStart()
 				}
 			} else {
 				if (scroller.__interruptedAnimation || scroller.__isDragging) {
-					if(scroller.options.scrollingComplete){scroller.options.scrollingComplete()}
+					if (scroller.options.scrollingComplete) {
+						scroller.options.scrollingComplete()
+					}
 				}
 				scroller.scrollTo(scroller.__scrollLeft, scroller.__scrollTop, true, scroller.__zoomLevel)
 
@@ -1092,8 +1159,7 @@ const scrollerMembers = function() {
 	 * @param top {Number} Top scroll position
 	 * @param animate {Boolean?false} Whether animation should be used to move to the new coordinates
 	 */
-	scroller.__publish= function (left: number, top: number, zoom: number, animate?: boolean) {
-
+	scroller.__publish = function (left: number, top: number, zoom: number, animate?: boolean) {
 		// Remember whether we had an animation, then we try to continue based on the current "drive" of the animation
 		const wasAnimating = scroller.__isAnimating
 		if (wasAnimating) {
@@ -1137,7 +1203,9 @@ const scrollerMembers = function() {
 					scroller.__isAnimating = 0
 				}
 				if (scroller.__didDecelerationComplete || wasFinished) {
-					if(scroller.options.scrollingComplete){scroller.options.scrollingComplete()}
+					if (scroller.options.scrollingComplete) {
+						scroller.options.scrollingComplete()
+					}
 				}
 
 				if (scroller.options.zooming) {
@@ -1154,7 +1222,7 @@ const scrollerMembers = function() {
 				step,
 				verify,
 				completed,
-				scroller.options.animationDuration??0,
+				scroller.options.animationDuration ?? 0,
 				wasAnimating ? easeOutCubic : easeInOutCubic
 			)
 		} else {
@@ -1181,14 +1249,19 @@ const scrollerMembers = function() {
 	/**
 	 * Recomputes scroll minimum values based on client dimensions and content dimensions.
 	 */
-	scroller.__computeScrollMax= function (zoomLevel?: number | null) {
-
+	scroller.__computeScrollMax = function (zoomLevel?: number | null) {
 		if (zoomLevel == null) {
 			zoomLevel = scroller.__zoomLevel
 		}
 
-		scroller.__maxScrollLeft = Math.max(scroller.__contentWidth * zoomLevel - scroller.__clientWidth, 0)
-		scroller.__maxScrollTop = Math.max(scroller.__contentHeight * zoomLevel - scroller.__clientHeight, 0)
+		scroller.__maxScrollLeft = Math.max(
+			scroller.__contentWidth * zoomLevel - scroller.__clientWidth,
+			0
+		)
+		scroller.__maxScrollTop = Math.max(
+			scroller.__contentHeight * zoomLevel - scroller.__clientHeight,
+			0
+		)
 	}
 
 	/*
@@ -1201,8 +1274,7 @@ const scrollerMembers = function() {
 	 * Called when a touch sequence end and the speed of the finger was high enough
 	 * to switch into deceleration mode.
 	 */
-	scroller.__startDeceleration= function () {
-
+	scroller.__startDeceleration = function () {
 		if (scroller.options.paging) {
 			const scrollLeft = Math.max(Math.min(scroller.__scrollLeft, scroller.__maxScrollLeft), 0)
 			const scrollTop = Math.max(Math.min(scroller.__scrollTop, scroller.__maxScrollTop), 0)
@@ -1236,7 +1308,7 @@ const scrollerMembers = function() {
 			if (!scroller.__decelerationVelocityX || !scroller.__decelerationVelocityY) {
 				return false
 			}
-			
+
 			const shouldContinue =
 				Math.abs(scroller.__decelerationVelocityX) >= minVelocityToKeepDecelerating ||
 				Math.abs(scroller.__decelerationVelocityY) >= minVelocityToKeepDecelerating
@@ -1249,7 +1321,9 @@ const scrollerMembers = function() {
 		const completed = function () {
 			scroller.__isDecelerating = 0
 			if (scroller.__didDecelerationComplete) {
-				if(scroller.options.scrollingComplete){scroller.options.scrollingComplete()}
+				if (scroller.options.scrollingComplete) {
+					scroller.options.scrollingComplete()
+				}
 			}
 
 			// Animate to grid when snapping is active, otherwise just fix out-of-boundary positions
@@ -1265,16 +1339,18 @@ const scrollerMembers = function() {
 	 *
 	 * @param render {Boolean?false} Whether to not render the current step, but keep it in memory only. Used internally only!
 	 */
-	scroller.__stepThroughDeceleration= function (render: boolean) {
-		if (!scroller.__decelerationVelocityY || !scroller.__decelerationVelocityX) {return }
+	scroller.__stepThroughDeceleration = function (render: boolean) {
+		if (!scroller.__decelerationVelocityY || !scroller.__decelerationVelocityX) {
+			return
+		}
 
 		//
 		// COMPUTE NEXT SCROLL POSITION
 		//
 
 		// Add deceleration to scroll position
-		let scrollLeft = scroller.__scrollLeft + scroller.__decelerationVelocityX 
-		let scrollTop = scroller.__scrollTop + scroller.__decelerationVelocityY  
+		let scrollLeft = scroller.__scrollLeft + scroller.__decelerationVelocityX
+		let scrollTop = scroller.__scrollTop + scroller.__decelerationVelocityY
 
 		//
 		// HARD LIMIT SCROLL POSITION FOR NON BOUNCING MODE
@@ -1282,8 +1358,8 @@ const scrollerMembers = function() {
 
 		if (!scroller.options.bouncing) {
 			const scrollLeftFixed = Math.max(
-				Math.min(scroller.__maxDecelerationScrollLeft??scrollLeft, scrollLeft),
-				scroller.__minDecelerationScrollLeft??scrollLeft
+				Math.min(scroller.__maxDecelerationScrollLeft ?? scrollLeft, scrollLeft),
+				scroller.__minDecelerationScrollLeft ?? scrollLeft
 			)
 			if (scrollLeftFixed !== scrollLeft) {
 				scrollLeft = scrollLeftFixed
@@ -1291,8 +1367,8 @@ const scrollerMembers = function() {
 			}
 
 			const scrollTopFixed = Math.max(
-				Math.min(scroller.__maxDecelerationScrollTop??scrollTop, scrollTop),
-				scroller.__minDecelerationScrollTop??scrollTop
+				Math.min(scroller.__maxDecelerationScrollTop ?? scrollTop, scrollTop),
+				scroller.__minDecelerationScrollTop ?? scrollTop
 			)
 			if (scrollTopFixed !== scrollTop) {
 				scrollTop = scrollTopFixed
@@ -1339,31 +1415,40 @@ const scrollerMembers = function() {
 			const penetrationAcceleration = scroller.options.penetrationAcceleration
 
 			// Check limits
-			if (scroller.__minDecelerationScrollLeft&&scrollLeft < scroller.__minDecelerationScrollLeft) {
+			if (
+				scroller.__minDecelerationScrollLeft &&
+				scrollLeft < scroller.__minDecelerationScrollLeft
+			) {
 				scrollOutsideX = scroller.__minDecelerationScrollLeft - scrollLeft
-			} else if (scroller.__maxDecelerationScrollLeft&&scrollLeft > scroller.__maxDecelerationScrollLeft) {
+			} else if (
+				scroller.__maxDecelerationScrollLeft &&
+				scrollLeft > scroller.__maxDecelerationScrollLeft
+			) {
 				scrollOutsideX = scroller.__maxDecelerationScrollLeft - scrollLeft
 			}
 
-			if (scroller.__minDecelerationScrollTop&&scrollTop < scroller.__minDecelerationScrollTop) {
+			if (scroller.__minDecelerationScrollTop && scrollTop < scroller.__minDecelerationScrollTop) {
 				scrollOutsideY = scroller.__minDecelerationScrollTop - scrollTop
-			} else if (scroller.__maxDecelerationScrollTop&&scrollTop > scroller.__maxDecelerationScrollTop) {
+			} else if (
+				scroller.__maxDecelerationScrollTop &&
+				scrollTop > scroller.__maxDecelerationScrollTop
+			) {
 				scrollOutsideY = scroller.__maxDecelerationScrollTop - scrollTop
 			}
 
 			// Slow down until slow enough, then flip back to snap position
 			if (scrollOutsideX !== 0) {
-				if (penetrationDeceleration&&scrollOutsideX * scroller.__decelerationVelocityX <= 0) {
+				if (penetrationDeceleration && scrollOutsideX * scroller.__decelerationVelocityX <= 0) {
 					scroller.__decelerationVelocityX += scrollOutsideX * penetrationDeceleration
-				} else if (penetrationAcceleration){
+				} else if (penetrationAcceleration) {
 					scroller.__decelerationVelocityX = scrollOutsideX * penetrationAcceleration
 				}
 			}
 
 			if (scrollOutsideY !== 0) {
-				if (penetrationDeceleration&&scrollOutsideY * scroller.__decelerationVelocityY <= 0) {
+				if (penetrationDeceleration && scrollOutsideY * scroller.__decelerationVelocityY <= 0) {
 					scroller.__decelerationVelocityY += scrollOutsideY * penetrationDeceleration
-				} else if(penetrationAcceleration) {
+				} else if (penetrationAcceleration) {
 					scroller.__decelerationVelocityY = scrollOutsideY * penetrationAcceleration
 				}
 			}
@@ -1373,21 +1458,19 @@ const scrollerMembers = function() {
 	return scroller
 }
 
-
-
 export type Scroller = ReturnType<typeof scrollerMembers> & {
-	callback:RenderFunction
+	callback: RenderFunction
 	options: ScrollerOptions
 }
 
 /**
  * A pure logic 'component' for 'virtual' scrolling/zooming.
  */
-export const MakeScroller = function (callback:RenderFunction, options: ScrollerOptions) {
+export const MakeScroller = function (callback: RenderFunction, options: ScrollerOptions) {
 	options = {
 		...DEFAULT_OPTIONS,
 		...options,
 	}
 
-	return {...scrollerMembers(),callback,options} as Scroller
+	return { ...scrollerMembers(), callback, options } as Scroller
 }
