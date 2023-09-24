@@ -1178,10 +1178,8 @@ const scrollerMembers = function () {
 			scroller.__scheduledTop = scroller.__scrollTop = top
 			scroller.__scheduledZoom = scroller.__zoomLevel = zoom
 
-			console.log(scroller.customRender)
 			// Push values out
 			if (scroller.customRender) {
-				console.log('sgagj')
 				scroller.customRender(left, top, zoom)
 			}
 

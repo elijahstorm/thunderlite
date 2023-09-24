@@ -4,21 +4,21 @@
 
 	export let scroller: Scroller
 
-	let scrollingX: boolean
-	let scrollingY: boolean
-	let animating: boolean
-	let bouncing: boolean
-	let locking: boolean
+	let scrollingX: boolean = true
+	let scrollingY: boolean = true
+	let animating: boolean = true
+	let bouncing: boolean = true
+	let locking: boolean = true
 
-	let zooming: boolean
-	let zoomLevel: string
+	let zooming: boolean = true
+	let zoomLevel: string = '1'
 	let zoom: VoidFunction
 	let zoomIn: VoidFunction
 	let zoomOut: VoidFunction
 
-	let scrollLeft: string
-	let scrollTop: string
-	let scrollTo: VoidFunction
+	let scrollLeft: string = '0'
+	let scrollTop: string = '0'
+	let scrollTo: VoidFunction | null = null
 	let scrollByUp: VoidFunction
 	let scrollByDown: VoidFunction
 	let scrollByLeft: VoidFunction
@@ -29,14 +29,14 @@
 		value: boolean
 	) => {}
 
-	$: {
-		saveChanges('scrollingX', scrollingX)
-		saveChanges('scrollingY', scrollingY)
-		saveChanges('animating', animating)
-		saveChanges('bouncing', bouncing)
-		saveChanges('locking', locking)
-		saveChanges('zooming', zooming)
-	}
+	$: saveChanges('scrollingX', scrollingX)
+	$: saveChanges('scrollingY', scrollingY)
+	$: saveChanges('animating', animating)
+	$: saveChanges('bouncing', bouncing)
+	$: saveChanges('locking', locking)
+	$: saveChanges('zooming', zooming)
+	$: scrollTo && scrollTop !== null ? scrollTo() : null
+	$: scrollTo && scrollLeft !== null ? scrollTo() : null
 
 	onMount(() => {
 		saveChanges = (key, value) => {
@@ -56,7 +56,7 @@
 		}
 
 		scrollTo = () => {
-			scroller.scrollTo(parseFloat(scrollLeft), parseFloat(scrollTop), true)
+			scroller.scrollTo(parseFloat(scrollLeft) * 100, parseFloat(scrollTop) * 100, true)
 		}
 
 		scrollByUp = () => {
@@ -81,50 +81,44 @@
 	<div>
 		<label for="scrollingX">ScrollingX: </label><input
 			type="checkbox"
-			bind:value={scrollingX}
+			bind:checked={scrollingX}
 			id="scrollingX"
-			checked
 		/>
 	</div>
 	<div>
 		<label for="scrollingY">ScrollingY: </label><input
 			type="checkbox"
-			bind:value={scrollingY}
+			bind:checked={scrollingY}
 			id="scrollingY"
-			checked
 		/>
 	</div>
 	<div>
 		<label for="animating">Animating: </label><input
 			type="checkbox"
-			bind:value={animating}
+			bind:checked={animating}
 			id="animating"
-			checked
 		/>
 	</div>
 	<div>
 		<label for="bouncing">Bouncing: </label><input
 			type="checkbox"
-			bind:value={bouncing}
+			bind:checked={bouncing}
 			id="bouncing"
-			checked
 		/>
 	</div>
 	<div>
 		<label for="locking">Locking: </label><input
 			type="checkbox"
-			bind:value={locking}
+			bind:checked={locking}
 			id="locking"
-			checked
 		/>
 	</div>
 
 	<div>
 		<label for="zooming">Zooming: </label><input
 			type="checkbox"
-			bind:value={zooming}
+			bind:checked={zooming}
 			id="zooming"
-			checked
 		/>
 	</div>
 

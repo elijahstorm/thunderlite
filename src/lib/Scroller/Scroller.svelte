@@ -3,6 +3,16 @@
 	import { MakeTiling, type Tiling } from './Tiling'
 	import { MakeScroller, type Scroller } from './Scroller'
 	import RenderSettings from './RenderSettings.svelte'
+	import {
+		___touchstart,
+		___touchmove,
+		___touchend,
+		___touchcancel,
+		___mousedown,
+		___mouseup,
+		___contextmenu,
+		___mousemove,
+	} from './PageInteractions'
 
 	let clientWidth = 0
 	let clientHeight = 0
@@ -17,40 +27,10 @@
 	let container: HTMLElement
 	let content: HTMLCanvasElement
 	let context: CanvasRenderingContext2D
+	let reflow: VoidFunction
 	let tiling: Tiling
 
 	let scroller: Scroller
-
-	onMount(() => {
-		const _context = content.getContext('2d')
-		if (_context) {
-			context = _context
-		}
-		tiling = MakeTiling()
-
-		// Initialize Scroller
-		scroller = MakeScroller(render, {
-			zooming: true,
-		})
-
-		let rect = container.getBoundingClientRect()
-		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
-
-		// Reflow handling
-		let reflow = function () {
-			clientWidth = container.clientWidth
-			clientHeight = container.clientHeight
-			scroller.setDimensions(
-				clientWidth,
-				clientHeight,
-				settings.contentWidth,
-				settings.contentHeight
-			)
-		}
-
-		window.addEventListener('resize', reflow, false)
-		reflow()
-	})
 
 	// Canvas renderer
 	const render = (left: number, top: number, zoom: number) => {
@@ -83,7 +63,6 @@
 		height: number,
 		zoom: number
 	) => {
-		console.log('test hehe')
 		context.fillStyle = (row % 2) + (col % 2) > 0 ? '#ddd' : '#fff'
 		context.fillRect(left, top, width, height)
 
@@ -93,10 +72,53 @@
 		// Pretty primitive text positioning :)
 		context.fillText(row + ',' + col, left + 6 * zoom, top + 18 * zoom)
 	}
+
+	onMount(() => {
+		const _context = content.getContext('2d')
+		if (_context) {
+			context = _context
+		}
+		tiling = MakeTiling()
+
+		// Initialize Scroller
+		scroller = MakeScroller(render, {
+			zooming: true,
+		})
+
+		let rect = container.getBoundingClientRect()
+		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
+
+		// Reflow handling
+		reflow = function () {
+			clientWidth = container.clientWidth
+			clientHeight = container.clientHeight
+			scroller.setDimensions(
+				clientWidth,
+				clientHeight,
+				settings.contentWidth,
+				settings.contentHeight
+			)
+		}
+
+		reflow()
+	})
 </script>
 
-<section bind:this={container} class="w-1/2 h-96 border border-solid">
-	<canvas bind:this={content}> </canvas>
+<svelte:body on:resize={reflow} />
+
+<section
+	bind:this={container}
+	on:touchstart={___touchstart}
+	on:touchmove={___touchmove}
+	on:touchend={___touchend}
+	on:touchcancel={___touchcancel}
+	on:mousedown={___mousedown}
+	on:mouseup={___mouseup}
+	on:contextmenu={___contextmenu}
+	on:mousemove={___mousemove}
+	class="w-1/2 h-96 border border-solid"
+>
+	<canvas bind:this={content} />
 </section>
 
 <RenderSettings {scroller} />
