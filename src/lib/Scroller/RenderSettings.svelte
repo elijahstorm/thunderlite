@@ -1,0 +1,172 @@
+<script lang="ts">
+	import { onMount } from 'svelte'
+	import type { Scroller } from './Scroller'
+
+	export let scroller: Scroller
+
+	let scrollingX: boolean
+	let scrollingY: boolean
+	let animating: boolean
+	let bouncing: boolean
+	let locking: boolean
+
+	let zooming: boolean
+	let zoomLevel: string
+	let zoom: VoidFunction
+	let zoomIn: VoidFunction
+	let zoomOut: VoidFunction
+
+	let scrollLeft: string
+	let scrollTop: string
+	let scrollTo: VoidFunction
+	let scrollByUp: VoidFunction
+	let scrollByDown: VoidFunction
+	let scrollByLeft: VoidFunction
+	let scrollByRight: VoidFunction
+
+	let saveChanges = (
+		key: 'scrollingX' | 'scrollingY' | 'animating' | 'bouncing' | 'locking' | 'zooming',
+		value: boolean
+	) => {}
+
+	$: {
+		saveChanges('scrollingX', scrollingX)
+		saveChanges('scrollingY', scrollingY)
+		saveChanges('animating', animating)
+		saveChanges('bouncing', bouncing)
+		saveChanges('locking', locking)
+		saveChanges('zooming', zooming)
+	}
+
+	onMount(() => {
+		saveChanges = (key, value) => {
+			scroller.options[key] = value
+		}
+
+		zoom = () => {
+			scroller.zoomTo(parseFloat(zoomLevel))
+		}
+
+		zoomIn = () => {
+			scroller.zoomBy(1.2, true)
+		}
+
+		zoomOut = () => {
+			scroller.zoomBy(0.8, true)
+		}
+
+		scrollTo = () => {
+			scroller.scrollTo(parseFloat(scrollLeft), parseFloat(scrollTop), true)
+		}
+
+		scrollByUp = () => {
+			scroller.scrollBy(0, -150, true)
+		}
+
+		scrollByRight = () => {
+			scroller.scrollBy(150, 0, true)
+		}
+
+		scrollByDown = () => {
+			scroller.scrollBy(0, 150, true)
+		}
+
+		scrollByLeft = () => {
+			scroller.scrollBy(-150, 0, true)
+		}
+	})
+</script>
+
+<section>
+	<div>
+		<label for="scrollingX">ScrollingX: </label><input
+			type="checkbox"
+			bind:value={scrollingX}
+			id="scrollingX"
+			checked
+		/>
+	</div>
+	<div>
+		<label for="scrollingY">ScrollingY: </label><input
+			type="checkbox"
+			bind:value={scrollingY}
+			id="scrollingY"
+			checked
+		/>
+	</div>
+	<div>
+		<label for="animating">Animating: </label><input
+			type="checkbox"
+			bind:value={animating}
+			id="animating"
+			checked
+		/>
+	</div>
+	<div>
+		<label for="bouncing">Bouncing: </label><input
+			type="checkbox"
+			bind:value={bouncing}
+			id="bouncing"
+			checked
+		/>
+	</div>
+	<div>
+		<label for="locking">Locking: </label><input
+			type="checkbox"
+			bind:value={locking}
+			id="locking"
+			checked
+		/>
+	</div>
+
+	<div>
+		<label for="zooming">Zooming: </label><input
+			type="checkbox"
+			bind:value={zooming}
+			id="zooming"
+			checked
+		/>
+	</div>
+
+	<div>
+		<label for="zoomLevel">Zoom Level: </label><input
+			type="text"
+			bind:value={zoomLevel}
+			id="zoomLevel"
+			size="5"
+		/>
+	</div>
+	<div>
+		<button on:click={zoom} id="zoom">Zoom to Level</button><button on:click={zoomIn} id="zoomIn"
+			>+</button
+		><button on:click={zoomOut} id="zoomOut">-</button>
+	</div>
+
+	<div>
+		<label for="scrollLeft">Scroll Left: </label><input
+			type="text"
+			bind:value={scrollLeft}
+			id="scrollLeft"
+			size="9"
+		/>
+	</div>
+	<div>
+		<label for="scrollTop">Scroll Top: </label><input
+			type="text"
+			bind:value={scrollTop}
+			id="scrollTop"
+			size="9"
+		/>
+	</div>
+	<div><button on:click={scrollTo} id="scrollTo">Scroll to Coords</button></div>
+
+	<div>
+		<button on:click={scrollByUp} id="scrollByUp">&uarr;</button><button
+			on:click={scrollByDown}
+			id="scrollByDown">&darr;</button
+		><button on:click={scrollByLeft} id="scrollByLeft">&larr;</button><button
+			on:click={scrollByRight}
+			id="scrollByRight">&rarr;</button
+		>
+	</div>
+</section>
