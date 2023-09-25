@@ -28,9 +28,6 @@ export type Tiling = {
 		tileHeight: number
 	}) => void
 	render: (
-		left: number,
-		top: number,
-		zoom: number,
 		paint: (
 			row: number,
 			col: number,
@@ -40,7 +37,7 @@ export type Tiling = {
 			tileHeight: number,
 			zoom: number
 		) => void
-	) => void
+	) => (left: number, top: number, zoom: number) => void
 }
 
 export const MakeTiling: () => Tiling = () => ({
@@ -86,71 +83,73 @@ export const MakeTiling: () => Tiling = () => ({
 	 * @param zoom {Number} Current zoom level (should be applied to `left` and `top` already)
 	 * @param paint {Function} Callback method for every tile to paint.
 	 */
-	render: function (left, top, zoom, paint) {
-		const clientHeight = this.__clientHeight
-		const clientWidth = this.__clientWidth
+	render: function (paint) {
+		return (left, top, zoom) => {
+			const clientHeight = this.__clientHeight
+			const clientWidth = this.__clientWidth
 
-		// Respect zooming
-		const tileHeight = this.__tileHeight * zoom
-		const tileWidth = this.__tileWidth * zoom
+			// Respect zooming
+			const tileHeight = this.__tileHeight * zoom
+			const tileWidth = this.__tileWidth * zoom
 
-		// Compute starting rows/columns and support out of range scroll positions
-		const startRow = Math.max(Math.floor(top / tileHeight), 0)
-		const startCol = Math.max(Math.floor(left / tileWidth), 0)
+			// Compute starting rows/columns and support out of range scroll positions
+			const startRow = Math.max(Math.floor(top / tileHeight), 0)
+			const startCol = Math.max(Math.floor(left / tileWidth), 0)
 
-		// Compute maximum rows/columns to render for content size
-		const maxRows = (this.__contentHeight * zoom) / tileHeight
-		const maxCols = (this.__contentWidth * zoom) / tileWidth
+			// Compute maximum rows/columns to render for content size
+			const maxRows = (this.__contentHeight * zoom) / tileHeight
+			const maxCols = (this.__contentWidth * zoom) / tileWidth
 
-		// Compute initial render offsets
-		// 1. Positive scroll position: We match the starting rows/tile first so we
-		//    just need to take care that the half-visible tile is fully rendered
-		//    and placed partly outside.
-		// 2. Negative scroll position: We shift the whole render context
-		//    (ignoring the tile dimensions) and effectively reduce the render
-		//    dimensions by the scroll amount.
-		const startTop = top >= 0 ? -top % tileHeight : -top
-		const startLeft = left >= 0 ? -left % tileWidth : -left
+			// Compute initial render offsets
+			// 1. Positive scroll position: We match the starting rows/tile first so we
+			//    just need to take care that the half-visible tile is fully rendered
+			//    and placed partly outside.
+			// 2. Negative scroll position: We shift the whole render context
+			//    (ignoring the tile dimensions) and effectively reduce the render
+			//    dimensions by the scroll amount.
+			const startTop = top >= 0 ? -top % tileHeight : -top
+			const startLeft = left >= 0 ? -left % tileWidth : -left
 
-		// Compute number of rows to render
-		let rows = Math.floor(clientHeight / tileHeight)
+			// Compute number of rows to render
+			let rows = Math.floor(clientHeight / tileHeight)
 
-		if (top % tileHeight > 0) {
-			rows += 1
-		}
-
-		if (startTop + rows * tileHeight < clientHeight) {
-			rows += 1
-		}
-
-		// Compute number of columns to render
-		let cols = Math.floor(clientWidth / tileWidth)
-
-		if (left % tileWidth > 0) {
-			cols += 1
-		}
-
-		if (startLeft + cols * tileWidth < clientWidth) {
-			cols += 1
-		}
-
-		// Limit rows/columns to maximum numbers
-		rows = Math.min(rows, maxRows - startRow)
-		cols = Math.min(cols, maxCols - startCol)
-
-		// Initialize looping variables
-		let currentTop = startTop
-		let currentLeft = startLeft
-
-		// Render new squares
-		for (let row = startRow; row < rows + startRow; row++) {
-			for (let col = startCol; col < cols + startCol; col++) {
-				paint(row, col, currentLeft, currentTop, tileWidth, tileHeight, zoom)
-				currentLeft += tileWidth
+			if (top % tileHeight > 0) {
+				rows += 1
 			}
 
-			currentLeft = startLeft
-			currentTop += tileHeight
+			if (startTop + rows * tileHeight < clientHeight) {
+				rows += 1
+			}
+
+			// Compute number of columns to render
+			let cols = Math.floor(clientWidth / tileWidth)
+
+			if (left % tileWidth > 0) {
+				cols += 1
+			}
+
+			if (startLeft + cols * tileWidth < clientWidth) {
+				cols += 1
+			}
+
+			// Limit rows/columns to maximum numbers
+			rows = Math.min(rows, maxRows - startRow)
+			cols = Math.min(cols, maxCols - startCol)
+
+			// Initialize looping variables
+			let currentTop = startTop
+			let currentLeft = startLeft
+
+			// Render new squares
+			for (let row = startRow; row < rows + startRow; row++) {
+				for (let col = startCol; col < cols + startCol; col++) {
+					paint(row, col, currentLeft, currentTop, tileWidth, tileHeight, zoom)
+					currentLeft += tileWidth
+				}
+
+				currentLeft = startLeft
+				currentTop += tileHeight
+			}
 		}
 	},
 })

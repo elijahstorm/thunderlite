@@ -72,7 +72,7 @@ const scrollerMembers = function () {
 		__scheduledZoom: number
 		__lastTouchLeft: number | null
 		__lastTouchTop: number | null
-		__lastTouchMove: Date | null
+		__lastTouchMove: number | null
 		__positions: number[]
 		__minDecelerationScrollLeft: number | null
 		__minDecelerationScrollTop: number | null
@@ -125,7 +125,7 @@ const scrollerMembers = function () {
 		) => void
 		scrollBy: (left: number, top: number, animate: boolean) => void
 		doMouseZoom: (wheelDelta: number, timeStamp: unknown, pageX: number, pageY: number) => void
-		doTouchStart: (touches: TouchList, timeStamp: Date | number | null) => void
+		doTouchStart: (touches: TouchList, timeStamp: number | number | null) => void
 		__interruptedAnimation: boolean
 		__initialTouchLeft: number
 		__initialTouchTop: number
@@ -133,8 +133,12 @@ const scrollerMembers = function () {
 		__lastScale: number
 		__enableScrollX: boolean
 		__enableScrollY: boolean
-		doTouchMove: (touches: TouchList, timeStamp: Date | number | null, scale: number) => void
-		doTouchEnd: (timeStampe: Date | number) => void
+		doTouchMove: (
+			touches: TouchList,
+			timeStamp: number | number | null,
+			scale?: number | null
+		) => void
+		doTouchEnd: (timeStampe: number | number) => void
 		__startDeceleration: VoidFunction
 		customRender: (left: number, top: number, zoom: number) => void
 		__stepThroughDeceleration: (render: boolean) => void
@@ -358,7 +362,7 @@ const scrollerMembers = function () {
 			pageX: number,
 			pageY: number
 		): void {},
-		doTouchStart: function (touches: TouchList, timeStamp: number | Date | null): void {},
+		doTouchStart: function (touches: TouchList, timeStamp: number | null): void {},
 		__interruptedAnimation: false,
 		__initialTouchLeft: 0,
 		__initialTouchTop: 0,
@@ -368,10 +372,10 @@ const scrollerMembers = function () {
 		__enableScrollY: false,
 		doTouchMove: function (
 			touches: TouchList,
-			timeStamp: number | Date | null,
-			scale: number
+			timeStamp: number | null,
+			scale?: number | null
 		): void {},
-		doTouchEnd: function (timeStampe: number | Date): void {},
+		doTouchEnd: function (timeStampe: number): void {},
 		__startDeceleration: () => {},
 		customRender: function (left: number, top: number, zoom: number): void {},
 		__stepThroughDeceleration: function (render: boolean): void {},
@@ -716,15 +720,12 @@ const scrollerMembers = function () {
 	/**
 	 * Touch start handler for scrolling support
 	 */
-	scroller.doTouchStart = function (touches: TouchList, timeStamp: Date | number | null) {
+	scroller.doTouchStart = function (touches: TouchList, timeStamp: number | null) {
 		// Array-like check is enough here
 		if (touches.length == null) {
 			throw new Error('Invalid touch list: ' + touches)
 		}
 
-		if (timeStamp instanceof Date) {
-			timeStamp = timeStamp.valueOf()
-		}
 		if (typeof timeStamp !== 'number') {
 			throw new Error('Invalid timestamp value: ' + timeStamp)
 		}
@@ -769,7 +770,7 @@ const scrollerMembers = function () {
 		scroller.__lastTouchTop = currentTouchTop
 
 		// Store initial move time stamp
-		scroller.__lastTouchMove = new Date(timeStamp)
+		scroller.__lastTouchMove = timeStamp
 
 		// Reset initial scale
 		scroller.__lastScale = 1
@@ -799,17 +800,14 @@ const scrollerMembers = function () {
 	 */
 	scroller.doTouchMove = function (
 		touches: TouchList,
-		timeStamp: Date | number | null,
-		scale: number
+		timeStamp: number | null,
+		scale?: number | null
 	) {
 		// Array-like check is enough here
 		if (touches.length == null) {
 			throw new Error('Invalid touch list: ' + touches)
 		}
 
-		if (timeStamp instanceof Date) {
-			timeStamp = timeStamp.valueOf()
-		}
 		if (typeof timeStamp !== 'number') {
 			throw new Error('Invalid timestamp value: ' + timeStamp)
 		}
@@ -956,17 +954,14 @@ const scrollerMembers = function () {
 		// Update last touch positions and time stamp for next event
 		scroller.__lastTouchLeft = currentTouchLeft
 		scroller.__lastTouchTop = currentTouchTop
-		scroller.__lastTouchMove = new Date(timeStamp)
-		scroller.__lastScale = scale
+		scroller.__lastTouchMove = timeStamp
+		if (scale) scroller.__lastScale = scale
 	}
 
 	/**
 	 * Touch end handler for scrolling support
 	 */
-	scroller.doTouchEnd = function (timeStamp: Date | number) {
-		if (timeStamp instanceof Date) {
-			timeStamp = timeStamp.valueOf()
-		}
+	scroller.doTouchEnd = function (timeStamp: number) {
 		if (typeof timeStamp !== 'number') {
 			throw new Error('Invalid timestamp value: ' + timeStamp)
 		}
@@ -992,7 +987,7 @@ const scrollerMembers = function () {
 				scroller.__isSingleTouch &&
 				scroller.options.animating &&
 				scroller.__lastTouchMove &&
-				timeStamp - scroller.__lastTouchMove.getMilliseconds() <= 100
+				timeStamp - scroller.__lastTouchMove <= 100
 			) {
 				// Then figure out what the scroll position was about 100ms ago
 				const positions = scroller.__positions
@@ -1000,11 +995,7 @@ const scrollerMembers = function () {
 				let startPos = endPos
 
 				// Move pointer to position measured 100ms ago
-				for (
-					let i = endPos;
-					i > 0 && positions[i] > scroller.__lastTouchMove.getMilliseconds() - 100;
-					i -= 3
-				) {
+				for (let i = endPos; i > 0 && positions[i] > scroller.__lastTouchMove - 100; i -= 3) {
 					startPos = i
 				}
 
@@ -1043,10 +1034,7 @@ const scrollerMembers = function () {
 						scroller.options.scrollingComplete()
 					}
 				}
-			} else if (
-				scroller.__lastTouchMove &&
-				timeStamp - scroller.__lastTouchMove.getMilliseconds() > 100
-			) {
+			} else if (scroller.__lastTouchMove && timeStamp - scroller.__lastTouchMove > 100) {
 				if (scroller.options.scrollingComplete) {
 					scroller.options.scrollingComplete()
 				}

@@ -7,7 +7,7 @@
 	let scrollingX: boolean = true
 	let scrollingY: boolean = true
 	let animating: boolean = true
-	let bouncing: boolean = true
+	let bouncing: boolean = false
 	let locking: boolean = true
 
 	let zooming: boolean = true

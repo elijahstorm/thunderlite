@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte'
 	import { MakeTiling, type Tiling } from './Tiling'
 	import { MakeScroller, type Scroller } from './Scroller'
-	import RenderSettings from './RenderSettings.svelte'
 	import {
 		___touchstart,
 		___touchmove,
@@ -30,68 +29,59 @@
 	let reflow: VoidFunction
 	let tiling: Tiling
 
-	let scroller: Scroller
+	export let scroller: Scroller
 
-	// Canvas renderer
-	const render = (left: number, top: number, zoom: number) => {
-		// Sync current dimensions with canvas
-		content.width = clientWidth
-		content.height = clientHeight
+	export let paint =
+		(context: CanvasRenderingContext2D) =>
+		(
+			row: number,
+			col: number,
+			left: number,
+			top: number,
+			width: number,
+			height: number,
+			zoom: number
+		) => {
+			context.save()
+			context.translate(left, top)
 
-		// Full clearing
-		context.clearRect(0, 0, clientWidth, clientHeight)
+			context.fillStyle = (row % 2) + (col % 2) > 0 ? '#ddd' : '#fff'
+			context.fillRect(0, 0, width, height)
 
-		// Use tiling
-		tiling.setup({
-			clientWidth,
-			clientHeight,
-			contentWidth: settings.contentWidth,
-			contentHeight: settings.contentHeight,
-			tileWidth: settings.cellWidth,
-			tileHeight: settings.cellHeight,
-		})
-		tiling.render(left, top, zoom, paint)
-	}
+			context.fillStyle = 'black'
+			context.font = (14 * zoom).toFixed(2) + 'px "Helvetica Neue", Helvetica, Arial, sans-serif'
 
-	// Cell Paint Logic
-	const paint = (
-		row: number,
-		col: number,
-		left: number,
-		top: number,
-		width: number,
-		height: number,
-		zoom: number
-	) => {
-		context.fillStyle = (row % 2) + (col % 2) > 0 ? '#ddd' : '#fff'
-		context.fillRect(left, top, width, height)
+			context.fillText(`${row}, ${col}`, 6 * zoom, 18 * zoom)
 
-		context.fillStyle = 'black'
-		context.font = (14 * zoom).toFixed(2) + 'px "Helvetica Neue", Helvetica, Arial, sans-serif'
-
-		// Pretty primitive text positioning :)
-		context.fillText(row + ',' + col, left + 6 * zoom, top + 18 * zoom)
-	}
+			context.restore()
+		}
 
 	onMount(() => {
 		const _context = content.getContext('2d')
-		if (_context) {
-			context = _context
+		if (!_context) {
+			return
 		}
-		tiling = MakeTiling()
 
-		// Initialize Scroller
-		scroller = MakeScroller(render, {
-			zooming: true,
-		})
+		context = _context
+		tiling = MakeTiling()
+		scroller = MakeScroller(tiling.render(paint(context)), { bouncing: false })
 
 		let rect = container.getBoundingClientRect()
 		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
 
-		// Reflow handling
-		reflow = function () {
+		reflow = () => {
 			clientWidth = container.clientWidth
 			clientHeight = container.clientHeight
+			content.width = clientWidth
+			content.height = clientHeight
+			tiling.setup({
+				clientWidth,
+				clientHeight,
+				contentWidth: settings.contentWidth,
+				contentHeight: settings.contentHeight,
+				tileWidth: settings.cellWidth,
+				tileHeight: settings.cellHeight,
+			})
 			scroller.setDimensions(
 				clientWidth,
 				clientHeight,
@@ -104,21 +94,21 @@
 	})
 </script>
 
-<svelte:body on:resize={reflow} />
+<svelte:window on:resize={reflow} />
 
 <section
+	role="grid"
+	tabindex="0"
 	bind:this={container}
-	on:touchstart={___touchstart}
-	on:touchmove={___touchmove}
-	on:touchend={___touchend}
-	on:touchcancel={___touchcancel}
-	on:mousedown={___mousedown}
-	on:mouseup={___mouseup}
-	on:contextmenu={___contextmenu}
-	on:mousemove={___mousemove}
-	class="w-1/2 h-96 border border-solid"
+	on:touchstart|stopPropagation|preventDefault={___touchstart(scroller)}
+	on:touchmove|stopPropagation|preventDefault={___touchmove(scroller)}
+	on:touchend|stopPropagation|preventDefault={___touchend(scroller)}
+	on:touchcancel|stopPropagation|preventDefault={___touchcancel(scroller)}
+	on:mousedown|stopPropagation|preventDefault={___mousedown(scroller)}
+	on:mouseup|stopPropagation|preventDefault={___mouseup(scroller)}
+	on:contextmenu|stopPropagation|preventDefault={___contextmenu(scroller)}
+	on:mousemove|stopPropagation|preventDefault={___mousemove(scroller)}
+	class="h-full"
 >
 	<canvas bind:this={content} />
 </section>
-
-<RenderSettings {scroller} />

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { Toasts } from 'as-toast';
-	import '../app.css';
+	import { Toasts } from 'as-toast'
+	import '../app.css'
 </script>
 
 <svelte:head>

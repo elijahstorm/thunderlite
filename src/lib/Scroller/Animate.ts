@@ -8,11 +8,7 @@
  * rendering. This eases a lot of cases where it might be pretty complex to break down a state
  * based on the pure time difference.
  */
-const time =
-	Date.now ||
-	function () {
-		return +new Date()
-	}
+
 const desiredFrames = 60
 const millisecondsPerSecond = 1000
 let running: (boolean | null)[] = []
@@ -47,7 +43,7 @@ export const Animate = {
 		let requests: { [key: number]: FrameRequestCallback } = {}
 		let rafHandle = 1
 		let intervalHandle: NodeJS.Timeout | null = null
-		let lastActive = +new Date()
+		let lastActive = performance.now()
 
 		return function (callback: FrameRequestCallback) {
 			const callbackHandle = rafHandle++
@@ -58,7 +54,7 @@ export const Animate = {
 			// Create timeout at first request
 			if (intervalHandle === null) {
 				intervalHandle = setInterval(function () {
-					const time = +new Date()
+					const time = performance.now()
 					const currentRequests = requests
 
 					// Reset data structure before executing callbacks
@@ -132,7 +128,7 @@ export const Animate = {
 		easingMethod?: (percent: number) => number,
 		root?: Element
 	) {
-		const start = time()
+		const start = performance.now()
 		let lastFrame = start
 		let percent = 0
 		let dropCounter = 0
@@ -152,7 +148,7 @@ export const Animate = {
 		}
 
 		// This is the internal step method which is called every few milliseconds
-		const step: (redner: boolean) => FrameRequestCallback = (render: boolean) => (now: number) => {
+		const step: (render: boolean) => FrameRequestCallback = (render: boolean) => (now: number) => {
 			// Verification is executed before next animation step
 			if (!running[id] || (verifyCallback && !verifyCallback(id))) {
 				running[id] = null
@@ -199,7 +195,7 @@ export const Animate = {
 		}
 
 		const virtual = () => {
-			step(false)(time())
+			step(false)(performance.now())
 		}
 
 		// Mark as running
