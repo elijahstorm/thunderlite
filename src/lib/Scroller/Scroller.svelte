@@ -20,7 +20,6 @@
 	export let rows = 10
 	export let cols = 10
 
-	export let interfacer: InterfaceInteraction
 	export let scroller: Scroller
 
 	export let handleClick = (x: number, y: number) => {}

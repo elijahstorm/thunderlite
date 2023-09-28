@@ -30,7 +30,6 @@
 			>
 				<Scroller
 					bind:scroller
-					{interfacer}
 					{cellHeight}
 					{cellWidth}
 					{rows}
