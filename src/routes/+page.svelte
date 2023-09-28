@@ -3,6 +3,7 @@
 	import RenderSettings from '$lib/Scroller/RenderSettings.svelte'
 	import Scroller from '$lib/Scroller/Scroller.svelte'
 	import type { Scroller as ScrollerType } from '$lib/Scroller/Scroller'
+	import TileSelector from '$lib/Layers/TileSelector.svelte'
 
 	let scroller: ScrollerType
 
@@ -37,9 +38,20 @@
 </svelte:head>
 
 <div class="flex gap-2 p-6 h-screen">
-	<div class="border-4 border-black flex-grow">
-		<Scroller bind:scroller {paint} />
-	</div>
+	<TileSelector let:handleClick let:handleKeypress>
+		<div class="border-4 border-black flex-grow">
+			<Scroller
+				bind:scroller
+				{paint}
+				cellHeight={30}
+				cellWidth={70}
+				rows={10}
+				cols={10}
+				{handleClick}
+				{handleKeypress}
+			/>
+		</div>
+	</TileSelector>
 
 	<div class="border-black border-4 p-4">
 		<RenderSettings {scroller} />

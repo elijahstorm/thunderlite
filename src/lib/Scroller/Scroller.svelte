@@ -3,25 +3,31 @@
 	import { MakeTiling, type Tiling } from './Tiling'
 	import { MakeScroller, type Scroller } from './Scroller'
 	import {
-		___touchstart,
-		___touchmove,
-		___touchend,
-		___touchcancel,
-		___mousedown,
-		___mouseup,
-		___contextmenu,
-		___mousemove,
+		touchstart,
+		touchmove,
+		touchend,
+		touchcancel,
+		mousedown,
+		mouseup,
+		contextmenu,
+		mousemove,
+		click,
+		keypress,
 	} from './PageInteractions'
 
-	let clientWidth = 0
-	let clientHeight = 0
+	export let cellWidth = 60
+	export let cellHeight = 60
+	export let rows = 10
+	export let cols = 10
+	let contentWidth: number
+	let contentHeight: number
+	$: contentWidth = cellWidth * rows
+	$: contentWidth = cellHeight * cols
 
-	const settings = {
-		contentWidth: 2000,
-		contentHeight: 2000,
-		cellWidth: 100,
-		cellHeight: 100,
-	}
+	export let scroller: Scroller
+
+	export let handleClick = (x: number, y: number) => {}
+	export let handleKeypress = (key: string, shiftKey: boolean) => {}
 
 	let container: HTMLElement
 	let content: HTMLCanvasElement
@@ -29,7 +35,8 @@
 	let reflow: VoidFunction
 	let tiling: Tiling
 
-	export let scroller: Scroller
+	let clientWidth = 0
+	let clientHeight = 0
 
 	export let paint =
 		(context: CanvasRenderingContext2D) =>
@@ -77,17 +84,12 @@
 			tiling.setup({
 				clientWidth,
 				clientHeight,
-				contentWidth: settings.contentWidth,
-				contentHeight: settings.contentHeight,
-				tileWidth: settings.cellWidth,
-				tileHeight: settings.cellHeight,
+				contentWidth: contentWidth,
+				contentHeight: contentHeight,
+				tileWidth: cellWidth,
+				tileHeight: cellHeight,
 			})
-			scroller.setDimensions(
-				clientWidth,
-				clientHeight,
-				settings.contentWidth,
-				settings.contentHeight
-			)
+			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
 		}
 
 		reflow()
@@ -100,14 +102,16 @@
 	role="grid"
 	tabindex="0"
 	bind:this={container}
-	on:touchstart|stopPropagation|preventDefault={___touchstart(scroller)}
-	on:touchmove|stopPropagation|preventDefault={___touchmove(scroller)}
-	on:touchend|stopPropagation|preventDefault={___touchend(scroller)}
-	on:touchcancel|stopPropagation|preventDefault={___touchcancel(scroller)}
-	on:mousedown|stopPropagation|preventDefault={___mousedown(scroller)}
-	on:mouseup|stopPropagation|preventDefault={___mouseup(scroller)}
-	on:contextmenu|stopPropagation|preventDefault={___contextmenu(scroller)}
-	on:mousemove|stopPropagation|preventDefault={___mousemove(scroller)}
+	on:click|stopPropagation|preventDefault={click(container.getBoundingClientRect())(handleClick)}
+	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
+	on:touchstart|stopPropagation|preventDefault={touchstart(scroller)}
+	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
+	on:touchend|stopPropagation|preventDefault={touchend(scroller)}
+	on:touchcancel|stopPropagation|preventDefault={touchcancel(scroller)}
+	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
+	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
+	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
+	on:mousemove|stopPropagation|preventDefault={mousemove(scroller)}
 	class="h-full"
 >
 	<canvas bind:this={content} />
