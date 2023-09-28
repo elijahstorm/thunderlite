@@ -1,25 +1,27 @@
 <script lang="ts">
-	let clickX: number
-	let clickY: number
+	export let interfacer: InterfaceInteraction
 
-	let key: string
-	let shift: boolean
+	const cellWidth = 60
+	const cellHeight = 60
 
 	const handleClick = (x: number, y: number) => {
-		clickX = x
-		clickY = y
+		interfacer.selected.x = x
+		interfacer.selected.y = y
 	}
 	const handleKeypress = (_key: string, _shiftKey: boolean) => {
-		key = _key
-		shift = _shiftKey
+		interfacer.key.key = _key
+		interfacer.key.shift = _shiftKey
 	}
 </script>
 
 <div class="flex flex-col">
-	<p>{clickX}</p>
-	<p>{clickY}</p>
-	<p>{key}</p>
-	<p>{shift}</p>
+	<p>
+		{Math.floor(interfacer.selected.y / cellHeight)}, {Math.floor(
+			interfacer.selected.x / cellWidth
+		)}
+	</p>
+	<p>{interfacer.key.key}</p>
+	<p>{interfacer.key.shift}</p>
 </div>
 
-<slot {handleClick} {handleKeypress} />
+<slot {handleClick} {handleKeypress} {cellWidth} {cellHeight} />

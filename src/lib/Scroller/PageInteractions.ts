@@ -14,10 +14,14 @@ const preventOnForms = (e: Event) =>
 	(e.target as HTMLElement).tagName.match(/input|textarea|select/i) ? true : false
 
 export const click =
-	(rect: DOMRect) =>
+	(rect: DOMRect, scroller: Scroller) =>
 	(click: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
 	(e) =>
-		validate(preventOnForms)(click, e.pageX - rect.left, e.pageY - rect.top)(e)
+		validate(preventOnForms)(
+			click,
+			e.pageX - rect.left + scroller.__scrollLeft,
+			e.pageY - rect.top + scroller.__scrollTop
+		)(e)
 export const keypress =
 	(keypress: (key: string, shiftKey: boolean) => void): KeyboardEventHandler<HTMLElement> =>
 	(e) =>

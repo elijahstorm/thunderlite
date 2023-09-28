@@ -19,10 +19,6 @@
 	export let cellHeight = 60
 	export let rows = 10
 	export let cols = 10
-	let contentWidth: number
-	let contentHeight: number
-	$: contentWidth = cellWidth * rows
-	$: contentWidth = cellHeight * cols
 
 	export let scroller: Scroller
 
@@ -37,6 +33,8 @@
 
 	let clientWidth = 0
 	let clientHeight = 0
+	let contentWidth: number = cellWidth * rows
+	let contentHeight: number = cellHeight * cols
 
 	export let paint =
 		(context: CanvasRenderingContext2D) =>
@@ -93,6 +91,8 @@
 		}
 
 		reflow()
+
+		container.focus()
 	})
 </script>
 
@@ -102,8 +102,11 @@
 	role="grid"
 	tabindex="0"
 	bind:this={container}
-	on:click|stopPropagation|preventDefault={click(container.getBoundingClientRect())(handleClick)}
-	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
+	on:click|stopPropagation|preventDefault={click(
+		container.getBoundingClientRect(),
+		scroller
+	)(handleClick)}
+	on:keypress={keypress(handleKeypress)}
 	on:touchstart|stopPropagation|preventDefault={touchstart(scroller)}
 	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
 	on:touchend|stopPropagation|preventDefault={touchend(scroller)}
@@ -112,7 +115,7 @@
 	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
 	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
 	on:mousemove|stopPropagation|preventDefault={mousemove(scroller)}
-	class="h-full"
+	class="h-full outline-none"
 >
 	<canvas bind:this={content} />
 </section>
