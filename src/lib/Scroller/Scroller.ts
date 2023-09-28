@@ -797,6 +797,7 @@ const scrollerMembers = function () {
 
 	/**
 	 * Touch move handler for scrolling support
+	 * @return {Boolean} True if scroller is being scrolled
 	 */
 	scroller.doTouchMove = function (
 		touches: TouchList,
@@ -814,7 +815,7 @@ const scrollerMembers = function () {
 
 		// Ignore event when tracking is not enabled (event might be outside of element)
 		if (!scroller.__isTracking) {
-			return
+			return false
 		}
 
 		let currentTouchLeft, currentTouchTop
@@ -956,6 +957,8 @@ const scrollerMembers = function () {
 		scroller.__lastTouchTop = currentTouchTop
 		scroller.__lastTouchMove = timeStamp
 		if (scale) scroller.__lastScale = scale
+
+		return true
 	}
 
 	/**

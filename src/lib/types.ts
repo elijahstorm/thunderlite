@@ -8,6 +8,10 @@ type InterfaceInteraction = {
 		x: number
 		y: number
 	}
+	hover: {
+		x: number
+		y: number
+	}
 	key: {
 		key: string
 		shift: boolean

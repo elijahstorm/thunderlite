@@ -4,6 +4,7 @@
 	const interfacer: InterfaceInteraction = (() => {
 		return {
 			selected: { x: -1, y: -1 },
+			hover: { x: -1, y: -1 },
 			key: { key: '', shift: false },
 		}
 	})()

@@ -1,18 +1,6 @@
 import type { KeyboardEventHandler, MouseEventHandler, TouchEventHandler } from 'svelte/elements'
 import type { Scroller } from './Scroller'
 
-const validate =
-	(...validations: ((e: Event) => boolean)[]) =>
-	<T, R>(action: (...args: [T, R]) => void, ...args: [T, R]) =>
-	(e: Event) =>
-		validations.reduce((valid, validator) => (valid ? validator(e) : false), true)
-			? null
-			: action(...args)
-
-const validateEnter = (e: KeyboardEvent) => e.key !== 'Enter'
-const preventOnForms = (e: Event) =>
-	(e.target as HTMLElement).tagName.match(/input|textarea|select/i) ? true : false
-
 export const click =
 	(rect: DOMRect, scroller: Scroller) =>
 	(click: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
@@ -66,9 +54,11 @@ export const contextmenu =
 	(e) =>
 		scroller ?? e
 export const mousemove =
-	(scroller: Scroller): MouseEventHandler<HTMLElement> =>
+	(rect: DOMRect, scroller: Scroller) =>
+	(mousemove: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
 	(e) =>
-		scroller.doTouchMove(
+		otherwise((scroller) => scroller.__isTracking)(
+			scroller.doTouchMove,
 			[
 				{
 					pageX: e.pageX,
@@ -76,4 +66,27 @@ export const mousemove =
 				},
 			] as unknown as TouchList,
 			e.timeStamp
-		)
+		)(
+			mousemove,
+			e.pageX - rect.left + scroller.__scrollLeft,
+			e.pageY - rect.top + scroller.__scrollTop
+		)(scroller)
+
+const otherwise =
+	(validation: (scroller: Scroller) => boolean) =>
+	<T, R>(action: (...args: [T, R]) => void, ...args: [T, R]) =>
+	<L, K>(otherwise: (...otherArgs: [L, K]) => void, ...otherArgs: [L, K]) =>
+	(scroller: Scroller) =>
+		validation(scroller) ? action(...args) : otherwise(...otherArgs)
+
+const validate =
+	(...validations: ((e: Event) => boolean)[]) =>
+	<T, R>(action: (...args: [T, R]) => void, ...args: [T, R]) =>
+	(e: Event) =>
+		validations.reduce((valid, validator) => (valid ? validator(e) : false), true)
+			? null
+			: action(...args)
+
+const validateEnter = (e: KeyboardEvent) => e.key === 'Enter'
+const preventOnForms = (e: Event) =>
+	(e.target as HTMLElement).tagName.match(/input|textarea|select/i) ? true : false

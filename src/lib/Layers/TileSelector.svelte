@@ -8,6 +8,10 @@
 		interfacer.selected.x = x
 		interfacer.selected.y = y
 	}
+	const handleHover = (x: number, y: number) => {
+		interfacer.hover.x = x
+		interfacer.hover.y = y
+	}
 	const handleKeypress = (_key: string, _shiftKey: boolean) => {
 		interfacer.key.key = _key
 		interfacer.key.shift = _shiftKey
@@ -20,8 +24,11 @@
 			interfacer.selected.x / cellWidth
 		)}
 	</p>
+	<p>
+		{Math.floor(interfacer.hover.y / cellHeight)}, {Math.floor(interfacer.hover.x / cellWidth)}
+	</p>
 	<p>{interfacer.key.key}</p>
 	<p>{interfacer.key.shift}</p>
 </div>
 
-<slot {handleClick} {handleKeypress} {cellWidth} {cellHeight} />
+<slot {handleClick} {handleHover} {handleKeypress} {cellWidth} {cellHeight} />

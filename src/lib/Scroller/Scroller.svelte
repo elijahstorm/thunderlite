@@ -23,6 +23,7 @@
 	export let scroller: Scroller
 
 	export let handleClick = (x: number, y: number) => {}
+	export let handleHover = (x: number, y: number) => {}
 	export let handleKeypress = (key: string, shiftKey: boolean) => {}
 
 	let container: HTMLElement
@@ -114,7 +115,10 @@
 	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
 	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
 	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
-	on:mousemove|stopPropagation|preventDefault={mousemove(scroller)}
+	on:mousemove|stopPropagation|preventDefault={mousemove(
+		container.getBoundingClientRect(),
+		scroller
+	)(handleHover)}
 	class="h-full outline-none"
 >
 	<canvas bind:this={content} />

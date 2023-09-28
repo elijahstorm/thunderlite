@@ -41,7 +41,14 @@
 
 <div class="flex gap-2 p-6 h-screen">
 	<Game {map} let:interfacer let:rows let:cols>
-		<TileSelector {interfacer} let:handleClick let:handleKeypress let:cellWidth let:cellHeight>
+		<TileSelector
+			{interfacer}
+			let:handleClick
+			let:handleHover
+			let:handleKeypress
+			let:cellWidth
+			let:cellHeight
+		>
 			<div class="border-4 border-black flex-grow">
 				<Scroller
 					bind:scroller
@@ -51,6 +58,7 @@
 					{cols}
 					{paint}
 					{handleClick}
+					{handleHover}
 					{handleKeypress}
 				/>
 			</div>
