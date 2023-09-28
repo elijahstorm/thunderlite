@@ -2,8 +2,8 @@
 	import MapRender from './MapRender.svelte'
 
 	let map = {
-		rows: 10,
-		cols: 10,
+		rows: 100,
+		cols: 100,
 	}
 </script>
 

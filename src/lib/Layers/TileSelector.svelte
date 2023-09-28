@@ -1,34 +1,50 @@
 <script lang="ts">
+	import type { Scroller } from '$lib/Scroller/Scroller'
+
 	export let interfacer: InterfaceInteraction
+	export let select: (x: number, y: number) => void
+	export let validTile: (x: number, y: number) => boolean
 
 	const cellWidth = 60
 	const cellHeight = 60
 
-	const handleClick = (x: number, y: number) => {
-		interfacer.selected.x = x
-		interfacer.selected.y = y
+	const handleClick = (_x: number, _y: number) => {
+		const [x, y] = [tileX(_x), tileY(_y)]
+		if (!validTile(x, y)) return
+		select(x, y)
+		interfacer.selected = { x, y }
 	}
-	const handleHover = (x: number, y: number) => {
-		interfacer.hover.x = x
-		interfacer.hover.y = y
+	const handleHover = (_x: number, _y: number) => {
+		const [x, y] = [tileX(_x), tileY(_y)]
+		if (!validTile(x, y)) return
+		interfacer.hover = { x, y }
+	}
+	const handleOffset = (x: number, y: number, zoom: number) => {
+		interfacer.offset = { x, y, zoom }
 	}
 	const handleKeypress = (_key: string, _shiftKey: boolean) => {
 		interfacer.key.key = _key
 		interfacer.key.shift = _shiftKey
 	}
+
+	const tileX = (x: number) => Math.floor(x / cellWidth)
+	const tileY = (y: number) => Math.floor(y / cellHeight)
+
+	$: selectedStyles = `left: ${interfacer.selected.x * cellWidth - interfacer.offset.x}px; top: ${
+		interfacer.selected.y * cellHeight - interfacer.offset.y
+	}px; width: ${cellWidth}px; height: ${cellHeight}px`
+	$: hoveredStyles = `left: ${interfacer.hover.x * cellWidth - interfacer.offset.x}px; top: ${
+		interfacer.hover.y * cellHeight - interfacer.offset.y
+	}px; width: ${cellWidth}px; height: ${cellHeight}px`
 </script>
 
-<div class="flex flex-col">
-	<p>
-		{Math.floor(interfacer.selected.y / cellHeight)}, {Math.floor(
-			interfacer.selected.x / cellWidth
-		)}
-	</p>
-	<p>
-		{Math.floor(interfacer.hover.y / cellHeight)}, {Math.floor(interfacer.hover.x / cellWidth)}
-	</p>
-	<p>{interfacer.key.key}</p>
-	<p>{interfacer.key.shift}</p>
-</div>
+<section class="grid flex-grow overflow-clip">
+	<div class="col-start-1 row-start-1 cursor-pointer">
+		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight} />
+	</div>
 
-<slot {handleClick} {handleHover} {handleKeypress} {cellWidth} {cellHeight} />
+	<div class="col-start-1 row-start-1 pointer-events-none relative">
+		<div class="absolute border-2 border-red-500" style={selectedStyles} />
+		<div class="absolute bg-yellow-500 opacity-30" style={hoveredStyles} />
+	</div>
+</section>

@@ -5,7 +5,7 @@ export const click =
 	(rect: DOMRect, scroller: Scroller) =>
 	(click: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
 	(e) =>
-		validate(preventOnForms)(
+		validate(preventOnForms, minimalMouseMovement(scroller))(
 			click,
 			e.pageX - rect.left + scroller.__scrollLeft,
 			e.pageY - rect.top + scroller.__scrollTop
@@ -57,7 +57,7 @@ export const mousemove =
 	(rect: DOMRect, scroller: Scroller) =>
 	(mousemove: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
 	(e) =>
-		otherwise((scroller) => scroller.__isTracking)(
+		otherwise(scrollerIsScrolling)(
 			scroller.doTouchMove,
 			[
 				{
@@ -84,9 +84,13 @@ const validate =
 	<T, R>(action: (...args: [T, R]) => void, ...args: [T, R]) =>
 	(e: Event) =>
 		validations.reduce((valid, validator) => (valid ? validator(e) : false), true)
-			? null
-			: action(...args)
+			? action(...args)
+			: null
 
 const validateEnter = (e: KeyboardEvent) => e.key === 'Enter'
 const preventOnForms = (e: Event) =>
-	(e.target as HTMLElement).tagName.match(/input|textarea|select/i) ? true : false
+	(e.target as HTMLElement).tagName.match(/input|textarea|select/i) ? false : true
+const minimalMouseMovement = (scroller: Scroller) => (e: Event) =>
+	Math.abs(scroller.__initialTouchLeft - (e as MouseEvent).pageX) < 10 &&
+	Math.abs(scroller.__initialTouchTop - (e as MouseEvent).pageY) < 10
+const scrollerIsScrolling = (scroller: Scroller) => scroller.__isTracking

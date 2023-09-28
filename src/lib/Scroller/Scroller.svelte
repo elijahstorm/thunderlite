@@ -20,10 +20,12 @@
 	export let rows = 10
 	export let cols = 10
 
+	export let interfacer: InterfaceInteraction
 	export let scroller: Scroller
 
 	export let handleClick = (x: number, y: number) => {}
 	export let handleHover = (x: number, y: number) => {}
+	export let handleOffset = (x: number, y: number, zoom: number) => {}
 	export let handleKeypress = (key: string, shiftKey: boolean) => {}
 
 	let container: HTMLElement
@@ -70,7 +72,10 @@
 
 		context = _context
 		tiling = MakeTiling()
-		scroller = MakeScroller(tiling.render(paint(context)), { bouncing: false })
+		scroller = MakeScroller(tiling.render(handleOffset, paint(context)), {
+			bouncing: false,
+			locking: false,
+		})
 
 		let rect = container.getBoundingClientRect()
 		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
@@ -89,6 +94,7 @@
 				tileHeight: cellHeight,
 			})
 			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
+			scroller.options.locking = window.innerWidth <= 768
 		}
 
 		reflow()

@@ -28,6 +28,7 @@ export type Tiling = {
 		tileHeight: number
 	}) => void
 	render: (
+		signalOffset: (left: number, top: number, zoom: number) => void,
 		paint: (
 			row: number,
 			col: number,
@@ -83,8 +84,10 @@ export const MakeTiling: () => Tiling = () => ({
 	 * @param zoom {Number} Current zoom level (should be applied to `left` and `top` already)
 	 * @param paint {Function} Callback method for every tile to paint.
 	 */
-	render: function (paint) {
+	render: function (signalOffset, paint) {
 		return (left, top, zoom) => {
+			signalOffset(left, top, zoom)
+
 			const clientHeight = this.__clientHeight
 			const clientWidth = this.__clientWidth
 
