@@ -1,4 +1,14 @@
+const renderAlways =
+	(renderer: (type: number) => HTMLImageElement, type: number) =>
+	(context: CanvasRenderingContext2D) =>
+		context.drawImage(renderer(type), 0, 0)
+const renderConditionally =
+	(renderer: (type: number) => HTMLImageElement, type?: number) =>
+	(context: CanvasRenderingContext2D) => (type ? context.drawImage(renderer(type), 0, 0) : null)
+
 export const paint =
+	(renderData: ObjectRenderer) =>
+	(map: MapObject) =>
 	(context: CanvasRenderingContext2D) =>
 	(
 		row: number,
@@ -10,15 +20,13 @@ export const paint =
 		zoom: number
 	) => {
 		context.save()
+		context.scale(zoom, zoom)
 		context.translate(left, top)
 
-		context.fillStyle = (row % 2) + (col % 2) > 0 ? '#ddd' : '#fff'
-		context.fillRect(0, 0, width, height)
-
-		context.fillStyle = 'green'
-		context.font = (14 * zoom).toFixed(2) + 'px "Helvetica Neue", Helvetica, Arial, sans-serif'
-
-		context.fillText(`${row}, ${col}`, 6 * zoom, 18 * zoom)
+		const tile = col + row * map.rows
+		renderAlways(renderData.ground, map.layers.ground[tile].type)(context)
+		renderConditionally(renderData.unit, map.layers.units[tile]?.type)(context)
+		renderConditionally(renderData.sky, map.layers.sky[tile]?.type)(context)
 
 		context.restore()
 	}

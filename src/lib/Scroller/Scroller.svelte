@@ -20,7 +20,7 @@
 	export let rows = 10
 	export let cols = 10
 
-	export let scroller: Scroller
+	let scroller: Scroller
 
 	export let handleClick = (x: number, y: number) => {}
 	export let handleHover = (x: number, y: number) => {}
