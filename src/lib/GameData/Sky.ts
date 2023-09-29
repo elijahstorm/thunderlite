@@ -8,12 +8,12 @@ type SkyData = {
 
 const localData = [
 	{
-		sprite: 'game/play/weather/cloud/cloud.png',
+		sprite: 'game/play/weather/cloud/0.png',
 		xOffset: 0,
 		yOffset: 0,
 	},
 	{
-		sprite: 'game/play/weather/cloud/cloud1.png',
+		sprite: 'game/play/weather/cloud/1.png',
 		xOffset: 0,
 		yOffset: 0,
 	},

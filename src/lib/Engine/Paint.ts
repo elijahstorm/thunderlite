@@ -1,23 +1,31 @@
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { get } from 'svelte/store'
 
-const renderAlways =
-	(type: number) =>
-	(renderer: (type: number) => ObjectSpecificRenderer, context: CanvasRenderingContext2D) =>
-	(width: number, height: number) =>
-	(state: number, animationFrame: number) =>
+const renderObject =
+	<T extends { state: number; type: number }>(object: T, render: ObjectSpecificRenderer) =>
+	(width: number, height: number, animationFrame: number) =>
+	(context: CanvasRenderingContext2D) =>
 		context.drawImage(
-			renderer(type).sprite,
-			state * height + renderer(type).xOffset,
-			animationFrame * width + renderer(type).yOffset,
-			width,
-			height,
-			0,
-			0,
-			width,
-			height
+			render.sprite,
+			object.state * width + render.xOffset,
+			animationFrame * (height + render.yOffset),
+			width + render.xOffset,
+			height + render.yOffset,
+			-render.xOffset,
+			-render.yOffset,
+			width + render.xOffset,
+			height + render.yOffset
 		)
-const renderConditionally = (type?: number) => (type ? renderAlways(type) : null)
+
+const always = <T extends { state: number; type: number }>(
+	renderer: (type: number) => ObjectSpecificRenderer,
+	object: T
+) => renderObject(object, renderer(object.type))
+
+const conditional = <T extends { state: number; type: number }>(
+	renderer: (type: number) => ObjectSpecificRenderer,
+	object?: T | null
+) => (object ? renderObject(object, renderer(object.type)) : null)
 
 export const paint =
 	(renderData: ObjectRenderer) =>
@@ -39,20 +47,9 @@ export const paint =
 		const tile = col + row * map.rows
 		const frame = get(animationFrame)
 
-		renderAlways(map.layers.ground[tile].type)(renderData.ground, context)(width, height)(
-			map.layers.ground[tile].state,
-			0
-		)
-		renderConditionally(map.layers.units[tile]?.type)?.call(
-			this,
-			renderData.unit,
-			context
-		)(width, height)(map.layers.ground[tile].state, frame)
-		renderConditionally(map.layers.sky[tile]?.type)?.call(
-			this,
-			renderData.sky,
-			context
-		)(width, height)(map.layers.ground[tile].state, 0)
+		always(renderData.ground, map.layers.ground[tile])(width, height, 0)(context)
+		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
+		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, 0)(context)
 
 		context.restore()
 	}

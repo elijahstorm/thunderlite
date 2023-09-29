@@ -6,8 +6,8 @@
 
 	const loadChecker = (finished: boolean) => loadedState.set(finished)
 
-	let rows = 11
-	let cols = 10
+	let rows = 100
+	let cols = 100
 
 	let map: MapObject
 
@@ -16,23 +16,23 @@
 		cols,
 		layers: {
 			ground: new Array(rows * cols).fill(0).map((_, index) => ({
-				type: Math.floor(Math.random() * 10),
+				type: Math.floor(Math.random() * 18),
 				state: 0,
 			})),
 			sky: new Array(rows * cols).fill(0).map((_, index) =>
-				Math.random() * 10 < 0.3
+				Math.random() * 100 > 7
 					? null
 					: {
-							type: Math.floor(Math.random() * 2),
+							type: 1,
 							tile: index * cols + rows,
 							state: 0,
 					  }
 			),
 			units: new Array(rows * cols).fill(0).map((_, index) =>
-				Math.random() * 2 < 1
+				Math.random() * 3 > 1
 					? null
 					: {
-							type: Math.floor(Math.random() * 2),
+							type: 1,
 							tile: index * cols + rows,
 							team: index % 2,
 							state: 0,

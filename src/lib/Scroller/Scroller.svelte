@@ -14,6 +14,7 @@
 		click,
 		keypress,
 	} from './PageInteractions'
+	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 
 	export let cellWidth = 60
 	export let cellHeight = 60
@@ -92,14 +93,21 @@
 				tileWidth: cellWidth,
 				tileHeight: cellHeight,
 			})
-			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
 			scroller.options.locking = window.innerWidth <= 768
+			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
 		}
 
 		reflow()
 
 		container.focus()
 	})
+
+	$: {
+		$animationFrame
+		if (reflow && !scroller?.__isDecelerating && !scroller?.__isTracking) {
+			reflow()
+		}
+	}
 </script>
 
 <svelte:window on:resize={reflow} />

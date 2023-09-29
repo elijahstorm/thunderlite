@@ -26,8 +26,8 @@
 
 	let renderData: ObjectRenderer = {
 		ground: (type: number) => get(rendererStore).ground[type],
-		unit: (type: number) => get(rendererStore).units[type],
-		sky: (type: number) => get(rendererStore).sky[type],
+		unit: (type?: number) => (type ? get(rendererStore).units[type] ?? null : null),
+		sky: (type?: number) => (type ? get(rendererStore).sky[type] ?? null : null),
 	}
 
 	onMount(() => {

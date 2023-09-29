@@ -4,10 +4,24 @@
 	import TileSelector from '$lib/Layers/TileSelector.svelte'
 	import Game from '$lib/Engine/Game.svelte'
 	import { paint } from '$lib/Engine/Paint'
+	import { onDestroy, onMount } from 'svelte'
+	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 
 	export let map: MapObject
 	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
 	export let loaded: boolean
+
+	let timer: NodeJS.Timeout
+	const inc = () => {
+		animationFrame.update((frame) => (frame + 1) % 4)
+		timer = setTimeout(inc, 1000)
+	}
+
+	onMount(() => {
+		timer = setTimeout(inc, 1000)
+	})
+
+	onDestroy(() => clearTimeout(timer))
 </script>
 
 <svelte:head>
