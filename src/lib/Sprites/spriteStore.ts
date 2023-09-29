@@ -4,7 +4,7 @@ type ContainedSpriteStore = {
 	[key: number]: HTMLImageElement
 }
 type ContainedLoadedSprites = {
-	[key: number]: ObjectDataLoaded
+	[key: number]: ObjectSpecificRenderer
 }
 
 export const spriteStore = writable<{

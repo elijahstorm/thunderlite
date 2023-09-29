@@ -1,14 +1,19 @@
 type ObjectType = {
 	type: number
 }
-type GroundObject = ObjectType
-type LocationObject = ObjectType & {
-	tile: number
+type AnimatedObject = {
+	state: number
 }
-type SkyObject = LocationObject
-type UnitObject = LocationObject & {
-	team: number
-}
+type GroundObject = ObjectType & AnimatedObject
+type LocationObject = ObjectType &
+	AnimatedObject & {
+		tile: number
+	}
+type SkyObject = LocationObject & AnimatedObject
+type UnitObject = LocationObject &
+	AnimatedObject & {
+		team: number
+	}
 
 type MapLayers = {
 	ground: GroundObject[]
@@ -27,10 +32,15 @@ type ObjectDataLoader = {
 type ObjectDataLoaded = {
 	sprite: HTMLImageElement
 }
+type ObjectSpecificRenderer = {
+	sprite: HTMLImageElement
+	xOffset: number
+	yOffset: number
+}
 type ObjectRenderer = {
-	ground: (type: number) => HTMLImageElement
-	unit: (type: number) => HTMLImageElement
-	sky: (type: number) => HTMLImageElement
+	ground: (type: number) => ObjectSpecificRenderer
+	unit: (type: number) => ObjectSpecificRenderer
+	sky: (type: number) => ObjectSpecificRenderer
 }
 
 type InterfaceInteraction = {

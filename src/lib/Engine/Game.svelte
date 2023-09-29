@@ -25,9 +25,9 @@
 	let cols = map.cols
 
 	let renderData: ObjectRenderer = {
-		ground: (type: number) => get(rendererStore).ground[type].sprite,
-		unit: (type: number) => get(rendererStore).units[type].sprite,
-		sky: (type: number) => get(rendererStore).sky[type].sprite,
+		ground: (type: number) => get(rendererStore).ground[type],
+		unit: (type: number) => get(rendererStore).units[type],
+		sky: (type: number) => get(rendererStore).sky[type],
 	}
 
 	onMount(() => {

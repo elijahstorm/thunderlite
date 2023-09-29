@@ -1,10 +1,23 @@
+import { animationFrame } from '$lib/Sprites/animationFrameCount'
+import { get } from 'svelte/store'
+
 const renderAlways =
-	(renderer: (type: number) => HTMLImageElement, type: number) =>
-	(context: CanvasRenderingContext2D) =>
-		context.drawImage(renderer(type), 0, 0)
-const renderConditionally =
-	(renderer: (type: number) => HTMLImageElement, type?: number) =>
-	(context: CanvasRenderingContext2D) => (type ? context.drawImage(renderer(type), 0, 0) : null)
+	(type: number) =>
+	(renderer: (type: number) => ObjectSpecificRenderer, context: CanvasRenderingContext2D) =>
+	(width: number, height: number) =>
+	(state: number, animationFrame: number) =>
+		context.drawImage(
+			renderer(type).sprite,
+			state * height + renderer(type).xOffset,
+			animationFrame * width + renderer(type).yOffset,
+			width,
+			height,
+			0,
+			0,
+			width,
+			height
+		)
+const renderConditionally = (type?: number) => (type ? renderAlways(type) : null)
 
 export const paint =
 	(renderData: ObjectRenderer) =>
@@ -24,9 +37,22 @@ export const paint =
 		context.translate(left, top)
 
 		const tile = col + row * map.rows
-		renderAlways(renderData.ground, map.layers.ground[tile].type)(context)
-		renderConditionally(renderData.unit, map.layers.units[tile]?.type)(context)
-		renderConditionally(renderData.sky, map.layers.sky[tile]?.type)(context)
+		const frame = get(animationFrame)
+
+		renderAlways(map.layers.ground[tile].type)(renderData.ground, context)(width, height)(
+			map.layers.ground[tile].state,
+			0
+		)
+		renderConditionally(map.layers.units[tile]?.type)?.call(
+			this,
+			renderData.unit,
+			context
+		)(width, height)(map.layers.ground[tile].state, frame)
+		renderConditionally(map.layers.sky[tile]?.type)?.call(
+			this,
+			renderData.sky,
+			context
+		)(width, height)(map.layers.ground[tile].state, 0)
 
 		context.restore()
 	}
