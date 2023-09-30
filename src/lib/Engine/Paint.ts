@@ -7,7 +7,7 @@ const renderObject =
 	(context: CanvasRenderingContext2D) =>
 		context.drawImage(
 			render.sprite,
-			object.state * width + render.xOffset,
+			object.state * (width + render.xOffset),
 			animationFrame * (height + render.yOffset),
 			width + render.xOffset,
 			height + render.yOffset,
@@ -23,9 +23,9 @@ const always = <T extends { state: number; type: number }>(
 ) => renderObject(object, renderer(object.type))
 
 const conditional = <T extends { state: number; type: number }>(
-	renderer: (type: number) => ObjectSpecificRenderer,
+	renderer: (type?: number) => ObjectSpecificRenderer | null,
 	object?: T | null
-) => (object ? renderObject(object, renderer(object.type)) : null)
+) => (object ? renderObject(object, renderer(object.type) as ObjectSpecificRenderer) : null)
 
 export const paint =
 	(renderData: ObjectRenderer) =>
@@ -49,8 +49,7 @@ export const paint =
 
 		always(renderData.ground, map.layers.ground[tile])(width, height, 0)(context)
 		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
-		context.globalAlpha = 0.8
-		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, 0)(context)
+		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, frame)(context)
 
 		context.restore()
 	}

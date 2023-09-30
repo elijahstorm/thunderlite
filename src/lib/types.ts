@@ -47,6 +47,7 @@ type ObjectRenderer = {
 type SpriteObject = {
 	url: string
 	sprite: HTMLImageElement
+	frames: number
 	yOffset: number
 	xOffset: number
 }

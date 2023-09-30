@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { skyData } from '$lib/GameData/Sky'
-	import { terrainData } from '$lib/GameData/Terrain'
-	import { unitData } from '$lib/GameData/Unit'
+	import { skyRenderer } from '$lib/GameData/Sky'
+	import { terrainRenderer } from '$lib/GameData/Terrain'
+	import { unitRenderer } from '$lib/GameData/Unit'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { onMount } from 'svelte'
 	import { get } from 'svelte/store'
@@ -31,11 +31,11 @@
 	}
 
 	onMount(() => {
-		const ground = terrainData(makeImage)(map.layers.ground.map((data) => data.type))
-		const units = unitData(makeImage)(
+		const ground = terrainRenderer(makeImage)(map.layers.ground.map((data) => data.type))
+		const units = unitRenderer(makeImage)(
 			map.layers.units.filter((data) => data !== null).map((data) => (data as ObjectType).type)
 		)
-		const sky = skyData(makeImage)(
+		const sky = skyRenderer(makeImage)(
 			map.layers.sky.filter((data) => data !== null).map((data) => (data as ObjectType).type)
 		)
 

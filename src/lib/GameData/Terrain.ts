@@ -1,7 +1,7 @@
 import { imageLazyLoader } from '$lib/Sprites/imageLazyLoader'
 
 type TerrainData = SpriteObject & {
-	sprites: number
+	connector: 0 | 1 | 2 | 3 | 4
 	name: string
 	description: string
 	details:
@@ -22,12 +22,13 @@ type TerrainData = SpriteObject & {
 	modifiers: string[]
 }
 
-const localData = [
+export const terrainData = [
 	{
 		url: 'game/play/terrain/plains.png',
-		sprites: 4,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 2,
 		name: 'Plains',
 		description: 'Basic terrain',
 		details: 'dirty',
@@ -40,9 +41,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/hills.png',
-		sprites: 4,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 2,
 		name: 'Hills',
 		description: 'Gives ranged units an extended range',
 		details: 'rough',
@@ -55,9 +57,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/forest.png',
-		sprites: 4,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 2,
 		name: 'Forest',
 		description: 'Gives defense boost',
 		details: 'rough',
@@ -70,9 +73,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/mountain.png',
-		sprites: 4,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 2,
 		name: 'Mountain',
 		description: 'Hard to traverse but gives strong defense',
 		details: 'rugged',
@@ -85,9 +89,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/road.png',
-		sprites: 6,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 1,
 		name: 'Road',
 		description: 'Easy to traverse but provides no defense',
 		details: 'clean',
@@ -100,9 +105,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/canyon.png',
-		sprites: 6,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 1,
 		name: 'Canyon',
 		description: 'Dips down, but ranged units cannot target here',
 		details: 'slippery',
@@ -115,9 +121,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/wasteland.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Wasteland',
 		description: 'Provides lots of defense, but costs health to rest on',
 		details: 'dirty',
@@ -130,9 +137,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/volcano.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 34,
+		connector: 0,
 		name: 'Volcano',
 		description: 'Impassable',
 		details: 'impassable',
@@ -145,9 +153,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/enriched-ore-deposit.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Enriched Ore Deposit',
 		description: 'Can be mined for money',
 		details: 'pot-holes',
@@ -160,9 +169,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/ore-deposit.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Ore Deposit',
 		description: 'Can be mined for money',
 		details: 'pot-holes',
@@ -175,9 +185,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/depleted-ore-deposit.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Depleted Ore Deposit',
 		description: 'Can be mined for money',
 		details: 'pot-holes',
@@ -190,9 +201,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/sea.png',
-		sprites: 4,
+		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 3,
 		name: 'Sea',
 		description: 'Basic sea terrain',
 		details: 'sea',
@@ -205,9 +217,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/reef.png',
-		sprites: 3,
+		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Reef',
 		description: 'Hard to traverse sea terrain',
 		details: 'sea',
@@ -220,9 +233,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/archipelago.png',
-		sprites: 3,
+		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Archipelago',
 		description: 'Rough sea terrain',
 		details: 'sea',
@@ -235,9 +249,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/rock-formation.png',
-		sprites: 3,
+		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 0,
 		name: 'Rock Formation',
 		description: 'Rocky sea terrain',
 		details: 'sea',
@@ -250,9 +265,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/shore.png',
-		sprites: 4,
+		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 3,
 		name: 'Shore',
 		description: 'An easy access to the sea',
 		details: 'sea',
@@ -265,9 +281,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/bridge.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 4,
 		name: 'Bridge',
 		description: 'Connects two islands, but provides no defense',
 		details: 'connector',
@@ -280,9 +297,10 @@ const localData = [
 	},
 	{
 		url: 'game/play/terrain/high-bridge.png',
-		sprites: 1,
+		frames: 0,
 		xOffset: 0,
 		yOffset: 0,
+		connector: 4,
 		name: 'High Bridge',
 		description: 'Connects two islands, and allows ships to pass, but provides no defense',
 		details: 'connector',
@@ -295,4 +313,4 @@ const localData = [
 	},
 ] as TerrainData[]
 
-export const terrainData = imageLazyLoader('ground', localData)
+export const terrainRenderer = imageLazyLoader('ground', terrainData)

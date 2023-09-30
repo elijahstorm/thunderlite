@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { createImageLoader } from '$lib/Sprites/images'
+	import { connectionDecision } from '$lib/Sprites/spriteConnector'
 	import MapRender from './MapRender.svelte'
 	import { loadedState, mapStore } from './mapStore'
 	import { get } from 'svelte/store'
@@ -9,14 +10,12 @@
 	let rows = 100
 	let cols = 100
 
-	let map: MapObject
-
-	map = get(mapStore) ?? {
+	const map: MapObject = get(mapStore) ?? {
 		rows,
 		cols,
 		layers: {
 			ground: new Array(rows * cols).fill(0).map((_, index) => ({
-				type: Math.floor(Math.random() * 18),
+				type: Math.random() * 3 > 1 ? 11 : Math.floor(Math.random() * 18),
 				state: 0,
 			})),
 			sky: new Array(rows * cols).fill(0).map((_, index) =>
@@ -40,6 +39,8 @@
 			),
 		},
 	}
+
+	map.layers.ground.map((object, index) => (object.state = connectionDecision(object)(map, index)))
 
 	mapStore.set(map)
 </script>
