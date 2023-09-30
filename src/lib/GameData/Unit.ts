@@ -1,19 +1,17 @@
 import { imageLazyLoader } from '$lib/Sprites/imageLazyLoader'
 
-type UnitData = {
-	sprite: string
-	yOffset: number
-	xOffset: number
+type UnitData = SpriteObject & {
+	//
 }
 
 const localData = [
 	{
-		sprite: 'game/play/units/idle/Strike Commando.png',
+		url: 'game/play/units/idle/strike-commando.png',
 		yOffset: 0,
 		xOffset: 0,
 	},
 	{
-		sprite: 'game/play/units/idle/Flak Tank.png',
+		url: 'game/play/units/idle/flak-tank.png',
 		yOffset: 60,
 		xOffset: 0,
 	},

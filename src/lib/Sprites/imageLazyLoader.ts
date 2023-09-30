@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { get } from 'svelte/store'
 import { spriteStore } from './spriteStore'
 
 export const imageLazyLoader =
-	<T>(imageContainer: keyof MapLayers, dataList: T[]) =>
+	<T extends SpriteObject>(imageContainer: keyof MapLayers, dataList: T[]) =>
 	(makeImage: (src: string) => (signalLoaded: (image: HTMLImageElement) => void) => void) =>
 	(includedTypes: number[]) =>
 		Object.entries(
@@ -20,20 +19,19 @@ export const imageLazyLoader =
 				(carry, [_index, data]) => {
 					const index = parseInt(_index)
 					const cache = get(spriteStore)[imageContainer][index]
+
 					if (cache) {
-						// @ts-ignore
 						data.sprite = cache
 					} else {
-						// @ts-ignore
-						makeImage(data.sprite)((image) => {
+						makeImage(data.url)((image) => {
 							spriteStore.update((sprites) => {
 								sprites[imageContainer][index] = image
 								return sprites
 							})
-							// @ts-ignore
 							data.sprite = image
 						})
 					}
+
 					carry[index] = data
 					return carry
 				},

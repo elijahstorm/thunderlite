@@ -40,11 +40,8 @@
 		)
 
 		rendererStore.update((store) => {
-			//@ts-ignore
 			store.ground = { ...store.ground, ...ground }
-			//@ts-ignore
 			store.units = { ...store.units, ...units }
-			//@ts-ignore
 			store.sky = { ...store.sky, ...sky }
 			return store
 		})

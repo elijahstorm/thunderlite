@@ -49,6 +49,7 @@ export const paint =
 
 		always(renderData.ground, map.layers.ground[tile])(width, height, 0)(context)
 		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
+		context.globalAlpha = 0.8
 		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, 0)(context)
 
 		context.restore()

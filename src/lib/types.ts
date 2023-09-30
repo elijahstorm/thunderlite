@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 type ObjectType = {
 	type: number
 }
@@ -39,8 +40,15 @@ type ObjectSpecificRenderer = {
 }
 type ObjectRenderer = {
 	ground: (type: number) => ObjectSpecificRenderer
-	unit: (type: number) => ObjectSpecificRenderer
-	sky: (type: number) => ObjectSpecificRenderer
+	unit: (type?: number) => ObjectSpecificRenderer | null
+	sky: (type?: number) => ObjectSpecificRenderer | null
+}
+
+type SpriteObject = {
+	url: string
+	sprite: HTMLImageElement
+	yOffset: number
+	xOffset: number
 }
 
 type InterfaceInteraction = {

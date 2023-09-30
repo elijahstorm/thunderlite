@@ -17,6 +17,9 @@ var Terrain_Data = {
 		'Connector',
 	],
 	Connnection_Images: function (type) {
+		// create an array of the return type length
+		// depending on Connection type
+		// and then
 		if (type == 1)
 			// roll into
 			return 6
