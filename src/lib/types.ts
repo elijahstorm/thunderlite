@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
 type ObjectType = {
 	type: number
 }
@@ -35,6 +36,7 @@ type ObjectDataLoaded = {
 }
 type ObjectSpecificRenderer = {
 	sprite: HTMLImageElement
+	frames: number
 	xOffset: number
 	yOffset: number
 }
@@ -44,12 +46,8 @@ type ObjectRenderer = {
 	sky: (type?: number) => ObjectSpecificRenderer | null
 }
 
-type SpriteObject = {
+type SpriteObject = ObjectSpecificRenderer & {
 	url: string
-	sprite: HTMLImageElement
-	frames: number
-	yOffset: number
-	xOffset: number
 }
 
 type InterfaceInteraction = {

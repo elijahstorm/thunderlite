@@ -4,6 +4,7 @@ node_modules
 /.svelte-kit
 /package
 .kra
+*~
 .env
 .env.*
 !.env.example

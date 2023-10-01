@@ -61,7 +61,7 @@ const rollInto: ConnectionDecision = (map, location) =>
 const random: ConnectionDecision = (map, location) => Math.floor(Math.random() * 5)
 
 const border: ConnectionDecision = (map, location) => {
-	return 0
+	return Math.floor(Math.random() * 12)
 
 	// sea border and animation
 	__sprite = null

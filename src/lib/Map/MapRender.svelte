@@ -13,7 +13,7 @@
 
 	let timer: NodeJS.Timeout
 	const inc = () => {
-		animationFrame.update((frame) => (frame + 1) % 4)
+		animationFrame.update((frame) => (frame + 1) % 100000)
 		timer = setTimeout(inc, 1000)
 	}
 

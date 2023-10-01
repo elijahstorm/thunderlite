@@ -25,7 +25,7 @@ type TerrainData = SpriteObject & {
 export const terrainData = [
 	{
 		url: 'game/play/terrain/plains.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 2,
@@ -41,7 +41,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/hills.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 2,
@@ -57,7 +57,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/forest.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 2,
@@ -73,7 +73,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/mountain.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 2,
@@ -89,7 +89,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/road.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 1,
@@ -105,7 +105,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/canyon.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 1,
@@ -121,7 +121,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/wasteland.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 0,
@@ -137,7 +137,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/volcano.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 34,
 		connector: 0,
@@ -153,7 +153,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/enriched-ore-deposit.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 0,
@@ -169,7 +169,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/ore-deposit.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 0,
@@ -185,7 +185,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/depleted-ore-deposit.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 0,
@@ -281,7 +281,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/bridge.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 4,
@@ -297,7 +297,7 @@ export const terrainData = [
 	},
 	{
 		url: 'game/play/terrain/high-bridge.png',
-		frames: 0,
+		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
 		connector: 4,
