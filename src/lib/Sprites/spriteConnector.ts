@@ -15,40 +15,76 @@ const rollInto: ConnectionDecision = (map, location) =>
 
 const random: ConnectionDecision = (map, location) => Math.floor(Math.random() * 5)
 
-// const cornerDecision = {
-// 	true: {
-// 		true: {
-// 			true: 0,
-// 			false: 5,
-// 		},
-// 		false: {
-// 			true: 0,
-// 			false: 0,
-// 		},
-// 	},
-// 	false: {
-// 		true: ,
-// 		false: ,
-// 	},
-// }
+const borderDecision = {
+	true: {
+		true: {
+			true: {
+				true: 0,
+				false: 4,
+			},
+			false: {
+				true: 3,
+				false: 12,
+			},
+		},
+		false: {
+			true: {
+				true: 2,
+				false: 15, // todo || rotate 1
+			},
+			false: {
+				true: 5,
+				false: 8,
+			},
+		},
+	},
+	false: {
+		true: {
+			true: {
+				true: 1,
+				false: 13,
+			},
+			false: {
+				true: 14, // todo ||
+				false: 9,
+			},
+		},
+		false: {
+			true: {
+				true: 6,
+				false: 7,
+			},
+			false: {
+				true: 10,
+				false: 11,
+			},
+		},
+	},
+}
 const border: ConnectionDecision = (map, location) => {
-	if (
-		left(map, location)(details) &&
-		up(map, location)(details) &&
-		!up(map, location - 1)(details)
-	) {
-		return 5
-	}
-	if (
-		left(map, location)(details) &&
-		down(map, location)(details) &&
-		!down(map, location - 1)(details)
-	) {
-		return 6
+	const border =
+		borderDecision[left(map, location)(ocean) ? 'true' : 'false'][
+			up(map, location)(ocean) ? 'true' : 'false'
+		][right(map, location)(ocean) ? 'true' : 'false'][down(map, location)(ocean) ? 'true' : 'false']
+
+	if (border === 0) {
+		if (!up(map, location + 1)(ocean)) {
+			return 19
+		}
+		if (!down(map, location + 1)(ocean)) {
+			return 18
+		}
+		if (!down(map, location - 1)(ocean)) {
+			return 17
+		}
+		if (!up(map, location - 1)(ocean)) {
+			return 16
+		}
 	}
 
-	return Math.floor(Math.random() * 12)
+	return border
 }
+
 const old = () => {
 	if (x != 0)
 		if (Terrain_Data.TERRE[_map[x - 1][y]].Type != connector)
@@ -308,20 +344,20 @@ const rollDecision = {
 }
 
 const type = (map: GroundObject[], location: number) => map[location].type
-const details = (map: GroundObject[], location: number) => terrainData[map[location].type].details
+const ocean = (map: GroundObject[], location: number) => terrainData[map[location].type].ocean
 
 const up =
 	(map: MapObject, location: number) =>
-	(reader: typeof type | typeof details = type) =>
+	(reader: typeof type | typeof ocean = type) =>
 		location - map.rows >= 0 &&
 		reader(map.layers.ground, location - map.rows) === reader(map.layers.ground, location)
-const down = (map: MapObject, location: number) => (reader: typeof type | typeof details) =>
+const down = (map: MapObject, location: number) => (reader: typeof type | typeof ocean) =>
 	location + map.rows < map.layers.ground.length &&
 	reader(map.layers.ground, location + map.rows) === reader(map.layers.ground, location)
 
-const left = (map: MapObject, location: number) => (reader: typeof type | typeof details) =>
+const left = (map: MapObject, location: number) => (reader: typeof type | typeof ocean) =>
 	location % map.rows !== 0 &&
 	reader(map.layers.ground, location - 1) === reader(map.layers.ground, location)
-const right = (map: MapObject, location: number) => (reader: typeof type | typeof details) =>
+const right = (map: MapObject, location: number) => (reader: typeof type | typeof ocean) =>
 	(location + 1) % map.rows !== 0 &&
 	reader(map.layers.ground, location + 1) === reader(map.layers.ground, location)

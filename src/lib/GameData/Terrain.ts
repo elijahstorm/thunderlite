@@ -4,16 +4,7 @@ type TerrainData = SpriteObject & {
 	connector: 0 | 1 | 2 | 3 | 4
 	name: string
 	description: string
-	details:
-		| 'dirty'
-		| 'rough'
-		| 'rugged'
-		| 'clean'
-		| 'pot-holes'
-		| 'slippery'
-		| 'sea'
-		| 'impassable'
-		| 'connector'
+	details: 'dirty' | 'rough' | 'rugged' | 'clean' | 'pot-holes' | 'slippery' | 'impassable'
 	ocean: boolean
 	protection: number
 	damage: number
@@ -207,7 +198,7 @@ export const terrainData = [
 		connector: 3,
 		name: 'Sea',
 		description: 'Basic sea terrain',
-		details: 'sea',
+		details: 'clean',
 		ocean: true,
 		protection: 0,
 		damage: 0,
@@ -223,7 +214,7 @@ export const terrainData = [
 		connector: 0,
 		name: 'Reef',
 		description: 'Hard to traverse sea terrain',
-		details: 'sea',
+		details: 'dirty',
 		ocean: true,
 		protection: 0.1,
 		damage: 0,
@@ -239,7 +230,7 @@ export const terrainData = [
 		connector: 0,
 		name: 'Archipelago',
 		description: 'Rough sea terrain',
-		details: 'sea',
+		details: 'rough',
 		ocean: true,
 		protection: 0.2,
 		damage: 0,
@@ -255,7 +246,7 @@ export const terrainData = [
 		connector: 0,
 		name: 'Rock Formation',
 		description: 'Rocky sea terrain',
-		details: 'sea',
+		details: 'rugged',
 		ocean: true,
 		protection: 0.7,
 		damage: 20,
@@ -271,7 +262,7 @@ export const terrainData = [
 		connector: 3,
 		name: 'Shore',
 		description: 'An easy access to the sea',
-		details: 'sea',
+		details: 'rough',
 		ocean: true,
 		protection: 0,
 		damage: 0,
@@ -287,7 +278,7 @@ export const terrainData = [
 		connector: 4,
 		name: 'Bridge',
 		description: 'Connects two islands, but provides no defense',
-		details: 'connector',
+		details: 'clean',
 		ocean: false,
 		protection: 0,
 		damage: 0,
@@ -303,7 +294,7 @@ export const terrainData = [
 		connector: 4,
 		name: 'High Bridge',
 		description: 'Connects two islands, and allows ships to pass, but provides no defense',
-		details: 'connector',
+		details: 'clean',
 		ocean: false,
 		protection: 0,
 		damage: 0,

@@ -15,7 +15,7 @@
 		cols,
 		layers: {
 			ground: new Array(rows * cols).fill(0).map((_, index) => ({
-				type: Math.random() * 3 > 1 ? 11 : Math.floor(Math.random() * 18),
+				type: Math.random() * 3 > 1 ? 0 : 11,
 				state: 0,
 			})),
 			sky: new Array(rows * cols).fill(0).map((_, index) =>
