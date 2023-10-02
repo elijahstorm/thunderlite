@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { unitData } from '$lib/GameData/Unit'
 	import { createImageLoader } from '$lib/Sprites/images'
 	import { connectionDecision } from '$lib/Sprites/spriteConnector'
 	import MapRender from './MapRender.svelte'
@@ -15,25 +16,25 @@
 		cols,
 		layers: {
 			ground: new Array(rows * cols).fill(0).map((_, index) => ({
-				type: Math.random() * 3 > 1 ? 0 : 11,
+				type: Math.random() * 3 > 1 ? 11 : 0,
 				state: 0,
 			})),
+			units: new Array(rows * cols).fill(0).map((_, index) =>
+				Math.random() * 4 > 1
+					? null
+					: {
+							type: Math.floor(Math.random() * unitData.length),
+							tile: index * cols + rows,
+							team: index % 2,
+							state: 4,
+					  }
+			),
 			sky: new Array(rows * cols).fill(0).map((_, index) =>
 				Math.random() * 100 > 7
 					? null
 					: {
 							type: 1,
 							tile: index * cols + rows,
-							state: 0,
-					  }
-			),
-			units: new Array(rows * cols).fill(0).map((_, index) =>
-				Math.random() * 3 > 1
-					? null
-					: {
-							type: 1,
-							tile: index * cols + rows,
-							team: index % 2,
 							state: 0,
 					  }
 			),
