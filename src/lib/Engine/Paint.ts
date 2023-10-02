@@ -48,7 +48,7 @@ export const paint =
 		const frame = get(animationFrame)
 
 		always(renderData.ground, map.layers.ground[tile])(width, height, frame)(context)
-		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
+		// conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
 		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, frame)(context)
 
 		context.restore()

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { skyRenderer } from '$lib/GameData/Sky'
-	import { terrainRenderer } from '$lib/GameData/Terrain'
-	import { unitRenderer } from '$lib/GameData/Unit'
+	import { terrainRenderer } from '$lib/GameData/terrain'
+	import { skyRenderer } from '$lib/GameData/sky'
+	import { unitRenderer } from '$lib/GameData/unit'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { onMount } from 'svelte'
 	import { get } from 'svelte/store'
