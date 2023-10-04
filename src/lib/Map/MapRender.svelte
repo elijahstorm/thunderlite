@@ -7,6 +7,7 @@
 	import { onDestroy, onMount } from 'svelte'
 	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 
+	export let pause = false
 	export let map: MapObject
 	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
 	export let loaded: boolean
@@ -14,8 +15,17 @@
 
 	let timer: NodeJS.Timeout
 	const inc = () => {
+		if (pause) {
+			return
+		}
 		animationFrame.update((frame) => (frame + 1) % 100000)
 		timer = setTimeout(inc, 800)
+	}
+
+	$: {
+		if (pause) {
+			timer = setTimeout(inc, 800)
+		}
 	}
 
 	onMount(() => {
@@ -66,7 +76,7 @@
 				/>
 			</TileSelector>
 		{:else}
-			<slot />
+			<p>loading...</p>
 		{/if}
 	</Game>
 </div>

@@ -22,10 +22,16 @@ type MapLayers = {
 	sky: (SkyObject | null)[]
 	units: (UnitObject | null)[]
 }
+type MapFilters = {
+	ground: (active: GroundObject[]) => number[]
+	sky: (active: (SkyObject | null)[]) => number[]
+	units: (active: (UnitObject | null)[]) => number[]
+}
 type MapObject = {
 	rows: number
 	cols: number
 	layers: MapLayers
+	filters: MapFilters
 }
 
 type ObjectDataLoader = {

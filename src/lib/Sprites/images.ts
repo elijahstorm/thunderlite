@@ -6,6 +6,7 @@ export const createImageLoader = (finished: (finished: boolean) => void) => {
 			action()
 			finished(loadedCount === images)
 		}
+
 		return [
 			() => isFinished(() => images++),
 			(signalLoaded: VoidFunction) => () =>

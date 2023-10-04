@@ -8,9 +8,15 @@
 	import { loadedState, mapStore } from './mapStore'
 	import { get } from 'svelte/store'
 	import Icon from '@iconify/svelte'
+	import { onMount } from 'svelte'
+	import { skyData } from '$lib/GameData/sky'
+	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 
 	const loadChecker = (finished: boolean) => loadedState.set(finished)
 
+	let editType: 'unit' | 'terrain' | 'weather'
+	let type: number
+	let team: number
 	let map: MapObject = get(mapStore) ?? {
 		rows: 10,
 		cols: 10,
@@ -22,7 +28,18 @@
 			units: [],
 			sky: [],
 		},
+		filters: {
+			ground: (active) => Array.from({ length: terrainData.length }, (_, index) => index),
+			units: (active) => Array.from({ length: unitData.length }, (_, index) => index),
+			sky: (active) => Array.from({ length: skyData.length }, (_, index) => index),
+		},
 	}
+
+	onMount(() => {
+		editType = 'unit'
+		type = 0
+		team = 0
+	})
 
 	$: {
 		map.layers.ground.map(
@@ -30,6 +47,7 @@
 		)
 
 		mapStore.set(map)
+		animationFrame.update((frame) => frame + 4)
 	}
 
 	const actions = [
@@ -45,48 +63,81 @@
 		},
 		{
 			label: 'share',
-			icon: 'fluent:open-12-regular',
+			icon: 'gg:share',
+			act: () => {},
+		},
+		{
+			label: 'play',
+			icon: 'solar:play-bold',
 			act: () => {},
 		},
 	]
 
-	let select = (x: number, y: number) => {
-		// todo editor interactions
-		console.log({ x, y })
+	const select = (x: number, y: number) => {
+		const tile = x + y * map.rows
+		if (editType === 'unit') {
+			map.layers.units[tile] = { type, tile, team, state: 4 }
+		} else if (editType === 'terrain') {
+			map.layers.ground[tile] = { type, state: 0 }
+		}
 	}
 
-	const size = 60
+	const changeType = (selectedType: typeof editType, index: number) => () => {
+		editType = selectedType
+		type = index
+	}
+
+	const size = 64
 	$: style = `width: ${size}px; height: ${size}px;`
 </script>
 
 <div class="p-6 h-screen max-h-screen overflow-clip">
 	<ButtonGrid rows={2} length={unitData.length} let:index>
-		<button class="border border-black overflow-hidden" {style}>
+		<button
+			on:click={changeType('unit', index)}
+			class="border-2 border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
+			class:border-yellow-500={editType === 'unit' && type === index}
+			class:bg-yellow-200={editType === 'unit' && type === index}
+			{style}
+		>
 			<img
 				class="object-cover min-w-fit"
 				src={unitData[index].url}
 				alt={unitData[index].name}
-				style="margin: {-unitData[index].yOffset + 2}px {-unitData[index].xOffset}px 0 0;"
+				style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
 			/>
 		</button>
 	</ButtonGrid>
 
 	<div class="flex flex-1">
 		<ButtonGrid cols={1} length={actions.length} let:index>
-			<button class="border border-black overflow-hidden" {style}>
+			<button
+				class="border border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
+				{style}
+			>
 				<Icon icon={actions[index].icon} width={size} height={size - 25} />
 				{actions[index].label}
 			</button>
 		</ButtonGrid>
 
 		<div class="flex-1">
-			<MapRender {map} {select} makeImage={createImageLoader(loadChecker)} loaded={$loadedState}>
-				<p>loading...</p>
-			</MapRender>
+			<MapRender
+				pause
+				{map}
+				{select}
+				makeImage={createImageLoader(loadChecker)}
+				loaded={$loadedState}
+			/>
 		</div>
 
 		<ButtonGrid cols={2} length={terrainData.length} let:index>
-			<button class="border border-black overflow-hidden" {style}>
+			<button
+				on:click={changeType('terrain', index)}
+				class="border-2 border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
+				class:border-yellow-500={editType === 'terrain' && type === index}
+				class:bg-yellow-200={editType === 'terrain' && type === index}
+				{style}
+			>
 				<img
 					class="object-cover object-left-top min-w-fit"
 					src={terrainData[index].url}

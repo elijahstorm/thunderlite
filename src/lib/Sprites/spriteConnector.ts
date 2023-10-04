@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { terrainData } from '$lib/GameData/Terrain'
+import { terrainData } from '$lib/GameData/terrain'
 
 type ConnectionDecision = (map: MapObject, location: number) => number
 
@@ -13,7 +13,7 @@ const rollInto: ConnectionDecision = (map, location) =>
 		right(map, location) ? 'true' : 'false'
 	][down(map, location) ? 'true' : 'false']
 
-const random: ConnectionDecision = (map, location) => Math.floor(Math.random() * 5)
+const random: ConnectionDecision = (map, location) => location % 5
 
 const borderDecision = {
 	true: {

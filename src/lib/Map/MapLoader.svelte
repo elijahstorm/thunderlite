@@ -39,6 +39,13 @@
 					  }
 			),
 		},
+		filters: {
+			ground: (active) => active.map((data) => data.type),
+			units: (active) =>
+				active.filter((data) => data !== null).map((data) => (data as ObjectType).type),
+			sky: (active) =>
+				active.filter((data) => data !== null).map((data) => (data as ObjectType).type),
+		},
 	}
 
 	map.layers.ground.map((object, index) => (object.state = connectionDecision(object)(map, index)))
@@ -47,7 +54,5 @@
 </script>
 
 <div class="p-6 h-screen">
-	<MapRender {map} makeImage={createImageLoader(loadChecker)} loaded={$loadedState}>
-		<p>loading...</p>
-	</MapRender>
+	<MapRender {map} makeImage={createImageLoader(loadChecker)} loaded={$loadedState} />
 </div>

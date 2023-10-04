@@ -35,13 +35,9 @@
 	}
 
 	onMount(() => {
-		const ground = terrainRenderer(makeImage)(map.layers.ground.map((data) => data.type))
-		const units = unitRenderer(makeImage)(
-			map.layers.units.filter((data) => data !== null).map((data) => (data as ObjectType).type)
-		)
-		const sky = skyRenderer(makeImage)(
-			map.layers.sky.filter((data) => data !== null).map((data) => (data as ObjectType).type)
-		)
+		const ground = terrainRenderer(makeImage)(map.filters.ground(map.layers.ground))
+		const units = unitRenderer(makeImage)(map.filters.units(map.layers.units))
+		const sky = skyRenderer(makeImage)(map.filters.sky(map.layers.sky))
 
 		rendererStore.update((store) => {
 			store.ground = { ...store.ground, ...ground }
