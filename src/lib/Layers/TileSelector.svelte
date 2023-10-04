@@ -1,6 +1,4 @@
 <script lang="ts">
-	import type { Scroller } from '$lib/Scroller/Scroller'
-
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean

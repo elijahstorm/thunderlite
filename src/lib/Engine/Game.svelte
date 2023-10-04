@@ -8,8 +8,10 @@
 
 	export let map: MapObject
 	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
+	export let select = (x: number, y: number) => {
+		;[x, y] // todo game interactions
+	}
 
-	let select = (x: number, y: number) => [x, y]
 	let validTile = (x: number, y: number) => x < rows && y < cols
 
 	const interfacer: InterfaceInteraction = (() => {

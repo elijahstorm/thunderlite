@@ -46,6 +46,8 @@
 	mapStore.set(map)
 </script>
 
-<MapRender {map} makeImage={createImageLoader(loadChecker)} loaded={$loadedState}>
-	<p>loading...</p>
-</MapRender>
+<div class="p-6 h-screen">
+	<MapRender {map} makeImage={createImageLoader(loadChecker)} loaded={$loadedState}>
+		<p>loading...</p>
+	</MapRender>
+</div>

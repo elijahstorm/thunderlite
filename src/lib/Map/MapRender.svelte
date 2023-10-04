@@ -10,6 +10,7 @@
 	export let map: MapObject
 	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
 	export let loaded: boolean
+	export let select: (x: number, y: number) => void
 
 	let timer: NodeJS.Timeout
 	const inc = () => {
@@ -28,45 +29,44 @@
 	<title>{PUBLIC_GAME_NAME}</title>
 </svelte:head>
 
-<div class="p-6 h-screen">
-	<div class="flex gap-2 border-4 border-black h-full">
-		<Game
-			{map}
-			{makeImage}
-			let:interfacer
-			let:select
-			let:validTile
-			let:rows
-			let:cols
-			let:renderData
-		>
-			{#if loaded}
-				<TileSelector
-					{interfacer}
-					{select}
-					{validTile}
-					let:handleClick
-					let:handleHover
-					let:handleKeypress
-					let:handleOffset
-					let:cellWidth
-					let:cellHeight
-				>
-					<Scroller
-						{cellHeight}
-						{cellWidth}
-						{rows}
-						{cols}
-						paint={paint(renderData)(map)}
-						{handleClick}
-						{handleHover}
-						{handleKeypress}
-						{handleOffset}
-					/>
-				</TileSelector>
-			{:else}
-				<slot />
-			{/if}
-		</Game>
-	</div>
+<div class="flex gap-2 border-4 border-black h-full bg-stone-400">
+	<Game
+		{map}
+		{makeImage}
+		{select}
+		let:select
+		let:interfacer
+		let:validTile
+		let:rows
+		let:cols
+		let:renderData
+	>
+		{#if loaded}
+			<TileSelector
+				{interfacer}
+				{select}
+				{validTile}
+				let:handleClick
+				let:handleHover
+				let:handleKeypress
+				let:handleOffset
+				let:cellWidth
+				let:cellHeight
+			>
+				<Scroller
+					{cellHeight}
+					{cellWidth}
+					{rows}
+					{cols}
+					paint={paint(renderData)(map)}
+					{handleClick}
+					{handleHover}
+					{handleKeypress}
+					{handleOffset}
+				/>
+			</TileSelector>
+		{:else}
+			<slot />
+		{/if}
+	</Game>
 </div>
