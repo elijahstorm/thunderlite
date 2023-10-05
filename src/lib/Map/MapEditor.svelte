@@ -29,9 +29,9 @@
 			sky: [],
 		},
 		filters: {
-			ground: (active) => Array.from({ length: terrainData.length }, (_, index) => index),
-			units: (active) => Array.from({ length: unitData.length }, (_, index) => index),
-			sky: (active) => Array.from({ length: skyData.length }, (_, index) => index),
+			ground: (_) => Array.from({ length: terrainData.length }, (_, index) => index),
+			units: (_) => Array.from({ length: unitData.length }, (_, index) => index),
+			sky: (_) => Array.from({ length: skyData.length }, (_, index) => index),
 		},
 	}
 
@@ -91,25 +91,27 @@
 	$: style = `width: ${size}px; height: ${size}px;`
 </script>
 
-<div class="p-6 h-screen max-h-screen overflow-clip">
-	<ButtonGrid rows={2} length={unitData.length} let:index>
-		<button
-			on:click={changeType('unit', index)}
-			class="border-2 border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
-			class:border-yellow-500={editType === 'unit' && type === index}
-			class:bg-yellow-200={editType === 'unit' && type === index}
-			{style}
-		>
-			<img
-				class="object-cover min-w-fit"
-				src={unitData[index].url}
-				alt={unitData[index].name}
-				style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
-			/>
-		</button>
-	</ButtonGrid>
+<div class="p-6 h-screen max-h-screen overflow-hidden flex flex-col">
+	<div class="flex-grow">
+		<ButtonGrid rows={2} length={unitData.length} let:index>
+			<button
+				on:click={changeType('unit', index)}
+				class="border-2 border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
+				class:border-yellow-500={editType === 'unit' && type === index}
+				class:bg-yellow-200={editType === 'unit' && type === index}
+				{style}
+			>
+				<img
+					class="object-cover min-w-fit"
+					src={unitData[index].url}
+					alt={unitData[index].name}
+					style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
+				/>
+			</button>
+		</ButtonGrid>
+	</div>
 
-	<div class="flex flex-1">
+	<div class="flex overflow-hidden">
 		<ButtonGrid cols={1} length={actions.length} let:index>
 			<button
 				class="border border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"

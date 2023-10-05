@@ -16,7 +16,7 @@
 		cols,
 		layers: {
 			ground: new Array(rows * cols).fill(0).map((_, index) => ({
-				type: Math.random() * 3 > 1 ? 15 : 0,
+				type: Math.random() * 3 > 1 ? 4 : 0,
 				state: 0,
 			})),
 			units: new Array(rows * cols).fill(0).map((_, index) =>

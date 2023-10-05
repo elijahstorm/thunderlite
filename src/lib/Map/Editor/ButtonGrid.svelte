@@ -13,8 +13,8 @@
 	}
 </script>
 
-<div class="border-black border-2 p-2 bg-blue-100">
-	<div class="flex gap-1 overflow-auto" class:flex-col={cols !== 0}>
+<div class="border-black border-2 p-2 bg-blue-100 overflow-auto">
+	<div class="flex gap-1" class:flex-col={cols !== 0}>
 		{#each filler as sub, group}
 			<div class="flex gap-1" class:flex-col={rows !== 0}>
 				{#each sub as _, item}
