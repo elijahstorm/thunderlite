@@ -41,7 +41,7 @@ type ObjectDataLoaded = {
 	sprite: HTMLImageElement
 }
 type ObjectSpecificRenderer = {
-	sprite: HTMLImageElement
+	sprite: HTMLImageElement[]
 	frames: number
 	xOffset: number
 	yOffset: number

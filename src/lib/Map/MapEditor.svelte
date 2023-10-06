@@ -11,12 +11,20 @@
 	import { onMount } from 'svelte'
 	import { skyData } from '$lib/GameData/sky'
 	import { animationFrame } from '$lib/Sprites/animationFrameCount'
+	import EditorButton from './Editor/EditorButton.svelte'
+	import { promiseColorized } from '$lib/Sprites/imageColorizer'
 
 	const loadChecker = (finished: boolean) => loadedState.set(finished)
 
+	const maxTeamAmount = 4
+	const size = 64
+	const unitRenders = new Array(maxTeamAmount)
+		.fill([])
+		.map((_) => new Array<Promise<string>>(unitData.length).fill(new Promise(() => null)))
+
 	let editType: 'unit' | 'terrain' | 'weather'
-	let type: number
-	let team: number
+	let type: number = 0
+	let team: number = 0
 	let map: MapObject = get(mapStore) ?? {
 		rows: 10,
 		cols: 10,
@@ -39,6 +47,12 @@
 		editType = 'unit'
 		type = 0
 		team = 0
+
+		unitRenders.map((unitList, team) =>
+			unitList.map(
+				(_, index) => (unitRenders[team][index] = promiseColorized(team)(unitData[index].url))
+			)
+		)
 	})
 
 	$: {
@@ -87,39 +101,59 @@
 		type = index
 	}
 
-	const size = 64
-	$: style = `width: ${size}px; height: ${size}px;`
+	const changeTeam = (index: number) => () => (team = index)
 </script>
 
 <div class="p-6 h-screen max-h-screen overflow-hidden flex flex-col">
-	<div class="flex-grow">
+	<div class="flex-grow flex">
+		<div class="flex-grow">
+			<ButtonGrid rows={2} length={maxTeamAmount} let:index>
+				<EditorButton
+					action={changeTeam(index)}
+					selected={editType !== 'terrain' && team === index}
+					{size}
+				>
+					{#await unitRenders[index][editType === 'terrain' ? 0 : type]}
+						...
+					{:then src}
+						<img
+							class="object-cover min-w-fit"
+							{src}
+							alt={unitData[editType === 'terrain' ? 0 : type].name}
+							style="margin: {-unitData[editType === 'terrain' ? 0 : type].yOffset +
+								6}px {-unitData[editType === 'terrain' ? 0 : type].xOffset}px 0 0;"
+						/>
+					{/await}
+				</EditorButton>
+			</ButtonGrid>
+		</div>
+
 		<ButtonGrid rows={2} length={unitData.length} let:index>
-			<button
-				on:click={changeType('unit', index)}
-				class="border-2 border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
-				class:border-yellow-500={editType === 'unit' && type === index}
-				class:bg-yellow-200={editType === 'unit' && type === index}
-				{style}
+			<EditorButton
+				action={changeType('unit', index)}
+				selected={editType === 'unit' && type === index}
+				{size}
 			>
-				<img
-					class="object-cover min-w-fit"
-					src={unitData[index].url}
-					alt={unitData[index].name}
-					style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
-				/>
-			</button>
+				{#await unitRenders[team][index]}
+					...
+				{:then src}
+					<img
+						class="object-cover min-w-fit"
+						{src}
+						alt={unitData[index].name}
+						style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
+					/>
+				{/await}
+			</EditorButton>
 		</ButtonGrid>
 	</div>
 
 	<div class="flex overflow-hidden">
 		<ButtonGrid cols={1} length={actions.length} let:index>
-			<button
-				class="border border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
-				{style}
-			>
-				<Icon icon={actions[index].icon} width={size} height={size - 25} />
+			<EditorButton action={actions[index].act} {size}>
+				<Icon icon={actions[index].icon} width={size - 3} height={size - 33} />
 				{actions[index].label}
-			</button>
+			</EditorButton>
 		</ButtonGrid>
 
 		<div class="flex-1">
@@ -133,12 +167,10 @@
 		</div>
 
 		<ButtonGrid cols={2} length={terrainData.length} let:index>
-			<button
-				on:click={changeType('terrain', index)}
-				class="border-2 border-black overflow-hidden transition-colors hover:border-yellow-400 hover:bg-yellow-100"
-				class:border-yellow-500={editType === 'terrain' && type === index}
-				class:bg-yellow-200={editType === 'terrain' && type === index}
-				{style}
+			<EditorButton
+				action={changeType('terrain', index)}
+				selected={editType === 'terrain' && type === index}
+				{size}
 			>
 				<img
 					class="object-cover object-left-top min-w-fit"
@@ -146,7 +178,7 @@
 					alt={terrainData[index].name}
 					style="margin: {-terrainData[index].yOffset}px {-terrainData[index].xOffset}px 0 0;"
 				/>
-			</button>
+			</EditorButton>
 		</ButtonGrid>
 	</div>
 </div>

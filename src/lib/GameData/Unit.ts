@@ -597,4 +597,4 @@ export const unitData = [
 	},
 ] as UnitData[]
 
-export const unitRenderer = imageLazyLoader('units', unitData)
+export const unitRenderer = imageLazyLoader('units', unitData, 4)

@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store'
 
 type ContainedSpriteStore = {
-	[key: number]: HTMLImageElement
+	[key: number]: HTMLImageElement[]
 }
 type ContainedLoadedSprites = {
 	[key: number]: ObjectSpecificRenderer

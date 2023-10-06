@@ -1,12 +1,14 @@
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { get } from 'svelte/store'
 
+type ActiveObject = { state: number; type: number; team?: number }
+
 const renderObject =
-	<T extends { state: number; type: number }>(render: ObjectSpecificRenderer, object: T) =>
+	<T extends ActiveObject>(render: ObjectSpecificRenderer, object: T) =>
 	(width: number, height: number, animationFrame: number) =>
 	(context: CanvasRenderingContext2D) =>
 		context.drawImage(
-			render.sprite,
+			render.sprite[object.team ?? 0],
 			object.state * (width + render.xOffset),
 			(animationFrame % render.frames) * (height + render.yOffset),
 			width + render.xOffset,

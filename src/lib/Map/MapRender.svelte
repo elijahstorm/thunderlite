@@ -11,7 +11,7 @@
 	export let map: MapObject
 	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
 	export let loaded: boolean
-	export let select: (x: number, y: number) => void
+	export let select: undefined | ((x: number, y: number) => void)
 
 	let timer: NodeJS.Timeout
 	const inc = () => {

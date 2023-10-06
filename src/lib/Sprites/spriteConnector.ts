@@ -13,7 +13,7 @@ const rollInto: ConnectionDecision = (map, location) =>
 		right(map, location) ? 'true' : 'false'
 	][down(map, location) ? 'true' : 'false']
 
-const random: ConnectionDecision = (map, location) => location % 5
+const random: ConnectionDecision = (map, location) => location%5
 
 const border: ConnectionDecision = (map, location) => {
 	const border =
