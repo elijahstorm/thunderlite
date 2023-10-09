@@ -4,15 +4,15 @@
 	import { unitRenderer } from '$lib/GameData/unit'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { onMount } from 'svelte'
-	import { get } from 'svelte/store'
 
 	export let map: MapObject
 	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
 	export let select = (x: number, y: number) => {
-		console.log(x, y) // todo game interactions
+		const tile = y * map.cols + x
+		console.log(tile, x, y) // todo game interactions
 	}
 
-	let validTile = (x: number, y: number) => x < rows && y < cols
+	let validTile = (x: number, y: number) => x < map.cols && y < map.rows
 
 	const interfacer: InterfaceInteraction = (() => {
 		return {
@@ -23,15 +23,11 @@
 		}
 	})()
 
-	let rows = map.rows
-	let cols = map.cols
-
 	let renderData: ObjectRenderer = {
-		ground: (type: number) => get(rendererStore).ground[type],
+		ground: (type: number) => $rendererStore.ground[type],
 		unit: (type?: number) =>
-			typeof type !== 'undefined' ? get(rendererStore).units[type] ?? null : null,
-		sky: (type?: number) =>
-			typeof type !== 'undefined' ? get(rendererStore).sky[type] ?? null : null,
+			typeof type !== 'undefined' ? $rendererStore.units[type] ?? null : null,
+		sky: (type?: number) => (typeof type !== 'undefined' ? $rendererStore.sky[type] ?? null : null),
 	}
 
 	onMount(() => {
@@ -48,4 +44,4 @@
 	})
 </script>
 
-<slot {interfacer} {select} {validTile} {rows} {cols} {renderData} />
+<slot {interfacer} {select} {validTile} {renderData} />

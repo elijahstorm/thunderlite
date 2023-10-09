@@ -2,30 +2,26 @@
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
 	import { createImageLoader } from '$lib/Sprites/images'
-	import { connectionDecision } from '$lib/Sprites/spriteConnector'
 	import ButtonGrid from './Editor/ButtonGrid.svelte'
 	import MapRender from './MapRender.svelte'
 	import { loadedState, mapStore } from './mapStore'
-	import { get } from 'svelte/store'
 	import Icon from '@iconify/svelte'
-	import { onMount } from 'svelte'
 	import { skyData } from '$lib/GameData/sky'
-	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import EditorButton from './Editor/EditorButton.svelte'
-	import { promiseColorized } from '$lib/Sprites/imageColorizer'
+	import MapOptions from './MapOptions.svelte'
+	import { addToast } from 'as-toast'
+	import { spriteStore } from '$lib/Sprites/spriteStore'
 
-	const loadChecker = (finished: boolean) => loadedState.set(finished)
+	const makeImage = createImageLoader((finished: boolean) => loadedState.set(finished))
 
 	const maxTeamAmount = 4
 	const size = 64
-	const unitRenders = new Array(maxTeamAmount)
-		.fill([])
-		.map((_) => new Array<Promise<string>>(unitData.length).fill(new Promise(() => null)))
 
-	let editType: 'unit' | 'terrain' | 'weather'
+	let openOptionsModal = false
+	let editType: keyof MapLayers = 'units'
 	let type: number = 0
 	let team: number = 0
-	let map: MapObject = get(mapStore) ?? {
+	let map: MapObject = $mapStore ?? {
 		rows: 10,
 		cols: 10,
 		layers: {
@@ -41,27 +37,6 @@
 			units: (_) => Array.from({ length: unitData.length }, (_, index) => index),
 			sky: (_) => Array.from({ length: skyData.length }, (_, index) => index),
 		},
-	}
-
-	onMount(() => {
-		editType = 'unit'
-		type = 0
-		team = 0
-
-		unitRenders.map((unitList, team) =>
-			unitList.map(
-				(_, index) => (unitRenders[team][index] = promiseColorized(team)(unitData[index].url))
-			)
-		)
-	})
-
-	$: {
-		map.layers.ground.map(
-			(object, index) => (object.state = connectionDecision(object)(map, index))
-		)
-
-		mapStore.set(map)
-		animationFrame.update((frame) => frame + 4)
 	}
 
 	const actions = [
@@ -83,15 +58,24 @@
 		{
 			label: 'play',
 			icon: 'solar:play-bold',
-			act: () => {},
+			act: () => {
+				addToast(`Loading...`)
+			},
+		},
+		{
+			label: 'options',
+			icon: 'gis:map-options',
+			act: () => {
+				openOptionsModal = !openOptionsModal
+			},
 		},
 	]
 
 	const select = (x: number, y: number) => {
-		const tile = x + y * map.rows
-		if (editType === 'unit') {
+		const tile = y * map.cols + x
+		if (editType === 'units') {
 			map.layers.units[tile] = { type, tile, team, state: 4 }
-		} else if (editType === 'terrain') {
+		} else if (editType === 'ground') {
 			map.layers.ground[tile] = { type, state: 0 }
 		}
 	}
@@ -102,48 +86,52 @@
 	}
 
 	const changeTeam = (index: number) => () => (team = index)
+
+	$: {
+		mapStore.set(map)
+	}
 </script>
 
-<div class="p-6 h-screen max-h-screen overflow-hidden flex flex-col">
+<grid class="p-6 h-screen max-h-screen overflow-hidden flex flex-col select-none">
 	<div class="flex-grow flex">
 		<div class="flex-grow">
 			<ButtonGrid rows={2} length={maxTeamAmount} let:index>
 				<EditorButton
 					action={changeTeam(index)}
-					selected={editType !== 'terrain' && team === index}
+					selected={editType !== 'ground' && team === index}
+					disabled={editType === 'ground'}
 					{size}
 				>
-					{#await unitRenders[index][editType === 'terrain' ? 0 : type]}
-						...
-					{:then src}
+					{#if $loadedState && editType !== 'ground'}
 						<img
 							class="object-cover min-w-fit"
-							{src}
-							alt={unitData[editType === 'terrain' ? 0 : type].name}
-							style="margin: {-unitData[editType === 'terrain' ? 0 : type].yOffset +
-								6}px {-unitData[editType === 'terrain' ? 0 : type].xOffset}px 0 0;"
+							src={$spriteStore[editType][type][index].src}
+							alt={unitData[type].name}
+							style="margin: {-unitData[type].yOffset + 6}px {-unitData[type].xOffset}px 0 0;"
 						/>
-					{/await}
+					{:else}
+						...
+					{/if}
 				</EditorButton>
 			</ButtonGrid>
 		</div>
 
 		<ButtonGrid rows={2} length={unitData.length} let:index>
 			<EditorButton
-				action={changeType('unit', index)}
-				selected={editType === 'unit' && type === index}
+				action={changeType('units', index)}
+				selected={editType === 'units' && type === index}
 				{size}
 			>
-				{#await unitRenders[team][index]}
-					...
-				{:then src}
+				{#if $loadedState}
 					<img
 						class="object-cover min-w-fit"
-						{src}
+						src={$spriteStore['units'][index][team].src}
 						alt={unitData[index].name}
 						style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
 					/>
-				{/await}
+				{:else}
+					...
+				{/if}
 			</EditorButton>
 		</ButtonGrid>
 	</div>
@@ -157,19 +145,13 @@
 		</ButtonGrid>
 
 		<div class="flex-1">
-			<MapRender
-				pause
-				{map}
-				{select}
-				makeImage={createImageLoader(loadChecker)}
-				loaded={$loadedState}
-			/>
+			<MapRender pause {map} {select} {makeImage} loaded={$loadedState} />
 		</div>
 
 		<ButtonGrid cols={2} length={terrainData.length} let:index>
 			<EditorButton
-				action={changeType('terrain', index)}
-				selected={editType === 'terrain' && type === index}
+				action={changeType('ground', index)}
+				selected={editType === 'ground' && type === index}
 				{size}
 			>
 				<img
@@ -181,4 +163,13 @@
 			</EditorButton>
 		</ButtonGrid>
 	</div>
-</div>
+</grid>
+
+<MapOptions
+	{map}
+	open={openOptionsModal}
+	apply={(appliedChanges) => (map = appliedChanges)}
+	let:updatedMap
+>
+	<MapRender pause mini map={updatedMap} select={() => {}} {makeImage} loaded={$loadedState} />
+</MapOptions>

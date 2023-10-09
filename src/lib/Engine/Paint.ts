@@ -3,16 +3,18 @@ import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
 
+const spriteSize = 60
+
 const renderObject =
 	<T extends ActiveObject>(render: ObjectSpecificRenderer, object: T) =>
 	(width: number, height: number, animationFrame: number) =>
 	(context: CanvasRenderingContext2D) =>
 		context.drawImage(
 			render.sprite[object.team ?? 0],
-			object.state * (width + render.xOffset),
-			(animationFrame % render.frames) * (height + render.yOffset),
-			width + render.xOffset,
-			height + render.yOffset,
+			object.state * (spriteSize + render.xOffset),
+			(animationFrame % render.frames) * (spriteSize + render.yOffset),
+			spriteSize + render.xOffset,
+			spriteSize + render.yOffset,
 			-render.xOffset,
 			-render.yOffset,
 			width + render.xOffset,
@@ -31,22 +33,14 @@ const conditional = <T extends { state: number; type: number }>(
 
 export const paint =
 	(renderData: ObjectRenderer) =>
-	(map: MapObject) =>
+	(getMap: () => MapObject) =>
 	(context: CanvasRenderingContext2D) =>
-	(
-		row: number,
-		col: number,
-		left: number,
-		top: number,
-		width: number,
-		height: number,
-		zoom: number
-	) => {
+	(row: number, col: number, left: number, top: number, width: number, height: number) => {
 		context.save()
-		context.scale(zoom, zoom)
 		context.translate(left, top)
 
-		const tile = col + row * map.rows
+		const map = getMap()
+		const tile = row * map.cols + col
 		const frame = get(animationFrame)
 
 		always(renderData.ground, map.layers.ground[tile])(width, height, frame)(context)

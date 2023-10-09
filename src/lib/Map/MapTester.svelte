@@ -1,17 +1,15 @@
 <script lang="ts">
 	import { unitData } from '$lib/GameData/unit'
 	import { createImageLoader } from '$lib/Sprites/images'
-	import { connectionDecision } from '$lib/Sprites/spriteConnector'
 	import MapRender from './MapRender.svelte'
 	import { loadedState, mapStore } from './mapStore'
-	import { get } from 'svelte/store'
 
 	const loadChecker = (finished: boolean) => loadedState.set(finished)
 
 	let rows = 100
 	let cols = 100
 
-	const map: MapObject = get(mapStore) ?? {
+	const map: MapObject = $mapStore ?? {
 		rows,
 		cols,
 		layers: {
@@ -47,8 +45,6 @@
 				active.filter((data) => data !== null).map((data) => (data as ObjectType).type),
 		},
 	}
-
-	map.layers.ground.map((object, index) => (object.state = connectionDecision(object)(map, index)))
 
 	mapStore.set(map)
 </script>

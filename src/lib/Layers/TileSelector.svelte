@@ -2,9 +2,10 @@
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
+	export let mini: boolean = false
 
-	const cellWidth = 60
-	const cellHeight = 60
+	const cellWidth = mini ? 20 : 60
+	const cellHeight = cellWidth
 
 	const handleClick = (_x: number, _y: number) => {
 		const [x, y] = [tileX(_x), tileY(_y)]
@@ -41,8 +42,10 @@
 		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight} />
 	</div>
 
-	<div class="col-start-1 row-start-1 pointer-events-none relative">
-		<div class="absolute border-2 border-red-500" style={selectedStyles} />
-		<div class="absolute bg-yellow-500 opacity-30" style={hoveredStyles} />
-	</div>
+	{#if !mini}
+		<div class="col-start-1 row-start-1 pointer-events-none relative">
+			<div class="absolute border-2 border-red-500" style={selectedStyles} />
+			<div class="absolute bg-yellow-500 opacity-30" style={hoveredStyles} />
+		</div>
+	{/if}
 </section>

@@ -28,8 +28,8 @@ type MapFilters = {
 	units: (active: (UnitObject | null)[]) => number[]
 }
 type MapObject = {
-	rows: number
 	cols: number
+	rows: number
 	layers: MapLayers
 	filters: MapFilters
 }
@@ -75,3 +75,14 @@ type InterfaceInteraction = {
 		shift: boolean
 	}
 }
+
+type Direction =
+	| 'top-left'
+	| 'top'
+	| 'top-right'
+	| 'left'
+	| 'center'
+	| 'right'
+	| 'bottom-left'
+	| 'bottom'
+	| 'bottom-right'

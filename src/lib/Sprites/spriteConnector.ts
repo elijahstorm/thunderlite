@@ -13,7 +13,7 @@ const rollInto: ConnectionDecision = (map, location) =>
 		right(map, location) ? 'true' : 'false'
 	][down(map, location) ? 'true' : 'false']
 
-const random: ConnectionDecision = (map, location) => location%5
+const random: ConnectionDecision = (map, location) => location % 5
 
 const border: ConnectionDecision = (map, location) => {
 	const border =
@@ -147,15 +147,15 @@ const type = (map: GroundObject[], location: number) => map[location].type
 const ocean = (map: GroundObject[], location: number) => terrainData[map[location].type].ocean
 
 const up = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
-	location - map.rows >= 0 &&
-	reader(map.layers.ground, location - map.rows) === reader(map.layers.ground, location)
+	location - map.cols >= 0 &&
+	reader(map.layers.ground, location - map.cols) === reader(map.layers.ground, location)
 const down = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
-	location + map.rows < map.layers.ground.length &&
-	reader(map.layers.ground, location + map.rows) === reader(map.layers.ground, location)
+	location + map.cols < map.layers.ground.length &&
+	reader(map.layers.ground, location + map.cols) === reader(map.layers.ground, location)
 
 const left = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
-	location % map.rows !== 0 &&
+	location % map.cols !== 0 &&
 	reader(map.layers.ground, location - 1) === reader(map.layers.ground, location)
 const right = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
-	(location + 1) % map.rows !== 0 &&
+	(location + 1) % map.cols !== 0 &&
 	reader(map.layers.ground, location + 1) === reader(map.layers.ground, location)

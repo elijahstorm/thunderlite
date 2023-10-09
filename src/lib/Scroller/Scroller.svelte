@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte'
 	import { MakeTiling, type Tiling } from './Tiling'
 	import { MakeScroller, type Scroller } from './Scroller'
+	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import {
 		touchstart,
 		touchmove,
@@ -14,31 +15,25 @@
 		click,
 		keypress,
 	} from './PageInteractions'
-	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 
-	export let cellWidth = 60
-	export let cellHeight = 60
-	export let rows = 10
-	export let cols = 10
+	export let tileWidth: number
+	export let tileHeight: number
+	export let contentWidth: number
+	export let contentHeight: number
+
+	export let handleClick: (x: number, y: number) => void
+	export let handleHover: (x: number, y: number) => void
+	export let handleOffset: (x: number, y: number, zoom: number) => void
+	export let handleKeypress: (key: string, shiftKey: boolean) => void
 
 	let scroller: Scroller
-
-	export let handleClick = (x: number, y: number) => {}
-	export let handleHover = (x: number, y: number) => {}
-	export let handleOffset = (x: number, y: number, zoom: number) => {}
-	export let handleKeypress = (key: string, shiftKey: boolean) => {}
-
 	let container: HTMLElement
 	let content: HTMLCanvasElement
 	let context: CanvasRenderingContext2D
-	let reflow: VoidFunction
 	let tiling: Tiling
 
-	let clientWidth = 0
-	let clientHeight = 0
-	let contentWidth: number = cellWidth * rows
-	let contentHeight: number = cellHeight * cols
-
+	let reflow: VoidFunction
+	const render = () => reflow && !scroller?.__isDecelerating && !scroller?.__isTracking && reflow()
 	export let paint =
 		(context: CanvasRenderingContext2D) =>
 		(
@@ -81,32 +76,31 @@
 		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
 
 		reflow = () => {
-			clientWidth = container.clientWidth
-			clientHeight = container.clientHeight
+			const clientWidth = container.clientWidth
+			const clientHeight = container.clientHeight
 			content.width = clientWidth
 			content.height = clientHeight
 			tiling.setup({
 				clientWidth,
 				clientHeight,
-				contentWidth: contentWidth,
-				contentHeight: contentHeight,
-				tileWidth: cellWidth,
-				tileHeight: cellHeight,
+				contentWidth,
+				contentHeight,
+				tileWidth,
+				tileHeight,
 			})
 			scroller.options.locking = window.innerWidth <= 768
 			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
 		}
 
 		reflow()
-
 		container.focus()
 	})
 
 	$: {
 		$animationFrame
-		if (reflow && !scroller?.__isDecelerating && !scroller?.__isTracking) {
-			reflow()
-		}
+		contentWidth
+		contentHeight
+		render()
 	}
 </script>
 
