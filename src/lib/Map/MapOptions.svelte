@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { deepClone, expand } from './Editor/mapResizer'
+	import { deepClone, reform } from './Editor/mapResizer'
 	import { Modal } from 'flowbite-svelte'
 
 	export let map: MapObject
@@ -10,20 +10,20 @@
 
 	let selectedDir: Direction = 'center'
 	const directions = [
-		'top-left',
+		'topLeft',
 		'top',
-		'top-right',
+		'topRight',
 		'left',
 		'center',
 		'right',
-		'bottom-left',
+		'bottomLeft',
 		'bottom',
-		'bottom-right',
+		'bottomRight',
 	] as const
 
-	const expander = expand(deepClone(map), (applied: MapObject) => (updatedMap = applied))
+	const resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
 
-	$: expander(updatedMap, selectedDir)
+	$: resizer(updatedMap, selectedDir)
 </script>
 
 <Modal title="Map Editor Options" bind:open outsideclose>

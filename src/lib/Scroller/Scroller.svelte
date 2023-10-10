@@ -20,6 +20,7 @@
 	export let tileHeight: number
 	export let contentWidth: number
 	export let contentHeight: number
+	export let requestRedraw = 0
 
 	export let handleClick: (x: number, y: number) => void
 	export let handleHover: (x: number, y: number) => void
@@ -100,6 +101,7 @@
 		$animationFrame
 		contentWidth
 		contentHeight
+		requestRedraw
 		render()
 	}
 </script>

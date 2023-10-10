@@ -65,16 +65,14 @@
 		{
 			label: 'options',
 			icon: 'gis:map-options',
-			act: () => {
-				openOptionsModal = !openOptionsModal
-			},
+			act: () => (openOptionsModal = !openOptionsModal),
 		},
 	]
 
 	const select = (x: number, y: number) => {
 		const tile = y * map.cols + x
 		if (editType === 'units') {
-			map.layers.units[tile] = { type, tile, team, state: 4 }
+			map.layers.units[tile] = { type, team, state: 4 }
 		} else if (editType === 'ground') {
 			map.layers.ground[tile] = { type, state: 0 }
 		}
@@ -87,9 +85,7 @@
 
 	const changeTeam = (index: number) => () => (team = index)
 
-	$: {
-		mapStore.set(map)
-	}
+	$: mapStore.set(map)
 </script>
 
 <grid class="p-6 h-screen max-h-screen overflow-hidden flex flex-col select-none">
@@ -167,7 +163,7 @@
 
 <MapOptions
 	{map}
-	open={openOptionsModal}
+	bind:open={openOptionsModal}
 	apply={(appliedChanges) => (map = appliedChanges)}
 	let:updatedMap
 >

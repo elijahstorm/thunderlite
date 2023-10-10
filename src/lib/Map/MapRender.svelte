@@ -15,10 +15,14 @@
 	export let select: undefined | ((x: number, y: number) => void)
 	export let mini: boolean = false
 
+	const ANIMATION_TIME = 800
+	let requestRedraw = 0
+
 	$: {
 		map.layers.ground.map(
 			(object, index) => (object.state = connectionDecision(object)(map, index))
 		)
+		requestRedraw = performance.now()
 	}
 
 	const inc = () => {
@@ -27,18 +31,18 @@
 			return
 		}
 		animationFrame.update((frame) => (frame + 1) % 100000)
-		$animationTimer = setTimeout(inc, 800)
+		$animationTimer = setTimeout(inc, ANIMATION_TIME)
 	}
 
 	$: {
 		if (!pause && !$animationTimer) {
-			$animationTimer = setTimeout(inc, 800)
+			$animationTimer = setTimeout(inc, ANIMATION_TIME)
 		}
 	}
 
 	onMount(() => {
 		if (!pause && !$animationTimer) {
-			$animationTimer = setTimeout(inc, 1000)
+			$animationTimer = setTimeout(inc, ANIMATION_TIME)
 		}
 	})
 
@@ -75,6 +79,7 @@
 					contentWidth={cellWidth * map.cols}
 					contentHeight={cellHeight * map.rows}
 					paint={paint(renderData)(() => map)}
+					{requestRedraw}
 					{handleClick}
 					{handleHover}
 					{handleKeypress}

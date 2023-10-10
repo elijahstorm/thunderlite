@@ -22,7 +22,6 @@
 					? null
 					: {
 							type: Math.floor(Math.random() * unitData.length),
-							tile: index * cols + rows,
 							team: index % 2,
 							state: 4,
 					  }
@@ -32,7 +31,6 @@
 					? null
 					: {
 							type: Math.floor(Math.random() * 2),
-							tile: index * cols + rows,
 							state: 0,
 					  }
 			),

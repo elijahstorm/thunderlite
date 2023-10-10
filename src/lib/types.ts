@@ -7,12 +7,8 @@ type AnimatedObject = {
 	state: number
 }
 type GroundObject = ObjectType & AnimatedObject
-type LocationObject = ObjectType &
-	AnimatedObject & {
-		tile: number
-	}
-type SkyObject = LocationObject & AnimatedObject
-type UnitObject = LocationObject &
+type SkyObject = ObjectType & AnimatedObject
+type UnitObject = ObjectType &
 	AnimatedObject & {
 		team: number
 	}
@@ -77,12 +73,12 @@ type InterfaceInteraction = {
 }
 
 type Direction =
-	| 'top-left'
+	| 'topLeft'
 	| 'top'
-	| 'top-right'
+	| 'topRight'
 	| 'left'
 	| 'center'
 	| 'right'
-	| 'bottom-left'
+	| 'bottomLeft'
 	| 'bottom'
-	| 'bottom-right'
+	| 'bottomRight'
