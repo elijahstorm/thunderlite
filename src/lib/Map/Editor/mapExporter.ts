@@ -1,7 +1,5 @@
-export const mapExporter = (map: MapObject) => {
-	const exported = ''
+export const mapExporter = (map: MapObject) => JSON.stringify(map)
 
-	map
+export const mapImporter = (content: string) => JSON.parse(content) as MapObject
 
-	return exported
-}
+export const mapHash = (map: MapObject) => `${map?.title ?? '_'}.tempHash`

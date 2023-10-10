@@ -24,6 +24,7 @@ type MapFilters = {
 	units: (active: (UnitObject | null)[]) => number[]
 }
 type MapObject = {
+	title?: string | null
 	cols: number
 	rows: number
 	layers: MapLayers

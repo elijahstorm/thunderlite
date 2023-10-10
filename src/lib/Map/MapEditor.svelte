@@ -11,6 +11,10 @@
 	import MapOptions from './MapOptions.svelte'
 	import { addToast } from 'as-toast'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
+	import { open, save } from './Editor/fileManager'
+	import { mapExporter, mapHash, mapImporter } from './Editor/mapExporter'
+	import { share } from './Editor/mapShare'
+	import { PUBLIC_GAME_NAME } from '$env/static/public'
 
 	const makeImage = createImageLoader((finished: boolean) => loadedState.set(finished))
 
@@ -22,6 +26,7 @@
 	let type: number = 0
 	let team: number = 0
 	let map: MapObject = $mapStore ?? {
+		title: 'rose gold',
 		rows: 10,
 		cols: 10,
 		layers: {
@@ -43,23 +48,29 @@
 		{
 			label: 'save',
 			icon: 'fluent:save-24-filled',
-			act: () => {},
+			act: () => save(mapExporter(map)),
 		},
 		{
 			label: 'open',
 			icon: 'fluent:folder-32-filled',
-			act: () => {},
+			act: () => {
+				open((content: string | null) => {
+					if (content) {
+						map = mapImporter(content)
+					}
+				})
+			},
 		},
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => {},
+			act: () => share(map?.title ?? PUBLIC_GAME_NAME, 'A Game', mapHash(map)),
 		},
 		{
 			label: 'play',
 			icon: 'solar:play-bold',
 			act: () => {
-				addToast(`Loading...`)
+				addToast(`Loading... JK not implemented yet!`)
 			},
 		},
 		{
