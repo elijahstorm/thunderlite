@@ -1953,8 +1953,8 @@ let MapEditorClass = function (__saved_imgs) {
 
 		if (game_data == null || !game_data.Valid) {
 			DATA.id = -1
-			DATA.units = new Array()
-			DATA.cities = new Array()
+			DATA.units = []
+			DATA.cities = []
 			DATA.weather = [0]
 			DATA.name = 'Unnamed Custom Map'
 			DATA.max_players = 2

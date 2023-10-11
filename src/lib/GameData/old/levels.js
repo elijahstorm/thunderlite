@@ -11,7 +11,7 @@ var Levels_Class = function () {
 		}
 		let Event = function (__type, __script, __attribute) {
 			// list of commands with a single event call
-			let actions = new Array()
+			let actions = []
 			this.Type = __type
 			this.Attribute = __attribute
 
@@ -216,7 +216,7 @@ var Levels_Class = function () {
 				self.Do_Event(i + 1)
 			}
 		}
-		let Commands = new Array()
+		let Commands = []
 
 		this.Do = function (_type, attribute) {
 			for (let _i = 0; _i < Commands.length; _i++) {
