@@ -14,7 +14,7 @@
 	import { open, save } from './Editor/fileManager'
 	import { mapExporter, mapHash, mapImporter } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
-	// import { PUBLIC_GAME_NAME } from '$env/static/public'
+	import { PUBLIC_GAME_NAME } from '$env/static/public'
 
 	const makeImage = createImageLoader((finished: boolean) => loadedState.set(finished))
 
@@ -64,7 +64,7 @@
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => share(map?.title ?? 'PUBLIC_GAME_NAME', 'A Game', mapHash(map)),
+			act: () => share(map?.title ?? PUBLIC_GAME_NAME, 'A Game', mapHash(map)),
 		},
 		{
 			label: 'play',
