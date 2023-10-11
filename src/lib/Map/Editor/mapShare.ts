@@ -1,4 +1,4 @@
-import { PUBLIC_URL } from '$env/static/public'
+// import { PUBLIC_URL } from '$env/static/public'
 import { addToast } from 'as-toast'
 
 export const share = (title: string, text: string, hash: string) => {
@@ -7,7 +7,7 @@ export const share = (title: string, text: string, hash: string) => {
 		const shareData = {
 			title,
 			text,
-			url: `${PUBLIC_URL}map/${hash}`,
+			url: `${'PUBLIC_URL'}map/${hash}`,
 		}
 
 		navigator
