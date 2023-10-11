@@ -3,7 +3,6 @@ import { addToast } from 'as-toast'
 
 export const share = (title: string, text: string, hash: string) => {
 	if (navigator.share) {
-		// Share API is supported
 		const shareData = {
 			title,
 			text,
@@ -19,7 +18,6 @@ export const share = (title: string, text: string, hash: string) => {
 				addToast(`Error sharing: ${error}`, 'warn')
 			})
 	} else {
-		// Share API is not supported
 		addToast('Share API is not available in this browser', 'warn')
 	}
 }
