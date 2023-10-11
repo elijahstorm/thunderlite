@@ -42,8 +42,7 @@ const expand = (
 
 	newData.layers.ground = new Array(newData.rows * newData.cols)
 		.fill(0)
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		.map((_) => ({ type: 0, state: 0 }))
+		.map(() => ({ type: 0, state: 0 }))
 
 	for (let col = 0; col < source.cols; col++) {
 		for (let row = 0; row < source.rows; row++) {

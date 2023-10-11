@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { PUBLIC_GAME_NAME } from '$env/static/public'
 	import Scroller from '$lib/Scroller/Scroller.svelte'
 	import TileSelector from '$lib/Layers/TileSelector.svelte'
 	import Game from '$lib/Engine/Game.svelte'
@@ -53,10 +52,6 @@
 		$animationTimer = null
 	})
 </script>
-
-<svelte:head>
-	<title>{PUBLIC_GAME_NAME}</title>
-</svelte:head>
 
 <div class="flex gap-2 border-4 border-black h-full bg-stone-400">
 	<Game {map} {makeImage} {select} let:interfacer let:renderData let:select let:validTile>

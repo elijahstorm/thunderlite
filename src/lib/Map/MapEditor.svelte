@@ -27,10 +27,10 @@
 	let team: number = 0
 	let map: MapObject = $mapStore ?? {
 		title: 'rose gold',
-		rows: 10,
 		cols: 10,
+		rows: 10,
 		layers: {
-			ground: new Array(100).fill(0).map((_) => ({
+			ground: new Array(100).fill(0).map(() => ({
 				type: 0,
 				state: 0,
 			})),
@@ -38,9 +38,9 @@
 			sky: [],
 		},
 		filters: {
-			ground: (_) => Array.from({ length: terrainData.length }, (_, index) => index),
-			units: (_) => Array.from({ length: unitData.length }, (_, index) => index),
-			sky: (_) => Array.from({ length: skyData.length }, (_, index) => index),
+			ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
+			units: () => Array.from({ length: unitData.length }, (_, index) => index),
+			sky: () => Array.from({ length: skyData.length }, (_, index) => index),
 		},
 	}
 

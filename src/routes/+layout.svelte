@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { PUBLIC_GAME_NAME } from '$env/static/public'
 	import { Toasts } from 'as-toast'
 	import '../app.css'
 </script>
 
 <svelte:head>
+	<title>{PUBLIC_GAME_NAME}</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
 	<link

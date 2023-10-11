@@ -1,0 +1,29 @@
+name: Playwright Tests
+
+on:
+  deployment_status:
+jobs:
+  run-e2es:
+    if: github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install && npx playwright install --with-deps
+      - name: Run tests
+        run: npx playwright test
+        env:
+          PUBLIC_URL: ${{ env.PUBLIC_URL }}
+          PUBLIC_GAME_NAME: ${{ env.PUBLIC_GAME_NAME }}
+          BASE_URL: ${{ github.event.deployment_status.environment_url }}

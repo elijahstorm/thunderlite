@@ -2,7 +2,7 @@
 // Copywrite April 5, 2020
 // for use only in ThunderLite Project
 
-var Mod_Class = function (index, name, act, type, arguments, desc, icon, test_func) {
+var Mod_Class = function (index, name, act, type, _args, desc, icon, test_func) {
 	if (test_func == null)
 		test_func = function () {
 			return true
@@ -11,7 +11,7 @@ var Mod_Class = function (index, name, act, type, arguments, desc, icon, test_fu
 	this.Name = name
 	this.Type = type
 	this.Description = desc
-	this.Args = arguments
+	this.Args = _args
 	this.Sprite = ERRORIMG
 	this.Active = true
 	this.toStr = function () {
