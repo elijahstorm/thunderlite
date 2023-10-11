@@ -8,7 +8,7 @@
 	$: {
 		filler = new Array(Math.floor(length / (rows || cols)))
 			.fill(0)
-			.map((_) => new Array(rows || cols))
+			.map(() => new Array(rows || cols))
 		filler.push(new Array(length % (rows || cols)))
 	}
 </script>

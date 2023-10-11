@@ -6,18 +6,18 @@
 
 	const loadChecker = (finished: boolean) => loadedState.set(finished)
 
-	let rows = 10
 	let cols = 11
+	let rows = 10
 
 	const map: MapObject = $mapStore ?? {
-		rows,
 		cols,
+		rows,
 		layers: {
-			ground: new Array(rows * cols).fill(0).map((_, index) => ({
+			ground: new Array(cols * rows).fill(0).map((_, index) => ({
 				type: Math.random() * 3 > 1 ? 4 : 0,
 				state: 0,
 			})),
-			units: new Array(rows * cols).fill(0).map((_, index) =>
+			units: new Array(cols * rows).fill(0).map((_, index) =>
 				index % cols !== 2
 					? null
 					: {
@@ -26,7 +26,7 @@
 							state: 4,
 					  }
 			),
-			sky: new Array(rows * cols).fill(0).map((_, index) =>
+			sky: new Array(cols * rows).fill(0).map((_, index) =>
 				Math.floor(index / cols) !== 2
 					? null
 					: {

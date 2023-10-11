@@ -10,5 +10,7 @@ export default defineConfig({
 	},
 	test: {
 		include: ['src/**/*.test.ts'],
+		environment: 'happy-dom',
+		alias: [{ find: /^svelte$/, replacement: 'svelte/internal' }],
 	},
 })
