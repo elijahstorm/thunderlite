@@ -8,4 +8,7 @@ export default defineConfig({
 			external: ['iconify-icon'],
 		},
 	},
+	test: {
+		include: ['src/**/*.test.ts'],
+	},
 })
