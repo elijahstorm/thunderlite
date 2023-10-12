@@ -48,7 +48,7 @@
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => share(map?.title ?? PUBLIC_GAME_NAME, 'A Game', mapHasher(map)),
+			act: () => share(map?.title ?? PUBLIC_GAME_NAME, mapHasher(map)),
 		},
 		{
 			label: 'play',
