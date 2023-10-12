@@ -3,20 +3,29 @@
 type ObjectType = {
 	type: number
 }
+type LocationObject = ObjectType & {
+	l: number
+}
 type AnimatedObject = {
 	state: number
 }
+type TeamObject = {
+	team: number
+}
+
 type GroundObject = ObjectType & AnimatedObject
 type SkyObject = ObjectType & AnimatedObject
-type UnitObject = ObjectType &
-	AnimatedObject & {
-		team: number
-	}
+type UnitObject = ObjectType & AnimatedObject & TeamObject
 
 type MapLayers = {
 	ground: GroundObject[]
 	sky: (SkyObject | null)[]
 	units: (UnitObject | null)[]
+}
+type MapLayersData = {
+	ground: ObjectType[]
+	sky: LocationObject[]
+	units: (LocationObject & TeamObject)[]
 }
 type MapFilters = {
 	ground: (active: GroundObject[]) => number[]
@@ -29,6 +38,18 @@ type MapObject = {
 	rows: number
 	layers: MapLayers
 	filters: MapFilters
+}
+type MapProcesser = {
+	title?: string | null
+	cols: number
+	rows: number
+	layers: MapLayers
+}
+type MapData = {
+	title?: string | null
+	cols: number
+	rows: number
+	layers: MapLayersData
 }
 
 type ObjectDataLoader = {

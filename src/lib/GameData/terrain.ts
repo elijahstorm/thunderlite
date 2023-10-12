@@ -15,7 +15,7 @@ type TerrainData = SpriteObject & {
 
 export const terrainData = [
 	{
-		url: 'game/play/terrain/plains.png',
+		url: '/game/play/terrain/plains.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -31,7 +31,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/hills.png',
+		url: '/game/play/terrain/hills.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -47,7 +47,7 @@ export const terrainData = [
 		modifiers: ['CURMODS.Properties.Extra_Sight'],
 	},
 	{
-		url: 'game/play/terrain/forest.png',
+		url: '/game/play/terrain/forest.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -63,7 +63,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/mountain.png',
+		url: '/game/play/terrain/mountain.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -79,7 +79,7 @@ export const terrainData = [
 		modifiers: ['CURMODS.Properties.Extra_Sight'],
 	},
 	{
-		url: 'game/play/terrain/road.png',
+		url: '/game/play/terrain/road.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -95,7 +95,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/canyon.png',
+		url: '/game/play/terrain/canyon.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -111,7 +111,7 @@ export const terrainData = [
 		modifiers: ['CURMODS.Properties.Trench'],
 	},
 	{
-		url: 'game/play/terrain/wasteland.png',
+		url: '/game/play/terrain/wasteland.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -127,7 +127,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/volcano.png',
+		url: '/game/play/terrain/volcano.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 34,
@@ -143,7 +143,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/enriched-ore-deposit.png',
+		url: '/game/play/terrain/enriched-ore-deposit.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -159,7 +159,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/ore-deposit.png',
+		url: '/game/play/terrain/ore-deposit.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -175,7 +175,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/depleted-ore-deposit.png',
+		url: '/game/play/terrain/depleted-ore-deposit.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -191,7 +191,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/sea.png',
+		url: '/game/play/terrain/sea.png',
 		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
@@ -207,7 +207,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/reef.png',
+		url: '/game/play/terrain/reef.png',
 		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
@@ -223,7 +223,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/archipelago.png',
+		url: '/game/play/terrain/archipelago.png',
 		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
@@ -239,7 +239,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/rock-formation.png',
+		url: '/game/play/terrain/rock-formation.png',
 		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
@@ -255,7 +255,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/shore.png',
+		url: '/game/play/terrain/shore.png',
 		frames: 3,
 		xOffset: 0,
 		yOffset: 0,
@@ -271,7 +271,7 @@ export const terrainData = [
 		modifiers: ['CURMODS.Properties.Port'],
 	},
 	{
-		url: 'game/play/terrain/bridge.png',
+		url: '/game/play/terrain/bridge.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
@@ -287,7 +287,7 @@ export const terrainData = [
 		modifiers: [],
 	},
 	{
-		url: 'game/play/terrain/high-bridge.png',
+		url: '/game/play/terrain/high-bridge.png',
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,

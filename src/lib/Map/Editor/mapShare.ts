@@ -2,11 +2,13 @@ import { PUBLIC_URL } from '$env/static/public'
 import { addToast } from 'as-toast'
 
 export const share = (title: string, text: string, hash: string) => {
+	const url = `${PUBLIC_URL}editor/${hash}`
+
 	if (navigator.share) {
 		const shareData = {
 			title,
 			text,
-			url: `${PUBLIC_URL}map/${hash}`,
+			url,
 		}
 
 		navigator
@@ -18,6 +20,12 @@ export const share = (title: string, text: string, hash: string) => {
 				addToast(`Error sharing: ${error}`, 'warn')
 			})
 	} else {
-		addToast('Share API is not available in this browser', 'warn')
+		const tempInput = document.createElement('input')
+		tempInput.value = url
+		document.body.appendChild(tempInput)
+		tempInput.select()
+		document.execCommand('copy')
+		document.body.removeChild(tempInput)
+		addToast('Copied link to clipboard')
 	}
 }

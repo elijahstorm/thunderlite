@@ -6,13 +6,13 @@ type SkyData = SpriteObject & {
 
 export const skyData = [
 	{
-		url: 'game/play/weather/cloud.png',
+		url: '/game/play/weather/cloud.png',
 		frames: 5,
 		xOffset: 0,
 		yOffset: 0,
 	},
 	{
-		url: 'game/play/weather/storm.png',
+		url: '/game/play/weather/storm.png',
 		frames: 5,
 		xOffset: 0,
 		yOffset: 0,
