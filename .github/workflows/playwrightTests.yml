@@ -24,6 +24,8 @@ jobs:
       - name: Run tests
         run: npx playwright test
         env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
           PUBLIC_URL: ${{ env.PUBLIC_URL }}
           PUBLIC_GAME_NAME: ${{ env.PUBLIC_GAME_NAME }}
           BASE_URL: ${{ github.event.deployment_status.environment_url }}
