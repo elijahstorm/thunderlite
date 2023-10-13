@@ -20,9 +20,9 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
       - name: Install dependencies
-        run: pnpm install && npx playwright install --with-deps
+        run: pnpm install
       - name: Run tests
-        run: npx playwright test
+        run: pnpm test
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
