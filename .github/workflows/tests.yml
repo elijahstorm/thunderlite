@@ -1,4 +1,4 @@
-name: Playwright Tests
+name: Run Test Suite
 
 on:
   deployment_status:
