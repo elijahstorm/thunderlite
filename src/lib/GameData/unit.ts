@@ -23,7 +23,7 @@ const COMMON_RANGE = [1, 1]
 
 export const unitData = [
 	{
-		url: 'game/play/units/idle/strike-commando.png',
+		url: '/game/play/units/idle/strike-commando.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -50,7 +50,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('footstep')`,
 	},
 	{
-		url: 'game/play/units/idle/heavy-commando.png',
+		url: '/game/play/units/idle/heavy-commando.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -77,7 +77,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('footstep')`,
 	},
 	{
-		url: 'game/play/units/idle/flak-tank.png',
+		url: '/game/play/units/idle/flak-tank.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -103,7 +103,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/scorpion-tank.png',
+		url: '/game/play/units/idle/scorpion-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -129,7 +129,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/lance-tank.png',
+		url: '/game/play/units/idle/lance-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -155,7 +155,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/spider-tank.png',
+		url: '/game/play/units/idle/spider-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -177,7 +177,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('footstep')`,
 	},
 	{
-		url: 'game/play/units/idle/stealth-tank.png',
+		url: '/game/play/units/idle/stealth-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -199,7 +199,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/annihilator-tank.png',
+		url: '/game/play/units/idle/annihilator-tank.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -225,7 +225,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/mortar-truck.png',
+		url: '/game/play/units/idle/mortar-truck.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -247,7 +247,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/rocket-truck.png',
+		url: '/game/play/units/idle/rocket-truck.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -269,7 +269,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/jammer-truck.png',
+		url: '/game/play/units/idle/jammer-truck.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -291,7 +291,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/warmachine.png',
+		url: '/game/play/units/idle/warmachine.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -319,7 +319,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('car engine')`,
 	},
 	{
-		url: 'game/play/units/idle/intrepid.png',
+		url: '/game/play/units/idle/intrepid.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -345,7 +345,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('boat')`,
 	},
 	{
-		url: 'game/play/units/idle/corvette.png',
+		url: '/game/play/units/idle/corvette.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -367,7 +367,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('boat')`,
 	},
 	{
-		url: 'game/play/units/idle/hunter-support.png',
+		url: '/game/play/units/idle/hunter-support.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -394,7 +394,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('boat')`,
 	},
 	{
-		url: 'game/play/units/idle/u-boat.png',
+		url: '/game/play/units/idle/u-boat.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -416,7 +416,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('boat')`,
 	},
 	{
-		url: 'game/play/units/idle/raptor-fighter.png',
+		url: '/game/play/units/idle/raptor-fighter.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -438,7 +438,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('jet')`,
 	},
 	{
-		url: 'game/play/units/idle/condor-bomber.png',
+		url: '/game/play/units/idle/condor-bomber.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -460,7 +460,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('air')`,
 	},
 	{
-		url: 'game/play/units/idle/vulture-drone.png',
+		url: '/game/play/units/idle/vulture-drone.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -486,7 +486,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('jet')`,
 	},
 	{
-		url: 'game/play/units/idle/turret.png',
+		url: '/game/play/units/idle/turret.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -508,7 +508,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('quite')`,
 	},
 	{
-		url: 'game/play/units/idle/blockade.png',
+		url: '/game/play/units/idle/blockade.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -530,7 +530,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('quite')`,
 	},
 	{
-		url: 'game/play/units/idle/battle-cruiser.png',
+		url: '/game/play/units/idle/battle-cruiser.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -552,7 +552,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('boat')`,
 	},
 	{
-		url: 'game/play/units/idle/leviathan.png',
+		url: '/game/play/units/idle/leviathan.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -574,7 +574,7 @@ export const unitData = [
 		moveSFX: `SFXs.Retrieve('boat')`,
 	},
 	{
-		url: 'game/play/units/idle/transporter.png',
+		url: '/game/play/units/idle/transporter.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,

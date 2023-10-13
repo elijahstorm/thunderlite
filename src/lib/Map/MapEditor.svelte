@@ -6,15 +6,16 @@
 	import MapRender from './MapRender.svelte'
 	import { loadedState, mapStore } from './mapStore'
 	import Icon from '@iconify/svelte'
-	import { skyData } from '$lib/GameData/sky'
 	import EditorButton from './Editor/EditorButton.svelte'
 	import MapOptions from './MapOptions.svelte'
 	import { addToast } from 'as-toast'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
 	import { open, save } from './Editor/fileManager'
-	import { mapExporter, mapHash, mapImporter } from './Editor/mapExporter'
+	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
 	import { PUBLIC_GAME_NAME } from '$env/static/public'
+
+	export let mapHash: string | undefined = undefined
 
 	const makeImage = createImageLoader((finished: boolean) => loadedState.set(finished))
 
@@ -25,30 +26,13 @@
 	let editType: keyof MapLayers = 'units'
 	let type: number = 0
 	let team: number = 0
-	let map: MapObject = $mapStore ?? {
-		title: 'rose gold',
-		cols: 10,
-		rows: 10,
-		layers: {
-			ground: new Array(100).fill(0).map(() => ({
-				type: 0,
-				state: 0,
-			})),
-			units: [],
-			sky: [],
-		},
-		filters: {
-			ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
-			units: () => Array.from({ length: unitData.length }, (_, index) => index),
-			sky: () => Array.from({ length: skyData.length }, (_, index) => index),
-		},
-	}
+	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
 
 	const actions = [
 		{
 			label: 'save',
 			icon: 'fluent:save-24-filled',
-			act: () => save(mapExporter(map)),
+			act: () => save(mapHasher(map)),
 		},
 		{
 			label: 'open',
@@ -56,7 +40,7 @@
 			act: () => {
 				open((content: string | null) => {
 					if (content) {
-						map = mapImporter(content)
+						map = deriveFromHash(content)
 					}
 				})
 			},
@@ -64,7 +48,7 @@
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => share(map?.title ?? PUBLIC_GAME_NAME, 'A Game', mapHash(map)),
+			act: () => share(map?.title ?? PUBLIC_GAME_NAME, mapHasher(map)),
 		},
 		{
 			label: 'play',
