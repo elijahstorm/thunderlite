@@ -1,7 +1,7 @@
 <script lang="ts">
-	import Header from "$lib/Components/Branding/Header.svelte"
+	import Header from '$lib/Components/Branding/Header.svelte'
 
-	export let logoLink: string = "/"
+	export let logoLink: string = '/'
 </script>
 
 <Header {logoLink} />

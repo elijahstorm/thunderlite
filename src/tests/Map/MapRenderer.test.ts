@@ -1,29 +1,27 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
+import { cleanup, fireEvent, render } from '@testing-library/svelte'
 import MapRender from '../../lib/Map/MapRender.svelte'
 import { unitData } from '../../lib/GameData/unit'
-import { createImageLoader } from '../../lib/Sprites/images'
 
 describe('MapRender.svelte', () => {
 	afterEach(() => cleanup())
 
 	it('mounts', () => {
-		// const { container } = renderConfiguredMap()
-		// expect(container).toBeTruthy()
-		// expect(container.innerHTML).toContain('loading')
-		// expect(container.innerHTML).toMatchSnapshot()
+		const { container } = renderConfiguredMap()
+		expect(container).toBeTruthy()
+		expect(container.innerHTML).toContain('loading')
+		expect(container.innerHTML).toMatchSnapshot()
 	})
 
 	it('updates on button click', async () => {
-		// let captured = false
-		// const { prepared, container } = renderConfiguredMap(() => {
-		// 	captured = true
-		// })
-		// await prepared
-		// const scroller = screen.getByRole('grid')
-		// expect(container.innerHTML).toContain('canvas')
-		// await fireEvent.click(scroller)
-		// expect(captured).toBe(true)
+		let captured = false
+		const { prepared, container } = renderConfiguredMap(() => {
+			captured = true
+		})
+		await prepared
+		expect(container.innerHTML).toContain('canvas')
+		await fireEvent.click(container)
+		expect(captured).toBe(true)
 	})
 })
 
@@ -73,12 +71,35 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 		},
 		filters: {
 			ground: (active) => active.map((data) => data.type),
-			units: (active) => active.filter((data) => data !== null).map((data) => data.type),
-			sky: (active) => active.filter((data) => data !== null).map((data) => data.type),
+			units: (active) => active.filter((data) => data !== null).map((data) => data?.type),
+			sky: (active) => active.filter((data) => data !== null).map((data) => data?.type),
 		},
-	}
+	} as MapObject
 	const select = captureEvent ?? (() => {})
-	const makeImage = createImageLoader(reportFinished)
+	const makeImage = (() => {
+		const [startLoad, loaded] = ((finished) => {
+			let images = 0
+			let loadedCount = 0
+			const isFinished = (action: VoidFunction) => {
+				action()
+				finished(loadedCount === images)
+			}
+
+			return [
+				() => isFinished(() => images++),
+				(signalLoaded: VoidFunction) => () =>
+					isFinished(() => {
+						loadedCount++
+						signalLoaded()
+					}),
+			]
+		})(reportFinished)
+
+		return () => (signalLoaded: (image: HTMLImageElement) => void) => {
+			startLoad()
+			loaded(() => signalLoaded(new Image()))()
+		}
+	})()
 
 	return { ...render(MapRender, { map, select, makeImage, loaded: false }), prepared }
 }
