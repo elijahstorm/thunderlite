@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Hero from '$lib/Components/PageContainers/Home/Hero.svelte'
-	import Motivation from '$lib/Components/PageContainers/Home/Motivation.svelte'
 </script>
 
 <div class="relative overflow-hidden">
@@ -11,6 +10,4 @@
 	</div>
 
 	<Hero />
-
-	<Motivation />
 </div>

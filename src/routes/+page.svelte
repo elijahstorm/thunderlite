@@ -4,10 +4,6 @@
 	import Header from '$lib/Components/Branding/Header.svelte'
 </script>
 
-<svelte:head>
-	<title>Haja: Do Together</title>
-</svelte:head>
-
 <ContentWithFooter>
 	<Header />
 	<LandingPage />

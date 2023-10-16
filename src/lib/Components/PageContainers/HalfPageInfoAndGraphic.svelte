@@ -24,7 +24,7 @@
 		</div>
 		<div class="flex-1 w-full m-auto max-w-xs relative mb-8 h-0">
 			<img class="absolute" src="/images/icon/colorful/blob.svg" alt="white background" />
-			<img class="absolute" src={icons[icon]} alt="haja-icon" />
+			<img class="absolute" src={icons[icon]} alt="bg-icon" />
 		</div>
 	</div>
 
@@ -38,7 +38,7 @@
 		<img
 			class="m-auto max-w-xs block opacity-100 md:hidden md:opacity-0"
 			src={icons[icon]}
-			alt="haja-icon"
+			alt="bg-icon"
 		/>
 	</div>
 </div>

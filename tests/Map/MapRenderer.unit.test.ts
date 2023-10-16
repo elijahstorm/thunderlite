@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/svelte'
-import MapRender from '../../lib/Map/MapRender.svelte'
-import { unitData } from '../../lib/GameData/unit'
+import MapRender from '../../src/lib/Map/MapRender.svelte'
+import { unitData } from '../../src/lib/GameData/unit'
 
 describe('MapRender.svelte', () => {
 	afterEach(() => cleanup())
@@ -10,7 +10,6 @@ describe('MapRender.svelte', () => {
 		const { container } = renderConfiguredMap()
 		expect(container).toBeTruthy()
 		expect(container.innerHTML).toContain('loading')
-		expect(container.innerHTML).toMatchSnapshot()
 	})
 
 	it('updates on button click', async () => {

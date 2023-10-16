@@ -21,8 +21,8 @@
 		</button>
 	{:else}
 		<a class="flex items-center content-center h-max btn btn-primary" href="/login">
-			<span class="pr-2">Login</span>
-			<Icon icon={'akar-icons:google-fill'} width={22} />
+			<span class="pl-2 pr-4">Login</span>
+			<Icon icon={'akar-icons:google-fill'} width={20} />
 		</a>
 	{/if}
 </section>

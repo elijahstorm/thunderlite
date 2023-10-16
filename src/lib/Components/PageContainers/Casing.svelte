@@ -6,9 +6,8 @@
 
 <Header {logoLink} />
 
-<div class="px-8 pb-16 flex justify-center">
-	<div class="max-w-4xl w-full break break-word">
-		<div class="pb-6" />
+<div class="pb-16 flex justify-center">
+	<div class="container w-full break break-word">
 		<slot />
 	</div>
 </div>
