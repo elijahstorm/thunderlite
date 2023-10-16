@@ -1,13 +1,12 @@
 <script lang="ts">
 	import type { LayoutData } from './$types'
-	import { PUBLIC_URL } from '$env/static/public'
 	import { Toasts } from 'as-toast'
 	import '../app.css'
 
 	export let data: LayoutData
 
 	const { title, desc, googleFonts } = data.config
-	const IMG_URL = `${PUBLIC_URL}images/embedded-card.png`
+	const IMG_URL = `/images/embedded-card.png`
 </script>
 
 <svelte:head>
@@ -17,7 +16,7 @@
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={desc} />
 	<meta property="og:image" content={IMG_URL} />
-	<meta property="og:url" content={PUBLIC_URL} />
+	<meta property="og:url" content="/" />
 
 	<meta property="twitter:title" content={title} />
 	<meta property="twitter:description" content={desc} />
