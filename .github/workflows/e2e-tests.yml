@@ -23,16 +23,11 @@ jobs:
         run: pnpm i --frozen-lockfile
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps
-      - name: envs
-        run: echo  "${{ env.PUBLIC_HANKO_API_URL }} ${{ env.EDGE_CONFIG }} ${{ env.BLOB_READ_WRITE_TOKEN }} ${{ env.POSTGRES_URL }} ${{ github.event.deployment_status.environment_url }}"
-      - name: envs
-        run: echo  "${{ secrets.PUBLIC_HANKO_API_URL }} ${{ secrets.EDGE_CONFIG }} ${{ secrets.BLOB_READ_WRITE_TOKEN }} ${{ secrets.POSTGRES_URL }} ${{ github.event.deployment_status.environment_url }}"
-
       - name: Run tests
         run: pnpm test:integration
         env:
           PUBLIC_HANKO_API_URL: ${{ env.PUBLIC_HANKO_API_URL }}
-          EDGE_CONFIG: ${{ env.EDGE_CONFIG }}
-          BLOB_READ_WRITE_TOKEN: ${{ env.BLOB_READ_WRITE_TOKEN }}
-          POSTGRES_URL: ${{ env.POSTGRES_URL }}
+          EDGE_CONFIG: ${{ secrets.EDGE_CONFIG }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
           BASE_URL: ${{ github.event.deployment_status.environment_url }}
