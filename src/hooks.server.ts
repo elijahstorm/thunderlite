@@ -5,7 +5,9 @@ import { PUBLIC_HANKO_API_URL } from '$env/static/public'
 const authenticatedUser = async (event: RequestEvent) => {
 	const { cookies } = event
 	const hanko = cookies.get('hanko')
-	const JWKS = createRemoteJWKSet(new URL(`${PUBLIC_HANKO_API_URL}/.well-known/jwks.json`))
+	const JWKS = createRemoteJWKSet(
+		new URL(`${'https://512eead1-52c4-4016-a1f5-6015f26df6c0.hanko.io'}/.well-known/jwks.json`)
+	)
 
 	try {
 		await jwtVerify(hanko ?? '', JWKS)
