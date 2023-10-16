@@ -9,9 +9,8 @@ export default defineConfig({
 		},
 	},
 	test: {
-		include: ['tests/*unit.(test|spec).[jt]s'],
+		include: ['tests/**/*unit.(test|spec).[jt]s'],
 		environment: 'jsdom',
 		alias: [{ find: /^svelte$/, replacement: 'svelte/internal' }],
-		setupFiles: ['vitest.setup.js'],
 	},
 })

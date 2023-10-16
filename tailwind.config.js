@@ -39,11 +39,6 @@ export default {
 					900: '#0986ef',
 				},
 			},
-			backgroundImage: () => ({
-				'header-desktop': "url('/images/bg-intro-desktop.svg')",
-				'header-mobile': "url('/images/bg-intro-mobile.svg')",
-				'image-mockups': "url('/images/image-mockups.png')",
-			}),
 			backgroundSize: {
 				'custom-mobile-header-size': '100% 50%',
 				'custom-mobile-mockup-size': 'auto 60%',

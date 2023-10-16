@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
-	import { createImageLoader } from '$lib/Sprites/images'
 	import ButtonGrid from './Editor/ButtonGrid.svelte'
 	import MapRender from './MapRender.svelte'
-	import { loadedState, mapStore } from './mapStore'
+	import { mapStore } from './mapStore'
 	import Icon from '@iconify/svelte'
 	import EditorButton from './Editor/EditorButton.svelte'
 	import MapOptions from './MapOptions.svelte'
@@ -14,13 +13,15 @@
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
 	import { PUBLIC_GAME_NAME } from '$env/static/public'
+	import { createImageLoader } from '$lib/Sprites/images'
 
 	export let mapHash: string | undefined = undefined
 
-	const makeImage = createImageLoader((finished: boolean) => loadedState.set(finished))
-
 	const maxTeamAmount = 4
 	const size = 64
+
+	let contextLoaded = false
+	const makeImage = createImageLoader((finished: boolean) => (contextLoaded = finished))
 
 	let openOptionsModal = false
 	let editType: keyof MapLayers = 'units'
@@ -93,7 +94,7 @@
 					disabled={editType === 'ground'}
 					{size}
 				>
-					{#if $loadedState && editType !== 'ground'}
+					{#if contextLoaded && editType !== 'ground'}
 						<img
 							class="object-cover min-w-fit"
 							src={$spriteStore[editType][type][index].src}
@@ -113,7 +114,7 @@
 				selected={editType === 'units' && type === index}
 				{size}
 			>
-				{#if $loadedState}
+				{#if contextLoaded}
 					<img
 						class="object-cover min-w-fit"
 						src={$spriteStore['units'][index][team].src}
@@ -136,7 +137,7 @@
 		</ButtonGrid>
 
 		<div class="flex-1">
-			<MapRender pause {map} {select} {makeImage} loaded={$loadedState} />
+			<MapRender pause {map} {select} {makeImage} {contextLoaded} />
 		</div>
 
 		<ButtonGrid cols={2} length={terrainData.length} let:index>
@@ -162,5 +163,5 @@
 	apply={(appliedChanges) => (map = appliedChanges)}
 	let:updatedMap
 >
-	<MapRender pause mini map={updatedMap} select={() => {}} {makeImage} loaded={$loadedState} />
+	<MapRender pause mini map={updatedMap} select={() => {}} />
 </MapOptions>

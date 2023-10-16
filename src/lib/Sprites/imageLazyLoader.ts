@@ -1,10 +1,11 @@
 import { get } from 'svelte/store'
 import { spriteStore } from './spriteStore'
-import { imageColorizer } from './imageColorizer'
+import type { imageColorizer } from './imageColorizer'
+import type { createImageLoader } from './images'
 
 export const imageLazyLoader =
 	<T extends SpriteObject>(imageContainer: keyof MapLayers, dataList: T[], teamAmount = 1) =>
-	(makeImage: (src: string) => (signalLoaded: (image: HTMLImageElement) => void) => void) =>
+	(makeImage: ReturnType<typeof createImageLoader>, colorizer: typeof imageColorizer) =>
 	(includedTypes: number[]) =>
 		Object.entries(
 			dataList.reduce(
@@ -31,10 +32,10 @@ export const imageLazyLoader =
 									if (!sprites[imageContainer][index]) {
 										sprites[imageContainer][index] = new Array(teamAmount)
 									}
-									sprites[imageContainer][index][team] = imageColorizer(team)(image)
+									sprites[imageContainer][index][team] = colorizer(team)(image)
 									return sprites
 								})
-								data.sprite[team] = imageColorizer(team)(image)
+								data.sprite[team] = colorizer(team)(image)
 							})
 						}
 					}

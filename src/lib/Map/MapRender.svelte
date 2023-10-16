@@ -6,13 +6,21 @@
 	import { onDestroy, onMount } from 'svelte'
 	import { animationFrame, animationTimer } from '$lib/Sprites/animationFrameCount'
 	import { connectionDecision } from '$lib/Sprites/spriteConnector'
+	import { imageColorizer } from '$lib/Sprites/imageColorizer'
+	import { createImageLoader } from '$lib/Sprites/images'
+	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
 
-	export let pause = false
 	export let map: MapObject
-	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
-	export let loaded: boolean
-	export let select: undefined | ((x: number, y: number) => void)
 	export let mini: boolean = false
+	export let pause = false
+
+	export let contextLoaded: boolean = false
+	export let makeImage: ReturnType<typeof createImageLoader> = createImageLoader(
+		(finished: boolean) => (contextLoaded = finished)
+	)
+	export let colorizer: typeof imageColorizer = imageColorizer
+	export let select: undefined | ((x: number, y: number) => void) = undefined
+	export let scroller: typeof Scroller = Scroller
 
 	const ANIMATION_TIME = 800
 	let requestRedraw = 0
@@ -54,8 +62,17 @@
 </script>
 
 <div class="flex gap-2 border-4 border-black h-full bg-stone-400">
-	<Game {map} {makeImage} {select} let:interfacer let:renderData let:select let:validTile>
-		{#if loaded}
+	<Game
+		{map}
+		{makeImage}
+		{colorizer}
+		{select}
+		let:interfacer
+		let:renderData
+		let:select
+		let:validTile
+	>
+		{#if contextLoaded}
 			<TileSelector
 				{mini}
 				{interfacer}
@@ -68,7 +85,8 @@
 				let:handleKeypress
 				let:handleOffset
 			>
-				<Scroller
+				<svelte:component
+					this={scroller}
 					tileWidth={cellWidth}
 					tileHeight={cellHeight}
 					contentWidth={cellWidth * map.cols}
@@ -82,7 +100,7 @@
 				/>
 			</TileSelector>
 		{:else}
-			<p>loading...</p>
+			<Loader />
 		{/if}
 	</Game>
 </div>

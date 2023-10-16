@@ -15,6 +15,13 @@ test('editor page has working editor', async ({ page }) => {
 })
 
 test('play page has working game', async ({ page }) => {
-	await page.goto('/play')
+	await page.goto('/hello')
 	await expect(page.locator('section[role="grid"] canvas')).toBeVisible()
+	await expect(page.getByText('No map with that SHA found.')).not.toBeVisible()
+})
+
+test('play page handles no game data', async ({ page }) => {
+	await page.goto('/bad-map-name')
+	await expect(page.locator('section[role="grid"] canvas')).not.toBeVisible()
+	await expect(page.getByText('No map with that SHA found.')).toBeVisible()
 })

@@ -28,6 +28,7 @@ jobs:
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           EDGE_CONFIG: ${{ env.EDGE_CONFIG }}
+          PUBLIC_HANKO_API_URL: ${{ env.PUBLIC_HANKO_API_URL }}
           POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
           PUBLIC_URL: ${{ env.PUBLIC_URL }}
           PUBLIC_GAME_NAME: ${{ env.PUBLIC_GAME_NAME }}

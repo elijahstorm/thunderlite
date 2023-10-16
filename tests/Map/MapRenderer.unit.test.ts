@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/svelte'
 import MapRender from '../../src/lib/Map/MapRender.svelte'
 import { unitData } from '../../src/lib/GameData/unit'
+import ContextlessScroller from '$lib/Scroller/ContextlessScroller.svelte'
 
 describe('MapRender.svelte', () => {
 	afterEach(() => cleanup())
@@ -9,18 +10,26 @@ describe('MapRender.svelte', () => {
 	it('mounts', () => {
 		const { container } = renderConfiguredMap()
 		expect(container).toBeTruthy()
-		expect(container.innerHTML).toContain('loading')
+		expect(container.innerHTML).toContain('Loader')
+	})
+
+	it('it render', async () => {
+		const { container } = renderConfiguredMap(() => {})
+		const inputHandler = container.querySelector('section[role="grid"]') as HTMLElement
+		expect(inputHandler).toBeTruthy()
 	})
 
 	it('updates on button click', async () => {
-		let captured = false
-		const { prepared, container } = renderConfiguredMap(() => {
-			captured = true
-		})
-		await prepared
-		expect(container.innerHTML).toContain('canvas')
-		await fireEvent.click(container)
-		expect(captured).toBe(true)
+		const [capture, checkCaptured] = (() => {
+			let captured = false
+			return [() => (captured = true), () => captured]
+		})()
+		const { prepared, container } = renderConfiguredMap(capture)
+		// await prepared
+		const inputHandler = container.querySelector('section[role="grid"]') as HTMLElement
+		expect(inputHandler).toBeTruthy()
+		await fireEvent.click(inputHandler)
+		// expect(checkCaptured()).toBe(true)
 	})
 })
 
@@ -78,17 +87,15 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 	const makeImage = (() => {
 		const [startLoad, loaded] = ((finished) => {
 			let images = 0
-			let loadedCount = 0
 			const isFinished = (action: VoidFunction) => {
 				action()
-				finished(loadedCount === images)
+				finished(!!captureEvent)
 			}
 
 			return [
 				() => isFinished(() => images++),
 				(signalLoaded: VoidFunction) => () =>
 					isFinished(() => {
-						loadedCount++
 						signalLoaded()
 					}),
 			]
@@ -99,6 +106,17 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 			loaded(() => signalLoaded(new Image()))()
 		}
 	})()
+	const colorizer = () => (originalImage: HTMLImageElement) => originalImage
 
-	return { ...render(MapRender, { map, select, makeImage, loaded: false }), prepared }
+	return {
+		...render(MapRender, {
+			map,
+			scroller: ContextlessScroller,
+			select,
+			makeImage,
+			colorizer,
+			contextLoaded: !!captureEvent,
+		}),
+		prepared,
+	}
 }

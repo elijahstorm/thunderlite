@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	const pool = createPool({ connectionString: POSTGRES_URL })
 
 	const results = await pool.query(`SELECT url from Maps where sha='${params.sha}'`)
-	const url = results.rows[0].url
+	const url = results.rows[0]?.url
 
 	if (!url) {
 		throw error(400, { message: 'No map with that SHA found.' })
