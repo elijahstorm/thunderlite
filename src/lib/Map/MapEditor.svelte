@@ -12,7 +12,6 @@
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
-	import { PUBLIC_GAME_NAME } from '$env/static/public'
 	import { createImageLoader } from '$lib/Sprites/images'
 
 	export let mapHash: string | undefined = undefined
@@ -49,7 +48,7 @@
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => share(map?.title ?? PUBLIC_GAME_NAME, mapHasher(map)),
+			act: () => share(map?.title ?? 'ThunderLite', mapHasher(map)),
 		},
 		{
 			label: 'play',
