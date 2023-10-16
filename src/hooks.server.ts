@@ -5,8 +5,6 @@ import { PUBLIC_HANKO_API_URL } from '$env/static/public'
 const authenticatedUser = async (event: RequestEvent) => {
 	const { cookies } = event
 	const hanko = cookies.get('hanko')
-	console.log('PUBLIC_HANKO_API_URL')
-	console.log(PUBLIC_HANKO_API_URL)
 	const JWKS = createRemoteJWKSet(new URL(`${PUBLIC_HANKO_API_URL}/.well-known/jwks.json`))
 
 	try {
