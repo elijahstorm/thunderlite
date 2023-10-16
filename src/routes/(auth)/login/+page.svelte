@@ -1,5 +1,5 @@
 <script lang="ts">
-	import HankoAuth from '$lib/Auth/HankoAuth.svelte'
+	import HankoAuth from '$lib/Components/Auth/HankoAuth.svelte'
 </script>
 
 <HankoAuth />

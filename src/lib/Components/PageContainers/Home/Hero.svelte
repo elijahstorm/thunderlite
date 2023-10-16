@@ -13,15 +13,8 @@
 			<div
 				class="h-1/2 flex flex-col justify-center items-center text-center lg:items-start lg:text-left"
 			>
-				<h1 class="text-4xl lg:text-5xl text-primary-dark-blue pb-5">
-					Let's accomplish it together
-				</h1>
-				<p class="text-neutral-grayish-blue text-xs lg:text-base leading-5 mb-7">
-					Maximize your team's potential with our group productivity app! Collaborate on projects,
-					delegate tasks, and track progress in real-time. Say goodbye to endless email chains and
-					scattered notes, and hello to streamlined communication and increased efficiency. Try our
-					app today and watch your team soar to new heights of productivity!
-				</p>
+				<h1 class="text-4xl lg:text-5xl text-primary-dark-blue pb-5">ThunderLite</h1>
+				<p class="text-neutral-grayish-blue text-xs lg:text-base leading-5 mb-7">text</p>
 				<a
 					class="bg-primary-lime-green px-7 py-3 rounded-full text-neutral-white text-xs bg-gradient-to-r from-primary-lime-green to-primary-bright-cyan hover:button-brightness mb-7 focus:outline-none focus:ring ring-green-400"
 					href="/signup"
