@@ -1,4 +1,3 @@
-import { PUBLIC_URL } from '$env/static/public'
 import { addToast } from 'as-toast'
 
 export const share = async (name: string, encoded: string) =>
@@ -16,7 +15,7 @@ export const share = async (name: string, encoded: string) =>
 		.then((response) => response.json())
 		.then((data) => {
 			const { sha } = data
-			const url = `${PUBLIC_URL}editor/${sha}`
+			const url = `/editor/${sha}`
 
 			if (navigator.share) {
 				const shareData = {

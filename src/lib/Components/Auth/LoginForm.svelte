@@ -3,7 +3,7 @@
 	// import { loginWithInfo, loginWithGoogle, loginWithFacebook } from "$lib/firebase/auth"
 	import { fade } from 'svelte/transition'
 	import Icon from '@iconify/svelte'
-	import { base } from '$app/paths'
+	import Logo from '../Branding/Logo.svelte'
 
 	const loginWithInfo = async (email: string, password: string) => ({
 		error: 'not implemeneted',
@@ -50,7 +50,7 @@
 	<form class:attempted on:submit|preventDefault={submit}>
 		<div class="p-4 mb-20">
 			<div class="flex gap-2 text-sm my-4 sm:hidden">
-				<img class="w-24" src="{base}/images/haja/logo_horizontal_full.png" alt="haja" />
+				<Logo />
 			</div>
 
 			{#if errorReport}
@@ -103,23 +103,23 @@
 
 			<div class="py-4 border-t border-t-grey-800">
 				<p class="mt-4 text-sm">
-					<span> New to Haja? </span>
+					<span> No account? </span>
 					<a
 						class="text-brand-500 no-underline border-b border-b-transparent transition-colors hover:border-b-brand-500"
-						href="{base}/signup">Sign up</a
+						href="/signup">Sign up</a
 					>
 				</p>
 				<p class="mt-4 text-sm">
 					<span> Can't log in? </span>
 					<a
 						class="text-brand-500 no-underline border-b border-b-transparent transition-colors hover:border-b-brand-500"
-						href="{base}/login/help/lost-email">Recover account</a
+						href="/login/help/lost-email">Recover account</a
 					>
 				</p>
 				<!-- Removed because this action is not allowed -->
 				<!-- <p class="mt-4 text-sm">
 					<span> Lost your </span>
-					<a class="text-brand-500 no-underline border-b border-b-transparent transition-colors hover:border-b-brand-500" href="{base}/login/help/forgot-password">password?</a>
+					<a class="text-brand-500 no-underline border-b border-b-transparent transition-colors hover:border-b-brand-500" href="/login/help/forgot-password">password?</a>
 				</p> -->
 			</div>
 		</div>

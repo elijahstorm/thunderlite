@@ -5,12 +5,10 @@
 	export let height = 150
 </script>
 
-{#if url}
-	<div
-		class="m-auto max-w-full"
-		style="background-image: url({url}); width: {width}px; height: {height}px;"
-	/>
-{/if}
+<div
+	class="m-auto max-w-full"
+	style="background-image: url({url}); width: {width}px; height: {height}px;"
+/>
 
 <style>
 	div {

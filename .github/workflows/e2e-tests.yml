@@ -1,4 +1,4 @@
-name: Run Test Suite
+name: Integration Tests
 
 on:
   deployment_status:
@@ -20,14 +20,14 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm i --frozen-lockfile
       - name: Install Playwright browsers
-        run: pnpm exec playwright install
+        run: pnpm exec playwright install --with-deps
       - name: Run tests
-        run: pnpm test
+        run: pnpm test:integration
         env:
+          PUBLIC_HANKO_API_URL: ${{ env.PUBLIC_HANKO_API_URL }}
+          EDGE_CONFIG: ${{ secrets.EDGE_CONFIG }}
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
-          PUBLIC_URL: ${{ env.PUBLIC_URL }}
-          PUBLIC_GAME_NAME: ${{ env.PUBLIC_GAME_NAME }}
           BASE_URL: ${{ github.event.deployment_status.environment_url }}

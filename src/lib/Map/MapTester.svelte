@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { unitData } from '$lib/GameData/unit'
-	import { createImageLoader } from '$lib/Sprites/images'
 	import MapRender from './MapRender.svelte'
-	import { loadedState, mapStore } from './mapStore'
-
-	const loadChecker = (finished: boolean) => loadedState.set(finished)
+	import { mapStore } from './mapStore'
 
 	let rows = 100
 	let cols = 100
@@ -50,10 +47,5 @@
 </script>
 
 <div class="p-6 h-screen">
-	<MapRender
-		{map}
-		select={undefined}
-		makeImage={createImageLoader(loadChecker)}
-		loaded={$loadedState}
-	/>
+	<MapRender {map} />
 </div>

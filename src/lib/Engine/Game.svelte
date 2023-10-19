@@ -4,9 +4,12 @@
 	import { unitRenderer } from '$lib/GameData/unit'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { onMount } from 'svelte'
+	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
+	import type { createImageLoader } from '$lib/Sprites/images'
 
 	export let map: MapObject
-	export let makeImage: (url: string) => (signalLoaded: (image: HTMLImageElement) => void) => void
+	export let colorizer: typeof imageColorizer
+	export let makeImage: ReturnType<typeof createImageLoader>
 	export let select = (x: number, y: number) => {
 		const tile = y * map.cols + x
 		console.log(tile, x, y) // todo game interactions
@@ -31,9 +34,9 @@
 	}
 
 	onMount(() => {
-		const ground = terrainRenderer(makeImage)(map.filters.ground(map.layers.ground))
-		const units = unitRenderer(makeImage)(map.filters.units(map.layers.units))
-		const sky = skyRenderer(makeImage)(map.filters.sky(map.layers.sky))
+		const ground = terrainRenderer(makeImage, colorizer)(map.filters.ground(map.layers.ground))
+		const units = unitRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
+		const sky = skyRenderer(makeImage, colorizer)(map.filters.sky(map.layers.sky))
 
 		rendererStore.update((store) => {
 			store.ground = { ...store.ground, ...ground }

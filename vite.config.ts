@@ -9,8 +9,8 @@ export default defineConfig({
 		},
 	},
 	test: {
-		include: ['src/**/*.test.ts'],
-		environment: 'happy-dom',
+		include: ['tests/**/*unit.(test|spec).[jt]s'],
+		environment: 'jsdom',
 		alias: [{ find: /^svelte$/, replacement: 'svelte/internal' }],
 	},
 })
