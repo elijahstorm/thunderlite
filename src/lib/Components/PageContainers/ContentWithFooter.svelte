@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LoginHeader from '$lib/Components/Auth/LoginHeader.svelte'
+	import LoginLogoutButton from '$lib/Components/Auth/LoginLogoutButton.svelte'
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 
 	const iconSocialLinks = [
@@ -79,7 +79,7 @@
 			<div
 				class="flex flex-col justify-between gap-4 items-center md:items-end md:justify-self-end md:col-span-3"
 			>
-				<LoginHeader />
+				<LoginLogoutButton />
 
 				<div class="text-neutral-grayish-blue text-xs md:text-sm">
 					<p>© ThunderLite</p>

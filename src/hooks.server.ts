@@ -1,5 +1,5 @@
 import { redirect, type Handle } from '@sveltejs/kit'
-import { authenticatedUser } from '$lib/Components/Auth/hanko-auth'
+import { authenticatedUser } from '$lib/Components/Auth/hanko-server'
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const verified = await authenticatedUser(event)

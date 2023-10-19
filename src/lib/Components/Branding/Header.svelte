@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LoginHeader from '$lib/Components/Auth/LoginHeader.svelte'
+	import LoginLogoutButton from '$lib/Components/Auth/LoginLogoutButton.svelte'
 	import Logo from './Logo.svelte'
 
 	export let logoLink: string = '/'
@@ -11,6 +11,6 @@
 			<Logo width={96} height={50} />
 		</a>
 		<div class="flex-1" />
-		<LoginHeader />
+		<LoginLogoutButton />
 	</div>
 </div>
