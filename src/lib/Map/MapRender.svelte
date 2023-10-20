@@ -2,21 +2,23 @@
 	import Scroller from '$lib/Scroller/Scroller.svelte'
 	import TileSelector from '$lib/Layers/TileSelector.svelte'
 	import Game from '$lib/Engine/Game.svelte'
+	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
 	import { paint } from '$lib/Engine/paint'
 	import { onDestroy, onMount } from 'svelte'
 	import { animationFrame, animationTimer } from '$lib/Sprites/animationFrameCount'
 	import { connectionDecision } from '$lib/Sprites/spriteConnector'
 	import { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import { createImageLoader } from '$lib/Sprites/images'
-	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
+	import { writable } from 'svelte/store'
+	import { rendererStore } from '$lib/Sprites/spriteStore'
 
 	export let map: MapObject
 	export let mini: boolean = false
 	export let pause = false
 
-	export let contextLoaded: boolean = false
+	export let contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 	export let makeImage: ReturnType<typeof createImageLoader> = createImageLoader(
-		(finished: boolean) => (contextLoaded = finished)
+		(finished: boolean) => ($contextLoaded = finished)
 	)
 	export let colorizer: typeof imageColorizer = imageColorizer
 	export let select: undefined | ((x: number, y: number) => void) = undefined
@@ -72,7 +74,7 @@
 		let:select
 		let:validTile
 	>
-		{#if contextLoaded}
+		{#if $contextLoaded}
 			<TileSelector
 				{mini}
 				{interfacer}

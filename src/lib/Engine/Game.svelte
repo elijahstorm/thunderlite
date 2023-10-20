@@ -1,19 +1,16 @@
 <script lang="ts">
+	import { onMount } from 'svelte'
 	import { terrainRenderer } from '$lib/GameData/terrain'
 	import { skyRenderer } from '$lib/GameData/sky'
 	import { unitRenderer } from '$lib/GameData/unit'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
-	import { onMount } from 'svelte'
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import type { createImageLoader } from '$lib/Sprites/images'
 
 	export let map: MapObject
 	export let colorizer: typeof imageColorizer
 	export let makeImage: ReturnType<typeof createImageLoader>
-	export let select = (x: number, y: number) => {
-		const tile = y * map.cols + x
-		console.log(tile, x, y) // todo game interactions
-	}
+	export let select = (x: number, y: number) => {}
 
 	let validTile = (x: number, y: number) => x < map.cols && y < map.rows
 

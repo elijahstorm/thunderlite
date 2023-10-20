@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { deriveFromHash } from './Editor/mapExporter'
-	import MapRender from './MapRender.svelte'
 	import { mapStore } from './mapStore'
 
 	export let mapHash: string | undefined
@@ -11,5 +10,5 @@
 </script>
 
 <div class="p-6 h-screen">
-	<MapRender {map} />
+	<slot {map} />
 </div>
