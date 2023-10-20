@@ -15,6 +15,7 @@
 	export let map: MapObject
 	export let mini: boolean = false
 	export let pause = false
+	export let requestRedraw = 0
 
 	export let contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 	export let makeImage: ReturnType<typeof createImageLoader> = createImageLoader(
@@ -25,7 +26,6 @@
 	export let scroller: typeof Scroller = Scroller
 
 	const ANIMATION_TIME = 800
-	let requestRedraw = 0
 
 	$: {
 		map.layers.ground.map(

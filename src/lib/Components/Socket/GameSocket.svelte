@@ -6,6 +6,7 @@
 	import { browser } from '$app/environment'
 
 	export let map: () => MapObject | undefined
+	let requestRedraw: number
 
 	let socket = writable<WebSocket | null>(null)
 	const connectionTimeout = writable<NodeJS.Timeout | null>()
@@ -17,7 +18,7 @@
 		const socket = new WebSocket(PUBLIC_SOCKET_CONNECTION)
 		socket.onopen = socketOpened
 		socket.onclose = socketClosed
-		socket.onmessage = socketMessage(map)
+		socket.onmessage = socketMessage(map, (now: number) => (requestRedraw = now))
 		return socket
 	}
 
@@ -50,5 +51,5 @@
 {#if error}
 	Your broswer does not support WebSockets.
 {:else}
-	<slot socket={$socket} />
+	<slot socket={$socket} {requestRedraw} />
 {/if}

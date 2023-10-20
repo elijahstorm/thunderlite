@@ -1,5 +1,5 @@
 <script lang="ts">
-	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
+	import LocalInteracter from '$lib/Components/Socket/LocalInteracter.svelte'
 	import MapRender from '$lib/Map/MapRender.svelte'
 	import { deriveFromHash } from '$lib/Map/Editor/mapExporter'
 	import { socketSelect } from '$lib/Components/Socket/socket'
@@ -8,7 +8,7 @@
 </script>
 
 <section class="h-screen">
-	<GameSocket let:socket map={() => map}>
-		<MapRender {map} select={socket ? socketSelect(socket, () => map) : undefined} />
-	</GameSocket>
+	<LocalInteracter map={() => map} let:socket let:requestRedraw>
+		<MapRender {map} {requestRedraw} select={socketSelect(socket, () => map)} />
+	</LocalInteracter>
 </section>

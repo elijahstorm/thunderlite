@@ -1,22 +1,20 @@
+import { interactor } from './interactor'
+
 type SocketMessage = {
 	tile: number
+	action: string
 }
 
 export const socketOpened = () => console.log('> Opened Socket')
 export const socketClosed = () => console.log('< Closed Socket')
 
 export const socketMessage =
-	(getMap: () => MapObject | undefined) => (evt: MessageEvent<string>) => {
+	(getMap: () => MapObject | undefined, render: (now: number) => void) =>
+	(evt: MessageEvent<string>) => {
 		const map = getMap()
-
 		if (!map) return
-
-		const { tile } = JSON.parse(evt.data) as SocketMessage
-
-		map.layers.ground[tile] = {
-			type: 8,
-			state: 0,
-		}
+		interactor({ ...(JSON.parse(evt.data) as SocketMessage), map })
+		render(performance.now())
 	}
 
 export const socketSelect =

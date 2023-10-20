@@ -9,7 +9,11 @@
 </script>
 
 <MapLoader mapHash={data?.mapHash} let:map>
-	<GameSocket map={() => map} let:socket>
-		<MapRender {map} select={socket ? socketSelect(socket, () => map) : undefined} />
+	<GameSocket map={() => map} let:socket let:requestRedraw>
+		<MapRender
+			{map}
+			{requestRedraw}
+			select={socket ? socketSelect(socket, () => map) : undefined}
+		/>
 	</GameSocket>
 </MapLoader>
