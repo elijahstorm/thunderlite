@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { highlightedTiles } from './tileHighlighter'
+
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
@@ -44,6 +46,18 @@
 
 	{#if !mini}
 		<div class="col-start-1 row-start-1 pointer-events-none relative">
+			{#each $highlightedTiles as highlight}
+				<div
+					class="absolute opacity-60"
+					class:bg-blue-500={highlight.type === 'move'}
+					class:bg-red-500={highlight.type === 'attack'}
+					class:bg-transparent={highlight.type === 'none'}
+					style="left: {highlight.tile.x * cellWidth - interfacer.offset.x}px; top: {highlight.tile
+						.y *
+						cellHeight -
+						interfacer.offset.y}px; width: {cellWidth}px; height: {cellHeight}px"
+				/>
+			{/each}
 			<div class="absolute border-2 border-red-500" style={selectedStyles} />
 			<div class="absolute bg-yellow-500 opacity-30" style={hoveredStyles} />
 		</div>

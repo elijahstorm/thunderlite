@@ -5,7 +5,7 @@ type TerrainData = ObjectAssetMeta & {
 	connector: 0 | 1 | 2 | 3 | 4
 	name: string
 	description: string
-	details: 'dirty' | 'rough' | 'rugged' | 'clean' | 'pot-holes' | 'slippery' | 'impassable'
+	details: 'clean' | 'dirty' | 'rough' | 'slippery' | 'rugged' | 'impassable'
 	ocean: boolean
 	protection: number
 	damage: number
@@ -151,7 +151,7 @@ export const terrainData: TerrainData[] = [
 		connector: 0,
 		name: 'Enriched Ore Deposit',
 		description: 'Can be mined for money',
-		details: 'pot-holes',
+		details: 'clean',
 		ocean: false,
 		protection: 0,
 		damage: 0,
@@ -167,7 +167,7 @@ export const terrainData: TerrainData[] = [
 		connector: 0,
 		name: 'Ore Deposit',
 		description: 'Can be mined for money',
-		details: 'pot-holes',
+		details: 'rough',
 		ocean: false,
 		protection: 0,
 		damage: 0,
@@ -183,7 +183,7 @@ export const terrainData: TerrainData[] = [
 		connector: 0,
 		name: 'Depleted Ore Deposit',
 		description: 'Can be mined for money',
-		details: 'pot-holes',
+		details: 'rugged',
 		ocean: false,
 		protection: 0,
 		damage: 0,

@@ -19,13 +19,15 @@
 				ground: new Array(100).fill(0).map((_, index) => ({
 					type:
 						index % cols !== 4 && index % cols !== 6
-							? 0
+							? index % cols > 5
+								? 0
+								: 11
 							: Math.floor(Math.random() * terrainData.length),
 					state: 0,
 				})),
 				sky: [],
 				units: new Array(rows * cols).fill(0).map((_, index) =>
-					index % cols !== 2
+					index % cols !== 2 && index % cols !== 8
 						? null
 						: {
 								type: Math.floor(Math.random() * unitData.length),
