@@ -6,6 +6,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import type { createImageLoader } from '$lib/Sprites/images'
+	import { buildingRenderer } from '$lib/GameData/building'
 
 	export let map: MapObject
 	export let colorizer: typeof imageColorizer
@@ -25,20 +26,27 @@
 
 	let renderData: ObjectRenderer = {
 		ground: (type: number) => $rendererStore.ground[type],
+		sky: (type?: number) => (typeof type !== 'undefined' ? $rendererStore.sky[type] ?? null : null),
 		unit: (type?: number) =>
 			typeof type !== 'undefined' ? $rendererStore.units[type] ?? null : null,
-		sky: (type?: number) => (typeof type !== 'undefined' ? $rendererStore.sky[type] ?? null : null),
+		building: (type?: number) =>
+			typeof type !== 'undefined' ? $rendererStore.buildings[type] ?? null : null,
 	}
 
 	onMount(() => {
 		const ground = terrainRenderer(makeImage, colorizer)(map.filters.ground(map.layers.ground))
-		const units = unitRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
 		const sky = skyRenderer(makeImage, colorizer)(map.filters.sky(map.layers.sky))
+		const units = unitRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
+		const buildings = buildingRenderer(
+			makeImage,
+			colorizer
+		)(map.filters.buildings(map.layers.buildings))
 
 		rendererStore.update((store) => {
 			store.ground = { ...store.ground, ...ground }
-			store.units = { ...store.units, ...units }
 			store.sky = { ...store.sky, ...sky }
+			store.units = { ...store.units, ...units }
+			store.buildings = { ...store.buildings, ...buildings }
 			return store
 		})
 	})

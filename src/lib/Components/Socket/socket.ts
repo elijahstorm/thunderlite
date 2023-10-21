@@ -1,9 +1,4 @@
-import { interactor } from './interactor'
-
-type SocketMessage = {
-	tile: number
-	action: string
-}
+import { interactor } from '$lib/Engine/Interactor/interactor'
 
 export const socketOpened = () => console.log('> Opened Socket')
 export const socketClosed = () => console.log('< Closed Socket')
@@ -13,7 +8,7 @@ export const socketMessage =
 	(evt: MessageEvent<string>) => {
 		const map = getMap()
 		if (!map) return
-		interactor({ ...(JSON.parse(evt.data) as SocketMessage), map })
+		interactor({ ...JSON.parse(evt.data), map })
 		render(performance.now())
 	}
 

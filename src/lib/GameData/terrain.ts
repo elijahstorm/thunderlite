@@ -1,6 +1,7 @@
 import { imageLazyLoader } from '$lib/Sprites/imageLazyLoader'
+import type { modifierData } from './modifier'
 
-type TerrainData = SpriteObject & {
+type TerrainData = ObjectAssetMeta & {
 	connector: 0 | 1 | 2 | 3 | 4
 	name: string
 	description: string
@@ -10,10 +11,10 @@ type TerrainData = SpriteObject & {
 	damage: number
 	height: number
 	drag: number
-	modifiers: string[]
+	modifiers: (keyof typeof modifierData)[]
 }
 
-export const terrainData = [
+export const terrainData: TerrainData[] = [
 	{
 		url: '/game/play/terrain/plains.png',
 		frames: 1,
@@ -44,7 +45,7 @@ export const terrainData = [
 		damage: 0,
 		height: 20,
 		drag: 2,
-		modifiers: ['CURMODS.Properties.Extra_Sight'],
+		modifiers: ['Extra_Sight'],
 	},
 	{
 		url: '/game/play/terrain/forest.png',
@@ -76,7 +77,7 @@ export const terrainData = [
 		damage: 0,
 		height: 50,
 		drag: 2,
-		modifiers: ['CURMODS.Properties.Extra_Sight'],
+		modifiers: ['Extra_Sight'],
 	},
 	{
 		url: '/game/play/terrain/road.png',
@@ -108,7 +109,7 @@ export const terrainData = [
 		damage: 0,
 		height: -10,
 		drag: 1,
-		modifiers: ['CURMODS.Properties.Trench'],
+		modifiers: ['Trench'],
 	},
 	{
 		url: '/game/play/terrain/wasteland.png',
@@ -268,7 +269,7 @@ export const terrainData = [
 		damage: 0,
 		height: 0,
 		drag: 1,
-		modifiers: ['CURMODS.Properties.Port'],
+		modifiers: ['Port'],
 	},
 	{
 		url: '/game/play/terrain/bridge.png',
@@ -302,6 +303,6 @@ export const terrainData = [
 		drag: 1,
 		modifiers: [],
 	},
-] as TerrainData[]
+]
 
 export const terrainRenderer = imageLazyLoader('ground', terrainData)

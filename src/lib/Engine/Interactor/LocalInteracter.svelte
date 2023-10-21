@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { socketMessage } from './socket'
+	import { socketMessage } from '$lib/Components/Socket/socket'
 
 	export let map: () => MapObject | undefined
 	let requestRedraw: number

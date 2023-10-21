@@ -2,12 +2,13 @@ import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 import { skyData } from '$lib/GameData/sky'
 import baseX from 'base-x'
+import { buildingData } from '$lib/GameData/building'
 
-export const mapHasher = (map: MapObject) => hash(mapExporter(map))
+export const mapHasher = (map: MapProcesser) => hash(mapExporter(map))
 
-export const deriveFromHash = (hash?: string) =>
+export const deriveFromHash = (hash?: string, existing: MapProcesser = EMPTY_MAP) =>
 	({
-		...EMPTY_MAP,
+		...existing,
 		...mapImporter(unhash(hash)),
 	}) as MapObject
 
@@ -20,13 +21,15 @@ const EMPTY_MAP = {
 			type: 0,
 			state: 0,
 		})),
-		units: [],
 		sky: [],
+		units: [],
+		buildings: [],
 	},
 	filters: {
 		ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
-		units: () => Array.from({ length: unitData.length }, (_, index) => index),
 		sky: () => Array.from({ length: skyData.length }, (_, index) => index),
+		units: () => Array.from({ length: unitData.length }, (_, index) => index),
+		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
 	},
 }
 
@@ -37,18 +40,19 @@ const hash = (content: string) => base62.encode(new TextEncoder().encode(content
 const unhash = (content?: string) =>
 	content ? new TextDecoder().decode(base62.decode(content)) : undefined
 
-const mapExporter = (map: MapObject) => JSON.stringify(filter(map))
+const mapExporter = (map: MapProcesser) => JSON.stringify(filter(map))
 
 const mapImporter = (content?: string) => (content ? process(JSON.parse(content)) : {})
 
-const filter = (map: MapObject) =>
+const filter = (map: MapProcesser) =>
 	({
 		cols: map.cols,
 		rows: map.rows,
 		layers: {
 			ground: map.layers.ground.map(removeState),
-			units: map.layers.units.map(addUnitLocation).filter(exists),
 			sky: map.layers.sky.map(addLocation).filter(exists),
+			units: map.layers.units.map(addUnitLocation).filter(exists),
+			buildings: map.layers.buildings.map(addUnitLocation).filter(exists),
 		},
 	}) as MapData
 
@@ -58,8 +62,9 @@ const process = (map: MapData) =>
 		rows: map.rows,
 		layers: {
 			ground: map.layers.ground.map((object) => ({ ...object, state: 0 })),
-			units: processObjects(map, map.layers.units)(processTeamObjectState),
 			sky: processObjects(map, map.layers.sky)(processObjectState),
+			units: processObjects(map, map.layers.units)(processTeamObjectState),
+			buildings: processObjects(map, map.layers.buildings)(processTeamObjectState),
 		},
 	}) as MapProcesser
 
@@ -79,7 +84,7 @@ const processTeamObjectState =
 		(source[object.l] = {
 			type: object.type,
 			team: object.team,
-			state: 4,
+			state: 0,
 		} as T & AnimatedObject)
 
 const processObjectState =

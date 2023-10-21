@@ -4,7 +4,7 @@ import type { imageColorizer } from './imageColorizer'
 import type { createImageLoader } from './images'
 
 export const imageLazyLoader =
-	<T extends SpriteObject>(imageContainer: keyof MapLayers, dataList: T[], teamAmount = 1) =>
+	<T extends ObjectAssetMeta>(imageContainer: keyof MapLayers, dataList: T[], teamAmount = 1) =>
 	(makeImage: ReturnType<typeof createImageLoader>, colorizer: typeof imageColorizer) =>
 	(includedTypes: number[]) =>
 		Object.entries(
@@ -19,13 +19,18 @@ export const imageLazyLoader =
 			.filter((_, index) => includedTypes.indexOf(index) !== -1)
 			.reduce(
 				(carry, [_index, data]) => {
+					const renderer = {
+						frames: data.frames,
+						xOffset: data.xOffset,
+						yOffset: data.yOffset,
+					} as ObjectSpriteRenderer
 					const index = parseInt(_index)
 					const cache = get(spriteStore)[imageContainer][index]
 
 					if (cache) {
-						data.sprite = cache
+						renderer.sprite = cache
 					} else {
-						data.sprite = new Array(teamAmount)
+						renderer.sprite = new Array(teamAmount)
 						for (let team = 0; team < teamAmount; team++) {
 							makeImage(data.url)((image) => {
 								spriteStore.update((sprites) => {
@@ -35,13 +40,13 @@ export const imageLazyLoader =
 									sprites[imageContainer][index][team] = colorizer(team)(image)
 									return sprites
 								})
-								data.sprite[team] = colorizer(team)(image)
+								renderer.sprite[team] = colorizer(team)(image)
 							})
 						}
 					}
 
-					carry[index] = data
+					carry[index] = renderer
 					return carry
 				},
-				{} as { [key: number]: T }
+				{} as { [key: number]: ObjectSpriteRenderer }
 			)

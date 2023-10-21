@@ -13,14 +13,15 @@
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
 	import { createImageLoader } from '$lib/Sprites/images'
+	import { writable } from 'svelte/store'
 
 	export let mapHash: string | undefined = undefined
 
 	const maxTeamAmount = 4
 	const size = 64
 
-	let contextLoaded = false
-	const makeImage = createImageLoader((finished: boolean) => (contextLoaded = finished))
+	let contextLoaded = writable(false)
+	const makeImage = createImageLoader((finished: boolean) => ($contextLoaded = finished))
 
 	let openOptionsModal = false
 	let editType: keyof MapLayers = 'units'

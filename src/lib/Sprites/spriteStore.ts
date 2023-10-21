@@ -4,25 +4,29 @@ type ContainedSpriteStore = {
 	[key: number]: HTMLImageElement[]
 }
 type ContainedLoadedSprites = {
-	[key: number]: ObjectSpecificRenderer
+	[key: number]: ObjectSpriteRenderer
 }
 
 export const spriteStore = writable<{
 	ground: ContainedSpriteStore
-	units: ContainedSpriteStore
 	sky: ContainedSpriteStore
+	units: ContainedSpriteStore
+	buildings: ContainedSpriteStore
 }>({
 	ground: {},
-	units: {},
 	sky: {},
+	units: {},
+	buildings: {},
 })
 
 export const rendererStore = writable<{
 	ground: ContainedLoadedSprites
-	units: ContainedLoadedSprites
 	sky: ContainedLoadedSprites
+	units: ContainedLoadedSprites
+	buildings: ContainedLoadedSprites
 }>({
 	ground: {},
-	units: {},
 	sky: {},
+	units: {},
+	buildings: {},
 })

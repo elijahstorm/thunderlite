@@ -6,7 +6,7 @@ type ActiveObject = { state: number; type: number; team?: number }
 const spriteSize = 60
 
 const renderObject =
-	<T extends ActiveObject>(render: ObjectSpecificRenderer, object: T) =>
+	<T extends ActiveObject>(render: ObjectSpriteRenderer, object: T) =>
 	(width: number, height: number, animationFrame: number) =>
 	(context: CanvasRenderingContext2D) =>
 		context.drawImage(
@@ -22,14 +22,14 @@ const renderObject =
 		)
 
 const always = <T extends { state: number; type: number }>(
-	renderer: (type: number) => ObjectSpecificRenderer,
+	renderer: (type: number) => ObjectSpriteRenderer,
 	object: T
 ) => renderObject(renderer(object.type), object)
 
 const conditional = <T extends { state: number; type: number }>(
-	renderer: (type?: number) => ObjectSpecificRenderer | null,
+	renderer: (type?: number) => ObjectSpriteRenderer | null,
 	object?: T | null
-) => (object ? renderObject(renderer(object.type) as ObjectSpecificRenderer, object) : null)
+) => (object ? renderObject(renderer(object.type) as ObjectSpriteRenderer, object) : null)
 
 export const paint =
 	(renderData: ObjectRenderer) =>
@@ -44,6 +44,12 @@ export const paint =
 		const frame = get(animationFrame)
 
 		always(renderData.ground, map.layers.ground[tile])(width, height, frame)(context)
+		conditional(renderData.building, map.layers.buildings[tile])?.call(
+			this,
+			width,
+			height,
+			frame
+		)(context)
 		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
 		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, frame)(context)
 
