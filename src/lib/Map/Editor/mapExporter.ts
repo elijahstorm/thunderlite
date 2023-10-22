@@ -32,6 +32,7 @@ const EMPTY_MAP: MapObject = {
 		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
 	},
 	highlights: [],
+	route: [],
 }
 
 const base62 = baseX('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')

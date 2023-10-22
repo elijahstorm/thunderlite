@@ -15,7 +15,11 @@ type TeamObject = {
 
 type GroundObject = ObjectType & AnimatedObject
 type SkyObject = ObjectType & AnimatedObject
-type UnitObject = ObjectType & AnimatedObject & TeamObject
+type UnitObject = ObjectType &
+	AnimatedObject &
+	TeamObject & {
+		health?: number
+	}
 type BuildingObject = ObjectType & AnimatedObject & TeamObject
 
 type HighlightType = 0 | 1
@@ -26,8 +30,12 @@ type HighlightMeta = {
 type TileInfo = {
 	tile: number
 }
-
 type Highlight = TileInfo & HighlightMeta
+type Route = {
+	state: number
+	rotate: number
+	index: number
+}
 
 type MapLayers = {
 	ground: GroundObject[]
@@ -53,7 +61,8 @@ type MapObject = {
 	rows: number
 	layers: MapLayers
 	filters: MapFilters
-	highlights: Highlight[]
+	route: (Route | undefined)[]
+	highlights: (Highlight | undefined)[]
 }
 type MapProcesser = {
 	title?: string | null
@@ -84,6 +93,10 @@ type ObjectRenderer = {
 	sky: (type?: number) => ObjectSpriteRenderer | null
 	unit: (type?: number) => ObjectSpriteRenderer | null
 	building: (type?: number) => ObjectSpriteRenderer | null
+}
+type HUDImages = {
+	advice: HTMLImageElement
+	arrow: HTMLImageElement
 }
 
 type InterfaceInteraction = {

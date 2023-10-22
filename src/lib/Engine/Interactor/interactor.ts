@@ -3,6 +3,7 @@ import { get } from 'svelte/store'
 import { animate } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
+import { pathFinder } from './Pathing/pathFinder'
 
 type Interaction = {
 	map: MapObject
@@ -30,7 +31,7 @@ const select: Interactor = ({ map, tile }) => {
 
 const choice: Interactor = ({ map, tile }) => {
 	const source = get(interactionSource)
-	interactionSource.set(undefined)
+	interactionSource.set(null)
 	interactionState.set('select')
 	const unit = source && map.layers.units[source]
 	if (!unit) return
@@ -65,16 +66,25 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	const target = destination && map.layers.units[destination]
 	if (!target) return
 
-	animate(map, tile, destination) // walk path
+	const path = pathFinder(map, attacker, tile, choice)
+	if (path.length > 1) {
+		move({
+			map,
+			tile,
+			choice: path[path.length - 1].tile,
+		})
+	}
+
 	animate(map, tile, destination) // attack
-	// target.health -= unitData[attacker.type].power
+	target.health = Math.max(
+		(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
+		0
+	)
+
 	/**
 	 * gameplay sprint
 	 * ---
 	 * todo
-	 * 0 fix ranged attack calculation
-	 * 1 add health & display
-	 * 2 add path
 	 * 3 add animations
 	 * 4 add game state (user turn)
 	 * 5 add selectable unit HUD UI

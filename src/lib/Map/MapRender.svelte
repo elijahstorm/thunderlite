@@ -11,28 +11,32 @@
 	import { createImageLoader } from '$lib/Sprites/images'
 	import { writable } from 'svelte/store'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
+	import { updateRoute } from '$lib/Layers/tileHighlighter'
+	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
 
 	export let map: MapObject
 	export let mini: boolean = false
 	export let pause = false
 	export let requestRedraw = 0
+	export let hud = {
+		advice: '/game/play/icon/move/advice.png',
+		arrow: '/game/play/icon/route/arrow.png',
+	}
 
 	export let contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 	export let makeImage: ReturnType<typeof createImageLoader> = createImageLoader(
 		(finished: boolean) => ($contextLoaded = finished)
 	)
 	export let colorizer: typeof imageColorizer = imageColorizer
-	export let select: undefined | ((x: number, y: number) => void) = undefined
 	export let scroller: typeof Scroller = Scroller
+	export let select: undefined | ((x: number, y: number) => void) = undefined
 
 	const ANIMATION_TIME = 800
+	// @ts-ignore
+	let hudImages: HUDImages = {}
 
-	$: {
-		map.layers.ground.map(
-			(object, index) => (object.state = connectionDecision(object)(map, index))
-		)
-		requestRedraw = performance.now()
-	}
+	const hover = (x: number, y: number) =>
+		(map.route = updateRoute(map, $interactionSource, [...map.route], y * map.cols + x))
 
 	const inc = () => {
 		if (pause) {
@@ -41,6 +45,13 @@
 		}
 		animationFrame.update((frame) => (frame + 1) % 100000)
 		$animationTimer = setTimeout(inc, ANIMATION_TIME)
+	}
+
+	$: {
+		map.layers.ground.map(
+			(object, index) => (object.state = connectionDecision(object)(map, index))
+		)
+		requestRedraw = performance.now()
 	}
 
 	$: {
@@ -53,6 +64,9 @@
 		if (!pause && !$animationTimer) {
 			$animationTimer = setTimeout(inc, ANIMATION_TIME)
 		}
+
+		hudImages.advice.src = hud.advice
+		hudImages.arrow.src = hud.arrow
 	})
 
 	onDestroy(() => {
@@ -80,6 +94,7 @@
 				{interfacer}
 				{select}
 				{validTile}
+				{hover}
 				let:cellWidth
 				let:cellHeight
 				let:handleClick
@@ -93,7 +108,7 @@
 					tileHeight={cellHeight}
 					contentWidth={cellWidth * map.cols}
 					contentHeight={cellHeight * map.rows}
-					paint={paint(renderData)(() => map)}
+					paint={paint(renderData, hudImages)(() => map)}
 					{requestRedraw}
 					{handleClick}
 					{handleHover}
@@ -106,3 +121,6 @@
 		{/if}
 	</Game>
 </div>
+
+<img class="hidden" bind:this={hudImages.arrow} src={hud.arrow} alt="placeholder arrow" />
+<img class="hidden" bind:this={hudImages.advice} src={hud.advice} alt="placeholder advice" />

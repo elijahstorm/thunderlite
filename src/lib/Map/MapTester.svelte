@@ -56,6 +56,7 @@
 			buildings: filter,
 		},
 		highlights: [],
+		route: [],
 	}
 
 	mapStore.set(map)

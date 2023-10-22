@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { interactionState } from '$lib/Engine/Interactor/interactionState'
+
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
+	export let hover: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
 	export let mini: boolean = false
 
@@ -16,6 +19,8 @@
 	const handleHover = (_x: number, _y: number) => {
 		const [x, y] = [tileX(_x), tileY(_y)]
 		if (!validTile(x, y)) return
+		if (interfacer.hover.x === x && interfacer.hover.y === y) return
+		hover(x, y)
 		interfacer.hover = { x, y }
 	}
 	const handleOffset = (x: number, y: number, zoom: number) => {
@@ -42,18 +47,14 @@
 
 	{#if !mini}
 		<div class="col-start-1 row-start-1 pointer-events-none relative">
-			<img
-				class="absolute"
-				src="/game/play/icon/move/hover.png"
-				style={position(interfacer.hover)}
-				alt="hovered tile"
-			/>
-			<img
-				class="absolute"
-				src="/game/play/icon/move/selected.png"
-				style={position(interfacer.selected)}
-				alt="selected tile"
-			/>
+			{#if $interactionState === 'select'}
+				<img
+					class="absolute"
+					src="/game/play/icon/move/hover.png"
+					style={position(interfacer.hover)}
+					alt="hovered tile"
+				/>
+			{/if}
 		</div>
 	{/if}
 </section>

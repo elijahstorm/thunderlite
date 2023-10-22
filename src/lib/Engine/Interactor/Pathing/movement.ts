@@ -55,7 +55,7 @@ const isWalkable = (
 	validTerrain(map.layers.ground[tile], unit)
 
 const IMPASSABLE = 9999
-const drag = (unit: UnitObject, terrain: GroundObject) =>
+export const drag = (unit: UnitObject, terrain: GroundObject) =>
 	unitData[unit.type].type === 'air'
 		? 1
 		: ((terrainData[terrain.type].name === 'Shore' &&

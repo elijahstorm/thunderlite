@@ -1,10 +1,11 @@
+import { unitData } from '$lib/GameData/unit'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
 
 export const paint =
-	(renderData: ObjectRenderer) =>
+	(renderData: ObjectRenderer, hudImages: HUDImages) =>
 	(getMap: () => MapObject) =>
 	(context: CanvasRenderingContext2D) =>
 	(row: number, col: number, left: number, top: number, width: number, height: number) => {
@@ -24,8 +25,10 @@ export const paint =
 			frame
 		)(context)
 		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
+		playInfo(map.layers.units[tile])(width, height)(context)
 		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, frame)(context)
-		advice(map.highlights[tile])(width, height)(context)
+		advice(map.highlights[tile], hudImages.advice)(width, height)(context)
+		route(map.route[tile], hudImages.arrow)(width, height)(context)
 
 		context.restore()
 	}
@@ -63,7 +66,9 @@ const highlights =
 	(width: number, height: number) =>
 	(context: CanvasRenderingContext2D) => {
 		if (!highlight) return
+
 		const style = ['green', 'red'][highlight.type]
+
 		context.strokeStyle = style
 		context.fillStyle = style
 		context.globalAlpha = 0.7
@@ -75,13 +80,11 @@ const highlights =
 	}
 
 const advice =
-	(highlight: Highlight | undefined) =>
+	(highlight: Highlight | undefined, advice: HTMLImageElement) =>
 	(width: number, height: number) =>
 	(context: CanvasRenderingContext2D) => {
 		if (!highlight) return
 
-		const advice = new Image()
-		advice.src = `/game/play/icon/move/advice.png`
 		context.globalAlpha = 0.5
 		context.drawImage(advice, 0, highlight.type * spriteSize, width, height, 0, 0, width, height)
 		context.globalAlpha = 1
@@ -96,4 +99,40 @@ const advice =
 			width,
 			height
 		)
+	}
+
+const playInfo =
+	(unit: UnitObject | null) =>
+	(width: number, height: number) =>
+	(context: CanvasRenderingContext2D) => {
+		if (!unit) return
+
+		const health = unit?.health ?? unitData[unit.type].health
+		if (health === unitData[unit.type].health) return
+
+		const percentage = health / unitData[unit.type].health
+		const color = percentage > 0.65 ? 'green' : percentage > 0.35 ? 'yellow' : 'red'
+
+		context.fillStyle = 'black'
+		context.fillRect(5, height - 15, width - 10, 5)
+		context.strokeStyle = color
+		context.fillStyle = color
+		context.lineWidth = 2
+		context.fillRect(5, height - 15, percentage * (width - 10), 5)
+		context.strokeRect(5, height - 15, width - 10, 5)
+	}
+
+const route =
+	(route: Route | undefined, arrow: HTMLImageElement) =>
+	(width: number, height: number) =>
+	(context: CanvasRenderingContext2D) => {
+		if (!route) return
+
+		route.rotate
+		context.save()
+		context.translate(width / 2, height / 2)
+		context.rotate((route.rotate * Math.PI) / 2)
+		context.translate(-width / 2, -height / 2)
+		context.drawImage(arrow, 0, route.state * spriteSize, width, height, 0, 0, width, height)
+		context.restore()
 	}
