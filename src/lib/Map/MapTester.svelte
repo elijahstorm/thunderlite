@@ -55,6 +55,7 @@
 			units: filter,
 			buildings: filter,
 		},
+		highlights: [],
 	}
 
 	mapStore.set(map)

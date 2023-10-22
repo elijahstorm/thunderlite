@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { highlightedTiles } from './tileHighlighter'
-
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
@@ -31,12 +29,10 @@
 	const tileX = (x: number) => Math.floor(x / cellWidth)
 	const tileY = (y: number) => Math.floor(y / cellHeight)
 
-	$: selectedStyles = `left: ${interfacer.selected.x * cellWidth - interfacer.offset.x}px; top: ${
-		interfacer.selected.y * cellHeight - interfacer.offset.y
-	}px; width: ${cellWidth}px; height: ${cellHeight}px`
-	$: hoveredStyles = `left: ${interfacer.hover.x * cellWidth - interfacer.offset.x}px; top: ${
-		interfacer.hover.y * cellHeight - interfacer.offset.y
-	}px; width: ${cellWidth}px; height: ${cellHeight}px`
+	const position: (tile: { x: number; y: number }) => string = ({ x, y }) =>
+		`left: ${x * cellWidth - interfacer.offset.x}px; top: ${
+			y * cellHeight - interfacer.offset.y
+		}px; width: ${cellWidth}px; height: ${cellHeight}px`
 </script>
 
 <section class="grid flex-grow overflow-clip">
@@ -46,20 +42,18 @@
 
 	{#if !mini}
 		<div class="col-start-1 row-start-1 pointer-events-none relative">
-			{#each $highlightedTiles as highlight}
-				<div
-					class="absolute opacity-60"
-					class:bg-blue-500={highlight.type === 'move'}
-					class:bg-red-500={highlight.type === 'attack'}
-					class:bg-transparent={highlight.type === 'none'}
-					style="left: {highlight.tile.x * cellWidth - interfacer.offset.x}px; top: {highlight.tile
-						.y *
-						cellHeight -
-						interfacer.offset.y}px; width: {cellWidth}px; height: {cellHeight}px"
-				/>
-			{/each}
-			<div class="absolute border-2 border-red-500" style={selectedStyles} />
-			<div class="absolute bg-yellow-500 opacity-30" style={hoveredStyles} />
+			<img
+				class="absolute"
+				src="/game/play/icon/move/hover.png"
+				style={position(interfacer.hover)}
+				alt="hovered tile"
+			/>
+			<img
+				class="absolute"
+				src="/game/play/icon/move/range-attack.png"
+				style={position(interfacer.selected)}
+				alt="selected tile"
+			/>
 		</div>
 	{/if}
 </section>

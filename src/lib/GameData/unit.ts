@@ -31,7 +31,7 @@ const COMMON_RANGE: [number, number] = [1, 1]
 
 export const unitData: UnitData[] = [
 	{
-		url: '/game/play/units/idle/strike-commando.png',
+		url: '/game/play/unit/idle/strike-commando.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -56,7 +56,7 @@ export const unitData: UnitData[] = [
 		],
 	},
 	{
-		url: '/game/play/units/idle/heavy-commando.png',
+		url: '/game/play/unit/idle/heavy-commando.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -81,7 +81,7 @@ export const unitData: UnitData[] = [
 		],
 	},
 	{
-		url: '/game/play/units/idle/flak-tank.png',
+		url: '/game/play/unit/idle/flak-tank.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -101,7 +101,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Can_Attack.Air_Raid', 'Damage.Flak', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/scorpion-tank.png',
+		url: '/game/play/unit/idle/scorpion-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -121,7 +121,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Damage.Fast_Attack', 'Self_Action.Repairable', 'Can_Attack.Bombard'],
 	},
 	{
-		url: '/game/play/units/idle/lance-tank.png',
+		url: '/game/play/unit/idle/lance-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -141,7 +141,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Attack.Lance', 'Self_Action.Repairable', 'Can_Attack.Bombard'],
 	},
 	{
-		url: '/game/play/units/idle/spider-tank.png',
+		url: '/game/play/unit/idle/spider-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -161,7 +161,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Attack.Stun', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/stealth-tank.png',
+		url: '/game/play/unit/idle/stealth-tank.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -181,7 +181,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['End_Turn.Cloak', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/annihilator-tank.png',
+		url: '/game/play/unit/idle/annihilator-tank.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -201,7 +201,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Damage.Slow_Attack', 'Self_Action.Repairable', 'Can_Attack.Bombard'],
 	},
 	{
-		url: '/game/play/units/idle/mortar-truck.png',
+		url: '/game/play/unit/idle/mortar-truck.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -221,7 +221,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/rocket-truck.png',
+		url: '/game/play/unit/idle/rocket-truck.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -241,7 +241,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/jammer-truck.png',
+		url: '/game/play/unit/idle/jammer-truck.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -261,7 +261,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Move.Radar', 'Idle.Jamming', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/warmachine.png',
+		url: '/game/play/unit/idle/warmachine.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -286,7 +286,7 @@ export const unitData: UnitData[] = [
 		],
 	},
 	{
-		url: '/game/play/units/idle/intrepid.png',
+		url: '/game/play/unit/idle/intrepid.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -306,7 +306,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Start_Turn.Capture', 'Move.Tracking', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/corvette.png',
+		url: '/game/play/unit/idle/corvette.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -326,7 +326,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Can_Attack.Ground_Assult', 'Damage.Fast_Attack'],
 	},
 	{
-		url: '/game/play/units/idle/hunter-support.png',
+		url: '/game/play/unit/idle/hunter-support.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -346,7 +346,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Can_Attack.Air_Raid', 'Damage.Flak', 'Move.Tracking', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/u-boat.png',
+		url: '/game/play/unit/idle/u-boat.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -366,7 +366,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['End_Turn.Cloak', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/raptor-fighter.png',
+		url: '/game/play/unit/idle/raptor-fighter.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -386,7 +386,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Can_Attack.Air_Raid', 'Self_Action.Irreparable'],
 	},
 	{
-		url: '/game/play/units/idle/condor-bomber.png',
+		url: '/game/play/unit/idle/condor-bomber.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -406,7 +406,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Self_Action.Repairable', 'Can_Attack.Bombard'],
 	},
 	{
-		url: '/game/play/units/idle/vulture-drone.png',
+		url: '/game/play/unit/idle/vulture-drone.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -426,7 +426,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['End_Turn.Vulture', 'Self_Action.Repairable', 'Can_Attack.Bombard'],
 	},
 	{
-		url: '/game/play/units/idle/turret.png',
+		url: '/game/play/unit/idle/turret.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -446,7 +446,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/blockade.png',
+		url: '/game/play/unit/idle/blockade.png',
 		frames: 4,
 		yOffset: 0,
 		xOffset: 0,
@@ -466,7 +466,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Self_Action.Irreparable'],
 	},
 	{
-		url: '/game/play/units/idle/battle-cruiser.png',
+		url: '/game/play/unit/idle/battle-cruiser.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -486,7 +486,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/leviathan.png',
+		url: '/game/play/unit/idle/leviathan.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,
@@ -506,7 +506,7 @@ export const unitData: UnitData[] = [
 		modifiers: ['Self_Action.Land', 'Self_Action.Repairable'],
 	},
 	{
-		url: '/game/play/units/idle/transporter.png',
+		url: '/game/play/unit/idle/transporter.png',
 		frames: 4,
 		yOffset: 60,
 		xOffset: 0,

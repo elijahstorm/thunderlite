@@ -12,7 +12,7 @@ export const deriveFromHash = (hash?: string, existing: MapProcesser = EMPTY_MAP
 		...mapImporter(unhash(hash)),
 	}) as MapObject
 
-const EMPTY_MAP = {
+const EMPTY_MAP: MapObject = {
 	title: 'rose gold',
 	cols: 10,
 	rows: 10,
@@ -31,6 +31,7 @@ const EMPTY_MAP = {
 		units: () => Array.from({ length: unitData.length }, (_, index) => index),
 		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
 	},
+	highlights: [],
 }
 
 const base62 = baseX('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')

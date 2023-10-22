@@ -18,6 +18,17 @@ type SkyObject = ObjectType & AnimatedObject
 type UnitObject = ObjectType & AnimatedObject & TeamObject
 type BuildingObject = ObjectType & AnimatedObject & TeamObject
 
+type HighlightType = 0 | 1
+type HighlightMeta = {
+	type: HighlightType
+	tip: 0 | 1 | 2 | 3
+}
+type TileInfo = {
+	tile: number
+}
+
+type Highlight = TileInfo & HighlightMeta
+
 type MapLayers = {
 	ground: GroundObject[]
 	sky: (SkyObject | null)[]
@@ -42,6 +53,7 @@ type MapObject = {
 	rows: number
 	layers: MapLayers
 	filters: MapFilters
+	highlights: Highlight[]
 }
 type MapProcesser = {
 	title?: string | null

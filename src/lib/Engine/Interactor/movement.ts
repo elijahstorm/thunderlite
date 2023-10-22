@@ -2,46 +2,52 @@ import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 
 export const generateMovementList = (map: MapObject, tile: number, unit: UnitObject) => [
-	...new Set(increment(map, unit, tile, unitData[unit.type].movement)),
+	...new Set([
+		tile,
+		...removeOccupied(map, increment(map, tile, unit, unitData[unit.type].movement)),
+	]),
 ]
 
-const increment: (map: MapObject, unit: UnitObject, tile: number, movement: number) => number[] = (
+const removeOccupied = (map: MapObject, tiles: number[]) =>
+	tiles.filter((tile) => !map.layers.units[tile])
+
+const increment: (map: MapObject, tile: number, unit: UnitObject, movement: number) => number[] = (
 	map,
-	unit,
 	tile,
+	unit,
 	movement
 ) => [
-	...move(map, unit, tile, movement, 'right'),
-	...move(map, unit, tile, movement, 'left'),
-	...move(map, unit, tile, movement, 'up'),
-	...move(map, unit, tile, movement, 'down'),
+	...move(map, tile, unit, movement, 'right'),
+	...move(map, tile, unit, movement, 'left'),
+	...move(map, tile, unit, movement, 'up'),
+	...move(map, tile, unit, movement, 'down'),
 ]
 
 const move = (
 	map: MapObject,
-	unit: UnitObject,
 	tile: number,
+	unit: UnitObject,
 	movement: number,
 	direction: keyof typeof directionDecision
-) => addWalkableTiles(map, unit, updateTileDecision[direction](map, tile), movement, direction)
+) => addWalkableTiles(map, updateTileDecision[direction](map, tile), unit, movement, direction)
 
 const addWalkableTiles = (
 	map: MapObject,
-	unit: UnitObject,
 	tile: number,
+	unit: UnitObject,
 	movement: number,
 	direction: keyof typeof directionDecision
 ) =>
-	isWalkable(map, tile, movement, direction, unit)
-		? [tile, ...increment(map, unit, tile, movement - drag(unit, map.layers.ground[tile]))]
+	isWalkable(map, tile, unit, movement, direction)
+		? [tile, ...increment(map, tile, unit, movement - drag(unit, map.layers.ground[tile]))]
 		: []
 
 const isWalkable = (
 	map: MapObject,
 	tile: number,
+	unit: UnitObject,
 	movement: number,
-	direction: keyof typeof directionDecision,
-	unit: UnitObject
+	direction: keyof typeof directionDecision
 ) =>
 	directionDecision[direction](map, tile) &&
 	movement >= drag(unit, map.layers.ground[tile]) &&

@@ -1,51 +1,44 @@
 import { generateAttackList } from '$lib/Engine/Interactor/attack'
 import { writable } from 'svelte/store'
 
-type HighlightType = 'none' | 'move' | 'attack'
-
-type HighlightMeta = {
-	type: HighlightType
-	tip: 'good' | 'bad' | 'neutral'
-}
-
-type TileInfo = {
-	tile: {
-		x: number
-		y: number
-	}
-}
-
-type Highlight = TileInfo & HighlightMeta
-
-export const highlightedTiles = writable<Highlight[]>([])
-
 export const route = writable<number[]>([])
 
-export const highlightMovementList = (map: MapObject, tiles: number[], unit: UnitObject) =>
-	highlightedTiles.set(
-		[
-			...new Set(
-				tiles
-					.reduce(
-						(highlights, tile) => [
-							...highlights,
-							...pathToHighlightable(map, generateAttackList(map, tile, unit), 'attack'),
-						],
-						pathToHighlightable(map, tiles, 'move')
-					)
-					.map(JSON.stringify)
-			),
-		].map(JSON.parse)
-	)
+export const highlightMovementList = (map: MapObject, tiles: number[], unit: UnitObject) => {
+	map.highlights = new Array(map.cols * map.rows)
+	tiles
+		.reduce(
+			(highlights, tile) => [
+				...highlights,
+				...pathToHighlightable(
+					map,
+					generateAttackList(
+						map,
+						tile,
+						unit,
+						highlights.map((meta) => meta.tile)
+					),
+					highlightTypes.attack
+				),
+			],
+			pathToHighlightable(map, tiles, highlightTypes.move)
+		)
+		.map((tile) => {
+			map.highlights[tile.tile] = tile
+		})
+}
 
 const pathToHighlightable = (map: MapObject, tiles: number[], type: HighlightType) =>
 	tiles.map<Highlight>((tile) => ({
-		tile: {
-			x: tile % map.cols,
-			y: Math.floor(tile / map.rows),
-		},
+		tile,
 		type,
-		tip: 'neutral',
+		tip: highlightTypes.neutral,
 	}))
 
-const removeDuplicates = () => [true]
+const highlightTypes = {
+	move: 0,
+	attack: 1,
+	good: 0,
+	neutral: 1,
+	bad: 2,
+	terrible: 3,
+} as const
