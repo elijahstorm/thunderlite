@@ -75,7 +75,7 @@ const processObjects =
 		const result = new Array(map.cols * map.rows)
 		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 		// @ts-ignore
-		objects.forEach(processer(result))
+		objects?.forEach(processer(result))
 		return result as ReturnType<ReturnType<T>>[]
 	}
 

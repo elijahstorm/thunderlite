@@ -50,7 +50,7 @@
 			/>
 			<img
 				class="absolute"
-				src="/game/play/icon/move/range-attack.png"
+				src="/game/play/icon/move/selected.png"
 				style={position(interfacer.selected)}
 				alt="selected tile"
 			/>

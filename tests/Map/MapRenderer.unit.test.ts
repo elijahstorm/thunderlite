@@ -4,6 +4,7 @@ import MapRender from '../../src/lib/Map/MapRender.svelte'
 import { unitData } from '../../src/lib/GameData/unit'
 import ContextlessScroller from '$lib/Scroller/ContextlessScroller.svelte'
 import { buildingData } from '$lib/GameData/building'
+import { writable } from 'svelte/store'
 
 describe('MapRender.svelte', () => {
 	afterEach(() => cleanup())
@@ -50,6 +51,7 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 		}
 		setTimeout(check, refresh)
 	})
+	const contextLoaded = writable(!!captureEvent)
 	const cols = 100
 	const rows = 100
 	const map = {
@@ -127,7 +129,7 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 			select,
 			makeImage,
 			colorizer,
-			contextLoaded: !!captureEvent,
+			contextLoaded,
 		}),
 		prepared,
 	}

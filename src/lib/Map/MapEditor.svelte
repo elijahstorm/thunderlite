@@ -94,7 +94,7 @@
 					disabled={editType === 'ground'}
 					{size}
 				>
-					{#if contextLoaded && editType !== 'ground'}
+					{#if $contextLoaded && editType !== 'ground'}
 						<img
 							class="object-cover min-w-fit"
 							src={$spriteStore[editType][type][index].src}
@@ -114,7 +114,7 @@
 				selected={editType === 'units' && type === index}
 				{size}
 			>
-				{#if contextLoaded}
+				{#if $contextLoaded}
 					<img
 						class="object-cover min-w-fit"
 						src={$spriteStore['units'][index][team].src}
