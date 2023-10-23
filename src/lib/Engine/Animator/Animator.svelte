@@ -1,15 +1,16 @@
 <script lang="ts">
+	import { ANIMATION_TIME, animateRoute, getDirection, startIncrementer } from './animator'
 	import { unitData } from '$lib/GameData/unit'
 	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { fly } from 'svelte/transition'
-	import { ANIMATION_TIME, animateRoute, getDirection, startIncrementer } from './animator'
 	import { linear } from 'svelte/easing'
 
-	export let position: (tile: { x: number; y: number }) => string = ({ x, y }) => ''
+	export let position: (tile: { x: number; y: number }) => string = () => ''
 
 	const spriteSize = 60
 	let index = 0
+	let hideNewInstance = false
 
 	const traverseRoute = (route: number[] | null) => {
 		if (route === null) {
@@ -18,7 +19,10 @@
 
 		index = 0
 		startIncrementer(
-			() => index++,
+			() => {
+				index++
+				hideNewInstance = true
+			},
 			() => index < route.length - 1
 		)
 	}
@@ -39,36 +43,29 @@
 		y: Math.floor(tile / map.cols),
 	})
 
-	const animations = [
-		(pixels: number) => `${pixels}px`,
-		(pixels: number) => `0 ${pixels}px`,
-		(pixels: number) => `-${pixels}px`,
-		(pixels: number) => `0 -${pixels}px`,
-	]
-
-	const values = [{ x: -60 }, { y: -60 }, { x: 60 }, { y: 60 }]
-
-	const animate = (node: HTMLDivElement, direction: number) => ({
-		delay: 0,
-		duration: ANIMATION_TIME,
-		easing: linear,
-		css: (t: number) => `translate: ${animations[direction](t * spriteSize)}`,
-	})
+	const animationDirection = [{ x: 60 }, { y: 60 }, { x: -60 }, { y: -60 }]
 
 	$: traverseRoute($animateRoute?.route ?? null)
+
+	$: setTimeout(() => {
+		index
+		hideNewInstance = false
+	}, ANIMATION_TIME)
 </script>
 
 {#if $animateRoute}
 	{#key index}
 		<div
 			class="absolute overflow-clip"
+			class:opacity-0={hideNewInstance}
 			style={`
                 ${position(tileToXY($animateRoute.map, $animateRoute.route[index]))} 
                 ${render($animateRoute, $animationFrame)}
             `}
-			in:fly={{
-				...values[getDirection($animateRoute.map, $animateRoute.route, index)],
-				// easing: linear,
+			out:fly={{
+				...animationDirection[getDirection($animateRoute.map, $animateRoute.route, index - 1)],
+				duration: ANIMATION_TIME,
+				easing: linear,
 				opacity: 1,
 			}}
 		/>

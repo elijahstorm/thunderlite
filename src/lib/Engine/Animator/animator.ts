@@ -7,7 +7,7 @@ export const animateRoute = writable<{
 	route: ReturnType<typeof pathFinder>
 } | null>(null)
 
-export const ANIMATION_TIME = 500
+export const ANIMATION_TIME = 200
 
 export const animate = (
 	map: MapObject,
@@ -35,8 +35,10 @@ export const startIncrementer: (increment: () => void, terminator: () => boolean
 	if (!terminator()) return
 	setTimeout(() => {
 		increment()
-		startIncrementer(increment, terminator)
-	}, ANIMATION_TIME)
+		setTimeout(() => {
+			startIncrementer(increment, terminator)
+		}, ANIMATION_TIME)
+	}, 0)
 }
 
 export const getDirection = (map: MapObject, route: number[], index: number) => {

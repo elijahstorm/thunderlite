@@ -39,6 +39,8 @@ const choice: Interactor = ({ map, tile }) => {
 
 	highlightActionsList(map, [])
 	map.route = []
+	if (tile === source) return
+
 	const action = generateActionsList(map, source, unit).find((action) => action.tile === tile)
 	if (!action) return
 
