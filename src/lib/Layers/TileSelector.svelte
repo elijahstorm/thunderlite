@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Animator from '$lib/Engine/Animator/Animator.svelte'
 	import { interactionState } from '$lib/Engine/Interactor/interactionState'
 
 	export let interfacer: InterfaceInteraction
@@ -6,6 +7,7 @@
 	export let hover: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
 	export let mini: boolean = false
+	export let animator: typeof Animator = Animator
 
 	const cellWidth = mini ? 20 : 60
 	const cellHeight = cellWidth
@@ -37,12 +39,16 @@
 	const position: (tile: { x: number; y: number }) => string = ({ x, y }) =>
 		`left: ${x * cellWidth - interfacer.offset.x}px; top: ${
 			y * cellHeight - interfacer.offset.y
-		}px; width: ${cellWidth}px; height: ${cellHeight}px`
+		}px; width: ${cellWidth}px; height: ${cellHeight}px;`
 </script>
 
 <section class="grid flex-grow overflow-clip">
 	<div class="col-start-1 row-start-1 cursor-pointer">
 		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight} />
+	</div>
+
+	<div class="col-start-1 row-start-1 pointer-events-none relative">
+		<svelte:component this={animator} {position} />
 	</div>
 
 	{#if !mini}

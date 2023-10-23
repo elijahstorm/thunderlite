@@ -78,7 +78,7 @@ export const drag = (unit: UnitObject, terrain: GroundObject) =>
 const notBlocked = (map: MapObject, tile: number, unit: UnitObject) =>
 	!map.layers.units[tile] || map.layers.units[tile]?.team === unit.team
 
-const validTerrain = (terrain: GroundObject, unit: UnitObject) =>
+export const validTerrain = (terrain: GroundObject, unit: UnitObject) =>
 	unitData[unit.type].movementType !== 'none' &&
 	terrainData[terrain.type].details !== 'impassable' &&
 	(unitData[unit.type].type === 'air' ||

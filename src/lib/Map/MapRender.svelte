@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Scroller from '$lib/Scroller/Scroller.svelte'
+	import Animator from '$lib/Engine/Animator/Animator.svelte'
 	import TileSelector from '$lib/Layers/TileSelector.svelte'
 	import Game from '$lib/Engine/Game.svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
@@ -29,6 +30,7 @@
 	)
 	export let colorizer: typeof imageColorizer = imageColorizer
 	export let scroller: typeof Scroller = Scroller
+	export let animator: typeof Animator = Animator
 	export let select: undefined | ((x: number, y: number) => void) = undefined
 
 	const ANIMATION_TIME = 800
@@ -90,6 +92,7 @@
 	>
 		{#if $contextLoaded}
 			<TileSelector
+				{animator}
 				{mini}
 				{interfacer}
 				{select}

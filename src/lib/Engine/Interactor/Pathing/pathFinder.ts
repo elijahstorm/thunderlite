@@ -1,5 +1,5 @@
 import { unitData } from '$lib/GameData/unit'
-import { drag } from './movement'
+import { drag, validTerrain } from './movement'
 
 export const pathFinder = (map: MapObject, unit: UnitObject, start: number, end: number) => {
 	if (start === end) return []
@@ -32,12 +32,12 @@ export const pathFinder = (map: MapObject, unit: UnitObject, start: number, end:
 		if (tile === end) {
 			if (targeting) {
 				if (path.length > 1 && !map.layers.units[path[path.length - 1].tile]) {
-					return path
+					return path.map(removeDrag)
 				} else {
 					continue
 				}
 			}
-			return path.concat([{ tile, drag: 0 }])
+			return path.concat([{ tile, drag: 0 }]).map(removeDrag)
 		}
 
 		if (!visited[tile]) {
@@ -48,6 +48,7 @@ export const pathFinder = (map: MapObject, unit: UnitObject, start: number, end:
 
 				if (
 					!isValid(newXY.x, newXY.y) ||
+					!validTerrain(map.layers.ground[newTile], unit) ||
 					visited[newXY.y * map.cols + newXY.x] ||
 					Math.abs(newXY.x - x) > 1 ||
 					Math.abs(newXY.y - y) > 1
@@ -70,3 +71,5 @@ export const pathFinder = (map: MapObject, unit: UnitObject, start: number, end:
 
 	return []
 }
+
+const removeDrag = (path: { tile: number; drag: number }) => path.tile

@@ -18,15 +18,14 @@ export const updateRoute = (
 	const updated = new Array<Route | undefined>(map.cols * map.rows)
 	const path = pathFinder(map, unit, selected, tile)
 
-	path.forEach((current, index) => {
-		const { tile } = current
+	path.forEach((tile, index) => {
 		let state = 0
 		let rotate = 0
 
 		if (index === 0) {
 			state = 0
 
-			const nextTile = path[index + 1]?.tile
+			const nextTile = path[index + 1]
 			if (tile + 1 === nextTile) {
 				rotate = 3
 			} else if (tile - map.cols === nextTile) {
@@ -37,7 +36,7 @@ export const updateRoute = (
 		} else if (index === path.length - 1) {
 			state = 3
 
-			const lastTile = path[index - 1]?.tile
+			const lastTile = path[index - 1]
 			if (lastTile - 1 === tile) {
 				rotate = 2
 			} else if (lastTile + map.cols === tile) {
@@ -46,8 +45,8 @@ export const updateRoute = (
 				rotate = 3
 			}
 		} else {
-			const nextTile = path[index + 1]?.tile
-			const lastTile = path[index - 1]?.tile
+			const nextTile = path[index + 1]
+			const lastTile = path[index - 1]
 
 			if (nextTile % map.cols === lastTile % map.cols) {
 				state = 2

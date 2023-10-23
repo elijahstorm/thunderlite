@@ -1,6 +1,6 @@
 import { highlightActionsList, generateActionsList } from '$lib/Layers/tileHighlighter'
 import { get } from 'svelte/store'
-import { animate } from '../Animator/animator'
+import { animate, animateAttack } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
@@ -10,6 +10,7 @@ type Interaction = {
 	tile: number
 	choice?: number
 	action?: keyof typeof actionsDecision
+	callback?: VoidFunction
 }
 
 type Interactor = (interaction: Interaction) => void
@@ -37,13 +38,14 @@ const choice: Interactor = ({ map, tile }) => {
 	if (!unit) return
 
 	highlightActionsList(map, [])
+	map.route = []
 	const action = generateActionsList(map, source, unit).find((action) => action.tile === tile)
 	if (!action) return
 
 	actionType[action.type]({ map, tile: source, choice: action.tile })
 }
 
-const move: Interactor = ({ map, tile, choice }) => {
+const move: Interactor = ({ map, tile, choice, callback }) => {
 	const unit = map.layers.units[tile]
 	if (!unit || !choice) return
 
@@ -51,9 +53,11 @@ const move: Interactor = ({ map, tile, choice }) => {
 		?.tile
 	if (!destination) return
 
-	animate(map, tile, destination) // walk path
 	map.layers.units[tile] = null
-	map.layers.units[destination] = unit
+	animate(map, unit, tile, destination).then(() => {
+		map.layers.units[destination] = unit
+		if (callback) callback()
+	})
 }
 
 const attack: Interactor = ({ map, tile, choice }) => {
@@ -66,32 +70,42 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	const target = destination && map.layers.units[destination]
 	if (!target) return
 
-	const path = pathFinder(map, attacker, tile, choice)
+	const path = pathFinder(map, attacker, tile, destination)
+
+	const performAttack = () =>
+		animateAttack(map, attacker, path[path.length - 1], destination).then(() => {
+			target.health = Math.max(
+				(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
+				0
+			)
+
+			if (target.health === 0) {
+				map.layers.units[destination] = null
+			}
+
+			/**
+			 * gameplay sprint
+			 * ---
+			 * todo
+			 * 3 add animations
+			 * 4 add game state (user turn)
+			 * 5 add selectable unit HUD UI
+			 * 6 test integration over sockets
+			 * 7 synch auth states (fake and real) in both servers
+			 * 8 socket logic for auth and game management
+			 */
+		})
+
 	if (path.length > 1) {
 		move({
 			map,
 			tile,
-			choice: path[path.length - 1].tile,
+			choice: path[path.length - 1],
+			callback: performAttack,
 		})
+	} else {
+		performAttack()
 	}
-
-	animate(map, tile, destination) // attack
-	target.health = Math.max(
-		(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
-		0
-	)
-
-	/**
-	 * gameplay sprint
-	 * ---
-	 * todo
-	 * 3 add animations
-	 * 4 add game state (user turn)
-	 * 5 add selectable unit HUD UI
-	 * 6 test integration over sockets
-	 * 7 synch auth states (fake and real) in both servers
-	 * 8 socket logic for auth and game management
-	 */
 }
 
 const hud: Interactor = () => {}
