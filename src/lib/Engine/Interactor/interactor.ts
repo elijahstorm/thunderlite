@@ -1,6 +1,6 @@
 import { highlightActionsList, generateActionsList } from '$lib/Layers/tileHighlighter'
 import { get } from 'svelte/store'
-import { animate, animateAttack } from '../Animator/animator'
+import { animate, animateAttack, animateExplosion } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
@@ -75,7 +75,7 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	const path = pathFinder(map, attacker, tile, destination)
 
 	const performAttack = () =>
-		animateAttack(map, attacker, path[path.length - 1], destination).then(() => {
+		animateAttack(map, attacker, path[path.length - 1] ?? tile, destination).then(() => {
 			target.health = Math.max(
 				(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
 				0
@@ -83,19 +83,18 @@ const attack: Interactor = ({ map, tile, choice }) => {
 
 			if (target.health === 0) {
 				map.layers.units[destination] = null
+				animateExplosion(map, destination)
+				return
 			}
 
-			/**
-			 * gameplay sprint
-			 * ---
-			 * todo
-			 * 3 add animations
-			 * 4 add game state (user turn)
-			 * 5 add selectable unit HUD UI
-			 * 6 test integration over sockets
-			 * 7 synch auth states (fake and real) in both servers
-			 * 8 socket logic for auth and game management
-			 */
+			attacker.health = Math.max(
+				(attacker.health ?? unitData[attacker.type].health) - unitData[target.type].power,
+				0
+			)
+			if (attacker.health === 0) {
+				map.layers.units[destination] = null
+				animateExplosion(map, path[path.length - 1] ?? tile)
+			}
 		})
 
 	if (path.length > 1) {
@@ -110,7 +109,18 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	}
 }
 
-const hud: Interactor = () => {}
+const hud: Interactor = () => {
+	/**
+	 * gameplay sprint
+	 * ---
+	 * todo
+	 * 4 add game state (user turn)
+	 * 5 add selectable unit HUD UI
+	 * 6 test integration over sockets
+	 * 7 synch auth states (fake and real) in both servers
+	 * 8 socket logic for auth and game management
+	 */
+}
 
 const actionsDecision = {
 	select,

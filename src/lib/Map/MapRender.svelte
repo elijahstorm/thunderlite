@@ -14,6 +14,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
+	import { ANIMATION_TIME, animateRoute } from '$lib/Engine/Animator/animator'
 
 	export let map: MapObject
 	export let mini: boolean = false
@@ -33,7 +34,6 @@
 	export let animator: typeof Animator = Animator
 	export let select: undefined | ((x: number, y: number) => void) = undefined
 
-	const ANIMATION_TIME = 800
 	// @ts-ignore
 	let hudImages: HUDImages = {}
 
@@ -50,6 +50,7 @@
 	}
 
 	$: {
+		$animateRoute
 		map.layers.ground.map(
 			(object, index) => (object.state = connectionDecision(object)(map, index))
 		)

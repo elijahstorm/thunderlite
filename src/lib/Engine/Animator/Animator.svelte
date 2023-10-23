@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { ANIMATION_TIME, animateRoute, getDirection, startIncrementer } from './animator'
+	import {
+		ANIMATION_TIME,
+		animateRoute,
+		animations,
+		getDirection,
+		startIncrementer,
+	} from './animator'
 	import { unitData } from '$lib/GameData/unit'
 	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
@@ -71,3 +77,21 @@
 		/>
 	{/key}
 {/if}
+
+{#each $animations as animation (`${animation.x},${animation.y}`)}
+	<!-- object.state * (spriteSize + render.xOffset),
+(animationFrame % render.frames) * (spriteSize + render.yOffset),
+spriteSize + render.xOffset,
+spriteSize + render.yOffset,
+-render.xOffset,
+-render.yOffset,
+width + render.xOffset,
+height + render.yOffset -->
+
+	<div
+		class="absolute overflow-clip"
+		style={`
+	${position({ ...animation })} 
+`}
+	/>
+{/each}

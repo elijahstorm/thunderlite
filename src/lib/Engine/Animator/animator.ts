@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store'
 import { pathFinder } from '../Interactor/Pathing/pathFinder'
+import { unitData } from '$lib/GameData/unit'
 
 export const animateRoute = writable<{
 	map: MapObject
@@ -7,7 +8,19 @@ export const animateRoute = writable<{
 	route: ReturnType<typeof pathFinder>
 } | null>(null)
 
-export const ANIMATION_TIME = 200
+export const animations = writable<
+	{
+		x: number
+		y: number
+		src: string
+		xOffset: number
+		yOffset: number
+		frames: number
+		state: number
+	}[]
+>([])
+
+export const ANIMATION_TIME = 1600 // 200
 
 export const animate = (
 	map: MapObject,
@@ -20,9 +33,9 @@ export const animate = (
 		animateRoute.set({ map, unit, route })
 		setTimeout(
 			() => {
-				unit.state = getDirection(map, route, route.length - 1)
 				resolve()
-				setTimeout(() => animateRoute.set(null), ANIMATION_TIME * 2)
+				unit.state = getDirection(map, route, route.length - 1)
+				animateRoute.set(null)
 			},
 			(route.length - 1) * ANIMATION_TIME
 		)
@@ -67,6 +80,24 @@ export const animateAttack = (
 	target: number
 ) =>
 	new Promise<void>((resolve) => {
-		attacker.state = getDirection(map, [source, target], 0)
+		attacker.state = getDirection(
+			map,
+			[
+				source,
+				unitData[attacker.type].range[0] > 1
+					? source % map.cols < target % map.cols
+						? source + 1
+						: source - 1
+					: target,
+			],
+			0
+		)
+		resolve()
+	})
+
+export const animateExplosion = (map: MapObject, source: number) =>
+	new Promise<void>((resolve) => {
+		map
+		source
 		resolve()
 	})
