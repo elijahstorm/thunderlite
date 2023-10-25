@@ -6,6 +6,10 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { terrainData } from '$lib/GameData/terrain'
 	import { buildingData } from '$lib/GameData/building'
+	import { writable } from 'svelte/store'
+	import { rendererStore } from '$lib/Sprites/spriteStore'
+
+	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
 	const rows = 10
 	const cols = 10
@@ -51,6 +55,12 @@
 
 <section class="h-screen">
 	<LocalInteracter map={() => map} let:socket let:requestRedraw>
-		<MapRender {map} {requestRedraw} select={socketSelect(socket, () => map)} />
+		<MapRender {map} {requestRedraw} select={socketSelect(socket, () => map)} {contextLoaded} />
 	</LocalInteracter>
+
+	{#if $contextLoaded}
+		<div class="fixed right-0 top-0 w-40 h-40">
+			<MapRender mini {map} {contextLoaded} />
+		</div>
+	{/if}
 </section>

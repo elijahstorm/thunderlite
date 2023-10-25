@@ -14,7 +14,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
-	import { ANIMATION_TIME, animateRoute } from '$lib/Engine/Animator/animator'
+	import { ANIMATION_TIME, animateRoute, animations } from '$lib/Engine/Animator/animator'
 
 	export let map: MapObject
 	export let mini: boolean = false
@@ -50,6 +50,7 @@
 	}
 
 	$: {
+		$animations
 		$animateRoute
 		map.layers.ground.map(
 			(object, index) => (object.state = connectionDecision(object)(map, index))

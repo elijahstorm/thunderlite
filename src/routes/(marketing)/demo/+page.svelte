@@ -42,8 +42,8 @@
 		<div>&nbsp;</div>
 		<div>&nbsp;</div>
 	</div>
-	{#each images as image, index}
-		<img bind:this={img} {style} class:shown={shown == index} src={image.src} alt={image.alt} />
+	{#each images as image, index (img.src)}
+		<img bind:this={img} {style} class:shown={shown === index} src={image.src} alt={image.alt} />
 	{/each}
 </section>
 

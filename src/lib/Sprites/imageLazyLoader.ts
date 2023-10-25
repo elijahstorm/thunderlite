@@ -19,12 +19,12 @@ export const imageLazyLoader =
 			.filter((_, index) => includedTypes.indexOf(index) !== -1)
 			.reduce(
 				(carry, [_index, data]) => {
+					const index = parseInt(_index)
 					const renderer = {
 						frames: data.frames,
 						xOffset: data.xOffset,
 						yOffset: data.yOffset,
 					} as ObjectSpriteRenderer
-					const index = parseInt(_index)
 					const cache = get(spriteStore)[imageContainer][index]
 
 					if (cache) {

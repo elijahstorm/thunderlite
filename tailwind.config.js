@@ -39,10 +39,6 @@ export default {
 					900: '#021827',
 				},
 			},
-			backgroundSize: {
-				'custom-mobile-header-size': '100% 50%',
-				'custom-mobile-mockup-size': 'auto 60%',
-			},
 			container: {
 				center: true,
 				padding: {

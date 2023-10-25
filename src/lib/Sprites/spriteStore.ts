@@ -12,11 +12,13 @@ export const spriteStore = writable<{
 	sky: ContainedSpriteStore
 	units: ContainedSpriteStore
 	buildings: ContainedSpriteStore
+	animation: ContainedSpriteStore
 }>({
 	ground: {},
 	sky: {},
 	units: {},
 	buildings: {},
+	animation: {},
 })
 
 export const rendererStore = writable<{
@@ -24,9 +26,11 @@ export const rendererStore = writable<{
 	sky: ContainedLoadedSprites
 	units: ContainedLoadedSprites
 	buildings: ContainedLoadedSprites
+	animation: ContainedLoadedSprites
 }>({
 	ground: {},
 	sky: {},
 	units: {},
 	buildings: {},
+	animation: {},
 })

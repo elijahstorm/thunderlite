@@ -94,7 +94,6 @@
 		}
 
 		reflow()
-		container.focus()
 	})
 
 	$: {

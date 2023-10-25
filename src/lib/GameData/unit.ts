@@ -33,8 +33,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/strike-commando.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Strike Commando',
 		description: 'Basic land unit',
 		type: 'ground',
@@ -58,8 +58,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/heavy-commando.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Heavy Commando',
 		description: 'Basic land unit',
 		type: 'ground',
@@ -83,8 +83,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/flak-tank.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Flak Tank',
 		description: 'Very effective against air units',
 		type: 'ground',
@@ -103,8 +103,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/scorpion-tank.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Scorpion Tank',
 		description: 'Basic tank unit',
 		type: 'ground',
@@ -123,8 +123,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/lance-tank.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Lance Tank',
 		description: 'Can hit space directly behind enemy',
 		type: 'ground',
@@ -143,8 +143,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/spider-tank.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Spider Tank',
 		description: 'Can climb mountains',
 		type: 'ground',
@@ -163,8 +163,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/stealth-tank.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Stealth Tank',
 		description: 'Can hide itself',
 		type: 'ground',
@@ -183,8 +183,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/annihilator-tank.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Annihilator Tank',
 		description: 'Massive tank',
 		type: 'ground',
@@ -203,8 +203,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/mortar-truck.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Mortar Truck',
 		description: 'Heavy distanced attack but with short range',
 		type: 'ground',
@@ -223,8 +223,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/rocket-truck.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Rocket Truck',
 		description: 'Weaker distanced attack but with long range',
 		type: 'ground',
@@ -243,8 +243,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/jammer-truck.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Jammer Truck',
 		description: 'Stops air units from entering jammed area and uncloaks hidden units',
 		type: 'ground',
@@ -263,8 +263,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/warmachine.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Warmachine',
 		description: 'Creates other units',
 		type: 'ground',
@@ -288,8 +288,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/intrepid.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Intrepid',
 		description: 'Can capture sea buildings',
 		type: 'sea',
@@ -308,8 +308,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/corvette.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Corvette',
 		description: 'Basic sea unit',
 		type: 'sea',
@@ -328,8 +328,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/hunter-support.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Hunter Support',
 		description: 'Can attack air units',
 		type: 'sea',
@@ -348,8 +348,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/u-boat.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'U-Boat',
 		description: 'Can hide underwater',
 		type: 'sea',
@@ -368,8 +368,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/raptor-fighter.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Raptor Fighter',
 		description: 'Basic air unit',
 		type: 'air',
@@ -388,8 +388,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/condor-bomber.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Condor Bomber',
 		description: 'Drops bombs of massive damage',
 		type: 'air',
@@ -408,8 +408,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/vulture-drone.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Vulture Drone',
 		description: 'Can move again if attack kills',
 		type: 'air',
@@ -428,8 +428,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/turret.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Turret',
 		description: 'Basic turret unit',
 		type: 'ground',
@@ -448,8 +448,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/blockade.png',
 		frames: 4,
-		yOffset: 0,
 		xOffset: 0,
+		yOffset: 0,
 		name: 'Blockade',
 		description: 'Cannot move or attack, but enemies cannot cross',
 		type: 'ground',
@@ -468,8 +468,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/battle-cruiser.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Battle Cruiser',
 		description: 'Can attack from the farthest distance in the game',
 		type: 'sea',
@@ -488,8 +488,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/leviathan.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Leviathan',
 		description: 'Can ship across water',
 		type: 'sea',
@@ -508,8 +508,8 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/transporter.png',
 		frames: 4,
-		yOffset: 60,
 		xOffset: 0,
+		yOffset: 60,
 		name: 'Transporter',
 		description: 'Can transport a non-air unit through the air',
 		type: 'air',

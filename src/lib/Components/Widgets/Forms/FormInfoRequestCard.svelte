@@ -95,7 +95,7 @@
 
 			<div class="relative w-full mt-6 mx-auto">
 				<form bind:this={formElement} on:submit|preventDefault={sendRequest}>
-					{#each inputs as input}
+					{#each inputs as input (input.id)}
 						<DataInput
 							text={input.text}
 							name={input.id}

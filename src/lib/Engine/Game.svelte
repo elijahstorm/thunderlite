@@ -3,10 +3,11 @@
 	import { terrainRenderer } from '$lib/GameData/terrain'
 	import { skyRenderer } from '$lib/GameData/sky'
 	import { unitRenderer } from '$lib/GameData/unit'
+	import { buildingRenderer } from '$lib/GameData/building'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import type { createImageLoader } from '$lib/Sprites/images'
-	import { buildingRenderer } from '$lib/GameData/building'
+	import { animationData, animationRenderer } from '$lib/GameData/animation'
 
 	export let map: MapObject
 	export let colorizer: typeof imageColorizer
@@ -41,12 +42,17 @@
 			makeImage,
 			colorizer
 		)(map.filters.buildings(map.layers.buildings))
+		const animation = animationRenderer(
+			makeImage,
+			colorizer
+		)(animationData.map((_, index) => index))
 
 		rendererStore.update((store) => {
 			store.ground = { ...store.ground, ...ground }
 			store.sky = { ...store.sky, ...sky }
 			store.units = { ...store.units, ...units }
 			store.buildings = { ...store.buildings, ...buildings }
+			store.animation = { ...store.animation, ...animation }
 			return store
 		})
 	})

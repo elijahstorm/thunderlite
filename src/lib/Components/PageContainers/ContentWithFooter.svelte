@@ -82,7 +82,7 @@
 				<LoginLogoutButton />
 
 				<div class="text-neutral-grayish-blue text-xs md:text-sm">
-					<p>© ThunderLite</p>
+					<p>© ThunderLite Online</p>
 					<p>All Rights Reserved</p>
 				</div>
 			</div>

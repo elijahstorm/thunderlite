@@ -1,27 +1,25 @@
 <script lang="ts">
-	import { terrainData } from '$lib/GameData/terrain'
-	import { unitData } from '$lib/GameData/unit'
+	import { writable } from 'svelte/store'
 	import ButtonGrid from './Editor/ButtonGrid.svelte'
 	import MapRender from './MapRender.svelte'
-	import { mapStore } from './mapStore'
 	import Icon from '@iconify/svelte'
 	import EditorButton from './Editor/EditorButton.svelte'
 	import MapOptions from './MapOptions.svelte'
+	import { terrainData } from '$lib/GameData/terrain'
+	import { unitData } from '$lib/GameData/unit'
+	import { mapStore } from './mapStore'
 	import { addToast } from 'as-toast'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
-	import { createImageLoader } from '$lib/Sprites/images'
-	import { writable } from 'svelte/store'
 
 	export let mapHash: string | undefined = undefined
 
 	const maxTeamAmount = 4
 	const size = 64
 
-	let contextLoaded = writable(false)
-	const makeImage = createImageLoader((finished: boolean) => ($contextLoaded = finished))
+	const contextLoaded = writable(false)
 
 	let openOptionsModal = false
 	let editType: keyof MapLayers = 'units'
@@ -49,7 +47,7 @@
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => share(map?.title ?? 'ThunderLite', mapHasher(map)),
+			act: () => share(map?.title ?? 'ThunderLite Online', mapHasher(map)),
 		},
 		{
 			label: 'play',
@@ -137,7 +135,7 @@
 		</ButtonGrid>
 
 		<div class="flex-1">
-			<MapRender pause {map} {select} {makeImage} {contextLoaded} />
+			<MapRender pause {map} {select} {contextLoaded} />
 		</div>
 
 		<ButtonGrid cols={2} length={terrainData.length} let:index>

@@ -48,7 +48,7 @@
 	</div>
 
 	<div class="col-start-1 row-start-1 pointer-events-none relative">
-		<svelte:component this={animator} {position} />
+		<svelte:component this={animator} offset={interfacer.offset} {cellWidth} {cellHeight} />
 	</div>
 
 	{#if !mini}
