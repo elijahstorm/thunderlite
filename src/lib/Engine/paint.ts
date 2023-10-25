@@ -4,67 +4,96 @@ import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
 
+const spriteSize = 60
+
 export const paint =
-	(renderData: ObjectRenderer, hudImages: HUDImages) =>
+	(renderData: ObjectRenderer, hudImages: HUDImages, paused: boolean = false) =>
 	(getMap: () => MapObject) =>
 	(context: CanvasRenderingContext2D) =>
 	(row: number, col: number, left: number, top: number, width: number, height: number) => {
+		const render = contextProvider(
+			context,
+			width,
+			height,
+			paused ? 0 : get(animationFrame),
+			spriteSize / height
+		)
+		const map = getMap()
+		const tile = row * map.cols + col
+
 		context.save()
 		context.translate(left, top)
 
-		const map = getMap()
-		const tile = row * map.cols + col
-		const frame = get(animationFrame)
-
-		always(renderData.ground, map.layers.ground[tile])(width, height, frame)(context)
-		highlights(map.highlights[tile])(width, height)(context)
-		conditional(renderData.building, map.layers.buildings[tile])?.call(
-			this,
-			width,
-			height,
-			frame
-		)(context)
-		conditional(renderData.unit, map.layers.units[tile])?.call(this, width, height, frame)(context)
-		playInfo(map.layers.units[tile])(width, height)(context)
-		conditional(renderData.sky, map.layers.sky[tile])?.call(this, width, height, frame)(context)
-		advice(map.highlights[tile], hudImages.advice)(width, height)(context)
-		route(map.route[tile], hudImages.arrow)(width, height)(context)
+		render.always(map.layers.ground[tile], renderData.ground)
+		render.highlights(map.highlights[tile])
+		render.conditionally(map.layers.buildings[tile], renderData.building)
+		render.conditionally(map.layers.units[tile], renderData.unit)
+		render.playInfo(map.layers.units[tile])
+		render.conditionally(map.layers.sky[tile], renderData.sky)
+		render.advice(map.highlights[tile], hudImages.advice)
+		render.route(map.route[tile], hudImages.arrow)
 
 		context.restore()
 	}
 
-const spriteSize = 60
+const contextProvider = (
+	context: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	frame: number,
+	scale: number
+) => ({
+	always: always(width, height, frame, scale)(context),
+	conditionally: conditionally(width, height, frame, scale)(context),
+	highlights: highlights(width, height)(context),
+	playInfo: playInfo(width, height, scale)(context),
+	advice: advice(width, height)(context),
+	route: route(width, height)(context),
+})
 
 const renderObject =
-	<T extends ActiveObject>(render: ObjectSpriteRenderer, object: T) =>
-	(width: number, height: number, animationFrame: number) =>
+	(width: number, height: number, frame: number, scale: number) =>
 	(context: CanvasRenderingContext2D) =>
+	<T extends ActiveObject>(object: T, render: ObjectSpriteRenderer) =>
 		context.drawImage(
 			render.sprite[object.team ?? 0],
 			object.state * (spriteSize + render.xOffset),
-			(animationFrame % render.frames) * (spriteSize + render.yOffset),
+			(frame % render.frames) * (spriteSize + render.yOffset),
 			spriteSize + render.xOffset,
 			spriteSize + render.yOffset,
-			-render.xOffset,
-			-render.yOffset,
-			width + render.xOffset,
-			height + render.yOffset
+			-(render.xOffset / scale),
+			-(render.yOffset / scale),
+			width + render.xOffset / scale,
+			height + render.yOffset / scale
 		)
 
-const always = <T extends { state: number; type: number }>(
-	renderer: (type: number) => ObjectSpriteRenderer,
-	object: T
-) => renderObject(renderer(object.type), object)
+const always =
+	(width: number, height: number, frame: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	<T extends { state: number; type: number }>(
+		object: T,
+		renderer: (type: number) => ObjectSpriteRenderer
+	) =>
+		renderObject(width, height, frame, scale)(context)(object, renderer(object.type))
 
-const conditional = <T extends { state: number; type: number }>(
-	renderer: (type?: number) => ObjectSpriteRenderer | null,
-	object?: T | null
-) => (object ? renderObject(renderer(object.type) as ObjectSpriteRenderer, object) : null)
+const conditionally =
+	(width: number, height: number, frame: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	<T extends { state: number; type: number }>(
+		object: T | null,
+		renderer: (type: number) => ObjectSpriteRenderer | null
+	) =>
+		object
+			? renderObject(width, height, frame, scale)(context)(
+					object,
+					renderer(object.type) as ObjectSpriteRenderer
+			  )
+			: null
 
 const highlights =
-	(highlight: Highlight | undefined) =>
 	(width: number, height: number) =>
-	(context: CanvasRenderingContext2D) => {
+	(context: CanvasRenderingContext2D) =>
+	(highlight: Highlight | undefined) => {
 		if (!highlight) return
 
 		const style = ['green', 'red'][highlight.type]
@@ -80,9 +109,9 @@ const highlights =
 	}
 
 const advice =
-	(highlight: Highlight | undefined, advice: HTMLImageElement) =>
 	(width: number, height: number) =>
-	(context: CanvasRenderingContext2D) => {
+	(context: CanvasRenderingContext2D) =>
+	(highlight: Highlight | undefined, advice: HTMLImageElement) => {
 		if (!highlight) return
 
 		context.globalAlpha = 0.5
@@ -92,8 +121,8 @@ const advice =
 			advice,
 			spriteSize + highlight.type * spriteSize,
 			highlight.tip * spriteSize,
-			width,
-			height,
+			spriteSize,
+			spriteSize,
 			0,
 			0,
 			width,
@@ -102,9 +131,9 @@ const advice =
 	}
 
 const playInfo =
-	(unit: UnitObject | null) =>
-	(width: number, height: number) =>
-	(context: CanvasRenderingContext2D) => {
+	(width: number, height: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(unit: UnitObject | null) => {
 		if (!unit) return
 
 		const health = unit?.health ?? unitData[unit.type].health
@@ -112,27 +141,37 @@ const playInfo =
 
 		const percentage = health / unitData[unit.type].health
 		const color = percentage > 0.65 ? 'green' : percentage > 0.35 ? 'yellow' : 'red'
+		const offset = 5 / scale
 
 		context.fillStyle = 'black'
-		context.fillRect(5, height - 15, width - 10, 5)
+		context.fillRect(offset, height - offset * 3, width - offset * 2, offset)
 		context.strokeStyle = color
 		context.fillStyle = color
 		context.lineWidth = 2
-		context.fillRect(5, height - 15, percentage * (width - 10), 5)
-		context.strokeRect(5, height - 15, width - 10, 5)
+		context.fillRect(offset, height - offset * 3, percentage * (width - offset * 2), offset)
+		context.strokeRect(offset, height - offset * 3, width - offset * 2, offset)
 	}
 
 const route =
-	(route: Route | undefined, arrow: HTMLImageElement) =>
 	(width: number, height: number) =>
-	(context: CanvasRenderingContext2D) => {
+	(context: CanvasRenderingContext2D) =>
+	(route: Route | undefined, arrow: HTMLImageElement) => {
 		if (!route) return
 
-		route.rotate
 		context.save()
 		context.translate(width / 2, height / 2)
 		context.rotate((route.rotate * Math.PI) / 2)
 		context.translate(-width / 2, -height / 2)
-		context.drawImage(arrow, 0, route.state * spriteSize, width, height, 0, 0, width, height)
+		context.drawImage(
+			arrow,
+			0,
+			route.state * spriteSize,
+			spriteSize,
+			spriteSize,
+			0,
+			0,
+			width,
+			height
+		)
 		context.restore()
 	}

@@ -14,7 +14,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
-	import { ANIMATION_TIME, animateRoute, animations } from '$lib/Engine/Animator/animator'
+	import { ANIMATION_TIME, routeAnimation, animations } from '$lib/Engine/Animator/animator'
 
 	export let map: MapObject
 	export let mini: boolean = false
@@ -34,6 +34,8 @@
 	export let animator: typeof Animator = Animator
 	export let select: undefined | ((x: number, y: number) => void) = undefined
 
+	const render = () => (requestRedraw = performance.now())
+
 	// @ts-ignore
 	let hudImages: HUDImages = {}
 
@@ -47,15 +49,16 @@
 		}
 		animationFrame.update((frame) => (frame + 1) % 100000)
 		$animationTimer = setTimeout(inc, ANIMATION_TIME)
+		render()
 	}
 
 	$: {
 		$animations
-		$animateRoute
+		$routeAnimation
 		map.layers.ground.map(
 			(object, index) => (object.state = connectionDecision(object)(map, index))
 		)
-		requestRedraw = performance.now()
+		render()
 	}
 
 	$: {
@@ -81,7 +84,7 @@
 	})
 </script>
 
-<div class="flex gap-2 border-4 border-black h-full bg-stone-400">
+<div class="flex gap-2 h-full">
 	<Game
 		{map}
 		{makeImage}
@@ -113,7 +116,7 @@
 					tileHeight={cellHeight}
 					contentWidth={cellWidth * map.cols}
 					contentHeight={cellHeight * map.rows}
-					paint={paint(renderData, hudImages)(() => map)}
+					paint={paint(renderData, hudImages, pause)(() => map)}
 					{requestRedraw}
 					{handleClick}
 					{handleHover}

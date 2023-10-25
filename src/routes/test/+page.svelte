@@ -59,8 +59,8 @@
 	</LocalInteracter>
 
 	{#if $contextLoaded}
-		<div class="fixed right-0 top-0 w-40 h-40">
-			<MapRender mini {map} {contextLoaded} />
+		<div class="fixed right-0 top-0 w-[200px] h-[200px]">
+			<MapRender mini pause {map} {contextLoaded} />
 		</div>
 	{/if}
 </section>

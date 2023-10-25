@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { ROUTE_SPEED, animateRoute, animations, getDirection, startIncrementer } from './animator'
+	import {
+		ANIMATION_TIME,
+		routeAnimation,
+		animations,
+		getDirection,
+		startIncrementer,
+	} from './animator'
 	import { unitData } from '$lib/GameData/unit'
 	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
@@ -28,14 +34,14 @@
 		)
 	}
 
-	const parseRoute = (route: typeof $animateRoute) => {
+	const parseRoute = (route: typeof $routeAnimation) => {
 		if (route === null) return null
 		const { x, y } = tileToXY(route.map, route.route[index])
 		const unit = unitData[route.unit.type]
 		return {
-			source: $rendererStore.units[route.unit.type].sprite[route.unit.team]?.src,
 			x,
 			y,
+			source: $rendererStore.units[route.unit.type].sprite[route.unit.team]?.src,
 			xOffset: unit.xOffset,
 			yOffset: unit.yOffset,
 			frames: unit.frames,
@@ -50,27 +56,22 @@
 			source: string
 			xOffset: number
 			yOffset: number
-			width?: number
-			height?: number
 			frames: number
 			state: number
+			scale?: number
+			width?: number
+			height?: number
 			states?: number
 		} | null,
 		frame: number
 	) => {
 		if (animation === null) return ''
-		const {
-			x,
-			y,
-			source,
-			xOffset,
-			yOffset,
-			width = cellWidth + xOffset,
-			height = cellHeight + yOffset,
-			frames,
-			state,
-			states = 6,
-		} = animation
+		const { x, y, scale = 60 / cellHeight, source, frames, state, states = 6 } = animation
+		let { xOffset, yOffset, width, height } = animation
+		xOffset /= scale
+		yOffset /= scale
+		width = !width ? cellWidth + xOffset : width / scale
+		height = !height ? cellHeight + yOffset : height / scale
 		return `
 			left: ${x * cellWidth - xOffset - offset.x}px;
 			top: ${y * cellHeight - yOffset - offset.y}px; 
@@ -94,23 +95,23 @@
 		{ y: -cellHeight },
 	]
 
-	$: traverseRoute($animateRoute?.route ?? null)
+	$: traverseRoute($routeAnimation?.route ?? null)
 
 	$: setTimeout(() => {
 		index
 		hideNewInstance = false
-	}, ROUTE_SPEED)
+	}, ANIMATION_TIME)
 </script>
 
-{#if $animateRoute}
+{#if $routeAnimation}
 	{#key index}
 		<div
 			class="absolute overflow-clip"
 			class:opacity-0={hideNewInstance}
-			style={render(parseRoute($animateRoute), $animationFrame)}
+			style={render(parseRoute($routeAnimation), $animationFrame)}
 			out:fly={{
-				...animationDirection[getDirection($animateRoute.map, $animateRoute.route, index - 1)],
-				duration: ROUTE_SPEED,
+				...animationDirection[getDirection($routeAnimation.map, $routeAnimation.route, index - 1)],
+				duration: ANIMATION_TIME,
 				easing: linear,
 				opacity: 1,
 			}}

@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte'
 	import { MakeTiling, type Tiling } from './Tiling'
 	import { MakeScroller, type Scroller } from './Scroller'
-	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import {
 		touchstart,
 		touchmove,
@@ -97,7 +96,6 @@
 	})
 
 	$: {
-		$animationFrame
 		contentWidth
 		contentHeight
 		requestRedraw

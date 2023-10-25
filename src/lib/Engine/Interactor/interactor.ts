@@ -1,9 +1,10 @@
 import { highlightActionsList, generateActionsList } from '$lib/Layers/tileHighlighter'
 import { get } from 'svelte/store'
-import { animate, animateAttack, animateExplosion } from '../Animator/animator'
+import { animateRoute, animateAttack, animateExplosion } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
+import { generateAttackList } from './Pathing/attack'
 
 type Interaction = {
 	map: MapObject
@@ -56,7 +57,7 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	if (!destination) return
 
 	map.layers.units[tile] = null
-	animate(map, unit, tile, destination).then(() => {
+	animateRoute(map, unit, tile, destination).then(() => {
 		map.layers.units[destination] = unit
 		if (callback) callback()
 	})
@@ -73,27 +74,30 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	if (!target) return
 
 	const path = pathFinder(map, attacker, tile, destination)
-
+	const movementEndTile = path[path.length - 1] ?? tile
+	const reduceHealth = (map: MapObject, attacker: UnitObject, target: UnitObject, tile: number) => {
+		target.health = Math.max(
+			(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
+			0
+		)
+		if (target.health === 0) {
+			map.layers.units[tile] = null
+			animateExplosion(map, tile)
+			return true
+		}
+		return false
+	}
 	const performAttack = () =>
-		animateAttack(map, attacker, path[path.length - 1] ?? tile, destination).then(() => {
-			target.health = Math.max(
-				(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
-				0
-			)
-
-			if (target.health === 0) {
-				map.layers.units[destination] = null
-				animateExplosion(map, destination)
-				return
-			}
-
-			attacker.health = Math.max(
-				(attacker.health ?? unitData[attacker.type].health) - unitData[target.type].power,
-				0
-			)
-			if (attacker.health === 0) {
-				map.layers.units[destination] = null
-				animateExplosion(map, path[path.length - 1] ?? tile)
+		animateAttack(map, attacker, movementEndTile, destination).then(() => {
+			const targetDied = reduceHealth(map, attacker, target, destination)
+			if (
+				!targetDied &&
+				unitData[target.type].power !== 0 &&
+				generateAttackList(map, destination, target).includes(movementEndTile)
+			) {
+				animateAttack(map, target, destination, movementEndTile).then(() =>
+					reduceHealth(map, target, attacker, movementEndTile)
+				)
 			}
 		})
 

@@ -3,11 +3,11 @@ import { pathFinder } from '../Interactor/Pathing/pathFinder'
 import { unitData } from '$lib/GameData/unit'
 import { animationData } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
+import { rendererStore } from '$lib/Sprites/spriteStore'
 
-export const ANIMATION_TIME = 1000
-export const ROUTE_SPEED = ANIMATION_TIME / 5
+export const ANIMATION_TIME = 100
 
-export const animateRoute = writable<{
+export const routeAnimation = writable<{
 	map: MapObject
 	unit: UnitObject
 	route: ReturnType<typeof pathFinder>
@@ -21,16 +21,16 @@ export const animations = writable<
 		source: string
 		xOffset: number
 		yOffset: number
-		width: number
-		height: number
 		frames: number
 		state: number
+		width: number
+		height: number
 		states: number
 		startingFrame: number
 	}[]
 >([])
 
-export const animate = (
+export const animateRoute = (
 	map: MapObject,
 	unit: UnitObject,
 	start: number,
@@ -38,14 +38,14 @@ export const animate = (
 	route: ReturnType<typeof pathFinder> = pathFinder(map, unit, start, destination)
 ) =>
 	new Promise<void>((resolve) => {
-		animateRoute.set({ map, unit, route })
+		routeAnimation.set({ map, unit, route })
 		setTimeout(
 			() => {
 				resolve()
 				unit.state = getDirection(map, route, route.length - 1)
-				animateRoute.set(null)
+				routeAnimation.set(null)
 			},
-			((route.length - 1) * ANIMATION_TIME) / 5
+			(route.length - 1) * ANIMATION_TIME
 		)
 	})
 
@@ -58,7 +58,7 @@ export const startIncrementer: (increment: () => void, terminator: () => boolean
 		increment()
 		setTimeout(() => {
 			startIncrementer(increment, terminator)
-		}, ANIMATION_TIME / 5)
+		}, ANIMATION_TIME)
 	}, 0)
 }
 
@@ -94,26 +94,30 @@ export const animateAttack = (
 			0
 		)
 		const key = generateAnimationKey()
-		const frames = 8
+		const attackSprite = get(rendererStore).attacks[attacker.type]
+		map.layers.units[source] = null
 		animations.update((animations) => [
 			...animations,
 			{
 				key,
 				x: source % map.cols,
 				y: Math.floor(source / map.cols),
-				source: unitData[attacker.type].url.replace('idle', 'attack'),
-				xOffset: 45,
-				yOffset: 45,
+				source: attackSprite.sprite[attacker.team].src,
+				xOffset: attackSprite.xOffset,
+				yOffset: attackSprite.yOffset,
+				frames: attackSprite.frames,
+				state: attacker.state,
 				width: 150,
 				height: 150,
-				frames, // read from source data
-				state: attacker.state,
 				states: 4,
 				startingFrame: get(animationFrame),
 			},
 		])
-		setTimeout(() => removeAnimationByKey(key), ANIMATION_TIME * frames)
-		resolve()
+		setTimeout(() => {
+			map.layers.units[source] = attacker
+			removeAnimationByKey(key)
+			resolve()
+		}, ANIMATION_TIME * attackSprite.frames)
 	})
 
 export const animateExplosion = (map: MapObject, source: number) =>
@@ -129,16 +133,21 @@ export const animateExplosion = (map: MapObject, source: number) =>
 				source: explosion.url,
 				xOffset: explosion.xOffset,
 				yOffset: explosion.yOffset,
-				width: explosion.width,
-				height: explosion.height,
 				frames: explosion.frames,
 				state: 0,
+				width: explosion.width,
+				height: explosion.height,
 				states: 1,
 				startingFrame: get(animationFrame),
 			},
 		])
-		setTimeout(() => removeAnimationByKey(key), ANIMATION_TIME * (explosion.frames - 1))
-		resolve()
+		setTimeout(
+			() => {
+				removeAnimationByKey(key)
+				resolve()
+			},
+			ANIMATION_TIME * (explosion.frames - 1)
+		)
 	})
 
 const directions = [

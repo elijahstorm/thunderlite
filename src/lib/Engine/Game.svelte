@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte'
 	import { terrainRenderer } from '$lib/GameData/terrain'
 	import { skyRenderer } from '$lib/GameData/sky'
-	import { unitRenderer } from '$lib/GameData/unit'
+	import { attacksRenderer, unitRenderer } from '$lib/GameData/unit'
 	import { buildingRenderer } from '$lib/GameData/building'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
@@ -38,6 +38,7 @@
 		const ground = terrainRenderer(makeImage, colorizer)(map.filters.ground(map.layers.ground))
 		const sky = skyRenderer(makeImage, colorizer)(map.filters.sky(map.layers.sky))
 		const units = unitRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
+		const attacks = attacksRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
 		const buildings = buildingRenderer(
 			makeImage,
 			colorizer
@@ -51,6 +52,7 @@
 			store.ground = { ...store.ground, ...ground }
 			store.sky = { ...store.sky, ...sky }
 			store.units = { ...store.units, ...units }
+			store.attacks = { ...store.attacks, ...attacks }
 			store.buildings = { ...store.buildings, ...buildings }
 			store.animation = { ...store.animation, ...animation }
 			return store
