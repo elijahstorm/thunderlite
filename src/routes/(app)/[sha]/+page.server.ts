@@ -3,6 +3,8 @@ import type { PageServerLoad } from './$types'
 import { POSTGRES_URL } from '$env/static/private'
 import { createPool } from '@vercel/postgres'
 
+export const prerender = false
+
 export const load: PageServerLoad = async ({ params }) => {
 	const pool = createPool({ connectionString: POSTGRES_URL })
 

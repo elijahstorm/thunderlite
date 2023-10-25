@@ -5,7 +5,7 @@ import { animationData } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { rendererStore } from '$lib/Sprites/spriteStore'
 
-export const ANIMATION_TIME = 100
+export const ANIMATION_TIME = 2000
 
 export const routeAnimation = writable<{
 	map: MapObject

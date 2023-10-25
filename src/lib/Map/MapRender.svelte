@@ -84,32 +84,23 @@
 	})
 </script>
 
-<div class="flex gap-2 h-full">
-	<Game
-		{map}
-		{makeImage}
-		{colorizer}
-		{select}
-		let:interfacer
-		let:renderData
-		let:select
-		let:validTile
-	>
-		{#if $contextLoaded}
-			<TileSelector
-				{animator}
-				{mini}
-				{interfacer}
-				{select}
-				{validTile}
-				{hover}
-				let:cellWidth
-				let:cellHeight
-				let:handleClick
-				let:handleHover
-				let:handleKeypress
-				let:handleOffset
-			>
+<Game {map} {makeImage} {colorizer} {select} let:interfacer let:renderData let:select let:validTile>
+	{#if $contextLoaded}
+		<TileSelector
+			{animator}
+			{mini}
+			{interfacer}
+			{select}
+			{validTile}
+			{hover}
+			let:cellWidth
+			let:cellHeight
+			let:handleClick
+			let:handleHover
+			let:handleKeypress
+			let:handleOffset
+		>
+			<div class="w-[{map.cols * cellWidth}px] h-[{map.rows * cellHeight}px]">
 				<svelte:component
 					this={scroller}
 					tileWidth={cellWidth}
@@ -123,12 +114,12 @@
 					{handleKeypress}
 					{handleOffset}
 				/>
-			</TileSelector>
-		{:else}
-			<Loader />
-		{/if}
-	</Game>
-</div>
+			</div>
+		</TileSelector>
+	{:else}
+		<Loader />
+	{/if}
+</Game>
 
 <img class="hidden" bind:this={hudImages.arrow} src={hud.arrow} alt="placeholder arrow" />
 <img class="hidden" bind:this={hudImages.advice} src={hud.advice} alt="placeholder advice" />

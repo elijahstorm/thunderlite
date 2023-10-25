@@ -9,6 +9,4 @@
 	mapStore.set(map)
 </script>
 
-<div class="p-6 h-screen">
-	<slot {map} />
-</div>
+<slot {map} />

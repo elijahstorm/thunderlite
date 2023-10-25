@@ -1,5 +1,6 @@
 <script lang="ts">
 	import LocalInteracter from '$lib/Engine/Interactor/LocalInteracter.svelte'
+	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
 	import MapRender from '$lib/Map/MapRender.svelte'
 	import { deriveFromHash, mapHasher } from '$lib/Map/Editor/mapExporter'
 	import { socketSelect } from '$lib/Components/Socket/socket'
@@ -53,13 +54,15 @@
 	)
 </script>
 
-<section class="h-screen">
+<section class="m-auto">
 	<LocalInteracter map={() => map} let:socket let:requestRedraw>
-		<MapRender {map} {requestRedraw} select={socketSelect(socket, () => map)} {contextLoaded} />
+		<GameStateManager interactor={socketSelect(socket, () => map)} let:select>
+			<MapRender {map} {requestRedraw} {select} {contextLoaded} />
+		</GameStateManager>
 	</LocalInteracter>
 
 	{#if $contextLoaded}
-		<div class="fixed right-0 top-0 w-[200px] h-[200px]">
+		<div class="fixed right-0 top-0 opacity-30 hover:opacity-100">
 			<MapRender mini pause {map} {contextLoaded} />
 		</div>
 	{/if}
