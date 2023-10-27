@@ -4,6 +4,7 @@ import { unitData } from '$lib/GameData/unit'
 import { animationData } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { rendererStore } from '$lib/Sprites/spriteStore'
+import { generateKey } from '$lib/Security/keys'
 
 export const ANIMATION_TIME = 2000
 
@@ -93,7 +94,7 @@ export const animateAttack = (
 			],
 			0
 		)
-		const key = generateAnimationKey()
+		const key = generateKey()
 		const attackSprite = get(rendererStore).attacks[attacker.type]
 		map.layers.units[source] = null
 		animations.update((animations) => [
@@ -123,7 +124,7 @@ export const animateAttack = (
 export const animateExplosion = (map: MapObject, source: number) =>
 	new Promise<void>((resolve) => {
 		const explosion = animationData[0]
-		const key = generateAnimationKey()
+		const key = generateKey()
 		animations.update((animations) => [
 			...animations,
 			{
@@ -156,14 +157,6 @@ const directions = [
 	(map: MapObject, from: number, to: number) => from - 1 === to,
 	(map: MapObject, from: number, to: number) => from - map.cols === to,
 ]
-
-const generateAnimationKey = () => {
-	const source = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-	return new Array(16)
-		.fill('')
-		.map(() => source[Math.floor(Math.random() * source.length)])
-		.join()
-}
 
 const removeAnimationByKey = (key: string) =>
 	animations.update((animations) => animations.filter((animation) => animation.key !== key))

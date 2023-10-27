@@ -10,6 +10,10 @@
 	import { writable } from 'svelte/store'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 
+	export let data
+	$: userSession = data.userSession
+	$: gameSession = data.gameSession
+
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
 	const rows = 10
@@ -56,7 +60,12 @@
 
 <section class="m-auto">
 	<LocalInteracter map={() => map} let:socket let:requestRedraw>
-		<GameStateManager interactor={socketSelect(socket, () => map)} let:select>
+		<GameStateManager
+			{userSession}
+			{gameSession}
+			interactor={socketSelect(socket, () => map)}
+			let:select
+		>
 			<MapRender {map} {requestRedraw} {select} {contextLoaded} />
 		</GameStateManager>
 	</LocalInteracter>

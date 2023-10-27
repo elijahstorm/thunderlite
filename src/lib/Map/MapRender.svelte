@@ -100,7 +100,7 @@
 			let:handleKeypress
 			let:handleOffset
 		>
-			<div class="w-[{map.cols * cellWidth}px] h-[{map.rows * cellHeight}px]">
+			<div style="width: {map.cols * cellWidth}px; height: {map.rows * cellHeight}px">
 				<svelte:component
 					this={scroller}
 					tileWidth={cellWidth}

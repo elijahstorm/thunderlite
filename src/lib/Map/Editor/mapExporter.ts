@@ -3,6 +3,7 @@ import { unitData } from '$lib/GameData/unit'
 import { skyData } from '$lib/GameData/sky'
 import baseX from 'base-x'
 import { buildingData } from '$lib/GameData/building'
+import { KEY_SOURCE } from '$lib/Security/keys'
 
 export const mapHasher = (map: MapProcesser) => hash(mapExporter(map))
 
@@ -35,7 +36,7 @@ const EMPTY_MAP: MapObject = {
 	route: [],
 }
 
-const base62 = baseX('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
+const base62 = baseX(KEY_SOURCE)
 
 const hash = (content: string) => base62.encode(new TextEncoder().encode(content))
 
