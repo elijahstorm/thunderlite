@@ -6,7 +6,7 @@ import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { rendererStore } from '$lib/Sprites/spriteStore'
 import { generateKey } from '$lib/Security/keys'
 
-export const ANIMATION_TIME = 2000
+export const ANIMATION_TIME = 200
 
 export const routeAnimation = writable<{
 	map: MapObject

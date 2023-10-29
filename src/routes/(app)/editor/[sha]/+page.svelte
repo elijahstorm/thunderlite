@@ -3,6 +3,7 @@
 	import MapEditor from '$lib/Map/MapEditor.svelte'
 
 	export let data: PageData
+	$: mapHash = data.mapHash
 </script>
 
-<MapEditor mapHash={data?.mapHash} />
+<MapEditor {mapHash} />

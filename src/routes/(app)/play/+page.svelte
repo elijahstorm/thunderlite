@@ -9,14 +9,19 @@
 	import { writable } from 'svelte/store'
 
 	export let data: PageData
+	$: userSession = data.userSession
+	$: gameSession = data.gameSession
+	$: mapHash = data.mapHash
 
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 </script>
 
 <section class="m-auto">
-	<MapLoader mapHash={data?.mapHash} let:map>
+	<MapLoader {mapHash} let:map>
 		<GameSocket map={() => map} let:socket let:requestRedraw>
 			<GameStateManager
+				{userSession}
+				{gameSession}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				let:select
 			>

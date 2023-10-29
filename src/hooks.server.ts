@@ -1,13 +1,13 @@
 import { error, redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
 import { createClient } from '@vercel/kv'
 import { createPool } from '@vercel/postgres'
-import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL } from '$env/static/private'
+import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL, VERCEL_ENV } from '$env/static/private'
 import { authenticatedUser } from '$lib/Components/Auth/hanko-server'
 import { generateKey } from '$lib/Security/keys'
 import { logToErrorDb } from '$lib/Security/server-logs'
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const protectedRoutes = ['/me', '/test']
+	const protectedRoutes = ['/me', '/play', '/api/game', '/api/upload', '/test']
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!(await authenticatedUser(event))) {
 			throw redirect(303, '/login')
@@ -20,6 +20,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 }
 
 const getUserSession = async (event: RequestEvent) => {
+	if (VERCEL_ENV !== 'production') {
+		return generateKey()
+	}
+
 	const userId = event.locals.user
 	if (!userId) {
 		throw error(500, 'User ID not set')

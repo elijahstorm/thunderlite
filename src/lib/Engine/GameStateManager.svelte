@@ -2,8 +2,8 @@
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
-	export let gameSession: string
 	export let userSession: string
+	export let gameSession: string
 
 	let state: 'waiting' | 'animating' | 'overlay' = 'waiting'
 	let active = false

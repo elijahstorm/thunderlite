@@ -13,6 +13,7 @@
 	export let data
 	$: userSession = data.userSession
 	$: gameSession = data.gameSession
+	$: console.log({ sha: data.sha })
 
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
