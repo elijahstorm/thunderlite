@@ -120,7 +120,6 @@ const hud: Interactor = () => {
 	 * todo
 	 * 4 add game state (user turn)
 	 * 5 add selectable unit HUD UI
-	 * 6 test integration over sockets
 	 * 7 synch auth states (fake and real) in both servers
 	 * 8 socket logic for auth and game management
 	 */

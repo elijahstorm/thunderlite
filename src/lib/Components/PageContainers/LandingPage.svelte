@@ -7,7 +7,7 @@
 
 	<section class="relative">
 		<div
-			class="absolute z-20 w-full h-full bg-no-repeat bg-top -top-12 md:-top-16 lg:hidden"
+			class="absolute z-20 w-full h-full bg-no-repeat bg-top -top-12 lg:left-32"
 			style="background-size: auto 60%; background-image: url('/images/embedded-card.png')"
 		/>
 		<div class="container h-screen relative z-20">

@@ -20,7 +20,7 @@
 		class="flex-[2] max-w-md bg-brand-600 select-none overflow-hidden p-16 pb-0 flex-col hidden md:flex"
 	>
 		<div class="flex-1 w-full m-auto my-0">
-			<Logo height={200} />
+			<Logo height={200} url="/images/logo/white-small.png" icon="" />
 		</div>
 		<div class="flex-1 w-full m-auto relative mb-8 h-0">
 			<img

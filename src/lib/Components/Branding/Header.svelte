@@ -8,7 +8,7 @@
 <div class="py-4 bg-stone-100 flex justify-center">
 	<div class="w-full flex container">
 		<a href={logoLink}>
-			<Logo width={96} height={50} />
+			<Logo width={156} height={40} />
 		</a>
 		<div class="flex-1" />
 		<LoginLogoutButton />

@@ -7,59 +7,59 @@ export const mailGenerator = (html: string, email: EmailHTMLGenerator) =>
 const replaceables = (email: EmailHTMLGenerator) =>
 	[
 		{
-			search: "$HOME_URL_TEXT",
-			replace: "Haja",
+			search: '$HOME_URL_TEXT',
+			replace: 'ThunderLite',
 		},
 		{
-			search: "$HOME_URL_HREF",
+			search: '$HOME_URL_HREF',
 			replace: siteUrl(),
 		},
 		{
-			search: "$LOGO_FULL_COLOR",
+			search: '$LOGO_FULL_COLOR',
 			replace: `${siteUrl()}/images/haja/logo_horizontal_full.png`,
 		},
 		{
-			search: "$LOGO_SMALL_COLOR",
+			search: '$LOGO_SMALL_COLOR',
 			replace: `${siteUrl()}/images/haja/logo_full.png`,
 		},
 		{
-			search: "$WHITE_LOGO_IMAGE",
+			search: '$WHITE_LOGO_IMAGE',
 			replace: `${siteUrl()}/images/haja/logo_horizontal_white.png`,
 		},
 		{
-			search: "$IMAGE_CALENDAR",
+			search: '$IMAGE_CALENDAR',
 			replace: `${siteUrl()}/emails/images/calendar.png`,
 		},
 		{
-			search: "$IMAGE_WORKSPACE",
+			search: '$IMAGE_WORKSPACE',
 			replace: `${siteUrl()}/emails/images/desktop.png`,
 		},
 		{
-			search: "$SUPPORT_TYPE",
+			search: '$SUPPORT_TYPE',
 			replace: email.type,
 		},
 		{
-			search: "$DATE_RECIEVED",
+			search: '$DATE_RECIEVED',
 			replace: email.date,
 		},
 		{
-			search: "$SENDER_EMAIL",
+			search: '$SENDER_EMAIL',
 			replace: email.email,
 		},
 		{
-			search: "$MESSAGE_SUBJECT",
+			search: '$MESSAGE_SUBJECT',
 			replace: email.subject,
 		},
 		{
-			search: "$SENT_MESSAGE",
+			search: '$SENT_MESSAGE',
 			replace: email.text,
 		},
 		{
-			search: "$ISSUE_URL_HREF",
+			search: '$ISSUE_URL_HREF',
 			replace: `${siteUrl()}/emails/${email.ticket}`,
 		},
 		{
-			search: "$ISSUE_ID",
+			search: '$ISSUE_ID',
 			replace: email.ticket,
 		},
 	] as { search: string; replace: string }[]
