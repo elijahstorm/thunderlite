@@ -27,10 +27,10 @@
 
 	export let contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 	export let makeImage = createImageLoader((finished: boolean) => ($contextLoaded = finished))
-	export let colorizer = imageColorizer()
+	export let colorizer: ReturnType<typeof imageColorizer> | undefined = undefined
 	export let scroller = Scroller
 	export let animator = Animator
-	export let select: undefined | ((x: number, y: number) => void) = undefined
+	export let select: ((x: number, y: number) => void) | undefined = undefined
 
 	const render = () => (requestRedraw = performance.now())
 
@@ -66,6 +66,8 @@
 	}
 
 	onMount(() => {
+		if (!colorizer) colorizer = imageColorizer()
+
 		if (!pause && !$animationTimer) {
 			$animationTimer = setTimeout(inc, ANIMATION_TIME)
 		}
@@ -82,42 +84,53 @@
 	})
 </script>
 
-<Game {map} {makeImage} {colorizer} {select} let:interfacer let:renderData let:select let:validTile>
-	{#if $contextLoaded}
-		<TileSelector
-			{animator}
-			{mini}
-			{interfacer}
-			{select}
-			{validTile}
-			{hover}
-			let:cellWidth
-			let:cellHeight
-			let:handleClick
-			let:handleHover
-			let:handleKeypress
-			let:handleOffset
-		>
-			<div style="width: {map.cols * cellWidth}px; height: {map.rows * cellHeight}px">
-				<svelte:component
-					this={scroller}
-					tileWidth={cellWidth}
-					tileHeight={cellHeight}
-					contentWidth={cellWidth * map.cols}
-					contentHeight={cellHeight * map.rows}
-					paint={paint(renderData, hudImages, pause)(() => map)}
-					{requestRedraw}
-					{handleClick}
-					{handleHover}
-					{handleKeypress}
-					{handleOffset}
-				/>
-			</div>
-		</TileSelector>
-	{:else}
-		<Loader />
-	{/if}
-</Game>
+{#if colorizer}
+	<Game
+		{map}
+		{makeImage}
+		{colorizer}
+		{select}
+		let:interfacer
+		let:renderData
+		let:select
+		let:validTile
+	>
+		{#if $contextLoaded}
+			<TileSelector
+				{animator}
+				{mini}
+				{interfacer}
+				{select}
+				{validTile}
+				{hover}
+				let:cellWidth
+				let:cellHeight
+				let:handleClick
+				let:handleHover
+				let:handleKeypress
+				let:handleOffset
+			>
+				<div style="width: {map.cols * cellWidth}px; height: {map.rows * cellHeight}px">
+					<svelte:component
+						this={scroller}
+						tileWidth={cellWidth}
+						tileHeight={cellHeight}
+						contentWidth={cellWidth * map.cols}
+						contentHeight={cellHeight * map.rows}
+						paint={paint(renderData, hudImages, pause)(() => map)}
+						{requestRedraw}
+						{handleClick}
+						{handleHover}
+						{handleKeypress}
+						{handleOffset}
+					/>
+				</div>
+			</TileSelector>
+		{:else}
+			<Loader />
+		{/if}
+	</Game>
+{/if}
 
 <img class="hidden" bind:this={hudImages.arrow} src={hud.arrow} alt="placeholder arrow" />
 <img class="hidden" bind:this={hudImages.advice} src={hud.advice} alt="placeholder advice" />

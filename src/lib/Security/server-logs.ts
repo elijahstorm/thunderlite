@@ -19,6 +19,7 @@ export const logToErrorDb = (pool: VercelPool) => async (e: unknown, info?: stri
 	} catch (msg) {
 		// big system failure here... maybe send alert?
 		console.error('!!AVOIDED SYSTEM CRASH!!', 'Could not save error log')
+		console.error(msg)
 	}
 }
 

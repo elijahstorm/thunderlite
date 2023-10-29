@@ -13,4 +13,5 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .DS_Store
 __snapshots__
+playwright-report
 .vercel

@@ -134,7 +134,7 @@
 			</EditorButton>
 		</ButtonGrid>
 
-		<div class="flex-1">
+		<div class="">
 			<MapRender pause {map} {select} {contextLoaded} />
 		</div>
 

@@ -1,20 +1,20 @@
 import { error } from '@sveltejs/kit'
 import { POSTGRES_URL } from '$env/static/private'
-import { createPool } from '@vercel/postgres'
+import { createPool, type QueryResult } from '@vercel/postgres'
 import { logToErrorDb } from '$lib/Security/server-logs'
 
 export const getMapHash = async (sha: string) => {
-	let url: string | undefined
+	let results: QueryResult
 
 	try {
 		const pool = createPool({ connectionString: POSTGRES_URL })
-		const results = await pool.query(`SELECT url from Maps where sha='${sha}'`)
-		url = results.rows[0].url
+		results = await pool.query(`SELECT url from Maps where sha='${sha}'`)
 	} catch (msg) {
 		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
 		throw error(500, 'Could not get map from database')
 	}
 
+	const url = results?.rows[0]?.url
 	if (!url) {
 		throw error(400, { message: 'No map with that SHA found.' })
 	}
