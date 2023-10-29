@@ -1,6 +1,6 @@
 import type { VercelPool } from '@vercel/postgres'
 
-export const logToErrorDb = (pool: VercelPool) => (e: unknown, info?: string) => {
+export const logToErrorDb = (pool: VercelPool) => async (e: unknown, info?: string) => {
 	let message: string
 	if (e instanceof Error) {
 		message = e.message
@@ -10,11 +10,16 @@ export const logToErrorDb = (pool: VercelPool) => (e: unknown, info?: string) =>
 		message = e ?? 'Unknown error'
 	}
 
-	pool.query(
-		`INSERT INTO Logs (type, message, time) VALUES ('error', '${
-			info ? info + ': ' : ''
-		}${message}', '${formatPostgresDate(new Date())}')`
-	)
+	try {
+		await pool.query(
+			`INSERT INTO Logs (type, message, time) VALUES ('error', '${
+				info ? info + ': ' : ''
+			}${message}', '${formatPostgresDate(new Date())}')`
+		)
+	} catch (msg) {
+		// big system failure here... maybe send alert?
+		console.error('!!AVOIDED SYSTEM CRASH!!', 'Could not save error log')
+	}
 }
 
 const formatPostgresDate = (date: Date) => {
