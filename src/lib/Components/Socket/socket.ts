@@ -1,7 +1,8 @@
 import { interactor } from '$lib/Engine/Interactor/interactor'
 
-export const socketOpened = () => console.log('> Opened Socket')
-export const socketClosed = () => console.log('< Closed Socket')
+export const socketOpened = (callback?: VoidFunction) => () => callback && callback()
+
+export const socketClosed = (callback?: VoidFunction) => () => callback && callback()
 
 export const socketMessage =
 	(getMap: () => MapObject | undefined, render: (now: number) => void) =>

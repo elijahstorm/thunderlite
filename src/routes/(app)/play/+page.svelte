@@ -16,7 +16,7 @@
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 </script>
 
-<section class="m-auto">
+<section class="h-screen overflow-clip">
 	<MapLoader {mapHash} let:map>
 		<GameSocket map={() => map} let:socket let:requestRedraw>
 			<GameStateManager
@@ -30,7 +30,9 @@
 		</GameSocket>
 
 		{#if $contextLoaded}
-			<div class="fixed right-0 top-0 opacity-30 hover:opacity-100">
+			<div
+				class="fixed right-0 top-0 border-l-2 border-b-2 border-black opacity-30 hover:opacity-100"
+			>
 				<MapRender mini pause {map} {contextLoaded} />
 			</div>
 		{/if}

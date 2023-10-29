@@ -9,7 +9,7 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { mapStore } from './mapStore'
 	import { addToast } from 'as-toast'
-	import { spriteStore } from '$lib/Sprites/spriteStore'
+	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
@@ -18,8 +18,7 @@
 
 	const maxTeamAmount = 4
 	const size = 64
-
-	const contextLoaded = writable(false)
+	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
 	let openOptionsModal = false
 	let editType: keyof MapLayers = 'units'
@@ -83,7 +82,7 @@
 </script>
 
 <grid class="p-6 h-screen max-h-screen overflow-hidden flex flex-col select-none">
-	<div class="flex-grow flex">
+	<div class="flex">
 		<div class="flex-grow">
 			<ButtonGrid rows={2} length={maxTeamAmount} let:index>
 				<EditorButton
@@ -134,7 +133,7 @@
 			</EditorButton>
 		</ButtonGrid>
 
-		<div class="">
+		<div class="shrink grow overflow-clip">
 			<MapRender pause {map} {select} {contextLoaded} />
 		</div>
 

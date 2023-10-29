@@ -138,7 +138,7 @@ const scrollerMembers = function () {
 			timeStamp: number | number | null,
 			scale?: number | null
 		) => void
-		doTouchEnd: (timeStampe: number | number) => void
+		doTouchEnd: (timeStamp: number | number) => void
 		__startDeceleration: VoidFunction
 		customRender: (left: number, top: number, zoom: number) => void
 		__stepThroughDeceleration: (render: boolean) => void
@@ -375,7 +375,7 @@ const scrollerMembers = function () {
 			timeStamp: number | null,
 			scale?: number | null
 		): void {},
-		doTouchEnd: function (timeStampe: number): void {},
+		doTouchEnd: function (timeStamp: number): void {},
 		__startDeceleration: () => {},
 		customRender: function (left: number, top: number, zoom: number): void {},
 		__stepThroughDeceleration: function (render: boolean): void {},

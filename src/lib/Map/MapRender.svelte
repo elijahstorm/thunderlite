@@ -84,53 +84,58 @@
 	})
 </script>
 
-{#if colorizer}
-	<Game
-		{map}
-		{makeImage}
-		{colorizer}
-		{select}
-		let:interfacer
-		let:renderData
-		let:select
-		let:validTile
-	>
-		{#if $contextLoaded}
-			<TileSelector
-				{animator}
-				{mini}
-				{interfacer}
-				{select}
-				{validTile}
-				{hover}
-				let:cellWidth
-				let:cellHeight
-				let:handleClick
-				let:handleHover
-				let:handleKeypress
-				let:handleOffset
-			>
-				<div style="width: {map.cols * cellWidth}px; height: {map.rows * cellHeight}px">
-					<svelte:component
-						this={scroller}
-						tileWidth={cellWidth}
-						tileHeight={cellHeight}
-						contentWidth={cellWidth * map.cols}
-						contentHeight={cellHeight * map.rows}
-						paint={paint(renderData, hudImages, pause)(() => map)}
-						{requestRedraw}
-						{handleClick}
-						{handleHover}
-						{handleKeypress}
-						{handleOffset}
-					/>
-				</div>
-			</TileSelector>
-		{:else}
-			<Loader />
-		{/if}
-	</Game>
-{/if}
+<div class="w-full h-full flex justify-center items-center bg-yellow-300">
+	{#if colorizer}
+		<Game
+			{map}
+			{makeImage}
+			{colorizer}
+			{select}
+			let:interfacer
+			let:renderData
+			let:select
+			let:validTile
+		>
+			{#if $contextLoaded}
+				<TileSelector
+					{animator}
+					{mini}
+					{interfacer}
+					{select}
+					{validTile}
+					{hover}
+					let:cellWidth
+					let:cellHeight
+					let:handleClick
+					let:handleHover
+					let:handleKeypress
+					let:handleOffset
+				>
+					<div
+						class="w-full h-full"
+						style="max-width: {map.cols * cellWidth}px; max-height: {map.rows * cellHeight}px"
+					>
+						<svelte:component
+							this={scroller}
+							tileWidth={cellWidth}
+							tileHeight={cellHeight}
+							contentWidth={cellWidth * map.cols}
+							contentHeight={cellHeight * map.rows}
+							paint={paint(renderData, hudImages, pause)(() => map)}
+							{requestRedraw}
+							{handleClick}
+							{handleHover}
+							{handleKeypress}
+							{handleOffset}
+						/>
+					</div>
+				</TileSelector>
+			{:else}
+				<Loader />
+			{/if}
+		</Game>
+	{/if}
+</div>
 
 <img class="hidden" bind:this={hudImages.arrow} src={hud.arrow} alt="placeholder arrow" />
 <img class="hidden" bind:this={hudImages.advice} src={hud.advice} alt="placeholder advice" />

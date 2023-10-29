@@ -113,11 +113,11 @@
 		container.getBoundingClientRect(),
 		scroller
 	)(handleClick)}
-	on:keypress={keypress(handleKeypress)}
-	on:touchstart|stopPropagation|preventDefault={touchstart(scroller)}
-	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
-	on:touchend|stopPropagation|preventDefault={touchend(scroller)}
-	on:touchcancel|stopPropagation|preventDefault={touchcancel(scroller)}
+	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
+	on:touchstart={touchstart(scroller)}
+	on:touchmove={touchmove(scroller)}
+	on:touchend={touchend(scroller)}
+	on:touchcancel={touchcancel(scroller)}
 	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
 	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
 	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}

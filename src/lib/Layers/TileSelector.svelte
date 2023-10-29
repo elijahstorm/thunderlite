@@ -42,17 +42,17 @@
 		}px; width: ${cellWidth}px; height: ${cellHeight}px;`
 </script>
 
-<section class="grid flex-grow overflow-clip">
+<section class="grid relative w-full h-full">
 	<div class="col-start-1 row-start-1 cursor-pointer">
 		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight} />
 	</div>
 
-	<div class="col-start-1 row-start-1 pointer-events-none relative">
+	<div class="col-start-1 row-start-1 pointer-events-none">
 		<svelte:component this={animator} offset={interfacer.offset} {cellWidth} {cellHeight} />
 	</div>
 
 	{#if !mini}
-		<div class="col-start-1 row-start-1 pointer-events-none relative">
+		<div class="col-start-1 row-start-1 pointer-events-none">
 			{#if $interactionState === 'select'}
 				<img
 					class="absolute"
