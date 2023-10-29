@@ -7,7 +7,7 @@ export const logToErrorDb = (pool: VercelPool) => (e: unknown, info?: string) =>
 	} else if (typeof e !== 'string') {
 		message = `${e}`
 	} else {
-		message = 'Unknown error'
+		message = e ?? 'Unknown error'
 	}
 
 	pool.query(
