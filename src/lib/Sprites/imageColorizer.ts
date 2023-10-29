@@ -1,53 +1,14 @@
-export const imageColorizer = (team: number) => (originalImage: HTMLImageElement) => {
+export const imageColorizer = () => {
 	const canvas = document.createElement('canvas')
-	const ctx = canvas.getContext('2d')
+	const ctx = canvas.getContext('2d', {
+		willReadFrequently: true,
+	})
+	if (!ctx) return () => (originalImage: HTMLImageElement) => originalImage
 
-	if (!ctx) {
-		return originalImage
-	}
+	return (team: number) => {
+		if (team === 0) return (originalImage: HTMLImageElement) => originalImage
 
-	canvas.width = originalImage.width
-	canvas.height = originalImage.height
-	ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height)
-
-	const [source, dest] = [colorData[0], colorData[team]]
-
-	const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-	const hardness = 50
-
-	for (let i = 0; i < imgData.data.length; i += 4) {
-		for (let j = 0; j < dest.length; j++) {
-			const r = imgData.data[i] - source[j][0]
-			const g = imgData.data[i + 1] - source[j][1]
-			const b = imgData.data[i + 2] - source[j][2]
-
-			if (Math.abs(r) < hardness && Math.abs(g) < hardness && Math.abs(b) < hardness) {
-				imgData.data[i] = Math.max(0, Math.min(255, dest[j][0] - r))
-				imgData.data[i + 1] = Math.max(0, Math.min(255, dest[j][1] - g))
-				imgData.data[i + 2] = Math.max(0, Math.min(255, dest[j][2] - b))
-			}
-		}
-	}
-
-	ctx.putImageData(imgData, 0, 0)
-	const output = new Image()
-	output.src = canvas.toDataURL('image/png')
-	return output
-}
-
-export const promiseColorized = (team: number) => async (src: string) =>
-	new Promise<string>((resolve, reject) => {
-		const originalImage = new Image()
-		originalImage.src = src
-		originalImage.onload = () => {
-			const canvas = document.createElement('canvas')
-			const ctx = canvas.getContext('2d')
-
-			if (!ctx) {
-				reject('could not load canvas')
-				return
-			}
-
+		return (originalImage: HTMLImageElement) => {
 			canvas.width = originalImage.width
 			canvas.height = originalImage.height
 			ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height)
@@ -58,6 +19,8 @@ export const promiseColorized = (team: number) => async (src: string) =>
 			const hardness = 50
 
 			for (let i = 0; i < imgData.data.length; i += 4) {
+				if (imgData.data[i + 3] < hardness) continue
+
 				for (let j = 0; j < dest.length; j++) {
 					const r = imgData.data[i] - source[j][0]
 					const g = imgData.data[i + 1] - source[j][1]
@@ -72,9 +35,12 @@ export const promiseColorized = (team: number) => async (src: string) =>
 			}
 
 			ctx.putImageData(imgData, 0, 0)
-			resolve(canvas.toDataURL('image/png'))
+			const output = new Image()
+			output.src = canvas.toDataURL('image/png')
+			return output
 		}
-	})
+	}
+}
 
 const colorData = [
 	// light to dark

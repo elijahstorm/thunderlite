@@ -10,7 +10,7 @@
 	import { animationData, animationRenderer } from '$lib/GameData/animation'
 
 	export let map: MapObject
-	export let colorizer: typeof imageColorizer
+	export let colorizer: ReturnType<typeof imageColorizer>
 	export let makeImage: ReturnType<typeof createImageLoader>
 	export let select = (x: number, y: number) => {}
 

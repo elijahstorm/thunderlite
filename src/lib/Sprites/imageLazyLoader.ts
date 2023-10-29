@@ -5,7 +5,7 @@ import type { createImageLoader } from './images'
 
 export const imageLazyLoader =
 	<T extends ObjectAssetMeta>(imageContainer: keyof MapLayers, dataList: T[], teamAmount = 1) =>
-	(makeImage: ReturnType<typeof createImageLoader>, colorizer: typeof imageColorizer) =>
+	(makeImage: ReturnType<typeof createImageLoader>, colorizer: ReturnType<typeof imageColorizer>) =>
 	(includedTypes: number[]) =>
 		Object.entries(
 			dataList.reduce(
@@ -32,15 +32,16 @@ export const imageLazyLoader =
 					} else {
 						renderer.sprite = new Array(teamAmount)
 						for (let team = 0; team < teamAmount; team++) {
+							const applyTeamColor = colorizer(team)
 							makeImage(data.url)((image) => {
 								spriteStore.update((sprites) => {
 									if (!sprites[imageContainer][index]) {
 										sprites[imageContainer][index] = new Array(teamAmount)
 									}
-									sprites[imageContainer][index][team] = colorizer(team)(image)
+									sprites[imageContainer][index][team] = applyTeamColor(image)
 									return sprites
 								})
-								renderer.sprite[team] = colorizer(team)(image)
+								renderer.sprite[team] = applyTeamColor(image)
 							})
 						}
 					}

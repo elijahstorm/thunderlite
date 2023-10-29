@@ -26,12 +26,10 @@
 	}
 
 	export let contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
-	export let makeImage: ReturnType<typeof createImageLoader> = createImageLoader(
-		(finished: boolean) => ($contextLoaded = finished)
-	)
-	export let colorizer: typeof imageColorizer = imageColorizer
-	export let scroller: typeof Scroller = Scroller
-	export let animator: typeof Animator = Animator
+	export let makeImage = createImageLoader((finished: boolean) => ($contextLoaded = finished))
+	export let colorizer = imageColorizer()
+	export let scroller = Scroller
+	export let animator = Animator
 	export let select: undefined | ((x: number, y: number) => void) = undefined
 
 	const render = () => (requestRedraw = performance.now())
