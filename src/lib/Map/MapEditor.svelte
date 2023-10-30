@@ -129,13 +129,8 @@
 		{#if editType !== 'ground'}
 			<div class="flex-grow h-[84px] transition-all hover:h-[286px] focus:h-[286px]">
 				<ButtonGrid cols={1} length={maxTeamAmount} let:index>
-					<EditorButton
-						action={changeTeam(index)}
-						selected={editType !== 'ground' && team === index}
-						disabled={editType === 'ground'}
-						{size}
-					>
-						{#if $contextLoaded && editType !== 'ground'}
+					<EditorButton action={changeTeam(index)} selected={team === index} {size}>
+						{#if $contextLoaded}
 							<img
 								class="object-cover min-w-fit"
 								src={$spriteStore[editType][type][index].src}
