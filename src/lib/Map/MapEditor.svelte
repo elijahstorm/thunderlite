@@ -13,6 +13,8 @@
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
+	import { skyData } from '$lib/GameData/sky'
+	import { buildingData } from '$lib/GameData/building'
 
 	export let mapHash: string | undefined = undefined
 
@@ -25,6 +27,13 @@
 	let type: number = 0
 	let team: number = 0
 	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
+
+	map.filters = {
+		ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
+		sky: () => Array.from({ length: skyData.length }, (_, index) => index),
+		units: () => Array.from({ length: unitData.length }, (_, index) => index),
+		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
+	}
 
 	const actions = [
 		{

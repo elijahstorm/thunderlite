@@ -15,11 +15,11 @@
 		rows,
 		cols,
 		layers: {
-			ground: new Array(rows * cols).fill(0).map((_, index) => ({
+			ground: Array.from({ length: rows * cols }, (_, index) => ({
 				type: Math.random() * 3 > 1 ? 4 : 0,
 				state: 0,
 			})),
-			sky: new Array(rows * cols).fill(0).map((_, index) =>
+			sky: Array.from({ length: rows * cols }, (_, index) =>
 				Math.random() * 100 > 7
 					? null
 					: {
@@ -28,7 +28,7 @@
 							state: 0,
 					  }
 			),
-			units: new Array(rows * cols).fill(0).map((_, index) =>
+			units: Array.from({ length: rows * cols }, (_, index) =>
 				Math.random() * 4 > 1
 					? null
 					: {
@@ -38,7 +38,7 @@
 							state: 4,
 					  }
 			),
-			buildings: new Array(rows * cols).fill(0).map((_, index) =>
+			buildings: Array.from({ length: rows * cols }, (_, index) =>
 				Math.random() * 4 > 1
 					? null
 					: {

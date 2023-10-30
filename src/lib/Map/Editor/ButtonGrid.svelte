@@ -6,9 +6,10 @@
 	let filler: unknown[][]
 
 	$: scrollX = rows !== 0
-	$: filler = new Array(Math.ceil(length / (rows || cols)))
-		.fill(0)
-		.map(() => new Array(rows || cols))
+	$: filler = Array.from(
+		{ length: Math.ceil(length / (rows || cols)) },
+		() => new Array(rows || cols)
+	)
 </script>
 
 <div

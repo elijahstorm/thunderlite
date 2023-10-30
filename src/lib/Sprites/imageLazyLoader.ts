@@ -30,20 +30,15 @@ export const imageLazyLoader =
 					if (cache) {
 						renderer.sprite = cache
 					} else {
-						renderer.sprite = new Array(teamAmount)
-						for (let team = 0; team < teamAmount; team++) {
-							const applyTeamColor = colorizer(team)
-							makeImage(data.url)((image) => {
-								spriteStore.update((sprites) => {
-									if (!sprites[imageContainer][index]) {
-										sprites[imageContainer][index] = new Array(teamAmount)
-									}
-									sprites[imageContainer][index][team] = applyTeamColor(image)
-									return sprites
-								})
-								renderer.sprite[team] = applyTeamColor(image)
+						makeImage(data.url)((image) => {
+							renderer.sprite = Array.from({ length: teamAmount }, (_, team) =>
+								colorizer(team)(image)
+							)
+							spriteStore.update((sprites) => {
+								sprites[imageContainer][index] = renderer.sprite
+								return sprites
 							})
-						}
+						})
 					}
 
 					carry[index] = renderer

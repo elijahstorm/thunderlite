@@ -35,28 +35,26 @@
 	}
 
 	onMount(() => {
-		const ground = terrainRenderer(makeImage, colorizer)(map.filters.ground(map.layers.ground))
-		const sky = skyRenderer(makeImage, colorizer)(map.filters.sky(map.layers.sky))
-		const units = unitRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
-		const attacks = attacksRenderer(makeImage, colorizer)(map.filters.units(map.layers.units))
-		const buildings = buildingRenderer(
-			makeImage,
-			colorizer
-		)(map.filters.buildings(map.layers.buildings))
-		const animation = animationRenderer(
-			makeImage,
-			colorizer
-		)(animationData.map((_, index) => index))
+		const [ground, sky, units, attacks, buildings, animation] = [
+			terrainRenderer,
+			skyRenderer,
+			unitRenderer,
+			attacksRenderer,
+			buildingRenderer,
+			animationRenderer,
+		].map((renderer) => renderer(makeImage, colorizer))
 
-		rendererStore.update((store) => {
-			store.ground = { ...store.ground, ...ground }
-			store.sky = { ...store.sky, ...sky }
-			store.units = { ...store.units, ...units }
-			store.attacks = { ...store.attacks, ...attacks }
-			store.buildings = { ...store.buildings, ...buildings }
-			store.animation = { ...store.animation, ...animation }
-			return store
-		})
+		rendererStore.update((store) => ({
+			ground: { ...store.ground, ...ground(map.filters.ground(map.layers.ground)) },
+			sky: { ...store.sky, ...sky(map.filters.sky(map.layers.sky)) },
+			units: { ...store.units, ...units(map.filters.units(map.layers.units)) },
+			attacks: { ...store.attacks, ...attacks(map.filters.units(map.layers.units)) },
+			buildings: {
+				...store.buildings,
+				...buildings(map.filters.buildings(map.layers.buildings)),
+			},
+			animation: { ...store.animation, ...animation(animationData.map((_, index) => index)) },
+		}))
 	})
 </script>
 

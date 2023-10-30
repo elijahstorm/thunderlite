@@ -1,8 +1,4 @@
-import { terrainData } from '$lib/GameData/terrain'
-import { unitData } from '$lib/GameData/unit'
-import { skyData } from '$lib/GameData/sky'
 import baseX from 'base-x'
-import { buildingData } from '$lib/GameData/building'
 import { KEY_SOURCE } from '$lib/Security/keys'
 
 export const mapHasher = (map: MapProcesser) => hash(mapExporter(map))
@@ -13,12 +9,15 @@ export const deriveFromHash = (hash?: string, existing: MapProcesser = EMPTY_MAP
 		...mapImporter(unhash(hash)),
 	}) as MapObject
 
+const filterUnsed = <T>(active: T[]) =>
+	active.filter((data) => data !== null).map((data) => (data as ObjectType).type)
+
 const EMPTY_MAP: MapObject = {
 	title: 'rose gold',
 	cols: 10,
 	rows: 10,
 	layers: {
-		ground: new Array(100).fill(0).map(() => ({
+		ground: Array.from({ length: 100 }, () => ({
 			type: 0,
 			state: 0,
 		})),
@@ -27,10 +26,10 @@ const EMPTY_MAP: MapObject = {
 		buildings: [],
 	},
 	filters: {
-		ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
-		sky: () => Array.from({ length: skyData.length }, (_, index) => index),
-		units: () => Array.from({ length: unitData.length }, (_, index) => index),
-		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
+		ground: filterUnsed,
+		sky: filterUnsed,
+		units: filterUnsed,
+		buildings: filterUnsed,
 	},
 	highlights: [],
 	route: [],
