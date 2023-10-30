@@ -92,7 +92,7 @@
 
 <grid class="p-0 h-screen max-h-screen overflow-hidden flex flex-col select-none md:p-6">
 	<div class="hidden md:flex">
-		<div class="flex-grow">
+		<div class="bg-blue-100 border-black border-2">
 			<ButtonGrid rows={2} length={maxTeamAmount} let:index>
 				<EditorButton
 					action={changeTeam(index)}
@@ -114,29 +114,33 @@
 			</ButtonGrid>
 		</div>
 
-		<ButtonGrid rows={2} length={unitData.length} let:index>
-			<EditorButton
-				action={changeType('units', index)}
-				selected={editType === 'units' && type === index}
-				{size}
-			>
-				{#if $contextLoaded}
-					<img
-						class="object-cover min-w-fit"
-						src={$spriteStore['units'][index][team].src}
-						alt={unitData[index].name}
-						style="margin-top: {-unitData[index].yOffset + 6}px"
-					/>
-				{:else}
-					...
-				{/if}
-			</EditorButton>
-		</ButtonGrid>
+		<div class="flex-1 bg-blue-100 border-black border-y-2 border-r-2">
+			<ButtonGrid rows={2} length={unitData.length} let:index>
+				<EditorButton
+					action={changeType('units', index)}
+					selected={editType === 'units' && type === index}
+					{size}
+				>
+					{#if $contextLoaded}
+						<img
+							class="object-cover min-w-fit"
+							src={$spriteStore['units'][index][team].src}
+							alt={unitData[index].name}
+							style="margin-top: {-unitData[index].yOffset + 6}px"
+						/>
+					{:else}
+						...
+					{/if}
+				</EditorButton>
+			</ButtonGrid>
+		</div>
 	</div>
 
 	<div class="flex md:hidden">
 		{#if editType !== 'ground'}
-			<div class="flex-grow h-[84px] transition-all hover:h-[286px] focus:h-[286px]">
+			<div
+				class="flex-grow bg-blue-100 border-black border-b border-r h-[84px] transition-all hover:h-[286px] focus:h-[286px]"
+			>
 				<ButtonGrid cols={1} length={maxTeamAmount} let:index>
 					<EditorButton action={changeTeam(index)} selected={team === index} {size}>
 						{#if $contextLoaded}
@@ -154,27 +158,29 @@
 			</div>
 		{/if}
 
-		<ButtonGrid rows={1} length={unitData.length} let:index>
-			<EditorButton
-				action={changeType('units', index)}
-				selected={editType === 'units' && type === index}
-				{size}
-			>
-				{#if $contextLoaded}
-					<img
-						class="object-cover min-w-fit"
-						src={$spriteStore['units'][index][team].src}
-						alt={unitData[index].name}
-						style="margin-top: {-unitData[index].yOffset + 6}px"
-					/>
-				{:else}
-					...
-				{/if}
-			</EditorButton>
-		</ButtonGrid>
+		<div class="bg-blue-100 border-black border-b">
+			<ButtonGrid rows={1} length={unitData.length} let:index>
+				<EditorButton
+					action={changeType('units', index)}
+					selected={editType === 'units' && type === index}
+					{size}
+				>
+					{#if $contextLoaded}
+						<img
+							class="object-cover min-w-fit"
+							src={$spriteStore['units'][index][team].src}
+							alt={unitData[index].name}
+							style="margin-top: {-unitData[index].yOffset + 6}px"
+						/>
+					{:else}
+						...
+					{/if}
+				</EditorButton>
+			</ButtonGrid>
+		</div>
 	</div>
 
-	<div class="contents md:hidden">
+	<div class="bg-blue-100 border-black border-b md:hidden">
 		<ButtonGrid rows={1} length={terrainData.length} let:index>
 			<EditorButton
 				action={changeType('ground', index)}
@@ -192,7 +198,7 @@
 	</div>
 
 	<div class="flex-1 flex overflow-hidden">
-		<div class="hidden md:contents">
+		<div class="bg-blue-100 border-black border-x-2 border-b-2 hidden md:block">
 			<ButtonGrid cols={1} length={actions.length} let:index>
 				<EditorButton action={actions[index].act} {size}>
 					<Icon icon={actions[index].icon} width={size - 3} height={size - 33} />
@@ -201,11 +207,11 @@
 			</ButtonGrid>
 		</div>
 
-		<div class="shrink grow overflow-clip min-w-[300px]">
+		<div class="shrink grow overflow-clip min-w-[300px] border-black md:border-b-2">
 			<MapRender pause {map} {select} {contextLoaded} />
 		</div>
 
-		<div class="hidden md:contents">
+		<div class="bg-blue-100 border-black border-x-2 border-b-2 hidden md:block">
 			<ButtonGrid cols={2} length={terrainData.length} let:index>
 				<EditorButton
 					action={changeType('ground', index)}
@@ -223,7 +229,7 @@
 		</div>
 	</div>
 
-	<div class="contents md:hidden">
+	<div class="bg-blue-100 border-black border-t md:hidden">
 		<ButtonGrid rows={1} length={actions.length} let:index>
 			<EditorButton action={actions[index].act} {size}>
 				<Icon icon={actions[index].icon} width={size - 3} height={size - 33} />

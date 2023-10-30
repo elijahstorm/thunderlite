@@ -13,7 +13,6 @@
 </script>
 
 <div
-	class="bg-blue-100 border-black border-y md:border-2"
 	class:w-full={scrollX}
 	class:h-full={!scrollX}
 	class:overflow-x-hidden={!scrollX}
