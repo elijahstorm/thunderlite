@@ -1,8 +1,13 @@
 <script lang="ts">
+	import Animator from '$lib/Engine/Animator/Animator.svelte'
+	import { interactionState } from '$lib/Engine/Interactor/interactionState'
+
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
+	export let hover: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
 	export let mini: boolean = false
+	export let animator: typeof Animator = Animator
 
 	const cellWidth = mini ? 20 : 60
 	const cellHeight = cellWidth
@@ -16,6 +21,8 @@
 	const handleHover = (_x: number, _y: number) => {
 		const [x, y] = [tileX(_x), tileY(_y)]
 		if (!validTile(x, y)) return
+		if (interfacer.hover.x === x && interfacer.hover.y === y) return
+		hover(x, y)
 		interfacer.hover = { x, y }
 	}
 	const handleOffset = (x: number, y: number, zoom: number) => {
@@ -29,23 +36,31 @@
 	const tileX = (x: number) => Math.floor(x / cellWidth)
 	const tileY = (y: number) => Math.floor(y / cellHeight)
 
-	$: selectedStyles = `left: ${interfacer.selected.x * cellWidth - interfacer.offset.x}px; top: ${
-		interfacer.selected.y * cellHeight - interfacer.offset.y
-	}px; width: ${cellWidth}px; height: ${cellHeight}px`
-	$: hoveredStyles = `left: ${interfacer.hover.x * cellWidth - interfacer.offset.x}px; top: ${
-		interfacer.hover.y * cellHeight - interfacer.offset.y
-	}px; width: ${cellWidth}px; height: ${cellHeight}px`
+	const position: (tile: { x: number; y: number }) => string = ({ x, y }) =>
+		`left: ${x * cellWidth - interfacer.offset.x}px; top: ${
+			y * cellHeight - interfacer.offset.y
+		}px; width: ${cellWidth}px; height: ${cellHeight}px;`
 </script>
 
-<section class="grid flex-grow overflow-clip">
+<section class="grid relative w-full h-full">
 	<div class="col-start-1 row-start-1 cursor-pointer">
 		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight} />
 	</div>
 
+	<div class="col-start-1 row-start-1 pointer-events-none">
+		<svelte:component this={animator} offset={interfacer.offset} {cellWidth} {cellHeight} />
+	</div>
+
 	{#if !mini}
-		<div class="col-start-1 row-start-1 pointer-events-none relative">
-			<div class="absolute border-2 border-red-500" style={selectedStyles} />
-			<div class="absolute bg-yellow-500 opacity-30" style={hoveredStyles} />
+		<div class="col-start-1 row-start-1 pointer-events-none">
+			{#if $interactionState === 'select'}
+				<img
+					class="absolute"
+					src="/game/play/icon/move/hover.png"
+					style={position(interfacer.hover)}
+					alt="hovered tile"
+				/>
+			{/if}
 		</div>
 	{/if}
 </section>

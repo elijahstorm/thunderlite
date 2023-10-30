@@ -40,9 +40,10 @@ const expand = (
 		newData.layers[key] = []
 	}
 
-	newData.layers.ground = new Array(newData.rows * newData.cols)
-		.fill(0)
-		.map(() => ({ type: 0, state: 0 }))
+	newData.layers.ground = Array.from({ length: newData.rows * newData.cols }, () => ({
+		type: 0,
+		state: 0,
+	}))
 
 	for (let col = 0; col < source.cols; col++) {
 		for (let row = 0; row < source.rows; row++) {

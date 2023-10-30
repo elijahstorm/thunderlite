@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LoginHeader from '$lib/Components/Auth/LoginHeader.svelte'
+	import LoginLogoutButton from '$lib/Components/Auth/LoginLogoutButton.svelte'
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 
 	const iconSocialLinks = [
@@ -46,8 +46,23 @@
 	<div class="container">
 		<div class="text-center grid grid-cols-1 justify-items-center gap-6 md:grid-cols-12 lg:gap-0">
 			<div class="flex flex-col gap-7 pb-1 justify-between md:justify-self-start md:col-span-3">
-				<a class="contents" href="/" target="_blank" rel="noopener noreferrer">
-					<Logo width={96} height={50} />
+				<a
+					class="flex flex-col items-center justify-center gap-3 md:hidden"
+					href="/"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<Logo width={116} height={30} url="" icon="/images/logo/white-small-tank.png" />
+					<Logo width={116} height={30} url="/images/logo/white-small.png" icon="" />
+				</a>
+
+				<a class="hidden md:contents" href="/" target="_blank" rel="noopener noreferrer">
+					<Logo
+						width={116}
+						height={30}
+						url="/images/logo/white-small.png"
+						icon="/images/logo/white-small-tank.png"
+					/>
 				</a>
 
 				<div class="flex justify-center md:justify-between items-center gap-4">
@@ -79,10 +94,10 @@
 			<div
 				class="flex flex-col justify-between gap-4 items-center md:items-end md:justify-self-end md:col-span-3"
 			>
-				<LoginHeader />
+				<LoginLogoutButton />
 
 				<div class="text-neutral-grayish-blue text-xs md:text-sm">
-					<p>© ThunderLite</p>
+					<p>© ThunderLite Online</p>
 					<p>All Rights Reserved</p>
 				</div>
 			</div>

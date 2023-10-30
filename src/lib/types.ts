@@ -15,22 +15,45 @@ type TeamObject = {
 
 type GroundObject = ObjectType & AnimatedObject
 type SkyObject = ObjectType & AnimatedObject
-type UnitObject = ObjectType & AnimatedObject & TeamObject
+type UnitObject = ObjectType &
+	AnimatedObject &
+	TeamObject & {
+		health?: number
+	}
+type BuildingObject = ObjectType & AnimatedObject & TeamObject
+
+type HighlightType = 0 | 1
+type HighlightMeta = {
+	type: HighlightType
+	tip: 0 | 1 | 2 | 3
+}
+type TileInfo = {
+	tile: number
+}
+type Highlight = TileInfo & HighlightMeta
+type Route = {
+	state: number
+	rotate: number
+	index: number
+}
 
 type MapLayers = {
 	ground: GroundObject[]
 	sky: (SkyObject | null)[]
 	units: (UnitObject | null)[]
+	buildings: (BuildingObject | null)[]
 }
 type MapLayersData = {
 	ground: ObjectType[]
 	sky: LocationObject[]
 	units: (LocationObject & TeamObject)[]
+	buildings: (LocationObject & TeamObject)[]
 }
 type MapFilters = {
 	ground: (active: GroundObject[]) => number[]
 	sky: (active: (SkyObject | null)[]) => number[]
 	units: (active: (UnitObject | null)[]) => number[]
+	buildings: (active: (BuildingObject | null)[]) => number[]
 }
 type MapObject = {
 	title?: string | null
@@ -38,6 +61,8 @@ type MapObject = {
 	rows: number
 	layers: MapLayers
 	filters: MapFilters
+	route: (Route | undefined)[]
+	highlights: (Highlight | undefined)[]
 }
 type MapProcesser = {
 	title?: string | null
@@ -52,26 +77,26 @@ type MapData = {
 	layers: MapLayersData
 }
 
-type ObjectDataLoader = {
-	sprite: string
-}
-type ObjectDataLoaded = {
-	sprite: HTMLImageElement
-}
-type ObjectSpecificRenderer = {
-	sprite: HTMLImageElement[]
+type RendererMeta = {
 	frames: number
 	xOffset: number
 	yOffset: number
 }
-type ObjectRenderer = {
-	ground: (type: number) => ObjectSpecificRenderer
-	unit: (type?: number) => ObjectSpecificRenderer | null
-	sky: (type?: number) => ObjectSpecificRenderer | null
-}
-
-type SpriteObject = ObjectSpecificRenderer & {
+type ObjectAssetMeta = RendererMeta & {
 	url: string
+}
+type ObjectSpriteRenderer = RendererMeta & {
+	sprite: HTMLImageElement[]
+}
+type ObjectRenderer = {
+	ground: (type: number) => ObjectSpriteRenderer
+	sky: (type?: number) => ObjectSpriteRenderer | null
+	unit: (type?: number) => ObjectSpriteRenderer | null
+	building: (type?: number) => ObjectSpriteRenderer | null
+}
+type HUDImages = {
+	advice: HTMLImageElement
+	arrow: HTMLImageElement
 }
 
 type InterfaceInteraction = {

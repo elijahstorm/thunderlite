@@ -1,32 +1,39 @@
 <script lang="ts">
-	import { terrainData } from '$lib/GameData/terrain'
-	import { unitData } from '$lib/GameData/unit'
+	import { writable } from 'svelte/store'
 	import ButtonGrid from './Editor/ButtonGrid.svelte'
 	import MapRender from './MapRender.svelte'
-	import { mapStore } from './mapStore'
 	import Icon from '@iconify/svelte'
 	import EditorButton from './Editor/EditorButton.svelte'
 	import MapOptions from './MapOptions.svelte'
+	import { terrainData } from '$lib/GameData/terrain'
+	import { unitData } from '$lib/GameData/unit'
+	import { mapStore } from './mapStore'
 	import { addToast } from 'as-toast'
-	import { spriteStore } from '$lib/Sprites/spriteStore'
+	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
-	import { createImageLoader } from '$lib/Sprites/images'
+	import { skyData } from '$lib/GameData/sky'
+	import { buildingData } from '$lib/GameData/building'
 
 	export let mapHash: string | undefined = undefined
 
 	const maxTeamAmount = 4
 	const size = 64
-
-	let contextLoaded = false
-	const makeImage = createImageLoader((finished: boolean) => (contextLoaded = finished))
+	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
 	let openOptionsModal = false
 	let editType: keyof MapLayers = 'units'
 	let type: number = 0
 	let team: number = 0
 	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
+
+	map.filters = {
+		ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
+		sky: () => Array.from({ length: skyData.length }, (_, index) => index),
+		units: () => Array.from({ length: unitData.length }, (_, index) => index),
+		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
+	}
 
 	const actions = [
 		{
@@ -48,7 +55,7 @@
 		{
 			label: 'share',
 			icon: 'gg:share',
-			act: () => share(map?.title ?? 'ThunderLite', mapHasher(map)),
+			act: () => share(map?.title ?? 'ThunderLite Online', mapHasher(map)),
 		},
 		{
 			label: 'play',
@@ -83,9 +90,9 @@
 	$: mapStore.set(map)
 </script>
 
-<grid class="p-6 h-screen max-h-screen overflow-hidden flex flex-col select-none">
-	<div class="flex-grow flex">
-		<div class="flex-grow">
+<grid class="p-0 h-screen max-h-screen overflow-hidden flex flex-col select-none md:p-6">
+	<div class="hidden md:flex">
+		<div class="bg-blue-100 border-black border-2">
 			<ButtonGrid rows={2} length={maxTeamAmount} let:index>
 				<EditorButton
 					action={changeTeam(index)}
@@ -93,7 +100,7 @@
 					disabled={editType === 'ground'}
 					{size}
 				>
-					{#if contextLoaded && editType !== 'ground'}
+					{#if $contextLoaded && editType !== 'ground'}
 						<img
 							class="object-cover min-w-fit"
 							src={$spriteStore[editType][type][index].src}
@@ -107,39 +114,74 @@
 			</ButtonGrid>
 		</div>
 
-		<ButtonGrid rows={2} length={unitData.length} let:index>
-			<EditorButton
-				action={changeType('units', index)}
-				selected={editType === 'units' && type === index}
-				{size}
-			>
-				{#if contextLoaded}
-					<img
-						class="object-cover min-w-fit"
-						src={$spriteStore['units'][index][team].src}
-						alt={unitData[index].name}
-						style="margin: {-unitData[index].yOffset + 6}px {-unitData[index].xOffset}px 0 0;"
-					/>
-				{:else}
-					...
-				{/if}
-			</EditorButton>
-		</ButtonGrid>
+		<div class="flex-1 bg-blue-100 border-black border-y-2 border-r-2">
+			<ButtonGrid rows={2} length={unitData.length} let:index>
+				<EditorButton
+					action={changeType('units', index)}
+					selected={editType === 'units' && type === index}
+					{size}
+				>
+					{#if $contextLoaded}
+						<img
+							class="object-cover min-w-fit"
+							src={$spriteStore['units'][index][team].src}
+							alt={unitData[index].name}
+							style="margin-top: {-unitData[index].yOffset + 6}px"
+						/>
+					{:else}
+						...
+					{/if}
+				</EditorButton>
+			</ButtonGrid>
+		</div>
 	</div>
 
-	<div class="flex overflow-hidden">
-		<ButtonGrid cols={1} length={actions.length} let:index>
-			<EditorButton action={actions[index].act} {size}>
-				<Icon icon={actions[index].icon} width={size - 3} height={size - 33} />
-				{actions[index].label}
-			</EditorButton>
-		</ButtonGrid>
+	<div class="flex md:hidden">
+		{#if editType !== 'ground'}
+			<div
+				class="flex-grow bg-blue-100 border-black border-b border-r h-[84px] transition-all hover:h-[286px] focus:h-[286px]"
+			>
+				<ButtonGrid cols={1} length={maxTeamAmount} let:index>
+					<EditorButton action={changeTeam(index)} selected={team === index} {size}>
+						{#if $contextLoaded}
+							<img
+								class="object-cover min-w-fit"
+								src={$spriteStore[editType][type][index].src}
+								alt={unitData[type].name}
+								style="margin: {-unitData[type].yOffset + 6}px {-unitData[type].xOffset}px 0 0;"
+							/>
+						{:else}
+							...
+						{/if}
+					</EditorButton>
+				</ButtonGrid>
+			</div>
+		{/if}
 
-		<div class="flex-1">
-			<MapRender pause {map} {select} {makeImage} {contextLoaded} />
+		<div class="bg-blue-100 border-black border-b">
+			<ButtonGrid rows={1} length={unitData.length} let:index>
+				<EditorButton
+					action={changeType('units', index)}
+					selected={editType === 'units' && type === index}
+					{size}
+				>
+					{#if $contextLoaded}
+						<img
+							class="object-cover min-w-fit"
+							src={$spriteStore['units'][index][team].src}
+							alt={unitData[index].name}
+							style="margin-top: {-unitData[index].yOffset + 6}px"
+						/>
+					{:else}
+						...
+					{/if}
+				</EditorButton>
+			</ButtonGrid>
 		</div>
+	</div>
 
-		<ButtonGrid cols={2} length={terrainData.length} let:index>
+	<div class="bg-blue-100 border-black border-b md:hidden">
+		<ButtonGrid rows={1} length={terrainData.length} let:index>
 			<EditorButton
 				action={changeType('ground', index)}
 				selected={editType === 'ground' && type === index}
@@ -151,6 +193,47 @@
 					alt={terrainData[index].name}
 					style="margin: {-terrainData[index].yOffset}px {-terrainData[index].xOffset}px 0 0;"
 				/>
+			</EditorButton>
+		</ButtonGrid>
+	</div>
+
+	<div class="flex-1 flex overflow-hidden">
+		<div class="bg-blue-100 border-black border-x-2 border-b-2 hidden md:block">
+			<ButtonGrid cols={1} length={actions.length} let:index>
+				<EditorButton action={actions[index].act} {size}>
+					<Icon icon={actions[index].icon} width={size - 3} height={size - 33} />
+					{actions[index].label}
+				</EditorButton>
+			</ButtonGrid>
+		</div>
+
+		<div class="shrink grow overflow-clip min-w-[300px] border-black md:border-b-2">
+			<MapRender pause {map} {select} {contextLoaded} />
+		</div>
+
+		<div class="bg-blue-100 border-black border-x-2 border-b-2 hidden md:block">
+			<ButtonGrid cols={2} length={terrainData.length} let:index>
+				<EditorButton
+					action={changeType('ground', index)}
+					selected={editType === 'ground' && type === index}
+					{size}
+				>
+					<img
+						class="object-cover object-left-top min-w-fit"
+						src={terrainData[index].url}
+						alt={terrainData[index].name}
+						style="margin: {-terrainData[index].yOffset}px {-terrainData[index].xOffset}px 0 0;"
+					/>
+				</EditorButton>
+			</ButtonGrid>
+		</div>
+	</div>
+
+	<div class="bg-blue-100 border-black border-t md:hidden">
+		<ButtonGrid rows={1} length={actions.length} let:index>
+			<EditorButton action={actions[index].act} {size}>
+				<Icon icon={actions[index].icon} width={size - 3} height={size - 33} />
+				{actions[index].label}
 			</EditorButton>
 		</ButtonGrid>
 	</div>

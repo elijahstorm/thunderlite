@@ -1,9 +1,14 @@
 <script lang="ts">
+	import { onMount } from 'svelte'
 	import Loader from '../Helpers/Loader.svelte'
 
 	export let title: string
 	export let prompt: string
 	export let type: string
+	export let prefill = {
+		subject: '',
+		message: '',
+	}
 
 	let email: string
 	let subject: string
@@ -39,6 +44,11 @@
 				postResponse = { message: error.message }
 			})
 	}
+
+	onMount(() => {
+		subject = prefill.subject
+		message = prefill.message
+	})
 </script>
 
 <section class="bg-white">

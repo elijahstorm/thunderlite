@@ -5,18 +5,26 @@
 
 	let filler: unknown[][]
 
-	$: {
-		filler = new Array(Math.floor(length / (rows || cols)))
-			.fill(0)
-			.map(() => new Array(rows || cols))
-		filler.push(new Array(length % (rows || cols)))
-	}
+	$: scrollX = rows !== 0
+	$: filler = Array.from(
+		{ length: Math.ceil(length / (rows || cols)) },
+		() => new Array(rows || cols)
+	)
 </script>
 
-<div class="border-black border-2 bg-blue-100 overflow-x-hidden overflow-y-auto">
-	<div class="flex gap-1 p-2 overflow-x-auto" class:flex-col={cols !== 0}>
+<div
+	class:w-full={scrollX}
+	class:h-full={!scrollX}
+	class:overflow-x-hidden={!scrollX}
+	class:overflow-y-hidden={scrollX}
+>
+	<div class="flex gap-1 p-2 justify-between" class:flex-col={!scrollX}>
 		{#each filler as sub, group}
-			<div class="flex gap-1" class:flex-col={rows !== 0}>
+			<div
+				class="flex gap-1"
+				class:flex-col={scrollX}
+				class:pr-2={scrollX && group === filler.length - 1}
+			>
 				{#each sub as _, item}
 					<slot index={group * (rows || cols) + item} />
 				{/each}

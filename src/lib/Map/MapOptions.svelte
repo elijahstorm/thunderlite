@@ -51,7 +51,7 @@
 
 		<flex class="flex items-center justify-around">
 			<grid class="grid grid-cols-3 grid-rows-3 gap-3 m-auto">
-				{#each directions as dir}
+				{#each directions as dir (dir)}
 					<button
 						class="bg-white text-gray-800 font-semibold p-3 border border-gray-400 rounded-sm shadow hover:bg-gray-200"
 						class:border-red-500={selectedDir === dir}
