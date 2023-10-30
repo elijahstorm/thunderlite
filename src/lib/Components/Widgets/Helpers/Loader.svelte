@@ -26,6 +26,6 @@
 	] as const
 </script>
 
-<div class="m-auto w-12 h-12">
+<div class="m-auto">
 	<svelte:component this={loaders[Math.floor(Math.random() * loaders.length)]} />
 </div>

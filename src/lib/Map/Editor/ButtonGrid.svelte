@@ -12,13 +12,13 @@
 </script>
 
 <div
-	class="border-black border-2 bg-blue-100"
+	class="bg-blue-100 border-black border-y md:border-2"
 	class:w-full={scrollX}
 	class:h-full={!scrollX}
 	class:overflow-x-hidden={!scrollX}
 	class:overflow-y-hidden={scrollX}
 >
-	<div class="flex gap-1 p-2" class:flex-col={!scrollX}>
+	<div class="flex gap-1 p-2 justify-between" class:flex-col={!scrollX}>
 		{#each filler as sub, group}
 			<div
 				class="flex gap-1"
