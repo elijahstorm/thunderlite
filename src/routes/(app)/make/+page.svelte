@@ -4,7 +4,7 @@
 	import { Card } from 'flowbite-svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
 
-	let sha: string = 'bad'
+	let sha: string = 'hello'
 	let postStatus: 'idle' | 'sending' | 'error' | 'success' | 'no-nav' = 'idle'
 	let postResponse: {
 		message: string
