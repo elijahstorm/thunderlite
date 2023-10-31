@@ -115,7 +115,7 @@
 	)(handleClick)}
 	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
 	on:touchstart={touchstart(scroller)}
-	on:touchmove={touchmove(scroller)}
+	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
 	on:touchend={touchend(scroller)}
 	on:touchcancel={touchcancel(scroller)}
 	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
