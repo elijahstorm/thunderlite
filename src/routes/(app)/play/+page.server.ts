@@ -6,9 +6,6 @@ import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL, VERCEL_ENV } from '$e
 import { logToErrorDb } from '$lib/Security/server-logs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
 
-// export const prerender = false
-// export const ssr = false
-
 export const load: PageServerLoad = async ({ locals }) => {
 	const userSession = locals.session
 	if (!userSession) throw error(401, 'User not logged in')
