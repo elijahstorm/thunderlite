@@ -6,7 +6,7 @@ import { addToast } from 'as-toast'
 
 const hanko = new Hanko(PUBLIC_HANKO_API_URL)
 
-export const loggedIn = writable(false)
+export const loggedIn = writable(hanko.session.isValid())
 
 export const redirectAfterLogin = () => goto('/me')
 export const redirectAfterLogout = () => goto('/login')

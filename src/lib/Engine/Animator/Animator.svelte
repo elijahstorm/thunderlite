@@ -41,7 +41,7 @@
 		return {
 			x,
 			y,
-			source: $rendererStore.units[route.unit.type].sprite[route.unit.team]?.src,
+			source: $rendererStore.units[route.unit.type].sprite[route.unit.team ?? 0]?.src,
 			xOffset: unit.xOffset,
 			yOffset: unit.yOffset,
 			frames: unit.frames,

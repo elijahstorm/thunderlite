@@ -124,7 +124,7 @@ const scrollerMembers = function () {
 			callback?: VoidFunction | null
 		) => void
 		scrollBy: (left: number, top: number, animate: boolean) => void
-		doMouseZoom: (wheelDelta: number, timeStamp: unknown, pageX: number, pageY: number) => void
+		doMouseZoom: (wheelDelta: number, timeStamp: unknown, clientX: number, clientY: number) => void
 		doTouchStart: (touches: TouchList, timeStamp: number | number | null) => void
 		__interruptedAnimation: boolean
 		__initialTouchLeft: number
@@ -359,8 +359,8 @@ const scrollerMembers = function () {
 		doMouseZoom: function (
 			wheelDelta: number,
 			timeStamp: unknown,
-			pageX: number,
-			pageY: number
+			clientX: number,
+			clientY: number
 		): void {},
 		doTouchStart: function (touches: TouchList, timeStamp: number | null): void {},
 		__interruptedAnimation: false,
@@ -704,16 +704,16 @@ const scrollerMembers = function () {
 	scroller.doMouseZoom = function (
 		wheelDelta: number,
 		timeStamp: unknown,
-		pageX: number,
-		pageY: number
+		clientX: number,
+		clientY: number
 	) {
 		const change = wheelDelta > 0 ? 0.97 : 1.03
 
 		scroller.zoomTo(
 			scroller.__zoomLevel * change,
 			false,
-			pageX - scroller.__clientLeft,
-			pageY - scroller.__clientTop
+			clientX - scroller.__clientLeft,
+			clientY - scroller.__clientTop
 		)
 	}
 
@@ -751,11 +751,11 @@ const scrollerMembers = function () {
 		let currentTouchLeft, currentTouchTop
 		const isSingleTouch = touches.length === 1
 		if (isSingleTouch) {
-			currentTouchLeft = touches[0].pageX
-			currentTouchTop = touches[0].pageY
+			currentTouchLeft = touches[0].clientX
+			currentTouchTop = touches[0].clientY
 		} else {
-			currentTouchLeft = Math.abs(touches[0].pageX + touches[1].pageX) / 2
-			currentTouchTop = Math.abs(touches[0].pageY + touches[1].pageY) / 2
+			currentTouchLeft = Math.abs(touches[0].clientX + touches[1].clientX) / 2
+			currentTouchTop = Math.abs(touches[0].clientY + touches[1].clientY) / 2
 		}
 
 		// Store initial positions
@@ -822,11 +822,11 @@ const scrollerMembers = function () {
 
 		// Compute move based around of center of fingers
 		if (touches.length === 2) {
-			currentTouchLeft = Math.abs(touches[0].pageX + touches[1].pageX) / 2
-			currentTouchTop = Math.abs(touches[0].pageY + touches[1].pageY) / 2
+			currentTouchLeft = Math.abs(touches[0].clientX + touches[1].clientX) / 2
+			currentTouchTop = Math.abs(touches[0].clientY + touches[1].clientY) / 2
 		} else {
-			currentTouchLeft = touches[0].pageX
-			currentTouchTop = touches[0].pageY
+			currentTouchLeft = touches[0].clientX
+			currentTouchTop = touches[0].clientY
 		}
 
 		const positions = scroller.__positions

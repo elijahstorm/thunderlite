@@ -7,8 +7,8 @@ export const click =
 	(e) =>
 		validate(preventOnForms, minimalMouseMovement(scroller))(
 			click,
-			e.pageX - rect.left + scroller.__scrollLeft,
-			e.pageY - rect.top + scroller.__scrollTop
+			e.clientX - rect.left + scroller.__scrollLeft,
+			e.clientY - rect.top + scroller.__scrollTop
 		)(e)
 export const keypress =
 	(keypress: (key: string, shiftKey: boolean) => void): KeyboardEventHandler<HTMLElement> =>
@@ -39,8 +39,8 @@ export const mousedown =
 			scroller.doTouchStart,
 			[
 				{
-					pageX: e.pageX,
-					pageY: e.pageY,
+					clientX: e.clientX,
+					clientY: e.clientY,
 				},
 			] as unknown as TouchList,
 			e.timeStamp
@@ -61,15 +61,15 @@ export const mousemove =
 			scroller.doTouchMove,
 			[
 				{
-					pageX: e.pageX,
-					pageY: e.pageY,
+					clientX: e.clientX,
+					clientY: e.clientY,
 				},
 			] as unknown as TouchList,
 			e.timeStamp
 		)(
 			mousemove,
-			e.pageX - rect.left + scroller.__scrollLeft,
-			e.pageY - rect.top + scroller.__scrollTop
+			e.clientX - rect.left + scroller.__scrollLeft,
+			e.clientY - rect.top + scroller.__scrollTop
 		)(scroller)
 
 const otherwise =
@@ -91,6 +91,6 @@ const validateEnter = (e: KeyboardEvent) => e.key === 'Enter'
 const preventOnForms = (e: Event) =>
 	(e.target as HTMLElement).tagName.match(/input|textarea|select/i) ? false : true
 const minimalMouseMovement = (scroller: Scroller) => (e: Event) =>
-	Math.abs(scroller.__initialTouchLeft - (e as MouseEvent).pageX) < 10 &&
-	Math.abs(scroller.__initialTouchTop - (e as MouseEvent).pageY) < 10
+	Math.abs(scroller.__initialTouchLeft - (e as MouseEvent).clientX) < 10 &&
+	Math.abs(scroller.__initialTouchTop - (e as MouseEvent).clientY) < 10
 const scrollerIsScrolling = (scroller: Scroller) => scroller.__isTracking
