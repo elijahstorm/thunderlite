@@ -8,7 +8,7 @@ export const getMapHash = async (sha: string) => {
 
 	try {
 		const pool = createPool({ connectionString: POSTGRES_URL })
-		results = await pool.query(`SELECT url from Maps where sha='${sha}'`)
+		results = await pool.query(`select url from maps where sha='${sha}'`)
 	} catch (msg) {
 		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
 		throw error(500, 'Could not get map from database')
@@ -29,12 +29,13 @@ export const getMapHash = async (sha: string) => {
 
 	return { mapHash }
 }
+
 export const isValidMapHash = async (sha: string) => {
 	let exists = false
 
 	try {
 		const pool = createPool({ connectionString: POSTGRES_URL })
-		const results = await pool.query(`SELECT COUNT(url) from Maps where sha='${sha}'`)
+		const results = await pool.query(`select count(url) from maps where sha='${sha}'`)
 		exists = results.rows[0]?.count !== '0'
 	} catch (msg) {
 		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)

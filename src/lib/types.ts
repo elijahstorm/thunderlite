@@ -129,3 +129,29 @@ type Direction =
 	| 'bottomLeft'
 	| 'bottom'
 	| 'bottomRight'
+
+type UserDBData = {
+	id: number
+	username: string
+	display_name: string
+	profile_image_url: string
+	email: string
+	bio: string
+	created_at: Date
+}
+type MapDBData = {
+	id: number
+	name: string
+	description: string
+	sha: string
+	url: string
+	owner_id: number
+	thumbnail: string
+	liked_by_me: number
+	likes: number
+	shares: number
+	plays: number
+	trending: boolean
+	created_at: Date
+	updated_at: Date
+}
