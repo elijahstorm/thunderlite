@@ -2,6 +2,8 @@
 	import LoginLogoutButton from '$lib/Components/Auth/LoginLogoutButton.svelte'
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 
+	export let noFooterOnMobile = false
+
 	const iconSocialLinks = [
 		{
 			href: 'https://github.com/elijahstorm',
@@ -43,7 +45,11 @@
 		<slot />
 	</div>
 
-	<footer class="bg-primary-dark-blue py-10">
+	<footer
+		class="bg-primary-dark-blue py-10"
+		class:hidden={noFooterOnMobile}
+		class:md:block={noFooterOnMobile}
+	>
 		<div class="container">
 			<div class="text-center grid grid-cols-1 justify-items-center gap-6 md:grid-cols-12 lg:gap-0">
 				<div class="flex flex-col gap-7 pb-1 justify-between md:justify-self-start md:col-span-3">
