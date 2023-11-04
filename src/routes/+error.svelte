@@ -31,8 +31,10 @@
 						href="/support"
 						class="border-transparent border-b-2 text-blue-600 transition-colors hover:border-blue-600 focus:border-blue-600"
 					>
-						you can report the issue here.
+						you can report the issue here
 					</a>
+
+					<span class="-ml-1"> . </span>
 				</p>
 
 				<FallbackImage alt={`${$page.status}, ${$page.error?.message}`} />

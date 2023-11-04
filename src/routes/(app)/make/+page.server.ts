@@ -1,4 +1,4 @@
 import type { PageServerLoad } from './$types'
-import { queryMaps } from './queryMaps'
+import { queryMaps } from '$lib/Database/queryMaps'
 
 export const load: PageServerLoad = () => queryMaps({})

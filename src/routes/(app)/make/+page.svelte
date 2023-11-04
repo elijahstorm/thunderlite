@@ -68,7 +68,7 @@
 <section class="px-5 sm:px-8 md:px-0 mx-auto sm:max-w-[640px] md:max-w-none">
 	{#if selectedMap}
 		<div class="m-auto">
-			<Card size="xl">
+			<Card size="2xl">
 				{#if postStatus === 'idle'}
 					<div class="w-full flex flex-col">
 						<p>Make a game with this map?</p>
