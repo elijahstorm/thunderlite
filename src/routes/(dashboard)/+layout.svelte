@@ -18,7 +18,7 @@
 <ContentWithFooter>
 	<Casing {toggleAside}>
 		<div
-			class="fixed inset-0 z-30 bg-[#ccc7] backdrop-blur-sm"
+			class="fixed inset-0 z-30 bg-[#ccc7] backdrop-blur-sm md:hidden"
 			class:hidden={!openAside}
 			on:keydown={closeAside}
 			on:click={closeAside}
