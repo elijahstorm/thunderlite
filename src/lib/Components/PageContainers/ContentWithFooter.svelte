@@ -86,7 +86,7 @@
 				>
 					{#each footerLinks as link (link.href)}
 						<a
-							class="hover:text-green-400"
+							class="hover:text-primary-baby-blue"
 							href={link.href}
 							target="_blank"
 							rel="noopener noreferrer"

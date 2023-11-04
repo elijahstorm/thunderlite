@@ -90,7 +90,7 @@
 	$: mapStore.set(map)
 </script>
 
-<grid class="h-screen max-h-screen overflow-hidden flex flex-col select-none">
+<grid class="flex flex-col select-none h-full">
 	<div class="hidden md:flex">
 		<div class="bg-blue-100 border-black border-2">
 			<ButtonGrid cols={2} length={maxTeamAmount} let:index>

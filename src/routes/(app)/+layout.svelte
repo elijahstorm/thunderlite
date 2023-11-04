@@ -6,7 +6,7 @@
 <ContentWithFooter noFooterOnMobile>
 	<Header />
 
-	<div class="md:container pt-6 pb-16 w-full break break-word">
+	<div class="md:container w-full break break-word">
 		<slot />
 	</div>
 </ContentWithFooter>

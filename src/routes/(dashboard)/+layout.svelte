@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onNavigate } from '$app/navigation'
 	import Casing from '$lib/Components/PageContainers/Casing.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 
@@ -7,48 +8,28 @@
 	const escape = (e: KeyboardEvent) => e.key === 'Escape' && closeAside()
 	const toggleAside = () => (openAside = !openAside)
 	const closeAside = () => (openAside = false)
+
+	// @ts-ignore
+	onNavigate(closeAside)
 </script>
 
 <svelte:window on:keydown={escape} />
 
 <ContentWithFooter>
-	<Casing>
-		<button
-			data-drawer-target="separator-sidebar"
-			data-drawer-toggle="separator-sidebar"
-			aria-controls="separator-sidebar"
-			type="button"
-			class="inline-flex items-center p-2 mt-2 ml-3 text-sm text-gray-500 rounded-lg sm:hidden hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600"
-			on:click={toggleAside}
-		>
-			<span class="sr-only">Open sidebar</span>
-			<svg
-				class="w-6 h-6"
-				aria-hidden="true"
-				fill="currentColor"
-				viewBox="0 0 20 20"
-				xmlns="http://www.w3.org/2000/svg"
-			>
-				<path
-					clip-rule="evenodd"
-					fill-rule="evenodd"
-					d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z"
-				></path>
-			</svg>
-		</button>
-
+	<Casing {toggleAside}>
 		<div
-			class="fixed inset-0 opacity-0 z-30"
+			class="fixed inset-0 z-30 bg-[#ccc7] backdrop-blur-sm"
 			class:hidden={!openAside}
-			on:keydown={escape}
+			on:keydown={closeAside}
 			on:click={closeAside}
+			aria-label="Close navigation side bar"
 			role="button"
 			tabindex="0"
 		/>
 
 		<section class="flex gap-4 py-4">
 			<aside
-				class="fixed pt-[82px] top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full sm:relative sm:translate-x-0 sm:pt-3"
+				class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full md:relative md:translate-x-0 md:pt-3"
 				class:translate-x-0={openAside}
 				aria-label="Sidebar"
 			>
