@@ -1,27 +1,35 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/server-logs'
-import { createPool, type QueryResult } from '@vercel/postgres'
-import { POSTGRES_URL } from '$env/static/private'
+import { createPool } from '@vercel/postgres'
+import postgres from 'postgres'
+import { LOCAL_POSTGRES, POSTGRES_URL, VERCEL_ENV } from '$env/static/private'
 
-export const getUserDBData = (id: number) =>
-	getUserFromQuery(`select * from users where id = ${id}`)
+export const getUserDBData = (id: number) => getUserFromQuery('id', `${id}`)
 
-export const getUserDBDataFromAuth = (auth: string) =>
-	getUserFromQuery(`select * from users where auth = '${auth}'`)
+export const getUserDBDataFromAuth = (auth: string) => getUserFromQuery('auth', auth)
 
-const getUserFromQuery: (query: string) => Promise<UserDBData> = async (query) => {
-	let results: QueryResult
+const getUserFromQuery: (query: 'auth' | 'id', auth: string) => Promise<UserDBData> = async (
+	query,
+	auth
+) => {
+	let user: UserDBData
 
 	try {
-		const pool = createPool({ connectionString: POSTGRES_URL })
-		results = await pool.query(query)
+		if (VERCEL_ENV === 'development') {
+			const sql = postgres(LOCAL_POSTGRES)
+			if (query === 'auth') {
+				user = (await sql`select * from users where auth = ${auth}`)[0] as UserDBData
+			} else {
+				user = (await sql`select * from users where id = ${auth}`)[0] as UserDBData
+			}
+		} else {
+			const pool = createPool({ connectionString: POSTGRES_URL })
+			user = (await pool.query(`select * from users where ${query} = ${auth}`))?.rows[0]
+		}
 	} catch (msg) {
 		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
-		console.error(msg)
 		throw error(500, 'Could not get user from database')
 	}
-
-	const user = results?.rows[0]
 
 	if (!user) {
 		throw error(400, { message: 'No user found.' })

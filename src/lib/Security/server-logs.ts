@@ -1,6 +1,12 @@
+import { VERCEL_ENV } from '$env/static/private'
 import type { VercelPool } from '@vercel/postgres'
 
 export const logToErrorDb = (pool: VercelPool) => async (e: unknown, info?: string) => {
+	if (VERCEL_ENV === 'development') {
+		console.error(e)
+		return
+	}
+
 	let message: string
 	if (e instanceof Error) {
 		message = e.message

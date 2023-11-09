@@ -7,7 +7,7 @@ import { generateKey } from '$lib/Security/keys'
 import { logToErrorDb } from '$lib/Security/server-logs'
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const protectedRoutes = ['/me', '/play', '/make', '/api/game', '/api/upload']
+	const protectedRoutes = ['/me', '/play', '/make', '/api/game', '/api/user', '/api/upload']
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!(await authenticatedUser(event))) {
 			throw redirect(303, '/login')

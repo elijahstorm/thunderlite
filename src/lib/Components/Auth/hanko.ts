@@ -4,9 +4,10 @@ import { goto } from '$app/navigation'
 import { writable } from 'svelte/store'
 import { addToast } from 'as-toast'
 
-const hanko = new Hanko(PUBLIC_HANKO_API_URL)
+export const hanko = new Hanko(PUBLIC_HANKO_API_URL)
 
 export const loggedIn = writable(hanko.session.isValid())
+export const userID = writable<string | null>(null)
 
 export const redirectAfterLogin = () => goto('/me')
 export const redirectAfterLogout = () => goto('/login')
@@ -14,8 +15,14 @@ export const redirectAfterLogout = () => goto('/login')
 export const logout = () => hanko.user.logout().catch(reportError)
 export const mountAuth = () => register(PUBLIC_HANKO_API_URL).catch(reportError)
 
-const setLoggedIn = () => loggedIn.set(true)
-const setLoggedOut = () => loggedIn.set(false)
+const setLoggedIn = () => {
+	loggedIn.set(true)
+	userID.set(hanko.session?.get()?.userID)
+}
+const setLoggedOut = () => {
+	loggedIn.set(false)
+	userID.set(hanko.session?.get()?.userID)
+}
 
 hanko.onAuthFlowCompleted(setLoggedIn)
 hanko.onSessionCreated(setLoggedIn)
