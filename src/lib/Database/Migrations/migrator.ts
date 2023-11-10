@@ -14,7 +14,7 @@ const prodMigrations = async () => {
 }
 
 const localMigrations = async () => {
-	// const local = postgres(LOCAL_POSTGRES, { max: 1 })
+	// const local = postgres(POSTGRES_URL, { max: 1 })
 	const local = sql
 
 	await migrationsList({ local })
