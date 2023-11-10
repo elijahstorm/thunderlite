@@ -1,20 +1,18 @@
 import { error } from '@sveltejs/kit'
-import { POSTGRES_URL } from '$env/static/private'
-import { createPool, type QueryResult } from '@vercel/postgres'
 import { logToErrorDb } from '$lib/Security/server-logs'
+import type postgres from 'postgres'
 
-export const getMapHash = async (sha: string) => {
-	let results: QueryResult
+export const getMapHash = async (sql: postgres.Sql, sha: string) => {
+	let map: MapDBData[]
 
 	try {
-		const pool = createPool({ connectionString: POSTGRES_URL })
-		results = await pool.query(`select url from maps where sha='${sha}'`)
+		map = await sql`select url from maps where sha = ${sha}`
 	} catch (msg) {
-		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
+		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
 	}
 
-	const url = results?.rows[0]?.url
+	const url = map[0]?.url
 	if (!url) {
 		throw error(400, { message: 'No map with that SHA found.' })
 	}
@@ -30,15 +28,14 @@ export const getMapHash = async (sha: string) => {
 	return { mapHash }
 }
 
-export const isValidMapHash = async (sha: string) => {
+export const isValidMapHash = async (sql: postgres.Sql, sha: string) => {
 	let exists = false
 
 	try {
-		const pool = createPool({ connectionString: POSTGRES_URL })
-		const results = await pool.query(`select count(url) from maps where sha='${sha}'`)
-		exists = results.rows[0]?.count !== '0'
+		const results = await sql`select count(url) from maps where sha = ${sha}`
+		exists = results?.length > 0
 	} catch (msg) {
-		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
+		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not perform count check on database')
 	}
 

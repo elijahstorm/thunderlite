@@ -1,7 +1,7 @@
 import { VERCEL_ENV } from '$env/static/private'
-import type { VercelPool } from '@vercel/postgres'
+import type postgres from 'postgres'
 
-export const logToErrorDb = (pool: VercelPool) => async (e: unknown, info?: string) => {
+export const logToErrorDb = (sql: postgres.Sql) => async (e: unknown, info?: string) => {
 	if (VERCEL_ENV === 'development') {
 		console.error(e)
 		return
@@ -17,11 +17,9 @@ export const logToErrorDb = (pool: VercelPool) => async (e: unknown, info?: stri
 	}
 
 	try {
-		await pool.query(
-			`INSERT INTO Logs (type, message, time) VALUES ('error', '${
-				info ? info + ': ' : ''
-			}${message}', '${formatPostgresDate(new Date())}')`
-		)
+		await sql`insert into logs (type, message, time) values ('error', ${
+			(info ? info + ': ' : '') + message
+		}, ${formatPostgresDate(new Date())})`
 	} catch (msg) {
 		// big system failure here... maybe send alert?
 		console.error('!!AVOIDED SYSTEM CRASH!!', 'Could not save error log')

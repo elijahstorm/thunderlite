@@ -1,9 +1,10 @@
-// See https://kit.svelte.dev/docs/types#app
-// for information about these interfaces
+import type postgres from 'postgres'
+
 declare global {
 	namespace App {
 		// interface Error {}
 		interface Locals {
+			sql: postgres.Sql
 			user?: string
 			session?: string
 			gameSession?: string

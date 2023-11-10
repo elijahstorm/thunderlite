@@ -10,9 +10,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 	let user: UserDBData | null = null
 
 	try {
-		user = await getUserDBDataFromAuth(locals.user)
+		user = await getUserDBDataFromAuth(locals.user)(locals.sql)
 	} catch (e) {
-		await makeUserDBDataFromAuth(locals.user)
+		await makeUserDBDataFromAuth(locals.user)(locals.sql)
 		user = {
 			id: -1,
 			username: '',

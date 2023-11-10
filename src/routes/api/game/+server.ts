@@ -1,6 +1,5 @@
 import { error, json } from '@sveltejs/kit'
-import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL } from '$env/static/private'
-import { createPool } from '@vercel/postgres'
+import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { createClient } from '@vercel/kv'
 import { generateKey } from '$lib/Security/keys.js'
 import { logToErrorDb } from '$lib/Security/server-logs.js'
@@ -11,7 +10,7 @@ export const POST = async ({ request, locals }) => {
 	if (!userSession) throw error(401, 'User not logged in')
 	const { sha } = await request.json()
 	if (!sha) throw error(400, 'Please provide a map SHA')
-	if (!(await isValidMapHash(sha))) throw error(400, 'Map with that SHA does not exist')
+	if (!(await isValidMapHash(locals.sql, sha))) throw error(400, 'Map with that SHA does not exist')
 
 	const kv = createClient({
 		url: KV_REST_API_URL,
@@ -28,7 +27,7 @@ export const POST = async ({ request, locals }) => {
 		})
 		await kv.sadd(`game:${session}`, userSession)
 	} catch (msg) {
-		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
+		logToErrorDb(locals.sql)(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 
