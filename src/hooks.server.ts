@@ -14,7 +14,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			throw redirect(303, '/login')
 		}
 
-		sql = postgres(POSTGRES_URL, { idle_timeout: 60 * 5, max_lifetime: 60 * 30 })
+		sql = postgres(`${POSTGRES_URL}?sslmode=require`, {
+			idle_timeout: 60 * 5,
+			max_lifetime: 60 * 30,
+		})
 		event.locals.session = await getUserSession(sql, event)
 	}
 
