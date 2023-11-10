@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ChangeEventHandler } from 'svelte/elements'
 	import FallbackImage from '$lib/Components/Widgets/Images/FallbackImage.svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
 	import ImageGradientOverlay from '$lib/Components/Widgets/Helpers/ImageGradientOverlay.svelte'
@@ -7,6 +8,7 @@
 
 	const fallback = 'https://cdn4.iconfinder.com/data/icons/small-n-flat/24/user-alt-512.png'
 
+	export let id: number
 	export let src: string = fallback
 	export let alt: string
 	export let dest: string = 'picture'
@@ -22,8 +24,47 @@
 	let fileinput: HTMLInputElement
 	let fileName = ''
 	let fileType = ''
-	let errorMssage: string
+	let errorMessage: string
 	let state: 'ready' | 'uploading' | 'finished' | 'failed' = 'ready'
+
+	const onFileSelected: ChangeEventHandler<HTMLInputElement> = async (event) => {
+		const blob = (<HTMLInputElement>event.target)?.files?.item(0)
+		if (!blob) return
+		const reader = new FileReader()
+		reader.readAsDataURL(blob)
+		reader.onload = () => {
+			src = reader.result?.toString() ?? ''
+		}
+		state = 'uploading'
+
+		try {
+			const { url } = await (
+				await fetch(`/api/user/${id}/image`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-sveltekit-action': 'true',
+					},
+					body: blob,
+				})
+			).json()
+			src = url
+			state = 'finished'
+			addToast('Image uploaded')
+			oncomplete()
+		} catch (e) {
+			state = 'failed'
+			if (e instanceof Error) {
+				errorMessage = e.message
+			} else if (typeof e !== 'string') {
+				errorMessage = `${e}`
+			} else {
+				errorMessage = e ?? 'Unknown error'
+			}
+		}
+	}
+
+	const open = () => fileinput.click()
 
 	$: {
 		if (src) {
@@ -31,38 +72,6 @@
 				decodeURIComponent(src).split('/').pop()?.split('?').shift() ?? 'ERROR GETTING NAME'
 			fileType = `.${src.split('.').pop()?.split('?').shift() ?? 'unknown'}`
 		}
-	}
-
-	const onFileSelected = async (e) => {
-		const blob = e.target.files[0]
-
-		const reader = new FileReader()
-		reader.readAsDataURL(blob)
-		reader.onload = (e) => {
-			src = fileinput.result as string
-		}
-
-		state = 'uploading'
-
-		try {
-			// await
-			addToast('Image uploaded')
-			state = 'finished'
-			oncomplete()
-		} catch (e) {
-			state = 'failed'
-			if (e instanceof Error) {
-				errorMssage = e.message
-			} else if (typeof e !== 'string') {
-				errorMssage = `${e}`
-			} else {
-				errorMssage = e ?? 'Unknown error'
-			}
-		}
-	}
-
-	const open = () => {
-		fileinput.click()
 	}
 </script>
 
@@ -89,7 +98,7 @@
 					<p
 						class="absolute mt-8 py-2 px-4 text-red-500 bg-red-100 rounded-lg border border-red-500"
 					>
-						{status}
+						{state}
 					</p>
 				</div>
 			{:else if state == 'finished'}

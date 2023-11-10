@@ -1,4 +1,6 @@
 <script lang="ts">
+	import FallbackImage from '../Images/FallbackImage.svelte'
+
 	export let user: UserDBData
 
 	const follow = () => {}
@@ -9,23 +11,21 @@
 <div
 	class="border bg-white rounded-lg overflow-hidden shadow-lg max-w-sm mx-auto transition-all duration-200hover:shadow-xl"
 >
-	<img
+	<FallbackImage
 		src={user.profile_image_url}
 		alt="User Profile"
-		class="object-cover w-full"
-		width="320"
-		height="320"
+		tailwind="object-cover w-full"
 		style="aspect-ratio:320/320;object-fit:cover"
 	/>
 	<div class="p-4">
 		<h2 class="text-2xl font-bold hover:text-gray-700 transition-all duration-200">
-			{user.display_name}
+			{user.display_name ?? 'No Name'}
 		</h2>
 		<h3 class="text-gray-500 hover:text-gray-600 transition-all duration-200">
-			@{user.username}
+			@{user.username ?? 'anonymous'}
 		</h3>
 		<p class="mt-2 text-gray-600 hover:text-gray-700 transition-all duration-200">
-			{user.bio}
+			{user.bio ?? 'No bio'}
 		</p>
 		<div class="flex mt-4 space-x-2">
 			<button

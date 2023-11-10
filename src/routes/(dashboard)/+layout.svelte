@@ -34,7 +34,7 @@
 				aria-label="Sidebar"
 			>
 				<div class="h-full px-3 overflow-y-auto bg-gray-50 dark:bg-gray-800">
-					<ul class="space-y-2 font-medium">
+					<ul class="space-y-2 font-medium pt-8 md:pt-0">
 						<li>
 							<a
 								href="/me"

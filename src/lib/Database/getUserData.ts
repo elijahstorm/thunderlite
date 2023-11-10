@@ -15,6 +15,16 @@ export const makeUserDBDataFromAuth = (auth: string) => async (sql: postgres.Sql
 	}
 }
 
+export const updateUserDBData =
+	(auth: string, user: UserDBData, entries: (keyof UserDBData)[]) => async (sql: postgres.Sql) => {
+		try {
+			await sql`update users set ${sql(user, ...entries)} where auth = ${auth}`
+		} catch (msg) {
+			logToErrorDb(sql)(msg)
+			throw error(500, 'Could not make user')
+		}
+	}
+
 const getUserFromQuery: (
 	query: 'auth' | 'id',
 	auth: string

@@ -7,10 +7,7 @@
 	let auth = writable<string | null>(null)
 
 	if (browser) {
-		import('./hanko').then((hanko) => {
-			auth = hanko.userID
-			console.log('hello', $auth)
-		})
+		import('./hanko').then((hanko) => (auth = hanko.userID))
 	}
 </script>
 

@@ -14,8 +14,8 @@
 	export let invalid: boolean = false
 	export let forceValid: boolean = false
 
-	$: messageBefore = message.trimStart().split(' ')[0]
-	$: messageAfter = message.trimStart().split(' ').slice(1).join(' ')
+	$: messageBefore = message?.trimStart().split(' ')[0]
+	$: messageAfter = message?.trimStart().split(' ').slice(1).join(' ')
 	$: iconHref = `background: url(${icon}); background-size: 1.5rem auto; background-repeat: repeat;`
 </script>
 
@@ -44,11 +44,11 @@
 		class:bg-red-50={invalid}
 		class:border-red-700={invalid}
 		class:text-red-700={invalid}
-		class:placeholder-red-700={invalid}
+		class:placeholder-red-400={invalid}
 		class:invalid:bg-red-50={attempted}
 		class:invalid:border-red-700={attempted}
 		class:invalid:text-red-700={attempted}
-		class:invalid:placeholder-red-700={attempted}
+		class:invalid:placeholder-red-400={attempted}
 		rows="4"
 		{id}
 		{name}
@@ -76,11 +76,11 @@
 			class:bg-red-50={invalid}
 			class:border-red-700={invalid}
 			class:text-red-700={invalid}
-			class:placeholder-red-700={invalid}
+			class:placeholder-red-400={invalid}
 			class:invalid:bg-red-50={attempted}
 			class:invalid:border-red-700={attempted}
 			class:invalid:text-red-700={attempted}
-			class:invalid:placeholder-red-700={attempted}
+			class:invalid:placeholder-red-400={attempted}
 			{id}
 			{name}
 			{required}

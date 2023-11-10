@@ -10,8 +10,11 @@
 	const fallback = 'https://cdn4.iconfinder.com/data/icons/small-n-flat/24/user-alt-512.png'
 
 	let floatingProfile: HTMLDivElement
-	let shouldFlowUpwards = false
-	let open = true
+	let shouldFlowLeft = false
+	let shouldFlowUp = false
+	let shouldFlowRight = false
+	let reflow = 0
+	let open = false
 	let style: string
 	$: style = `width: ${size}rem; height: ${size}rem;`
 
@@ -31,11 +34,23 @@
 			fetchUserData(id)
 		}
 	}
+
+	$: {
+		reflow
+		open
+		const profile = floatingProfile?.getBoundingClientRect()
+		shouldFlowLeft = profile?.x + 120 > floatingProfile?.ownerDocument?.body?.clientWidth
+		shouldFlowUp = profile?.y + 400 > floatingProfile?.ownerDocument?.body?.clientHeight
+		shouldFlowRight = !shouldFlowLeft && profile?.x - 120 < 0
+	}
 </script>
+
+<svelte:window on:resize={() => (reflow = performance.now())} />
 
 <div class="relative">
 	<button class="contents" on:click={openProfile}>
 		<div
+			bind:this={floatingProfile}
 			class="h-8 w-8 bg-white rounded-full border border-solid border-gray-600 overflow-hidden self-center cursor-pointer"
 			{style}
 		>
@@ -43,11 +58,22 @@
 		</div>
 	</button>
 
+	<div
+		class="fixed inset-0 z-30 bg-[#ccc1] backdrop-blur-[2px] md:hidden"
+		class:hidden={!open}
+		on:keydown={() => (open = false)}
+		on:click={() => (open = false)}
+		aria-label="Close profile popup modal"
+		role="button"
+		tabindex="0"
+	/>
+
 	{#if open}
 		<div
 			class="absolute left-1/2 -translate-x-1/2 pt-1 shadow-xl z-50"
-			bind:this={floatingProfile}
-			class:bottom-10={shouldFlowUpwards}
+			class:bottom-10={shouldFlowUp}
+			class:-translate-x-6={shouldFlowRight}
+			class:-translate-x-40={shouldFlowLeft}
 			in:fly={{ y: -20, duration: 200 }}
 			out:fly={{ y: -20, duration: 200 }}
 		>
