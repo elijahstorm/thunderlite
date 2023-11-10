@@ -18,7 +18,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		event.locals.session = await getUserSession(sql, event)
 	}
 
-	event.locals.sql = sql ?? postgres(POSTGRES_URL, { idle_timeout: 20, max_lifetime: 60 * 10 })
+	event.locals.sql =
+		sql ?? postgres(`${POSTGRES_URL}?sslmode=require`, { idle_timeout: 20, max_lifetime: 60 * 10 })
 
 	return await resolve(event)
 }
