@@ -76,7 +76,7 @@
 		<ImageGradientOverlay title={title ?? `Your ${dest}`} info={''} {fileType} {fileName} {state} />
 
 		<div
-			class="upload-interation-icon cursor-pointer z-50 opacity-0 transition-opacity duration-500 bg-white p-4 m-4 border border-gray-300 rounded-full"
+			class="upload-interation-icon cursor-pointer z-10 opacity-0 transition-opacity duration-500 bg-white p-4 m-4 border border-gray-300 rounded-full"
 			class:opacity-100={state != 'ready'}
 		>
 			{#if state == 'ready'}

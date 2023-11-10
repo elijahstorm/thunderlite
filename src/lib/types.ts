@@ -135,7 +135,6 @@ type UserDBData = {
 	username: string
 	display_name: string
 	profile_image_url: string
-	email: string
 	bio: string
 	created_at: Date
 }

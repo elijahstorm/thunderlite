@@ -2,6 +2,9 @@
 	"name": "thunderlite",
 	"version": "0.0.1",
 	"private": true,
+	"engines": {
+		"node": ">=18.8.0"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -27,7 +30,6 @@
 		"@vercel/blob": "^0.15.0",
 		"@vercel/edge-config": "^0.4.1",
 		"@vercel/kv": "^1.0.0",
-		"@vercel/postgres": "^0.5.1",
 		"as-toast": "^1.1.0",
 		"autoprefixer": "^10.4.16",
 		"base-x": "^4.0.0",
@@ -53,5 +55,8 @@
 		"vite": "^4.5.0",
 		"vitest": "^0.34.6"
 	},
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"@vercel/postgres": "^0.5.1"
+	}
 }

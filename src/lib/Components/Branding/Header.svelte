@@ -6,7 +6,7 @@
 	export let toggleAside: VoidFunction | null = null
 </script>
 
-<div class="py-4 bg-stone-100 flex justify-center sticky top-0 z-20 md:z-0 md:relative">
+<div class="py-4 bg-stone-100 flex justify-center sticky top-0 z-20 md:relative">
 	<div class="w-full flex container">
 		{#if toggleAside}
 			<button

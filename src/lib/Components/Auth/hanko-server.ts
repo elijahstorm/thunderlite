@@ -15,3 +15,14 @@ export const authenticatedUser = async (event: RequestEvent) => {
 		return false
 	}
 }
+
+export const activeUserInfo = async (auth: string) => {
+	const response = await fetch(`${PUBLIC_HANKO_API_URL}/users/${auth}`)
+	const data = await response.json()
+
+	const email = data.emails ? data.emails[0]?.address : null
+
+	return {
+		email,
+	}
+}

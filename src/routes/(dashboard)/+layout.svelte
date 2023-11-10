@@ -209,7 +209,7 @@
 
 			<div class="flex-1">
 				<div
-					class="p-4 pt-0 border border-gray-200 rounded-md dark:border-gray-700 divide-y space-y-6 font-light"
+					class="p-4 pt-0 divide-y space-y-6 font-light rounded-md border border-gray-200 dark:border-gray-700"
 				>
 					<slot />
 				</div>

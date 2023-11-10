@@ -58,17 +58,6 @@
 		/>
 
 		<DataInput
-			value={updated.email}
-			placeholder="mail@provider.com"
-			label="Email"
-			name="email"
-			id="email"
-			invalid={form?.incorrect || form?.missing}
-			message={form?.email ? `${form.email} is not a valid email` : ''}
-			showPrivacy
-		/>
-
-		<DataInput
 			value={updated.bio}
 			placeholder="I like spicy food and..."
 			label="About you"

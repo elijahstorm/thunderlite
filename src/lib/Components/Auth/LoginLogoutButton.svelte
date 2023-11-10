@@ -4,10 +4,13 @@
 	import { browser } from '$app/environment'
 	import { writable } from 'svelte/store'
 
-	let auth = writable<Promise<string> | string | null>(null)
+	let auth = writable<string | null>(null)
 
 	if (browser) {
-		import('./hanko').then((hanko) => (auth = hanko.userID))
+		import('./hanko').then((hanko) => {
+			auth = hanko.userID
+			console.log('hello', $auth)
+		})
 	}
 </script>
 
@@ -23,18 +26,5 @@
 			<span class="px-2 hidden sm:block"> Logout </span>
 			<Icon icon={'fe:logout'} width={16} />
 		</a>
-	{:else}
-		{#await $auth}
-			<a href="/logout" class="btn btn-gray text-xs px-2 py-2 flex items-center h-max my-auto">
-				<span class="px-2 hidden sm:block"> Logout </span>
-				<Icon icon={'fe:logout'} width={16} />
-			</a>
-		{:then $auth}
-			<UserIcon id={$auth} />
-			<a href="/logout" class="btn btn-gray text-xs px-2 py-2 flex items-center h-max my-auto">
-				<span class="px-2 hidden sm:block"> Logout </span>
-				<Icon icon={'fe:logout'} width={16} />
-			</a>
-		{/await}
 	{/if}
 </section>

@@ -1,4 +1,4 @@
-import { getUserDBDataFromAuth } from '$lib/Database/getUserData'
+import { getUserDBDataFromAuth, makeUserDBDataFromAuth } from '$lib/Database/getUserData'
 import { error, fail } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 
@@ -7,7 +7,22 @@ export const ssr = false
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) throw error(403, 'You are not logged in')
-	const user = await getUserDBDataFromAuth(locals.user)
+	let user: UserDBData | null = null
+
+	try {
+		user = await getUserDBDataFromAuth(locals.user)
+	} catch (e) {
+		await makeUserDBDataFromAuth(locals.user)
+		user = {
+			id: -1,
+			username: '',
+			display_name: '',
+			profile_image_url: '',
+			bio: '',
+			created_at: new Date(),
+		}
+	}
+
 	return { user }
 }
 
