@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { createClient } from '@vercel/kv'
 import { KV_REST_API_TOKEN, KV_REST_API_URL, VERCEL_ENV } from '$env/static/private'
-import { logToErrorDb } from '$lib/Security/server-logs.js'
+import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
 import type postgres from 'postgres'
 

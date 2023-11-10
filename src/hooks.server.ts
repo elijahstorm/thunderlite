@@ -3,10 +3,11 @@ import { createClient } from '@vercel/kv'
 import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL, VERCEL_ENV } from '$env/static/private'
 import { authenticatedUser } from '$lib/Components/Auth/hanko-server'
 import { generateKey } from '$lib/Security/keys'
-import { logToErrorDb } from '$lib/Security/server-logs'
+import { logToErrorDb } from '$lib/Security/serverLogs'
 import postgres from 'postgres'
 
 export const handle: Handle = async ({ event, resolve }) => {
+	const dbUri = `${POSTGRES_URL}${VERCEL_ENV !== 'development' ? '?sslmode=require' : ''}`
 	let sql: postgres.Sql | null = null
 	const protectedRoutes = ['/me', '/play', '/make', '/api/game', '/api/user', '/api/upload']
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
@@ -14,15 +15,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 			throw redirect(303, '/login')
 		}
 
-		sql = postgres(`${POSTGRES_URL}?sslmode=require`, {
+		sql = postgres(dbUri, {
 			idle_timeout: 60 * 5,
 			max_lifetime: 60 * 30,
 		})
 		event.locals.session = await getUserSession(sql, event)
 	}
 
-	event.locals.sql =
-		sql ?? postgres(`${POSTGRES_URL}?sslmode=require`, { idle_timeout: 20, max_lifetime: 60 * 10 })
+	event.locals.sql = sql ?? postgres(dbUri, { idle_timeout: 20, max_lifetime: 60 * 10 })
 
 	return await resolve(event)
 }

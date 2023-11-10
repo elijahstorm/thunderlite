@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit'
-import { logToErrorDb } from '$lib/Security/server-logs'
+import { logToErrorDb } from '$lib/Security/serverLogs'
 import type postgres from 'postgres'
 
 export const getMapHash = async (sql: postgres.Sql, sha: string) => {

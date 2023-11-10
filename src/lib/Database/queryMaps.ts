@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit'
 import { getUserDBData } from './getUserData'
-import { logToErrorDb } from '$lib/Security/server-logs'
+import { logToErrorDb } from '$lib/Security/serverLogs'
 import type postgres from 'postgres'
 
 export const queryMaps: (

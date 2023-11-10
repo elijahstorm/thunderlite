@@ -1,5 +1,15 @@
 import type postgres from 'postgres'
-import { CreateUserTable } from './create_users.sql'
+import { CreateUsers } from './create_users.sql'
+import { CreateUserStats } from './create_user_stats.sql'
+import { CreateMaps } from './create_maps.sql'
+import { CreateLogs } from './create_logs.sql'
+import { CreateInfo } from './create_info.sql'
+import { CreateInfoMorphMap } from './create_info_morph_map.sql'
+import { CreateShareMorphMap } from './create_share_morph_map.sql'
+import { CreateLikes } from './create_likes.sql'
+import { CreateFriends } from './create_friends.sql'
+import { CreateFollows } from './create_follows.sql'
+import { CreateMessages } from './create_messages.sql'
 
 export const migrationsList = async (types: postgres.Sql) => {
 	const results = []
@@ -7,7 +17,8 @@ export const migrationsList = async (types: postgres.Sql) => {
 
 	console.log('starting migrations')
 
-	for (const migration of migrations) {
+	for (const [name, migration] of Object.entries(migrations)) {
+		console.log('running', name, 'migration')
 		const result = await migration(types)
 		results.push(result)
 	}
@@ -17,4 +28,16 @@ export const migrationsList = async (types: postgres.Sql) => {
 	return results
 }
 
-const migrationsInOrder = [CreateUserTable] as const
+const migrationsInOrder = {
+	CreateLogs,
+	CreateUsers,
+	CreateUserStats,
+	CreateMaps,
+	CreateInfo,
+	CreateInfoMorphMap,
+	CreateShareMorphMap,
+	CreateLikes,
+	CreateFriends,
+	CreateFollows,
+	CreateMessages,
+} as const

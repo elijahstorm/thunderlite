@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { createClient } from '@vercel/kv'
 import { generateKey } from '$lib/Security/keys.js'
-import { logToErrorDb } from '$lib/Security/server-logs.js'
+import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { isValidMapHash } from '$lib/Map/hashLoader.js'
 
 export const POST = async ({ request, locals }) => {

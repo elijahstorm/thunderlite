@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { BLOB_READ_WRITE_TOKEN } from '$env/static/private'
 import { hash } from '$lib/Map/Editor/mapEncrypter.js'
 import { put } from '@vercel/blob'
-import { logToErrorDb } from '$lib/Security/server-logs.js'
+import { logToErrorDb } from '$lib/Security/serverLogs.js'
 
 export const POST = async ({ request, locals }) => {
 	const { name, encoded } = await request.json()
