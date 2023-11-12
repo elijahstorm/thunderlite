@@ -15,3 +15,4 @@ vite.config.ts.timestamp-*
 __snapshots__
 playwright-report
 .vercel
+demo_data/

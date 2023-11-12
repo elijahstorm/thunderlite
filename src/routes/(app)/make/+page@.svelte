@@ -10,6 +10,7 @@
 	import InfiniteScroll from '$lib/Components/Widgets/Helpers/InfiniteScroll.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import Header from '$lib/Components/Branding/Header.svelte'
+	import SearchWithTypes from '$lib/Components/Widgets/Forms/SearchWithTypes.svelte'
 
 	export let data: PageData
 	$: maps = data.maps
@@ -55,6 +56,7 @@
 	}
 
 	const loadMore = () =>
+		!selectedMap &&
 		hasMore &&
 		fetch(`/api/maps?${new URLSearchParams({ page: `${++page}` })}`)
 			.then((response) => response.json())
@@ -114,6 +116,8 @@
 
 		<div class="md:container w-full break break-word">
 			<section class="pt-6 pb-16 px-5 sm:px-8 md:px-0 mx-auto sm:max-w-[640px] md:max-w-none">
+				<SearchWithTypes />
+
 				{#if selectedMap}
 					<div class="m-auto">
 						<div

@@ -9,7 +9,15 @@ import postgres from 'postgres'
 export const handle: Handle = async ({ event, resolve }) => {
 	const dbUri = `${POSTGRES_URL}${VERCEL_ENV !== 'development' ? '?sslmode=require' : ''}`
 	let sql: postgres.Sql | null = null
-	const protectedRoutes = ['/me', '/play', '/make', '/api/game', '/api/user', '/api/upload']
+	const protectedRoutes = [
+		'/me',
+		'/play',
+		'/make',
+		'/chat',
+		'/api/game',
+		'/api/user',
+		'/api/upload',
+	]
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!(await authenticatedUser(event))) {
 			throw redirect(303, '/login')
