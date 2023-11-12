@@ -2,8 +2,9 @@
 	import { fly } from 'svelte/transition'
 	import FallbackImage from '$lib/Components/Images/FallbackImage.svelte'
 	import FullProfileCard from '$lib/Components/Widgets/Social/FullProfileCard.svelte'
+	import { browser } from '$app/environment'
 
-	export let id: string | null = null
+	export let auth: string | null = null
 	export let user: UserDBData | null = null
 	export let size: number = 2
 
@@ -18,8 +19,8 @@
 	let style: string
 	$: style = `width: ${size}rem; height: ${size}rem;`
 
-	const fetchUserData = (userId: string) =>
-		fetch(`/api/user/${userId}`)
+	const fetchUserData = (userAuth: string) =>
+		fetch(`/api/user/${userAuth}`)
 			.then((res) => res.json())
 			.then((data) => {
 				if (data.user) {
@@ -30,8 +31,8 @@
 	const openProfile = () => (open = !open)
 
 	$: {
-		if (typeof id === 'string') {
-			fetchUserData(id)
+		if (browser && typeof auth === 'string') {
+			fetchUserData(auth)
 		}
 	}
 
@@ -54,15 +55,20 @@
 			class="h-8 w-8 bg-white rounded-full border border-solid border-gray-600 overflow-hidden self-center cursor-pointer"
 			{style}
 		>
-			<FallbackImage src={user?.profile_image_url} alt="user profile" {fallback} cover />
+			<FallbackImage
+				src={user?.profile_image_url}
+				alt="{user?.display_name ?? 'user'} profile"
+				{fallback}
+				cover
+			/>
 		</div>
 	</button>
 
 	<div
-		class="fixed inset-0 z-30 bg-[#ccc1] backdrop-blur-[2px] md:hidden"
+		class="fixed inset-0 h-screen w-screen z-50 bg-[#ccc1] backdrop-blur-[2px]"
 		class:hidden={!open}
-		on:keydown={() => (open = false)}
-		on:click={() => (open = false)}
+		on:keydown|stopPropagation={() => (open = false)}
+		on:click|stopPropagation={() => (open = false)}
 		aria-label="Close profile popup modal"
 		role="button"
 		tabindex="0"
@@ -70,7 +76,7 @@
 
 	{#if open}
 		<div
-			class="absolute left-1/2 -translate-x-1/2 pt-1 shadow-xl z-50"
+			class="absolute left-1/2 -translate-x-1/2 pt-1 z-50 max-w-[13rem] w-52"
 			class:bottom-10={shouldFlowUp}
 			class:-translate-x-6={shouldFlowRight}
 			class:-translate-x-40={shouldFlowLeft}

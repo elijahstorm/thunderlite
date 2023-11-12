@@ -9,6 +9,7 @@ export const CreateUsers = (sql: postgres.Sql) =>
             username varchar(20) unique,
             display_name varchar(30) unique,
             bio varchar(1000),
-            created_at timestamp
+            private boolean default false,
+            created_at timestamp default current_timestamp
         )
         `

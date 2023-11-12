@@ -14,16 +14,17 @@
 	$: users = data.users
 
 	const updateStore =
-		<T extends { id: number }>(data: T[]) =>
-		(store: T[]) =>
-			data?.reduce((store, data) => {
-				if (!data) return store
-				store[data.id] = data
+		<T extends object>(data: T[], key = 'id') =>
+		(store: { [key: string]: T }) =>
+			data?.reduce((store, value) => {
+				if (!value) return store
+				// @ts-ignore
+				store[value[key]] = value
 				return store
 			}, store) ?? store
 
 	$: {
-		dbUsersStore.update(updateStore(users))
+		dbUsersStore.update(updateStore(users, 'auth'))
 		dbMapsStore.update(updateStore(maps))
 	}
 
@@ -68,11 +69,11 @@
 <section class="pt-6 pb-16 px-5 sm:px-8 md:px-0 mx-auto sm:max-w-[640px] md:max-w-none">
 	{#if selectedMap}
 		<div class="m-auto">
-			<Card size="2xl">
+			<div class="p-8 border text-card-foreground bg-white dark:bg-gray-800 rounded-xl shadow-md">
 				{#if postStatus === 'idle'}
 					<div class="w-full flex flex-col">
 						<p>Make a game with this map?</p>
-						<div class="scale-90">
+						<div class="p-6 pb-0">
 							<MakeGameMapCard map={selectedMap} />
 						</div>
 						<div class="w-full flex gap-3 justify-end">
@@ -113,7 +114,7 @@
 				{:else if postStatus === 'sending'}
 					<Loader />
 				{/if}
-			</Card>
+			</div>
 		</div>
 	{:else}
 		<div class="space-y-8">

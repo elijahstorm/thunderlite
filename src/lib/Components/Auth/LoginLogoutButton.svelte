@@ -7,7 +7,7 @@
 	let auth = writable<string | null>(null)
 
 	if (browser) {
-		import('./hanko').then((hanko) => (auth = hanko.userID))
+		import('./hanko').then((hanko) => (auth = hanko.userAuth))
 	}
 </script>
 
@@ -18,7 +18,7 @@
 			<Icon icon={'fe:login'} width={16} />
 		</a>
 	{:else if typeof $auth === 'string'}
-		<UserIcon id={$auth} />
+		<UserIcon auth={$auth} />
 		<a href="/logout" class="btn btn-gray text-xs px-2 py-2 flex items-center h-max my-auto">
 			<span class="px-2 hidden sm:block"> Logout </span>
 			<Icon icon={'fe:logout'} width={16} />

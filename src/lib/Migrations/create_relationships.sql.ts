@@ -1,11 +1,12 @@
 import type postgres from 'postgres'
 
-export const CreateFollows = (sql: postgres.Sql) =>
+export const CreateRelationships = (sql: postgres.Sql) =>
 	sql`
-        create table follows (
+        create table relationships (
             id serial primary key,
             source text references users(auth),
             target text references users(auth),
+            status varchar(20) default 'unknown',
             created_at timestamp default current_timestamp
         )
         `

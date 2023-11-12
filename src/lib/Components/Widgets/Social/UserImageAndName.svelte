@@ -1,19 +1,14 @@
 <script lang="ts">
+	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+
 	export let user: UserDBData | null
 	export let text = false
 </script>
 
 <div class="flex items-center">
-	<img
-		src={user?.profile_image_url}
-		alt="{user?.username} Profile"
-		class="rounded-full"
-		height="40"
-		width="40"
-		style="aspect-ratio:40/40;object-fit:cover"
-	/>
+	<UserIcon auth={user?.auth} size={2.5} />
 	{#if text}
-		<div class="ml-4">
+		<div class="ml-4 text-left">
 			<div class="uppercase tracking-wide text-sm text-black dark:text-white font-semibold">
 				{user?.display_name ?? '...'}
 			</div>

@@ -42,7 +42,7 @@
 			}
 		}}
 	>
-		<ImageUploader alt="user profile" src={user.profile_image_url} id={user.id} />
+		<ImageUploader alt="user profile" src={user.profile_image_url} auth={user.auth} />
 
 		<DataInput
 			icon="/images/icons/person.svg"

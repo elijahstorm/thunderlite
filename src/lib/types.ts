@@ -130,26 +130,37 @@ type Direction =
 	| 'bottom'
 	| 'bottomRight'
 
+type RelationshipStatus = 'unknown' | 'blocked' | 'friends' | 'friend-request'
+type Relationship = {
+	mine: RelationshipStatus
+	theirs: RelationshipStatus
+}
+
 type UserDBData = {
 	id: number
+	auth: string
 	username: string
 	display_name: string
 	profile_image_url: string
 	bio: string
+	following?: boolean
+	follower?: boolean
+	relationship?: RelationshipStatus
+	messageCount?: number
 	created_at: Date
 }
 type MapDBData = {
 	id: number
+	sha: string
+	owner_auth: string
 	name: string
 	description: string
-	sha: string
-	url: string
-	owner_id: number
 	thumbnail: string
-	liked_by_me: number
-	likes: number
-	shares: number
+	url: string
 	plays: number
+	likes: number
+	liked_by_me: number
+	shares: number
 	trending: boolean
 	created_at: Date
 	updated_at: Date

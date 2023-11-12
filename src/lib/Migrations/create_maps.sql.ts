@@ -5,11 +5,13 @@ export const CreateMaps = (sql: postgres.Sql) =>
         create table maps (
             id serial primary key,
             sha text unique not null,
-            url text not null,
+            owner_auth text references users(auth),
             name text not null,
+            description text not null,
+            thumbnail text not null,
+            url text not null,
             status text default 'private',
             plays int default 0,
-            owner_id int references users(id),
             created_at timestamp default current_timestamp,
             updated_at timestamp default current_timestamp
         )

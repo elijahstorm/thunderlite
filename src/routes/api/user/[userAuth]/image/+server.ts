@@ -6,7 +6,7 @@ import { generateKey } from '$lib/Security/keys.js'
 
 export const POST = async ({ params, request, locals }) => {
 	const blob = await request.blob()
-	const { userId } = params
+	const { userAuth } = params
 
 	if (!blob) {
 		throw error(400, { message: 'No image to upload.' })
@@ -18,7 +18,7 @@ export const POST = async ({ params, request, locals }) => {
 	})
 
 	try {
-		await locals.sql`update users set profile_image_url = ${url} where id = ${userId}`
+		await locals.sql`update users set profile_image_url = ${url} where auth = ${userAuth}`
 	} catch (msg) {
 		logToErrorDb(locals.sql)(msg)
 		throw error(500, 'Could not save image url to database')

@@ -6,7 +6,7 @@
 </script>
 
 <section class="mb-8">
-	<UserImageAndName user={$dbUsersStore[map.owner_id]} text />
+	<UserImageAndName user={$dbUsersStore[map.owner_auth]} text />
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
 		<div>
 			<img

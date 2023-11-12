@@ -8,7 +8,7 @@
 
 	const fallback = 'https://cdn4.iconfinder.com/data/icons/small-n-flat/24/user-alt-512.png'
 
-	export let id: number
+	export let auth: string
 	export let src: string = fallback
 	export let alt: string
 	export let dest: string = 'picture'
@@ -39,7 +39,7 @@
 
 		try {
 			const { url } = await (
-				await fetch(`/api/user/${id}/image`, {
+				await fetch(`/api/user/${auth}/image`, {
 					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',

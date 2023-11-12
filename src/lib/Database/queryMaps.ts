@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit'
-import { getUserDBData } from './getUserData'
+import { getUserDBDataFromAuth } from './getUserData'
 import { logToErrorDb } from '$lib/Security/serverLogs'
 import type postgres from 'postgres'
 
@@ -19,7 +19,7 @@ export const queryMaps: (
 				count(distinct likes.id) as likes,
 				count(distinct share_morph_map.id) as shares,
 				case when maps.created_at >= now() - interval '1 month' then true else false end as trending,
-				case when max(case when likes.auth = ${me} then 1 else 0 end) = 1 then true else false end as liked_by_me
+				case when max(case when likes.user_auth = ${me} then 1 else 0 end) = 1 then true else false end as liked_by_me
 			from maps
 				left join likes on maps.id = likes.map_id
 				left join share_morph_map on share_morph_map.entity_type = 'map' and maps.id = share_morph_map.entity_id
@@ -36,15 +36,18 @@ export const queryMaps: (
 		throw error(400, { message: 'No maps found. Try to change your search.' })
 	}
 
-	const users = await Promise.all(
-		maps.reduce((users, map) => {
-			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-			// @ts-ignore
-			if (users[map.owner_id]) return users
-			users[map.owner_id] = getUserDBData(map.owner_id)(sql)
-			return users
-		}, [] as Promise<UserDBData>[])
-	)
+	const users = (await Promise.all(
+		Object.values(
+			maps.reduce(
+				(users, map) => {
+					if (users[map.owner_auth]) return users
+					users[map.owner_auth] = getUserDBDataFromAuth(sql, map.owner_auth, me)
+					return users
+				},
+				{} as { [key: string]: Promise<UserDBData> | undefined }
+			)
+		)
+	)) as UserDBData[]
 
 	return {
 		maps,

@@ -7,7 +7,7 @@ import { CreateInfo } from './create_info.sql'
 import { CreateInfoMorphMap } from './create_info_morph_map.sql'
 import { CreateShareMorphMap } from './create_share_morph_map.sql'
 import { CreateLikes } from './create_likes.sql'
-import { CreateFriends } from './create_friends.sql'
+import { CreateRelationships } from './create_relationships.sql'
 import { CreateFollows } from './create_follows.sql'
 import { CreateMessages } from './create_messages.sql'
 
@@ -37,7 +37,7 @@ const migrationsInOrder = {
 	CreateInfoMorphMap,
 	CreateShareMorphMap,
 	CreateLikes,
-	CreateFriends,
+	CreateRelationships,
 	CreateFollows,
 	CreateMessages,
 } as const

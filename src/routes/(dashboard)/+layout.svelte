@@ -29,7 +29,7 @@
 
 		<section class="flex gap-4 py-4">
 			<aside
-				class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full md:relative md:translate-x-0 md:pt-3"
+				class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full md:relative md:translate-x-0 md:pt-3 md:z-0"
 				class:translate-x-0={openAside}
 				aria-label="Sidebar"
 			>
