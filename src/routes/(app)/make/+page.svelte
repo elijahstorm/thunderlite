@@ -70,7 +70,7 @@
 	{#if selectedMap}
 		<div class="m-auto">
 			<div class="p-8 border text-card-foreground bg-white dark:bg-gray-800 rounded-xl shadow-md">
-				{#if postStatus === 'idle'}
+				{#if postStatus === 'idle' || postStatus === 'error'}
 					<div class="w-full flex flex-col">
 						<p>Make a game with this map?</p>
 						<div class="p-6 pb-0">
@@ -91,13 +91,14 @@
 								<span class="pl-4 pr-2"> make game </span>
 							</button>
 						</div>
+						{#if postStatus === 'error'}
+							<p
+								class="text-red-500 block p-3 mb-4 w-full text-sm bg-red-50 rounded-lg border border-red-300 shadow-sm"
+							>
+								{postResponse.message}
+							</p>
+						{/if}
 					</div>
-				{:else if postStatus === 'error'}
-					<p
-						class="text-red-500 block p-3 mb-4 w-full text-sm bg-red-50 rounded-lg border border-red-300 shadow-sm"
-					>
-						{postResponse.message}
-					</p>
 				{:else if postStatus === 'no-nav'}
 					<p>
 						<span> Game created. </span>
