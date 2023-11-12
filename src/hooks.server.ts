@@ -16,13 +16,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 
 		sql = postgres(dbUri, {
-			idle_timeout: 60 * 5,
-			max_lifetime: 60 * 30,
+			idle_timeout: 60,
+			max_lifetime: 60 * 3,
 		})
 		event.locals.session = await getUserSession(sql, event)
 	}
 
-	event.locals.sql = sql ?? postgres(dbUri, { idle_timeout: 20, max_lifetime: 60 * 10 })
+	event.locals.sql = sql ?? postgres(dbUri, { idle_timeout: 20, max_lifetime: 60 })
 
 	return await resolve(event)
 }

@@ -6,10 +6,10 @@ import type postgres from 'postgres'
 export const queryMaps: (
 	sql: postgres.Sql,
 	props: {
-		offset?: number
+		page?: number
 	},
 	me?: string
-) => Promise<{ maps: MapDBData[]; users: UserDBData[] }> = async (sql, { offset }, me = '') => {
+) => Promise<{ maps: MapDBData[]; users: UserDBData[] }> = async (sql, { page }, me = '') => {
 	let maps: MapDBData[]
 	const limit = 10
 
@@ -26,7 +26,7 @@ export const queryMaps: (
 			where status is null or status != 'private'
 				group by maps.id, maps.created_at
 				order by maps.created_at asc
-				limit ${limit} offset ${(offset ?? 0) * limit}`
+				limit ${limit} offset ${(page ?? 0) * limit}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
