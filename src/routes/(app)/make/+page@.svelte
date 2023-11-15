@@ -135,7 +135,7 @@
 	}
 </script>
 
-<InfiniteScroll on:load={loader} threshold={600}>
+<InfiniteScroll tailwind="max-h-screen h-screen" threshold={600} on:load={loader}>
 	<ContentWithFooter noFooterOnMobile>
 		<Header />
 

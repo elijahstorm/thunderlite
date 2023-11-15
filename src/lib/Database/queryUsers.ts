@@ -17,21 +17,22 @@ export const queryUsers: (
             select users.*,
                 exists(select 1 from follows where source = ${me} and target = users.auth) as following,
                 exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-                (select count(*) from messages where source = ${me} and target = users.auth) as messageCount,
+                count(*) as message_count,
+				json_build_object(
+					'message', max(messages.message),
+					'when', max(messages.created_at)
+				) AS last_message,
                 relationships.status as relationship
             from users
                 left join relationships on source = ${me} and target = users.auth
+				left join messages on (messages.target = users.auth and messages.source = ${me}) or (messages.target = ${me} and messages.source = users.auth)
             where private = false and profile_image_url is not null
-                group by maps.id, maps.created_at
-                order by maps.created_at asc
+				group by relationships.status, users.id
+				order by case when relationships.status = 'friends' then 1 else 2 end, message_count desc
                 limit ${limit} offset ${(page ?? 0) * limit}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
-	}
-
-	if (!users?.length) {
-		throw error(400, { message: 'No users found. Try to change your search.' })
 	}
 
 	return {
@@ -52,23 +53,24 @@ export const queryFriends: (
 	try {
 		users = await sql`
             select users.*,
-                exists(select 1 from follows where source = ${me} and target = users.auth) as following,
-                exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-                (select count(*) from messages where source = ${me} and target = users.auth) as messageCount,
-                relationships.status as relationship
+				exists(select 1 from follows where source = ${me} and target = users.auth) as following,
+				exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
+				count(*) as message_count,
+				json_build_object(
+					'message', max(messages.message),
+					'when', max(messages.created_at)
+				) AS last_message,
+				relationships.status as relationship
             from users
                 left join relationships on source = ${me} and target = users.auth
+				left join messages on (messages.target = users.auth and messages.source = ${me}) or (messages.target = ${me} and messages.source = users.auth)
             where relationships.status = 'friends'
-                group by maps.id, maps.created_at
-                order by maps.created_at asc
-                limit ${limit} offset ${(page ?? 0) * limit}`
+				group by relationships.status, users.id
+				order by case when relationships.status = 'friends' then 1 else 2 end, message_count desc
+				limit ${limit} offset ${(page ?? 0) * limit}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
-	}
-
-	if (!users?.length) {
-		throw error(400, { message: 'No users found. Try to change your search.' })
 	}
 
 	return {
@@ -89,23 +91,24 @@ export const queryFollowing: (
 	try {
 		users = await sql`
             select users.*,
-                exists(select 1 from follows where source = ${me} and target = users.auth) as following,
-                exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-                (select count(*) from messages where source = ${me} and target = users.auth) as messageCount,
-                relationships.status as relationship
+				exists(select 1 from follows where source = ${me} and target = users.auth) as following,
+				exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
+				count(*) as message_count,
+				json_build_object(
+					'message', max(messages.message),
+					'when', max(messages.created_at)
+				) AS last_message,
+				relationships.status as relationship
             from users
                 left join relationships on source = ${me} and target = users.auth
+				left join messages on (messages.target = users.auth and messages.source = ${me}) or (messages.target = ${me} and messages.source = users.auth)
             where exists(select 1 from follows where source = ${me} and target = users.auth)
-                group by maps.id, maps.created_at
-                order by maps.created_at asc
-                limit ${limit} offset ${(page ?? 0) * limit}`
+				group by relationships.status, users.id
+				order by case when relationships.status = 'friends' then 1 else 2 end, message_count desc
+				limit ${limit} offset ${(page ?? 0) * limit}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
-	}
-
-	if (!users?.length) {
-		throw error(400, { message: 'No users found. Try to change your search.' })
 	}
 
 	return {
@@ -126,23 +129,24 @@ export const queryFollowers: (
 	try {
 		users = await sql`
             select users.*,
-                exists(select 1 from follows where source = ${me} and target = users.auth) as following,
-                exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-                (select count(*) from messages where source = ${me} and target = users.auth) as messageCount,
-                relationships.status as relationship
+				exists(select 1 from follows where source = ${me} and target = users.auth) as following,
+				exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
+				count(*) as message_count,
+				json_build_object(
+					'message', max(messages.message),
+					'when', max(messages.created_at)
+				) AS last_message,
+				relationships.status as relationship
             from users
                 left join relationships on source = ${me} and target = users.auth
+				left join messages on (messages.target = users.auth and messages.source = ${me}) or (messages.target = ${me} and messages.source = users.auth)
             where exists(select 1 from follows where source = users.auth and target = ${me})
-                group by maps.id, maps.created_at
-                order by maps.created_at asc
-                limit ${limit} offset ${(page ?? 0) * limit}`
+				group by relationships.status, users.id
+				order by case when relationships.status = 'friends' then 1 else 2 end, message_count desc
+				limit ${limit} offset ${(page ?? 0) * limit}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
-	}
-
-	if (!users?.length) {
-		throw error(400, { message: 'No users found. Try to change your search.' })
 	}
 
 	return {

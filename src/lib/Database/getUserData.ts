@@ -11,7 +11,7 @@ export const getUserDBDataFromAuth = async (sql: postgres.Sql, auth: string, me:
 				select users.*,
 					exists(select 1 from follows where source = ${me} and target = users.auth) as following,
 					exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-					(select count(*) from messages where source = ${me} and target = users.auth) as messageCount,
+					(select count(*) from messages where source = ${me} and target = users.auth) as message_count,
 					relationships.status as relationship
 				from users
 					left join relationships on source = ${me} and target = users.auth

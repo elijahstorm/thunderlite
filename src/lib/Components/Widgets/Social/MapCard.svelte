@@ -30,6 +30,17 @@
 
 		return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm} · ${month} ${day}, ${year}`
 	}
+
+	const shortenNumber = (value: number) => {
+		if (value >= 1e9) {
+			return (value / 1e9).toFixed(1) + 'b'
+		} else if (value >= 1e6) {
+			return (value / 1e6).toFixed(1) + 'm'
+		} else if (value >= 1e3) {
+			return (value / 1e3).toFixed(1) + 'k'
+		}
+		return value.toString()
+	}
 </script>
 
 <div
@@ -107,7 +118,7 @@
 							>
 							</path>
 						</svg>
-						<span class="ml-1 text-red-500"> {map.likes ?? 0} </span>
+						<span class="ml-1 text-red-500"> {shortenNumber(map.likes ?? 0)} </span>
 					</div>
 					<div class="flex items-center">
 						<svg
@@ -126,7 +137,7 @@
 								d="M112,111V401c0,17.44,17,28.52,31,20.16l247.9-148.37c12.12-7.25,12.12-26.33,0-33.58L143,90.84C129,82.48,112,93.56,112,111Z"
 							/>
 						</svg>
-						<span class="ml-1 text-green-500"> {map.plays} </span>
+						<span class="ml-1 text-green-500"> {shortenNumber(map.plays)} </span>
 					</div>
 					<div class="flex items-center">
 						<svg
@@ -146,7 +157,7 @@
 							<path d="m7 22-4-4 4-4" />
 							<path d="M21 13v1a4 4 0 0 1-4 4H3" />
 						</svg>
-						<span class="ml-1 text-blue-500"> {map.shares ?? 0} </span>
+						<span class="ml-1 text-blue-500"> {shortenNumber(map.shares ?? 0)} </span>
 					</div>
 				</div>
 				<div class="text-gray-400 dark:text-gray-300">

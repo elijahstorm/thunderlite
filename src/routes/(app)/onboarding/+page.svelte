@@ -6,6 +6,7 @@
 	import { addToast } from 'as-toast'
 
 	export let data
+	$: user = data.user
 	$: auth = data.auth ?? ''
 
 	export let form
@@ -25,6 +26,7 @@
 				bio: '',
 				created_at: new Date(),
 			},
+			...(user ?? {}),
 			...data,
 		})
 
@@ -42,6 +44,8 @@
 			{}
 		)
 	}
+
+	$: user && resetForm()
 </script>
 
 <div class="max-w-md mx-auto py-8 md:max-w-full">
@@ -101,11 +105,11 @@
 					invalid={Object.hasOwn(errors, 'bio')}
 					message={errors.bio ?? ''}
 				/>
-			{/if}
 
-			<div class="w-full flex justify-end gap-4 pt-4">
-				<button class="btn btn-primary" type="submit"> save </button>
-			</div>
+				<div class="w-full flex justify-end gap-4 pt-4">
+					<button class="btn btn-primary" type="submit"> save </button>
+				</div>
+			{/if}
 		</form>
 	{:else}
 		<p

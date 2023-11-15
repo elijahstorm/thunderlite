@@ -146,7 +146,11 @@ type UserDBData = {
 	following?: boolean
 	follower?: boolean
 	relationship?: RelationshipStatus
-	messageCount?: number
+	message_count?: number
+	last_message?: {
+		message: string
+		when: Date
+	}
 	created_at: Date
 }
 type MapDBData = {

@@ -21,9 +21,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	try {
 		const user = await getUserDBDataFromAuth(locals.sql, locals.user)
-		if (user.username) {
+		if (user.username && user.profile_image_url) {
 			throw redirect(302, '/make')
 		}
+		return { auth, user }
 	} catch (e) {
 		if (e.status === 302) {
 			throw redirect(302, '/make')

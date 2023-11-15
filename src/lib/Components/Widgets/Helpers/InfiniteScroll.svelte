@@ -31,11 +31,6 @@
 	}
 </script>
 
-<div
-	bind:this={component}
-	class="max-h-screen h-screen overflow-auto {tailwind}"
-	on:scroll={scroll}
-	on:resize={scroll}
->
+<div bind:this={component} class="overflow-auto {tailwind}" on:scroll={scroll} on:resize={scroll}>
 	<slot />
 </div>

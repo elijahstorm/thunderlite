@@ -7,6 +7,7 @@
 	export let auth: string | null = null
 	export let user: UserDBData | null = null
 	export let size: number = 2
+	export let noClick = false
 
 	const fallback = 'https://cdn4.iconfinder.com/data/icons/small-n-flat/24/user-alt-512.png'
 
@@ -28,7 +29,7 @@
 				}
 			})
 
-	const openProfile = () => (open = !open)
+	const openProfile = () => (open = !noClick && !!user?.username && !open)
 
 	$: {
 		if (browser && typeof auth === 'string') {
