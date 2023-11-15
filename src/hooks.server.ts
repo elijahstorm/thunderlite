@@ -10,6 +10,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const dbUri = `${POSTGRES_URL}${VERCEL_ENV !== 'development' ? '?sslmode=require' : ''}`
 	let sql: postgres.Sql | null = null
 	const protectedRoutes = [
+		'/onboarding',
 		'/me',
 		'/play',
 		'/make',

@@ -155,6 +155,8 @@ type MapDBData = {
 	owner_auth: string
 	name: string
 	description: string
+	type: string
+	info: { info: string; color: string }[]
 	thumbnail: string
 	url: string
 	plays: number

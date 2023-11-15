@@ -4,7 +4,7 @@ export const CreateInfo = (sql: postgres.Sql) =>
 	sql`
         create table info (
             id serial primary key,
-            info text,
-            color text
+            info varcar(30),
+            color varcar(30)
         )
         `

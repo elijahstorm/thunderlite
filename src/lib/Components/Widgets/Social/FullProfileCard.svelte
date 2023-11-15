@@ -52,7 +52,6 @@
 			{user.bio ?? 'No bio'}
 		</p>
 		{#if $auth && $auth !== user.auth}
-			{relationship}
 			<div class="flex mt-4 space-x-2" class:hidden={true}>
 				<button
 					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground h-9 rounded-md px-3 w-full hover:bg-gray-700 hover:text-white transition-all duration-200"

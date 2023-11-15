@@ -15,9 +15,73 @@
 	export let data: PageData
 	$: maps = data.maps
 	$: users = data.users
+	$: mapTypes = data.mapTypes
 
-	let page = 0
+	let loader = () => {}
 	let hasMore = true
+
+	const createLoader: (
+		props: { detail: { search: string; type: string } },
+		load?: boolean
+	) => void = ({ detail }, load = true) => {
+		const { search, type } = detail
+		let page = -1
+		hasMore = true
+		loader = () =>
+			!selectedMap &&
+			hasMore &&
+			fetch(
+				`/api/maps?${new URLSearchParams({
+					search: search,
+					type: type,
+					page: `${++page}`,
+				})}`
+			)
+				.then((response) => response.json())
+				.then((data) => {
+					if (data.message) {
+						console.error(data.message)
+						return
+					}
+					if (data.users) {
+						dbUsersStore.update(updateStore(data.users, 'auth'))
+						users = [
+							...users,
+							...data.users.map((user: UserDBData) => ({
+								...user,
+								created_at: new Date(user.created_at),
+							})),
+						]
+					}
+					if (search || type) {
+						maps = []
+					}
+					if (data.maps) {
+						dbMapsStore.update(updateStore(data.maps))
+						maps = [
+							...maps,
+							...data.maps.map((map: MapDBData) => ({
+								...map,
+								created_at: new Date(map.created_at),
+								updated_at: new Date(map.updated_at),
+							})),
+						]
+						if (data.maps.length < 10) {
+							hasMore = false
+						}
+					} else {
+						hasMore = false
+					}
+				})
+				.catch((reason) => console.error(reason))
+
+		if (load) {
+			loader()
+		}
+	}
+
+	createLoader({ detail: { search: '', type: '' } }, false)
+
 	let selectedMap: MapDBData | null = null
 	let postStatus: 'idle' | 'sending' | 'error' | 'success' | 'no-nav' = 'idle'
 	let postResponse: {
@@ -55,45 +119,6 @@
 			})
 	}
 
-	const loadMore = () =>
-		!selectedMap &&
-		hasMore &&
-		fetch(`/api/maps?${new URLSearchParams({ page: `${++page}` })}`)
-			.then((response) => response.json())
-			.then((data) => {
-				if (data.message) {
-					console.error(data.message)
-					return
-				}
-				if (data.users) {
-					dbUsersStore.update(updateStore(data.users, 'auth'))
-					users = [
-						...users,
-						...data.users.map((user: UserDBData) => ({
-							...user,
-							created_at: new Date(user.created_at),
-						})),
-					]
-				}
-				if (data.maps) {
-					dbMapsStore.update(updateStore(data.maps))
-					maps = [
-						...maps,
-						...data.maps.map((map: MapDBData) => ({
-							...map,
-							created_at: new Date(map.created_at),
-							updated_at: new Date(map.updated_at),
-						})),
-					]
-					if (data.maps.length < 10) {
-						hasMore = false
-					}
-				} else {
-					hasMore = false
-				}
-			})
-			.catch((reason) => console.error(reason))
-
 	const updateStore =
 		<T extends object>(data: T[], key = 'id') =>
 		(store: { [key: string]: T }) =>
@@ -110,14 +135,12 @@
 	}
 </script>
 
-<InfiniteScroll on:load={loadMore} threshold={600}>
+<InfiniteScroll on:load={loader} threshold={600}>
 	<ContentWithFooter noFooterOnMobile>
 		<Header />
 
 		<div class="md:container w-full break break-word">
-			<section class="pt-6 pb-16 px-5 sm:px-8 md:px-0 mx-auto sm:max-w-[640px] md:max-w-none">
-				<SearchWithTypes />
-
+			<section class="pt-6 pb-16 px-5 mx-auto sm:px-8 md:px-0 sm:max-w-[640px] md:max-w-none">
 				{#if selectedMap}
 					<div class="m-auto">
 						<div
@@ -172,6 +195,8 @@
 					</div>
 				{:else}
 					<div class="space-y-8">
+						<SearchWithTypes on:load={createLoader} types={mapTypes} />
+
 						{#each maps as map}
 							<button
 								class="w-full transition-all outline-none rounded-xl ring-primary-500 ring-offset-4 hover:ring focus:ring hover:scale-105 focus:scale-105"
@@ -181,7 +206,14 @@
 							</button>
 						{/each}
 
-						{#if !hasMore}
+						{#if !maps?.length}
+							<p
+								class="text-gray-500 block p-3 mb-4 w-full text-sm bg-gray-50 rounded-lg border border-gray-200 shadow-sm"
+							>
+								We could not find any results for your search. Try broaden your search to get more
+								results.
+							</p>
+						{:else if !hasMore}
 							<p
 								class="text-brand-500 block p-3 mb-4 w-full text-sm bg-brand-50 rounded-lg border border-brand-200 shadow-sm"
 							>

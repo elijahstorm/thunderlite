@@ -1,0 +1,72 @@
+// redirect if account made
+// otherwise show form to make account
+// then redirect to /me
+
+import {
+	getUserDBDataFromAuth,
+	makeUserDBDataFromAuth,
+	updateUserDBData,
+} from '$lib/Database/getUserData'
+import { error, fail, redirect } from '@sveltejs/kit'
+import type { PageServerLoad } from './$types'
+import { migrate } from '$lib/Database/Migrations/migrator'
+import { validate } from '$lib/Database/validators'
+
+export const prerender = false
+export const ssr = false
+
+export const load: PageServerLoad = async ({ locals }) => {
+	if (!locals.user) throw error(403, 'You are not logged in')
+	const auth = locals.user
+
+	try {
+		if (await getUserDBDataFromAuth(locals.sql, locals.user)) {
+			throw redirect(302, '/make')
+		}
+	} catch (e) {
+		if (e.status === 302) {
+			throw redirect(302, '/make')
+		}
+		try {
+			await makeUserDBDataFromAuth(locals.user)(locals.sql)
+		} catch (e) {
+			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+			// @ts-ignore
+			if (Object.hasOwn(e, 'status') && e.status === 500) {
+				await migrate(locals.sql)
+				await makeUserDBDataFromAuth(locals.user)(locals.sql)
+			} else {
+				throw error(500, 'There was an issue making your new account')
+			}
+		}
+	}
+
+	return { auth }
+}
+
+export const actions = {
+	default: async ({ request, locals }) => {
+		if (!locals.user) return fail(403, {})
+
+		const rules = {
+			username: 'required|string|noWhitespace|max:20|min:5',
+			display_name: 'required|string|max:30|min:5',
+			bio: 'string|max:1000',
+		}
+
+		const { validated, errors } = validate(await request.formData(), rules)
+
+		if (Object.keys(errors).length > 0) return fail(400, { errors })
+
+		await updateUserDBData(
+			locals.user,
+			validated as UserDBData,
+			Object.keys(validated) as (keyof UserDBData)[]
+		)(locals.sql)
+
+		return {
+			validated,
+			errors,
+		}
+	},
+}

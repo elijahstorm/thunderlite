@@ -9,7 +9,7 @@ export const hanko = new Hanko(PUBLIC_HANKO_API_URL)
 export const loggedIn = writable(hanko?.session?.isValid())
 export const userAuth = writable<string | null>(hanko?.session?.get()?.userID)
 
-export const redirectAfterLogin = () => goto('/me')
+export const redirectAfterLogin = () => goto('/onboarding')
 export const redirectAfterLogout = () => goto('/login')
 
 export const logout = () => hanko.user.logout().catch(reportError)

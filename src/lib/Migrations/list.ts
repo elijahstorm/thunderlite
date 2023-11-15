@@ -1,6 +1,7 @@
 import type postgres from 'postgres'
 import { CreateUsers } from './create_users.sql'
 import { CreateUserStats } from './create_user_stats.sql'
+import { CreateMapTypes } from './create_map_types.sql'
 import { CreateMaps } from './create_maps.sql'
 import { CreateLogs } from './create_logs.sql'
 import { CreateInfo } from './create_info.sql'
@@ -32,6 +33,7 @@ const migrationsInOrder = {
 	CreateLogs,
 	CreateUsers,
 	CreateUserStats,
+	CreateMapTypes,
 	CreateMaps,
 	CreateInfo,
 	CreateInfoMorphMap,

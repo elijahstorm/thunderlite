@@ -61,15 +61,31 @@
 				</svg>
 			</div>
 			<p class="text-left text-md pt-4 truncate">
-				<span class="font-medium tracking-wider">
+				<span class="text-xl font-bold tracking-wider">
 					{map.name ?? 'Unnamed'}
 				</span>
+				<span class="text-left text-md font-normal opacity-70"> - </span>
 				{#if map.description}
-					<span class="text-left text-md text-ellipsis opacity-80">
-						- {map.description}
+					<span class="text-left text-md text-ellipsis text-zinc-500 dark:text-zinc-400">
+						{map.description}
 					</span>
 				{/if}
 			</p>
+			<div class="flex flex-wrap gap-x-4 gap-y-2 text-left pt-3">
+				<div
+					class="center relative border inline-block select-none whitespace-nowrap rounded-lg py-2 px-3.5 align-baseline font-sans text-xs font-semibold uppercase leading-none border-gray-500 text-gray-600 bg-gray-50"
+				>
+					<div class="mt-px">{map.type}</div>
+				</div>
+				<span class="text-gray-400 font-thin" class:hidden={!map.info.length}> | </span>
+				{#each map.info as info}
+					<div
+						class="center relative border inline-block select-none whitespace-nowrap rounded-lg py-2 px-3.5 align-baseline font-sans text-xs font-semibold uppercase leading-none border-{info.color}-500 text-{info.color}-600 bg-{info.color}-50"
+					>
+						<div class="mt-px">{info.info}</div>
+					</div>
+				{/each}
+			</div>
 			<MapThumbnail {map} />
 			<div class="flex mt-6 justify-between items-center">
 				<div class="flex space-x-4 text-gray-400 dark:text-gray-300">
