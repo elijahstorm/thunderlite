@@ -4,8 +4,9 @@
 	import DataInput from '$lib/Components/Widgets/Forms/DataInput.svelte'
 	import ImageUploader from '$lib/Components/Widgets/Forms/ImageUploader.svelte'
 	import { addToast } from 'as-toast'
+	import type { PageData } from './$types.js'
 
-	export let data
+	export let data: PageData
 	$: user = data.user
 	$: auth = data.auth ?? ''
 

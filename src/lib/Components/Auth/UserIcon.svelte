@@ -20,6 +20,8 @@
 	let style: string
 	$: style = `width: ${size}rem; height: ${size}rem;`
 
+	const openProfile = () => (open = !noClick && !!user?.username && !open)
+
 	const fetchUserData = (userAuth: string) =>
 		fetch(`/api/user/${userAuth}`)
 			.then((res) => res.json())
@@ -28,8 +30,6 @@
 					user = data.user
 				}
 			})
-
-	const openProfile = () => (open = !noClick && !!user?.username && !open)
 
 	$: {
 		if (browser && typeof auth === 'string') {
@@ -50,10 +50,11 @@
 <svelte:window on:resize={() => (reflow = performance.now())} />
 
 <div class="relative">
-	<button class="contents" on:click={openProfile}>
+	<button class="contents" disabled={noClick} on:click={openProfile}>
 		<div
 			bind:this={floatingProfile}
 			class="h-8 w-8 bg-white rounded-full border border-solid border-gray-600 overflow-hidden self-center cursor-pointer"
+			class:cursor-default={noClick}
 			{style}
 		>
 			<FallbackImage

@@ -1,27 +1,109 @@
 <script lang="ts">
+	import { writable } from 'svelte/store'
+	import { browser } from '$app/environment'
+	import UserImageAndName from './UserImageAndName.svelte'
+	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import { generateKey } from '$lib/Security/keys'
+	import { onMount } from 'svelte'
+
+	type Message = {
+		source: string
+		target: string
+		message: string
+		created_at: Date
+	}
+
+	export let source: string
+	export let target: string
+	const targetUser = writable<UserDBData>()
+	const sourceUser = writable<UserDBData>()
+
+	const limit = 10
+	let page = -1
+	let hasMore = true
+
+	const messages = writable<
+		{
+			key: string
+			user: UserDBData
+			messages: Message[]
+		}[]
+	>([])
+
+	const loadMoreMessage = () =>
+		hasMore &&
+		fetch(
+			`/api/user/${target}/messages?${new URLSearchParams({
+				page: `${++page}`,
+			})}`
+		)
+			.then((response) => response.json())
+			.then((data) => {
+				const moreMessages = data.messages as Message[]
+				if (!moreMessages || moreMessages.length < limit) hasMore = false
+				if (!moreMessages) return
+				const parsedMessages = moreMessages.reverse().map((message) => ({
+					...message,
+					key: generateKey(),
+					user: message.source === source ? $sourceUser : $targetUser,
+					messages: moreMessages,
+				}))
+
+				$messages = [...$messages, ...parsedMessages]
+			})
+
+	const fetchUserData = (userAuth: string, resolve: (data: { user: UserDBData }) => void) =>
+		fetch(`/api/user/${userAuth}`)
+			.then((res) => res.json())
+			.then(resolve)
+
+	const shortenDate = (when?: Date, now = new Date()) => {
+		if (!when) return ''
+
+		const diffMilliseconds = now.getTime() - when.getTime()
+		const diffSeconds = Math.floor(diffMilliseconds / 1000)
+		const diffMinutes = Math.floor(diffSeconds / 60)
+		const diffHours = Math.floor(diffMinutes / 60)
+		const diffDays = Math.floor(diffHours / 24)
+		const diffWeeks = Math.floor(diffDays / 7)
+		const diffMonths = Math.floor(diffDays / 30)
+		const diffYears = Math.floor(diffDays / 365)
+
+		if (diffYears >= 1) {
+			return `${diffYears}y`
+		} else if (diffMonths >= 1) {
+			return `${diffMonths}m`
+		} else if (diffWeeks >= 1) {
+			return `${diffWeeks}w`
+		} else if (diffDays >= 1) {
+			return `${diffDays}d`
+		} else if (diffHours >= 1) {
+			return `${diffHours}h`
+		}
+		return 'now'
+	}
+
+	onMount(() => {
+		if (browser) {
+			fetchUserData(target, (data) => {
+				if (data.user) {
+					$targetUser = data.user
+				}
+			})
+			fetchUserData(source, (data) => {
+				if (data.user) {
+					$sourceUser = data.user
+				}
+			})
+			loadMoreMessage()
+		}
+	})
 </script>
 
-<div class="flex-1 p:2 sm:p-6 justify-between flex flex-col h-screen">
-	<div class="flex sm:items-center justify-between py-3 border-b-2 border-gray-200">
+<div class="p:2 sm:p-6 justify-between flex flex-col h-screen">
+	<header class="flex sm:items-center justify-between py-3 border-b-2 border-gray-200">
 		<div class="relative flex items-center space-x-4">
-			<div class="relative">
-				<span class="absolute text-green-500 right-0 bottom-0">
-					<svg width="20" height="20">
-						<circle cx="8" cy="8" r="8" fill="currentColor"></circle>
-					</svg>
-				</span>
-				<img
-					src="https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt=""
-					class="w-10 sm:w-16 h-10 sm:h-16 rounded-full"
-				/>
-			</div>
-			<div class="flex flex-col leading-tight">
-				<div class="text-2xl mt-1 flex items-center">
-					<span class="text-gray-700 mr-3">Anderson Vanhron</span>
-				</div>
-				<span class="text-lg text-gray-600">Junior Developer</span>
-			</div>
+			<UserImageAndName user={$targetUser} text />
 		</div>
 		<div class="flex items-center space-x-2">
 			<button
@@ -82,202 +164,40 @@
 				</svg>
 			</button>
 		</div>
-	</div>
+	</header>
 	<div
-		id="messages"
-		class="flex flex-col space-y-4 p-3 overflow-y-auto scrollbar-thumb-blue scrollbar-thumb-rounded scrollbar-track-blue-lighter scrollbar-w-2 scrolling-touch"
+		class="flex flex-col-reverse justify-start h-full gap-y-4 p-3 overflow-y-auto scrolling-touch"
 	>
-		<div class="chat-message">
-			<div class="flex items-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-2 items-start">
-					<div>
-						<span
-							class="px-4 py-2 rounded-lg inline-block rounded-bl-none bg-gray-300 text-gray-600"
-							>Can be verified on any platform using docker</span
+		{#each $messages as messageGroups (messageGroups.key)}
+			<div class="flex items-end" class:justify-end={messageGroups.user.auth === source}>
+				<div
+					class="flex flex-col space-y-2 text-xs max-w-xs mx-2 items-start"
+					class:order-2={messageGroups.user.auth === target}
+				>
+					<p class="truncate text-xs text-center self-center text-gray-600 opacity-80">
+						{shortenDate(new Date(messageGroups.messages[0].created_at))}
+					</p>
+					{#each messageGroups.messages as message, index (`${new Date(message.created_at).getTime()}_${index}`)}
+						<div
+							class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
+							class:bg-gray-300={messageGroups.user.auth === target}
+							class:text-gray-600={messageGroups.user.auth === target}
+							class:bg-blue-600={messageGroups.user.auth === source}
+							class:text-white={messageGroups.user.auth === source}
+							class:rounded-bl-none={messageGroups.user.auth === target &&
+								index === messageGroups.messages.length - 1}
+							class:rounded-br-none={messageGroups.user.auth === source &&
+								index === messageGroups.messages.length - 1}
 						>
-					</div>
+							{message.message}
+						</div>
+					{/each}
 				</div>
-				<img
-					src="https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-1"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end justify-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-1 items-end">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block rounded-br-none bg-blue-600 text-white"
-							>Your error message says permission denied, npm global installs must be given root
-							privileges.</span
-						>
-					</div>
+				<div class:order-2={messageGroups.user.auth === source}>
+					<UserIcon user={messageGroups.user} noClick />
 				</div>
-				<img
-					src="https://images.unsplash.com/photo-1590031905470-a1a1feacbb0b?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-2"
-				/>
 			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-2 items-start">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							>Command was run with root privileges. I'm sure about that.</span
-						>
-					</div>
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							>I've update the description so it's more obviously now</span
-						>
-					</div>
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							>FYI https://askubuntu.com/a/700266/510172</span
-						>
-					</div>
-					<div>
-						<span
-							class="px-4 py-2 rounded-lg inline-block rounded-bl-none bg-gray-300 text-gray-600"
-						>
-							Check the line above (it ends with a # so, I'm running it as root )
-							<pre># npm install -g @vue/devtools</pre>
-						</span>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-1"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end justify-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-1 items-end">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block rounded-br-none bg-blue-600 text-white"
-							>Any updates on this issue? I'm getting the same error when trying to install
-							devtools. Thanks</span
-						>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1590031905470-a1a1feacbb0b?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-2"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-2 items-start">
-					<div>
-						<span
-							class="px-4 py-2 rounded-lg inline-block rounded-bl-none bg-gray-300 text-gray-600"
-							>Thanks for your message David. I thought I'm alone with this issue. Please, ? the
-							issue to support it :)</span
-						>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-1"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end justify-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-1 items-end">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-blue-600 text-white"
-							>Are you using sudo?</span
-						>
-					</div>
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block rounded-br-none bg-blue-600 text-white"
-							>Run this command sudo chown -R `whoami` /Users/[your_user_profile]/.npm-global/ then
-							install the package globally without using sudo</span
-						>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1590031905470-a1a1feacbb0b?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-2"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-2 items-start">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							>It seems like you are from Mac OS world. There is no /Users/ folder on linux ?</span
-						>
-					</div>
-					<div>
-						<span
-							class="px-4 py-2 rounded-lg inline-block rounded-bl-none bg-gray-300 text-gray-600"
-							>I have no issue with any other packages installed with root permission globally.</span
-						>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-1"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end justify-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-1 items-end">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block rounded-br-none bg-blue-600 text-white"
-							>yes, I have a mac. I never had issues with root permission as well, but this helped
-							me to solve the problem</span
-						>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1590031905470-a1a1feacbb0b?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-2"
-				/>
-			</div>
-		</div>
-		<div class="chat-message">
-			<div class="flex items-end">
-				<div class="flex flex-col space-y-2 text-xs max-w-xs mx-2 order-2 items-start">
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							>I get the same error on Arch Linux (also with sudo)</span
-						>
-					</div>
-					<div>
-						<span class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							>I also have this issue, Here is what I was doing until now: #1076</span
-						>
-					</div>
-					<div>
-						<span
-							class="px-4 py-2 rounded-lg inline-block rounded-bl-none bg-gray-300 text-gray-600"
-							>even i am facing</span
-						>
-					</div>
-				</div>
-				<img
-					src="https://images.unsplash.com/photo-1549078642-b2ba4bda0cdb?ixlib=rb-1.2.1&amp;ixid=eyJhcHBfaWQiOjEyMDd9&amp;auto=format&amp;fit=facearea&amp;facepad=3&amp;w=144&amp;h=144"
-					alt="My profile"
-					class="w-6 h-6 rounded-full order-1"
-				/>
-			</div>
-		</div>
+		{/each}
 	</div>
 	<div class="border-t-2 border-gray-200 px-4 pt-4 mb-2 sm:mb-0">
 		<div class="relative flex">
@@ -391,26 +311,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-	.scrollbar-w-2::-webkit-scrollbar {
-		width: 0.25rem;
-		height: 0.25rem;
-	}
-
-	.scrollbar-track-blue-lighter::-webkit-scrollbar-track {
-		--bg-opacity: 1;
-		background-color: #f7fafc;
-		background-color: rgba(247, 250, 252, var(--bg-opacity));
-	}
-
-	.scrollbar-thumb-blue::-webkit-scrollbar-thumb {
-		--bg-opacity: 1;
-		background-color: #edf2f7;
-		background-color: rgba(237, 242, 247, var(--bg-opacity));
-	}
-
-	.scrollbar-thumb-rounded::-webkit-scrollbar-thumb {
-		border-radius: 0.25rem;
-	}
-</style>

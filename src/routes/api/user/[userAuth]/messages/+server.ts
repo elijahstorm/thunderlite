@@ -16,7 +16,7 @@ export const GET = async ({ url, params, locals }) => {
 			where
                 source = ${source} and target = ${target} or
                 source = ${target} and target = ${source}
-            order by created_at asc
+            order by created_at desc
             limit ${limit} offset ${(page ?? 0) * limit}`
 
 		return json({ messages })
