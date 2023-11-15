@@ -20,7 +20,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const auth = locals.user
 
 	try {
-		if (await getUserDBDataFromAuth(locals.sql, locals.user)) {
+		const user = await getUserDBDataFromAuth(locals.sql, locals.user)
+		if (user.username) {
 			throw redirect(302, '/make')
 		}
 	} catch (e) {
@@ -57,6 +58,13 @@ export const actions = {
 		const { validated, errors } = validate(await request.formData(), rules)
 
 		if (Object.keys(errors).length > 0) return fail(400, { errors })
+
+		if (validated.username && typeof validated.username === 'string') {
+			const user = await locals.sql`select id from users where username = ${validated.username}`
+			if (user.length) {
+				return fail(400, { errors: { username: ['Sorry! This username is already taken'] } })
+			}
+		}
 
 		await updateUserDBData(
 			locals.user,

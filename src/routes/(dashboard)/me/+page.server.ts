@@ -58,6 +58,13 @@ export const actions = {
 
 		if (Object.keys(errors).length > 0) return fail(400, { errors })
 
+		if (validated.username && typeof validated.username === 'string') {
+			const user = await locals.sql`select id from users where username = ${validated.username}`
+			if (user.length) {
+				return fail(400, { errors: { username: ['Sorry! This username is already taken'] } })
+			}
+		}
+
 		await updateUserDBData(
 			locals.user,
 			validated as UserDBData,

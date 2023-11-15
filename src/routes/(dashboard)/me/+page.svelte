@@ -16,7 +16,13 @@
 
 	let usernameTaken = false
 
-	const resetForm = () => (updated = { ...(user ?? {}) })
+	const resetForm = (data = {}) => (updated = { ...(user ?? {}), ...data })
+
+	const checkUsernameTaken = (data: { detail: { target: { value: string } } }) =>
+		data.detail.target.value &&
+		fetch(`/api/user/exists/${data.detail.target.value}`)
+			.then((response) => response.json())
+			.then((data) => (usernameTaken = data.exists?.length))
 
 	$: {
 		errors = Object.entries(form?.errors ?? {}).reduce(
@@ -39,6 +45,7 @@
 					addToast('Error saving your data', 'warn')
 				}
 				update()
+				if (result.data?.validated) resetForm(result.data?.validated)
 			}
 		}}
 	>
@@ -64,6 +71,7 @@
 			id="username"
 			invalid={usernameTaken || Object.hasOwn(errors, 'username')}
 			message={usernameTaken ? 'Sorry! This username is already taken' : errors.username ?? ''}
+			on:change={checkUsernameTaken}
 		/>
 
 		<DataInput

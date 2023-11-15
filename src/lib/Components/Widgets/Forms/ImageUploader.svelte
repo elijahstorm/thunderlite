@@ -5,15 +5,16 @@
 	import ImageGradientOverlay from '$lib/Components/Widgets/Helpers/ImageGradientOverlay.svelte'
 	import Icon from '@iconify/svelte'
 	import { addToast } from 'as-toast'
+	import { createEventDispatcher } from 'svelte'
 
 	const fallback = 'https://cdn4.iconfinder.com/data/icons/small-n-flat/24/user-alt-512.png'
+	const dispatch = createEventDispatcher()
 
 	export let auth: string
 	export let src: string = fallback
 	export let alt: string
 	export let dest: string = 'picture'
 	export let title: string | undefined = undefined
-	export let oncomplete: () => void = () => {}
 
 	const accept = '.jpg, .jpeg, .png, .svg'
 	const icon = 'akar-icons:cloud-upload'
@@ -51,7 +52,7 @@
 			src = url
 			state = 'finished'
 			addToast('Image uploaded')
-			oncomplete()
+			dispatch('complete')
 		} catch (e) {
 			state = 'failed'
 			if (e instanceof Error) {

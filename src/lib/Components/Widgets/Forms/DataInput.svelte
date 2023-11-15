@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { createEventDispatcher } from 'svelte'
+
 	export let value: string
 	export let id: string
 	export let name: string
@@ -13,6 +15,8 @@
 	export let attempted: boolean = false
 	export let invalid: boolean = false
 	export let forceValid: boolean = false
+
+	const dispatch = createEventDispatcher()
 
 	$: messageBefore = message?.trimStart().split(' ')[0]
 	$: messageAfter = message?.trimStart().split(' ').slice(1).join(' ')
@@ -55,6 +59,7 @@
 		{required}
 		{placeholder}
 		bind:value
+		on:change={(e) => dispatch('change', e)}
 	/>
 {:else}
 	<div class="relative my-4 mx-0">
@@ -87,6 +92,7 @@
 			{placeholder}
 			type="text"
 			bind:value
+			on:change={(e) => dispatch('change', e)}
 		/>
 	</div>
 {/if}
