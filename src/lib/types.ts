@@ -136,6 +136,12 @@ type Relationship = {
 	theirs: RelationshipStatus
 }
 
+type MessageDBData = {
+	source: string
+	target: string
+	message: string
+	created_at: Date
+}
 type UserDBData = {
 	id: number
 	auth: string

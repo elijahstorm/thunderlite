@@ -12,7 +12,7 @@ import { CreateRelationships } from './create_relationships.sql'
 import { CreateFollows } from './create_follows.sql'
 import { CreateMessages } from './create_messages.sql'
 
-export const migrationsList = async (types: postgres.Sql) => {
+export const migrationsList = async (sql: postgres.Sql) => {
 	const results = []
 	const migrations = migrationsInOrder
 
@@ -20,7 +20,7 @@ export const migrationsList = async (types: postgres.Sql) => {
 
 	for (const [name, migration] of Object.entries(migrations)) {
 		console.log('running', name, 'migration')
-		const result = await migration(types)
+		const result = await migration(sql)
 		results.push(result)
 	}
 

@@ -5,7 +5,6 @@ import {
 } from '$lib/Database/getUserData'
 import { error, fail } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { migrate } from '$lib/Database/Migrations/migrator'
 import { validate } from '$lib/Database/validators'
 
 export const prerender = false
@@ -20,24 +19,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 	} catch (e) {
 		try {
 			await makeUserDBDataFromAuth(locals.user)(locals.sql)
-		} catch (e) {
-			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-			// @ts-ignore
-			if (Object.hasOwn(e, 'status') && e.status === 500) {
-				await migrate(locals.sql)
-				await makeUserDBDataFromAuth(locals.user)(locals.sql)
-			} else {
-				throw error(500, 'There was an issue making your new account')
+			user = {
+				id: -1,
+				auth: locals.user,
+				username: '',
+				display_name: '',
+				profile_image_url: '',
+				bio: '',
+				created_at: new Date(),
 			}
-		}
-		user = {
-			id: -1,
-			auth: locals.user,
-			username: '',
-			display_name: '',
-			profile_image_url: '',
-			bio: '',
-			created_at: new Date(),
+		} catch (e) {
+			throw error(500, 'There was an issue making your new account')
 		}
 	}
 

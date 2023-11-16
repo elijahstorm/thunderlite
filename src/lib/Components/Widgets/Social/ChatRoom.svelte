@@ -2,16 +2,10 @@
 	import { writable } from 'svelte/store'
 	import { browser } from '$app/environment'
 	import UserImageAndName from './UserImageAndName.svelte'
-	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 	import { generateKey } from '$lib/Security/keys'
 	import { onMount } from 'svelte'
-
-	type Message = {
-		source: string
-		target: string
-		message: string
-		created_at: Date
-	}
+	import ChatMessageGroups from './ChatMessageGroups.svelte'
+	import InfiniteScroll from '../Helpers/InfiniteScroll.svelte'
 
 	export let source: string
 	export let target: string
@@ -25,8 +19,8 @@
 	const messages = writable<
 		{
 			key: string
-			user: UserDBData
-			messages: Message[]
+			user: string
+			messages: MessageDBData[]
 		}[]
 	>([])
 
@@ -39,15 +33,25 @@
 		)
 			.then((response) => response.json())
 			.then((data) => {
-				const moreMessages = data.messages as Message[]
+				const moreMessages = data.messages as MessageDBData[]
 				if (!moreMessages || moreMessages.length < limit) hasMore = false
 				if (!moreMessages) return
-				const parsedMessages = moreMessages.reverse().map((message) => ({
-					...message,
-					key: generateKey(),
-					user: message.source === source ? $sourceUser : $targetUser,
-					messages: moreMessages,
-				}))
+				const parsedMessages = []
+				for (let i = 0; i < moreMessages.length; ) {
+					const firstMessageInGroup = moreMessages[i]
+					const currentUser = firstMessageInGroup.source
+					const messageGroup = []
+					for (; i < moreMessages.length; i++) {
+						if (moreMessages[i].source === currentUser) {
+							messageGroup.push(moreMessages[i])
+						} else break
+					}
+					parsedMessages.push({
+						key: generateKey(),
+						user: firstMessageInGroup.source,
+						messages: messageGroup.reverse(),
+					})
+				}
 
 				$messages = [...$messages, ...parsedMessages]
 			})
@@ -57,34 +61,8 @@
 			.then((res) => res.json())
 			.then(resolve)
 
-	const shortenDate = (when?: Date, now = new Date()) => {
-		if (!when) return ''
-
-		const diffMilliseconds = now.getTime() - when.getTime()
-		const diffSeconds = Math.floor(diffMilliseconds / 1000)
-		const diffMinutes = Math.floor(diffSeconds / 60)
-		const diffHours = Math.floor(diffMinutes / 60)
-		const diffDays = Math.floor(diffHours / 24)
-		const diffWeeks = Math.floor(diffDays / 7)
-		const diffMonths = Math.floor(diffDays / 30)
-		const diffYears = Math.floor(diffDays / 365)
-
-		if (diffYears >= 1) {
-			return `${diffYears}y`
-		} else if (diffMonths >= 1) {
-			return `${diffMonths}m`
-		} else if (diffWeeks >= 1) {
-			return `${diffWeeks}w`
-		} else if (diffDays >= 1) {
-			return `${diffDays}d`
-		} else if (diffHours >= 1) {
-			return `${diffHours}h`
-		}
-		return 'now'
-	}
-
 	onMount(() => {
-		if (browser) {
+		if (browser && !$targetUser) {
 			fetchUserData(target, (data) => {
 				if (data.user) {
 					$targetUser = data.user
@@ -100,7 +78,7 @@
 	})
 </script>
 
-<div class="p:2 sm:p-6 justify-between flex flex-col h-screen">
+<div class="p:2 sm:p-6 justify-between flex flex-col h-screen max-h-screen">
 	<header class="flex sm:items-center justify-between py-3 border-b-2 border-gray-200">
 		<div class="relative flex items-center space-x-4">
 			<UserImageAndName user={$targetUser} text />
@@ -165,40 +143,16 @@
 			</button>
 		</div>
 	</header>
-	<div
-		class="flex flex-col-reverse justify-start h-full gap-y-4 p-3 overflow-y-auto scrolling-touch"
+	<InfiniteScroll
+		tailwind="flex flex-col-reverse justify-start h-full gap-y-4 p-3 overflow-y-auto scrolling-touch"
+		threshold={60}
+		reverse
+		on:load={loadMoreMessage}
 	>
-		{#each $messages as messageGroups (messageGroups.key)}
-			<div class="flex items-end" class:justify-end={messageGroups.user.auth === source}>
-				<div
-					class="flex flex-col space-y-2 text-xs max-w-xs mx-2 items-start"
-					class:order-2={messageGroups.user.auth === target}
-				>
-					<p class="truncate text-xs text-center self-center text-gray-600 opacity-80">
-						{shortenDate(new Date(messageGroups.messages[0].created_at))}
-					</p>
-					{#each messageGroups.messages as message, index (`${new Date(message.created_at).getTime()}_${index}`)}
-						<div
-							class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-							class:bg-gray-300={messageGroups.user.auth === target}
-							class:text-gray-600={messageGroups.user.auth === target}
-							class:bg-blue-600={messageGroups.user.auth === source}
-							class:text-white={messageGroups.user.auth === source}
-							class:rounded-bl-none={messageGroups.user.auth === target &&
-								index === messageGroups.messages.length - 1}
-							class:rounded-br-none={messageGroups.user.auth === source &&
-								index === messageGroups.messages.length - 1}
-						>
-							{message.message}
-						</div>
-					{/each}
-				</div>
-				<div class:order-2={messageGroups.user.auth === source}>
-					<UserIcon user={messageGroups.user} noClick />
-				</div>
-			</div>
+		{#each $messages as messageGroup (messageGroup.key)}
+			<ChatMessageGroups {messageGroup} sourceUser={$sourceUser} targetUser={$targetUser} />
 		{/each}
-	</div>
+	</InfiniteScroll>
 	<div class="border-t-2 border-gray-200 px-4 pt-4 mb-2 sm:mb-0">
 		<div class="relative flex">
 			<span class="absolute inset-y-0 flex items-center">

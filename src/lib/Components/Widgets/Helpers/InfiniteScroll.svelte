@@ -5,6 +5,7 @@
 	export let tailwind = ''
 	export let threshold = 0
 	export let horizontal = false
+	export let reverse = false
 
 	const dispatch = createEventDispatcher()
 	let isLoadMore = false
@@ -16,7 +17,11 @@
 		// @ts-ignore
 		const { scrollWidth, clientWidth, scrollLeft, scrollHeight, clientHeight, scrollTop } = e.target
 
-		const offset = horizontal
+		const offset = reverse
+			? horizontal
+				? scrollWidth - clientWidth + scrollLeft
+				: scrollHeight - clientHeight + scrollTop
+			: horizontal
 			? scrollWidth - clientWidth - scrollLeft
 			: scrollHeight - clientHeight - scrollTop
 

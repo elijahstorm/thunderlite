@@ -9,18 +9,18 @@ import {
 } from '$lib/Database/getUserData'
 import { error, fail, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { migrate } from '$lib/Database/Migrations/migrator'
+import { faker, migrate } from '$lib/Database/Migrations/migrator'
 import { validate } from '$lib/Database/validators'
 
 export const prerender = false
 export const ssr = false
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) throw error(403, 'You are not logged in')
 	const auth = locals.user
+	if (!auth) throw error(403, 'You are not logged in')
 
 	try {
-		const user = await getUserDBDataFromAuth(locals.sql, locals.user)
+		const user = await getUserDBDataFromAuth(locals.sql, auth)
 		if (user.username && user.profile_image_url) {
 			throw redirect(302, '/make')
 		}
@@ -30,13 +30,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 			throw redirect(302, '/make')
 		}
 		try {
-			await makeUserDBDataFromAuth(locals.user)(locals.sql)
+			await makeUserDBDataFromAuth(auth)(locals.sql)
 		} catch (e) {
 			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 			// @ts-ignore
 			if (Object.hasOwn(e, 'status') && e.status === 500) {
 				await migrate(locals.sql)
-				await makeUserDBDataFromAuth(locals.user)(locals.sql)
+				await makeUserDBDataFromAuth(auth)(locals.sql)
+				await faker(locals.sql, auth)
 			} else {
 				throw error(500, 'There was an issue making your new account')
 			}

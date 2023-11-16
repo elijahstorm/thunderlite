@@ -18,6 +18,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		'/api/game',
 		'/api/user',
 		'/api/upload',
+		'/api/migrations',
 	]
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!(await authenticatedUser(event))) {
