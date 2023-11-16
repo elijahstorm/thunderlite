@@ -2,7 +2,8 @@ import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 
 export const POST = async ({ params, request, locals }) => {
-	const { message } = await request.json()
+	const message = (await request.formData()).get('chat-input')?.toString()
+	if (!message) return json({ status: 'no message' })
 	const { userAuth } = params
 	const source = locals.user
 	const target = userAuth

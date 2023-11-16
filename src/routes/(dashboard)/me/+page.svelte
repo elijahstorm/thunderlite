@@ -44,7 +44,8 @@
 				if (result.status !== 200 && result.status !== 400) {
 					addToast('Error saving your data', 'warn')
 				}
-				update()
+				update({ reset: false })
+				// @ts-ignore
 				if (result.data?.validated) resetForm(result.data?.validated)
 			}
 		}}

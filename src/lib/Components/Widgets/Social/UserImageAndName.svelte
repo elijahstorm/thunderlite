@@ -3,10 +3,11 @@
 
 	export let user: UserDBData | null
 	export let text = false
+	export let noClick = false
 </script>
 
 <div class="flex items-start justify-start">
-	<UserIcon auth={user?.auth} size={2.5} />
+	<UserIcon auth={user?.auth} size={2.5} {noClick} />
 	{#if text}
 		<div class="ml-4 text-left">
 			<div class="tracking-wide text-sm text-black opacity-80 dark:text-white font-medium">

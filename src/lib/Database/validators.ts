@@ -3,7 +3,7 @@ export const validate = (data: FormData, validators: { [key: string]: string }) 
 	const validated: { [key: string]: unknown } = {}
 
 	Object.entries(validators).map(([dataName, validator]) => {
-		const entry = data.get(dataName) as string | undefined
+		const entry = data.get(dataName)?.toString()
 		const rules = validator.split('|')
 		rules.map((rule) => {
 			const [action, ...args] = rule.split(':')

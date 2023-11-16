@@ -1,0 +1,158 @@
+<script lang="ts">
+	import { enhance } from '$app/forms'
+	import { addToast } from 'as-toast'
+	import { createEventDispatcher } from 'svelte'
+
+	export let target: string
+
+	const dispatch = createEventDispatcher()
+
+	const attach = () => addToast('not implemented', 'warn')
+
+	const picture = () => addToast('not implemented', 'warn')
+
+	const emoji = () => addToast('not implemented', 'warn')
+
+	const send = (message: string) => dispatch('send', { message })
+</script>
+
+<form
+	method="POST"
+	action="/api/user/{target}/message"
+	use:enhance={({ formData, cancel }) => {
+		const message = formData.get('chat-input')
+		if (!message) {
+			cancel()
+			return
+		}
+		send(message.toString())
+		return async ({ result, update }) => {
+			// @ts-ignore
+			if (result.status !== 'ok') {
+				addToast(`Error sending the message. ${result.status}`, 'warn')
+			}
+			update()
+		}
+	}}
+>
+	<div class="relative flex overflow-hidden">
+		<span class="absolute inset-y-0 flex items-center">
+			<button
+				type="button"
+				class="inline-flex items-center justify-center rounded-full h-12 w-12 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					class="h-6 w-6 text-gray-600"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+					>
+					</path>
+				</svg>
+			</button>
+		</span>
+		<input
+			id="chat-input"
+			name="chat-input"
+			type="text"
+			placeholder="Write your message!"
+			class="w-full pl-12 py-3 border-t border-t-gray-300 border-b-0 border-x-0 bg-gray-100 text-gray-600 placeholder-gray-600 pr-20 sm:pr-44 lg:pr-60 focus:outline-none focus:placeholder-gray-400"
+		/>
+		<div class="absolute right-0 items-center inset-y-0 flex">
+			<button
+				type="button"
+				class="hidden md:inline-flex items-center justify-center rounded-full h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
+				on:click={attach}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					class="h-6 w-6 text-gray-600"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+					>
+					</path>
+				</svg>
+			</button>
+			<button
+				type="button"
+				class="hidden md:inline-flex items-center justify-center rounded-full h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
+				on:click={picture}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					class="h-6 w-6 text-gray-600"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+					>
+					</path>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+					>
+					</path>
+				</svg>
+			</button>
+			<button
+				type="button"
+				class="hidden md:inline-flex items-center justify-center rounded-full h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
+				on:click={emoji}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					class="h-6 w-6 text-gray-600"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+					>
+					</path>
+				</svg>
+			</button>
+			<button
+				type="submit"
+				class="inline-flex items-center justify-center px-4 py-3 transition duration-500 ease-in-out text-white bg-brand-500 hover:bg-brand-400 focus:outline-none"
+			>
+				<span class="font-bold hidden lg:block"> Send </span>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 20 20"
+					fill="currentColor"
+					class="h-6 w-6 transform rotate-90 lg:ml-2"
+				>
+					<path
+						d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"
+					>
+					</path>
+				</svg>
+			</button>
+		</div>
+	</div>
+</form>

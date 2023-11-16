@@ -17,20 +17,18 @@
 		const diffMinutes = Math.floor(diffSeconds / 60)
 		const diffHours = Math.floor(diffMinutes / 60)
 		const diffDays = Math.floor(diffHours / 24)
-		const diffWeeks = Math.floor(diffDays / 7)
-		const diffMonths = Math.floor(diffDays / 30)
-		const diffYears = Math.floor(diffDays / 365)
 
-		if (diffYears >= 1) {
-			return `${diffYears}y`
-		} else if (diffMonths >= 1) {
-			return `${diffMonths}m`
-		} else if (diffWeeks >= 1) {
-			return `${diffWeeks}w`
-		} else if (diffDays >= 1) {
-			return `${diffDays}d`
+		if (diffDays >= 1) {
+			return new Intl.DateTimeFormat('en', {
+				month: 'short',
+				day: 'numeric',
+				hour: 'numeric',
+				minute: 'numeric',
+			}).format(when)
 		} else if (diffHours >= 1) {
 			return `${diffHours}h`
+		} else if (diffMinutes >= 1) {
+			return `${diffMinutes}m`
 		}
 		return 'now'
 	}
@@ -39,15 +37,16 @@
 {#if sourceUser && targetUser}
 	<div class="flex items-end" class:justify-end={messageGroup.user === sourceUser.auth}>
 		<div
-			class="flex flex-col space-y-2 text-xs max-w-xs mx-2 items-start"
+			class="flex flex-col space-y-2 text-xs max-w-xs w-full mx-2 items-start"
 			class:order-2={messageGroup.user === targetUser.auth}
 		>
-			<p class="truncate text-xs text-center self-center text-gray-600 opacity-80">
+			<p class="truncate text-xs text-center self-center text-gray-600 opacity-80 w-full pt-1">
 				{shortenDate(new Date(messageGroup.messages[0].created_at))}
 			</p>
 			{#each messageGroup.messages as message, index (`${new Date(message.created_at).getTime()}_${index}`)}
 				<div
 					class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
+					class:self-end={messageGroup.user === sourceUser.auth}
 					class:bg-gray-300={messageGroup.user === targetUser.auth}
 					class:text-gray-600={messageGroup.user === targetUser.auth}
 					class:bg-blue-600={messageGroup.user === sourceUser.auth}
