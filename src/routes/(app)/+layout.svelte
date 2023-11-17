@@ -15,14 +15,12 @@
 	if (browser) {
 		import('$lib/Components/Auth/hanko').then((hanko) => (auth = hanko.userAuth))
 	}
-
-	$: console.log($auth, chattingWith)
 </script>
 
 <slot />
 
 <section
-	class="fixed right-4 z-50 border-brand-200 rounded-t-lg overflow-clip transition-all"
+	class="fixed right-4 z-50 border-brand-200 border-b-0 rounded-t-lg overflow-clip transition-all"
 	class:-bottom-96={!showChatList}
 	class:bottom-0={showChatList}
 	class:border={showChatList}
@@ -39,18 +37,20 @@
 
 {#if chattingWith && $auth}
 	<section
-		class="fixed right-96 z-50 border-brand-200 rounded-t-lg overflow-clip transition-all"
+		class="fixed right-96 z-50 translate-y-1 max-w-[440px] w-[440px] border-brand-200 border-b-0 rounded-t-lg overflow-clip transition-all"
 		class:-bottom-96={!showChat}
 		class:bottom-0={showChat}
 		class:border={showChat}
 		class:bg-gray-200={!showChat}
 		class:bg-gray-50={showChat}
 	>
-		<ChatRoom
-			source={$auth}
-			target={chattingWith}
-			highlight={!showChat}
-			on:toggle={() => (showChat = !showChat)}
-		/>
+		{#key chattingWith}
+			<ChatRoom
+				source={$auth}
+				target={chattingWith}
+				highlight={!showChat}
+				on:toggle={() => (showChat = !showChat)}
+			/>
+		{/key}
 	</section>
 {/if}

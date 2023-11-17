@@ -4,6 +4,7 @@
 	import { createEventDispatcher } from 'svelte'
 
 	export let target: string
+	let chatInput: HTMLInputElement
 
 	const dispatch = createEventDispatcher()
 
@@ -26,6 +27,7 @@
 			return
 		}
 		send(message.toString())
+		chatInput.value = ''
 		return async ({ result, update }) => {
 			// @ts-ignore
 			if (result.status !== 'ok') {
@@ -59,10 +61,12 @@
 			</button>
 		</span>
 		<input
+			bind:this={chatInput}
 			id="chat-input"
 			name="chat-input"
 			type="text"
 			placeholder="Write your message!"
+			autocomplete="off"
 			class="w-full pl-12 py-3 border-t border-t-gray-300 border-b-0 border-x-0 bg-gray-100 text-gray-600 placeholder-gray-600 pr-20 sm:pr-44 lg:pr-60 focus:outline-none focus:placeholder-gray-400"
 		/>
 		<div class="absolute right-0 items-center inset-y-0 flex">

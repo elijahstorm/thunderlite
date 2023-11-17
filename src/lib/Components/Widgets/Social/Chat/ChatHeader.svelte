@@ -17,12 +17,12 @@
 
 <button type="button" on:click={() => dispatch('toggle')}>
 	<header
-		class="flex px-4 sm:items-center justify-between pb-3 border-b-2 border-gray-200"
+		class="flex px-4 sm:items-center justify-between pb-3 border-b border-gray-200"
 		class:pt-6={!highlight}
 		class:pt-4={highlight}
 	>
 		<div class="relative flex items-center space-x-4">
-			<UserImageAndName {user} text />
+			<UserImageAndName {user} text noClick />
 		</div>
 		<div class="flex items-center space-x-2">
 			<button

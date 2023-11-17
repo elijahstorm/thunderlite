@@ -17,7 +17,7 @@ export const queryUsers: (
             select users.*,
                 exists(select 1 from follows where source = ${me} and target = users.auth) as following,
                 exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-                count(*) as message_count,
+				coalesce(count(messages.message), 0) as message_count,
 				json_build_object(
 					'message', max(messages.message),
 					'when', max(messages.created_at)
@@ -55,7 +55,7 @@ export const queryFriends: (
             select users.*,
 				exists(select 1 from follows where source = ${me} and target = users.auth) as following,
 				exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-				count(*) as message_count,
+				coalesce(count(messages.message), 0) as message_count,
 				json_build_object(
 					'message', max(messages.message),
 					'when', max(messages.created_at)
@@ -71,6 +71,8 @@ export const queryFriends: (
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
+
+		console.log(users)
 	}
 
 	return {
@@ -93,7 +95,7 @@ export const queryFollowing: (
             select users.*,
 				exists(select 1 from follows where source = ${me} and target = users.auth) as following,
 				exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-				count(*) as message_count,
+				coalesce(count(messages.message), 0) as message_count,
 				json_build_object(
 					'message', max(messages.message),
 					'when', max(messages.created_at)
@@ -110,6 +112,8 @@ export const queryFollowing: (
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
 	}
+
+	console.log(users)
 
 	return {
 		users,
@@ -131,7 +135,7 @@ export const queryFollowers: (
             select users.*,
 				exists(select 1 from follows where source = ${me} and target = users.auth) as following,
 				exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-				count(*) as message_count,
+				coalesce(count(messages.message), 0) as message_count,
 				json_build_object(
 					'message', max(messages.message),
 					'when', max(messages.created_at)
@@ -147,6 +151,8 @@ export const queryFollowers: (
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not get map from database')
+
+		console.log(users)
 	}
 
 	return {

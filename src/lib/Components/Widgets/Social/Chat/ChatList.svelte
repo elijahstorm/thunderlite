@@ -119,7 +119,7 @@
 	}
 </script>
 
-<section class="h-full antialiased text-gray-600 relative max-w-[340px] mx-auto">
+<section class="h-full antialiased text-gray-600 relative max-w-[340px] w-[340px] mx-auto">
 	<header
 		class="relative px-5 border-b border-gray-200 transition-colors"
 		class:pt-6={!highlight}
