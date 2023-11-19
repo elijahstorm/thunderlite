@@ -8,11 +8,11 @@
 	import { fly } from 'svelte/transition'
 
 	export let map: () => MapObject | undefined
-	let requestRedraw: number
 
-	let socket = writable<WebSocket | null>(null)
 	const connectionTimeout = writable<NodeJS.Timeout | null>()
 	const TIMEOUT = 1000
+	let socket = writable<WebSocket | null>(null)
+	let requestRedraw: number
 	let error = false
 	let opened = false
 
