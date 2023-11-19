@@ -1,5 +1,5 @@
 import { VERCEL_ENV } from '$env/static/private'
-import { CreateDemoData } from '$lib/Migrations/create_demo_data.sql'
+import { CreateDemoData } from '$lib/Migrations/seed_faker_data.sql'
 import { migrationsList } from '$lib/Migrations/list'
 import type postgres from 'postgres'
 

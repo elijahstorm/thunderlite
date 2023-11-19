@@ -2,7 +2,7 @@
 </script>
 
 <section>
-	<h1 class="py-4 opacity-90 text-lg font-semibold">Settings</h1>
+	<h1 class="py-4 opacity-90 text-lg font-semibold">My Items</h1>
 
-	<p>information</p>
+	<p>Unlock Pro to keep your items.</p>
 </section>

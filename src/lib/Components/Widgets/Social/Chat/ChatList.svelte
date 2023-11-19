@@ -225,7 +225,7 @@
 							<UserIcon {user} noClick />
 							<div>
 								<h4 class="text-sm font-semibold text-gray-900">{user.display_name}</h4>
-								<div class="text-[13px] flex gap-x-2">
+								<div class="text-[13px] flex gap-x-2" class:font-bold={user.last_message?.unread}>
 									<p
 										class="max-w-[200px] truncate text-ellipsis"
 										class:opacity-60={!user.last_message?.message}

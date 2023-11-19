@@ -54,12 +54,32 @@ export const CreateDemoData = async (sql: postgres.Sql, user: string) => {
         `
 
 	await sql`
-        INSERT INTO "messages" ("source", "target", "message") VALUES
-        (${user}, 'b', 'hello message one'),
-        (${user}, 'b', 'Lorem Ipsum is simply dummy text of the printing and typesettin'),
-        ('b', ${user}, 'The standard chunk of Lorem Ipsum used since the 1500s is repro'),
-        ('b', ${user}, 'Lorem ipsum dolor sit amet.'),
-        ('b', ${user}, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque consequat feugiat elementum. Pellentesque varius vitae est nec porta. Nunc viverra ac nisi in molestie. Curabitur eget neque nunc. Donec in nibh ipsum. Aenean ut nisi vitae tellus tempor imperdiet ac vel odio. In eu augue at lectus iaculis semper. In mattis ante vitae aliquam porta. Curabitur laoreet vel erat nec faucibus. Quisque iaculis lorem vitae lectus interdum sagittis. Aliquam erat volutpat. Quisque et turpis vel eros tristique bibendum sit amet at ipsum. Integer at quam metus. Suspendisse iaculis mattis nulla.        '),
-        (${user}, 'b', 'Fusce nibh justo, tincidunt vitae velit non, rhoncus pulvinar');
+        INSERT INTO "messages" ("source", "target", "message", "created_at") VALUES
+        (${user}, 'b', 'hello message one', '2023-11-19 09:05:47.583993'),
+        (${user}, 'b', 'Lorem Ipsum is simply dummy text of the printing and typesettin', '2023-11-19 09:05:47.583993'),
+        ('b', ${user}, 'The standard chunk of Lorem Ipsum used since the 1500s is repro', '2023-11-19 09:05:47.583993'),
+        ('b', ${user}, 'Lorem ipsum dolor sit amet.', '2023-11-19 09:05:47.583993'),
+        ('b', ${user}, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque consequat feugiat elementum. Pellentesque varius vitae est nec porta. Nunc viverra ac nisi in molestie. Curabitur eget neque nunc. Donec in nibh ipsum. Aenean ut nisi vitae tellus tempor imperdiet ac vel odio. In eu augue at lectus iaculis semper. In mattis ante vitae aliquam porta. Curabitur laoreet vel erat nec faucibus. Quisque iaculis lorem vitae lectus interdum sagittis. Aliquam erat volutpat. Quisque et turpis vel eros tristique bibendum sit amet at ipsum. Integer at quam metus. Suspendisse iaculis mattis nulla.', '2023-11-19 09:05:47.583993'),
+        (${user}, 'b', 'Fusce nibh justo, tincidunt vitae velit non, rhoncus pulvinar', '2023-11-19 09:05:47.583993');
+        `
+
+	await sql`
+        INSERT INTO "messages" ("source", "target", "message", "created_at") VALUES
+        (${user}, 'c', 'hello message one', '2023-11-15 09:05:47.583993'),
+        (${user}, 'c', 'Lorem Ipsum is simply dummy text of the printing and typesettin', '2023-11-15 09:05:47.583993'),
+        ('c', ${user}, 'The standard chunk of Lorem Ipsum used since the 1500s is repro', '2023-11-15 09:05:47.583993'),
+        ('c', ${user}, 'Lorem ipsum dolor sit amet.', '2023-11-15 09:05:47.583993'),
+        ('c', ${user}, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque consequat feugiat elementum. Pellentesque varius vitae est nec porta. Nunc viverra ac nisi in molestie. Curabitur eget neque nunc. Donec in nibh ipsum. Aenean ut nisi vitae tellus tempor imperdiet ac vel odio. In eu augue at lectus iaculis semper. In mattis ante vitae aliquam porta. Curabitur laoreet vel erat nec faucibus. Quisque iaculis lorem vitae lectus interdum sagittis. Aliquam erat volutpat. Quisque et turpis vel eros tristique bibendum sit amet at ipsum. Integer at quam metus. Suspendisse iaculis mattis nulla.', '2023-11-15 09:05:47.583993'),
+        (${user}, 'c', 'Fusce nibh justo, tincidunt vitae velit non, rhoncus pulvinar', '2023-11-15 09:05:47.583993');
+        `
+
+	await sql`
+        INSERT INTO "messages" ("source", "target", "message", "created_at") VALUES
+        (${user}, 'a', 'hello message one', '2023-11-05 09:05:47.583993'),
+        (${user}, 'a', 'Lorem Ipsum is simply dummy text of the printing and typesettin', '2023-11-05 09:05:47.583993'),
+        ('a', ${user}, 'The standard chunk of Lorem Ipsum used since the 1500s is repro', '2023-11-05 09:05:47.583993'),
+        ('a', ${user}, 'Lorem ipsum dolor sit amet.', '2023-11-05 09:05:47.583993'),
+        ('a', ${user}, 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque consequat feugiat elementum. Pellentesque varius vitae est nec porta. Nunc viverra ac nisi in molestie. Curabitur eget neque nunc. Donec in nibh ipsum. Aenean ut nisi vitae tellus tempor imperdiet ac vel odio. In eu augue at lectus iaculis semper. In mattis ante vitae aliquam porta. Curabitur laoreet vel erat nec faucibus. Quisque iaculis lorem vitae lectus interdum sagittis. Aliquam erat volutpat. Quisque et turpis vel eros tristique bibendum sit amet at ipsum. Integer at quam metus. Suspendisse iaculis mattis nulla.', '2023-11-05 09:05:47.583993'),
+        (${user}, 'a', 'Fusce nibh justo, tincidunt vitae velit non, rhoncus pulvinar', '2023-11-05 09:05:47.583993');
         `
 }

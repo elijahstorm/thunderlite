@@ -7,6 +7,7 @@ export const CreateMessages = (sql: postgres.Sql) =>
             source text references users(auth),
             target text references users(auth),
             message text not null,
+            read_at timestamp default null,
             created_at timestamp default current_timestamp
         )
         `

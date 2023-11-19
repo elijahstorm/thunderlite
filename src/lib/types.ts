@@ -152,9 +152,9 @@ type UserDBData = {
 	following?: boolean
 	follower?: boolean
 	relationship?: RelationshipStatus
-	message_count?: number
 	last_message?: {
 		message: string
+		unread: boolean
 		when: Date
 	}
 	created_at: Date

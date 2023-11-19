@@ -18,29 +18,51 @@ const query: (type: QueryType) => (
 
 		try {
 			users = await sql`
-            select users.*,
+            select
+				users.*,
                 exists(select 1 from follows where source = ${me} and target = users.auth) as following,
                 exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-				coalesce(count(messages.message), 0) as message_count,
+				relationships.status as relationship,
 				json_build_object(
-					'message', max(messages.message),
-					'when', max(messages.created_at)
-				) AS last_message,
-                relationships.status as relationship
-            from users
-                left join relationships on source = ${me} and target = users.auth
-				left join messages on (messages.target = users.auth and messages.source = ${me}) or (messages.target = ${me} and messages.source = users.auth)
-            where users.auth != ${me}
+					'message', last_message.message,
+					'unread', case when last_message.source != ${me} and last_message.read_at is null then 1 else 0 end,
+					'when', last_message.created_at
+				) as last_message
+            from
+				users
+			left join
+				relationships on source = ${me} and target = users.auth
+			left join lateral (
+				select
+					messages.message,
+					messages.source,
+					messages.created_at,
+					messages.read_at
+				from
+					messages
+				where
+					(messages.target = users.auth and messages.source = ${me})
+					or (messages.target = ${me} and messages.source = users.auth)
+				order by
+					messages.created_at desc
+				limit 1
+			) as last_message on true
+            where
+				users.auth != ${me}
 				and (${type} != 'public' or private = false and profile_image_url is not null)
 				and (${type} != 'friends' or relationships.status = 'friends')
 				and (${type} != 'following' or exists(select 1 from follows where source = ${me} and target = users.auth))
 				and (${type} != 'followers' or exists(select 1 from follows where source = users.auth and target = ${me}))
-			group by relationships.status, users.id
-				order by case when relationships.status = 'friends' then 1 else 2 end, message_count desc
-                limit ${limit} offset ${(page ?? 0) * limit}`
+			order by
+				last_message.created_at desc nulls last,
+				case when relationships.status = 'friends' then 1 else 2 end
+			limit
+				${limit}
+			offset
+				${(page ?? 0) * limit}`
 		} catch (msg) {
 			logToErrorDb(sql)(msg)
-			throw error(500, 'Could not get map from database')
+			throw error(500, 'Could not get users from database')
 		}
 
 		return {

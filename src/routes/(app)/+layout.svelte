@@ -10,7 +10,10 @@
 	let showChat = false
 	let chattingWith: string | null = null
 
-	const openChat = (auth: string) => (chattingWith = auth)
+	const openChat = (auth: string) => {
+		chattingWith = auth
+		showChat = true
+	}
 
 	if (browser) {
 		import('$lib/Components/Auth/hanko').then((hanko) => (auth = hanko.userAuth))

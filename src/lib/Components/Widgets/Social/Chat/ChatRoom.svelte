@@ -33,7 +33,6 @@
 		Math.abs(new Date(lastMessage).getTime() - new Date(currentMessage).getTime()) < 2 * 60 * 1000
 
 	const parseMessages = (allMessages: MessageDBData[]) => {
-		console.log($targetUser, allMessages)
 		const parsedMessages = []
 		for (let i = 0; i < allMessages.length; ) {
 			const firstMessageInGroup = allMessages[i]
@@ -116,7 +115,7 @@
 <div class="justify-between flex flex-col h-full max-h-screen">
 	<ChatHeader user={$targetUser} on:toggle={() => dispatch('toggle')} {highlight} />
 	<InfiniteScroll
-		tailwind="flex flex-col-reverse max-h-[calc(21.25rem-1px)] h-[calc(21.25rem-1px)] justify-start h-full gap-y-4 p-3 overflow-y-auto scrolling-touch"
+		tailwind="flex flex-col-reverse max-h-[calc(21.25rem-1px)] h-[calc(21.25rem-1px)] justify-start gap-y-4 p-3 overflow-y-auto scrolling-touch"
 		threshold={40}
 		reverse
 		on:load={loadMoreMessage}

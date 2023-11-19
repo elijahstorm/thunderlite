@@ -72,7 +72,7 @@
 				</svg>
 			</div>
 			<p class="text-left text-md pt-4 truncate">
-				<span class="text-xl font-bold tracking-wider">
+				<span class="text-md font-bold tracking-wider">
 					{map.name ?? 'Unnamed'}
 				</span>
 				<span class="text-left text-md font-normal opacity-70"> - </span>
