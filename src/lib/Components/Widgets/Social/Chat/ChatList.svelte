@@ -4,10 +4,16 @@
 	import InfiniteScroll from '../../Helpers/InfiniteScroll.svelte'
 	import UserImageAndName from '../UserImageAndName.svelte'
 	import { browser } from '$app/environment'
-	import { writable } from 'svelte/store'
+	import { writable, type Writable } from 'svelte/store'
 	import { fly } from 'svelte/transition'
 	import { createEventDispatcher } from 'svelte'
 
+	export let socketMessages: Writable<
+		(MessageDBData & {
+			created_at: Date
+			read_at: Date | null
+		})[]
+	>
 	export let highlight = false
 
 	let auth = writable<string | null>(null)
@@ -21,6 +27,7 @@
 	let page = -1
 	let hasMore = true
 	let queryState = ''
+	let openedChatAuth: string | undefined
 	const queryStates = [
 		{
 			state: ``,
@@ -60,6 +67,33 @@
 		dispatch('open')
 	}
 
+	const openChatRoom = (auth: string) => {
+		openedChatAuth = auth
+		dispatch('chat', auth)
+	}
+
+	const updateWithNewChats = (
+		newMessages: (MessageDBData & {
+			created_at: Date
+			read_at: Date | null
+		})[],
+		openedChat: string | undefined
+	) =>
+		($users = $users.map((user) => {
+			const message = [...newMessages].reverse().find((message) => message.source === user.auth)
+			if (!message) return user
+			if (message.created_at === user.last_message?.when) return user
+			if (message.source === openedChat) {
+				message.read_at = new Date()
+			}
+			user.last_message = {
+				message: message.message,
+				when: message.created_at,
+				unread: message.read_at === null,
+			}
+			return user
+		}))
+
 	const newChat = () => {}
 
 	const updateQuery = (state: typeof queryState) => () => {
@@ -86,13 +120,15 @@
 		if (diffYears >= 1) {
 			return `${diffYears}y`
 		} else if (diffMonths >= 1) {
-			return `${diffMonths}m`
+			return `${diffMonths}mth`
 		} else if (diffWeeks >= 1) {
 			return `${diffWeeks}w`
 		} else if (diffDays >= 1) {
 			return `${diffDays}d`
 		} else if (diffHours >= 1) {
 			return `${diffHours}h`
+		} else if (diffMinutes >= 1) {
+			return `${diffMinutes}m`
 		}
 		return 'now'
 	}
@@ -117,6 +153,8 @@
 			}
 		}
 	}
+
+	$: updateWithNewChats($socketMessages, openedChatAuth)
 </script>
 
 <section class="h-full antialiased text-gray-600 relative max-w-[340px] w-[340px] mx-auto">
@@ -126,7 +164,9 @@
 		class:pt-4={highlight}
 	>
 		{#await me}
-			<Loader />
+			<div class="pt-1 pb-4">
+				<Loader type={9} />
+			</div>
 		{:then me}
 			<button
 				type="button"
@@ -219,7 +259,7 @@
 					<button
 						type="button"
 						class="w-full text-left py-2 focus:outline-none focus-visible:bg-indigo-50 hover:bg-indigo-50"
-						on:click={() => dispatch('chat', user.auth)}
+						on:click={() => openChatRoom(user.auth)}
 					>
 						<div class="flex items-center overflow-hidden gap-x-3">
 							<UserIcon {user} noClick />
@@ -250,14 +290,14 @@
 	</InfiniteScroll>
 	<!-- Bottom right button -->
 	<button
-		class="absolute bottom-5 right-5 inline-flex transition-colors items-center text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-full text-center px-3 py-2 shadow-lg focus:outline-none focus-visible:ring-2"
+		class="group absolute bottom-5 right-5 space-x-2 inline-flex transition-colors items-center text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-full text-center px-3 py-2 shadow-lg focus:outline-none focus-visible:ring-2"
 		on:click={newChat}
 	>
-		<svg class="w-3 h-3 fill-current text-indigo-300 flex-shrink-0 mr-2" viewBox="0 0 12 12">
+		<svg class="w-3 h-3 fill-current text-indigo-300 flex-shrink-0" viewBox="0 0 12 12">
 			<path
 				d="M11.866.146a.5.5 0 0 0-.437-.139c-.26.044-6.393 1.1-8.2 2.913a4.145 4.145 0 0 0-.617 5.062L.305 10.293a1 1 0 1 0 1.414 1.414L7.426 6l-2 3.923c.242.048.487.074.733.077a4.122 4.122 0 0 0 2.933-1.215c1.81-1.809 2.87-7.94 2.913-8.2a.5.5 0 0 0-.139-.439Z"
 			/>
 		</svg>
-		<span> New Chat </span>
+		<span class="hidden md:block hover-group:block"> New Chat </span>
 	</button>
 </section>

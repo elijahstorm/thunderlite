@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { writable } from 'svelte/store'
+	import { writable, type Writable } from 'svelte/store'
 	import { browser } from '$app/environment'
 	import { generateKey } from '$lib/Security/keys'
 	import { createEventDispatcher, onMount } from 'svelte'
@@ -8,6 +8,13 @@
 	import ChatInput from './ChatInput.svelte'
 	import ChatHeader from './ChatHeader.svelte'
 
+	export let populate: (props: { message: string; source: string; target: string }) => void
+	export let socketMessages: Writable<
+		(MessageDBData & {
+			created_at: Date
+			read_at: Date | null
+		})[]
+	>
 	export let highlight = false
 	export let source: string
 	export let target: string
@@ -19,13 +26,6 @@
 	let hasMore = true
 	const dispatch = createEventDispatcher()
 
-	const messageGroups = writable<
-		{
-			key: string
-			user: string
-			messages: MessageDBData[]
-		}[]
-	>([])
 	const allMessages = writable<MessageDBData[]>([])
 
 	const shouldFlowTogether = (lastMessage: Date | undefined, currentMessage: Date) =>
@@ -33,6 +33,7 @@
 		Math.abs(new Date(lastMessage).getTime() - new Date(currentMessage).getTime()) < 2 * 60 * 1000
 
 	const parseMessages = (allMessages: MessageDBData[]) => {
+		allMessages.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 		const parsedMessages = []
 		for (let i = 0; i < allMessages.length; ) {
 			const firstMessageInGroup = allMessages[i]
@@ -77,9 +78,14 @@
 			.then((res) => res.json())
 			.then(resolve)
 
-	const sendMessage = (data: { detail: { message: string } }) => {
+	const populateMessage = (data: { detail: { message: string } }) => {
 		const { message } = data.detail
 		if (!message) return
+		populate({
+			target,
+			source,
+			message,
+		})
 		$allMessages = [
 			...[
 				{
@@ -108,8 +114,6 @@
 			loadMoreMessage()
 		}
 	})
-
-	$: $messageGroups = parseMessages($allMessages)
 </script>
 
 <div class="justify-between flex flex-col h-full max-h-screen">
@@ -120,9 +124,9 @@
 		reverse
 		on:load={loadMoreMessage}
 	>
-		{#each $messageGroups as messageGroup (messageGroup.key)}
+		{#each parseMessages([...$allMessages, ...$socketMessages]) as messageGroup (messageGroup.key)}
 			<ChatMessageGroups {messageGroup} sourceUser={$sourceUser} targetUser={$targetUser} />
 		{/each}
 	</InfiniteScroll>
-	<ChatInput {target} on:send={sendMessage} />
+	<ChatInput {target} on:send={populateMessage} />
 </div>

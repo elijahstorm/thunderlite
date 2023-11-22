@@ -34,7 +34,7 @@
 	}
 </script>
 
-{#if sourceUser && targetUser}
+{#if sourceUser && targetUser && (messageGroup.user === sourceUser.auth || messageGroup.user === targetUser.auth)}
 	<div class="flex items-end" class:justify-end={messageGroup.user === sourceUser.auth}>
 		<div
 			class="flex flex-col space-y-2 text-xs max-w-xs w-full mx-2 items-start"
@@ -43,7 +43,7 @@
 			<p class="truncate text-xs text-center self-center text-gray-600 opacity-80 w-full pt-1">
 				{shortenDate(new Date(messageGroup.messages[0].created_at))}
 			</p>
-			{#each messageGroup.messages as message, index (`${new Date(message.created_at).getTime()}_${index}`)}
+			{#each messageGroup.messages as message, index (`${new Date(message.created_at).getTime()}_${message.message}`)}
 				<div
 					class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
 					class:self-end={messageGroup.user === sourceUser.auth}
