@@ -23,14 +23,14 @@
 	const TIMEOUT = 1000
 	let socket = writable<WebSocket | null>(null)
 	let error = false
-	let opened = false
+	let opened: boolean | undefined = undefined
 
 	const populate = (props: SocketMessage) => $socket && $socket.send(JSON.stringify(props))
 
 	const create = () => {
 		if (!browser) return null
 		const socket = new WebSocket(PUBLIC_SOCKET_CONNECTION)
-		socket.onopen = socketOpened(() => (opened = true))
+		socket.onopen = socketOpened(socket, () => (opened = true))
 		socket.onclose = socketClosed(() => (opened = false))
 		socket.onmessage = (evt: MessageEvent<string>) => {
 			const data = JSON.parse(evt.data) as SocketMessage | undefined
@@ -52,7 +52,7 @@
 			$connectionTimeout = null
 			return
 		}
-		if (!$socket) {
+		if (!$socket || (typeof opened !== 'undefined' && !opened)) {
 			socket.set(create())
 		}
 		$connectionTimeout = setTimeout(connect, TIMEOUT)
