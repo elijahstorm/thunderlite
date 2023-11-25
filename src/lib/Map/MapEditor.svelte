@@ -90,10 +90,10 @@
 	$: mapStore.set(map)
 </script>
 
-<grid class="p-0 h-screen max-h-screen overflow-hidden flex flex-col select-none md:p-6">
+<grid class="flex flex-col select-none h-full">
 	<div class="hidden md:flex">
 		<div class="bg-blue-100 border-black border-2">
-			<ButtonGrid rows={2} length={maxTeamAmount} let:index>
+			<ButtonGrid cols={2} length={maxTeamAmount} let:index>
 				<EditorButton
 					action={changeTeam(index)}
 					selected={editType !== 'ground' && team === index}
@@ -114,7 +114,7 @@
 			</ButtonGrid>
 		</div>
 
-		<div class="flex-1 bg-blue-100 border-black border-y-2 border-r-2">
+		<div class="flex-1 bg-blue-100 border-black border-y-2 border-r-2 overflow-hidden">
 			<ButtonGrid rows={2} length={unitData.length} let:index>
 				<EditorButton
 					action={changeType('units', index)}
@@ -158,7 +158,7 @@
 			</div>
 		{/if}
 
-		<div class="bg-blue-100 border-black border-b">
+		<div class="bg-blue-100 border-black border-b overflow-hidden">
 			<ButtonGrid rows={1} length={unitData.length} let:index>
 				<EditorButton
 					action={changeType('units', index)}

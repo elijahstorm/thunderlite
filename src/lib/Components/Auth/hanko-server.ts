@@ -1,14 +1,8 @@
 import type { RequestEvent } from '@sveltejs/kit'
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from 'jose'
 import { PUBLIC_HANKO_API_URL } from '$env/static/public'
-import { VERCEL_ENV } from '$env/static/private'
 
 export const authenticatedUser = async (event: RequestEvent) => {
-	if (VERCEL_ENV !== 'production') {
-		event.locals.user = 'local'
-		return true
-	}
-
 	const hanko = event.cookies.get('hanko')
 	try {
 		await jwtVerify(
@@ -19,5 +13,16 @@ export const authenticatedUser = async (event: RequestEvent) => {
 		return true
 	} catch {
 		return false
+	}
+}
+
+export const activeUserInfo = async (auth: string) => {
+	const response = await fetch(`${PUBLIC_HANKO_API_URL}/users/${auth}`)
+	const data = await response.json()
+
+	const email = data.emails ? data.emails[0]?.address : null
+
+	return {
+		email,
 	}
 }

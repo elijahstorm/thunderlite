@@ -3,6 +3,14 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	server: {
+		port: 5173,
+		host: true,
+	},
+	preview: {
+		port: 4173,
+		host: true,
+	},
 	build: {
 		rollupOptions: {
 			external: ['iconify-icon'],

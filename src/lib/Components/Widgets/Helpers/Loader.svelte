@@ -24,8 +24,10 @@
 		SyncLoader,
 		BarLoader,
 	] as const
+
+	export let type = Math.floor(Math.random() * loaders.length)
 </script>
 
 <div class="m-auto">
-	<svelte:component this={loaders[Math.floor(Math.random() * loaders.length)]} />
+	<svelte:component this={loaders[type]} />
 </div>

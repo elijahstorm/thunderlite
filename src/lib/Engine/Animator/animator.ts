@@ -103,7 +103,7 @@ export const animateAttack = (
 				key,
 				x: source % map.cols,
 				y: Math.floor(source / map.cols),
-				source: attackSprite.sprite[attacker.team].src,
+				source: attackSprite.sprite[attacker.team ?? 0].src,
 				xOffset: attackSprite.xOffset,
 				yOffset: attackSprite.yOffset,
 				frames: attackSprite.frames,

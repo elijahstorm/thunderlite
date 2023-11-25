@@ -129,3 +129,51 @@ type Direction =
 	| 'bottomLeft'
 	| 'bottom'
 	| 'bottomRight'
+
+type RelationshipStatus = 'unknown' | 'blocked' | 'friends' | 'friend-request'
+type Relationship = {
+	mine: RelationshipStatus
+	theirs: RelationshipStatus
+}
+
+type MessageDBData = {
+	source: string
+	target: string
+	message: string
+	created_at: Date
+}
+type UserDBData = {
+	id: number
+	auth: string
+	username: string
+	display_name: string
+	profile_image_url: string
+	bio: string
+	following?: boolean
+	follower?: boolean
+	relationship?: RelationshipStatus
+	last_message?: {
+		message: string
+		unread: boolean
+		when: Date
+	}
+	created_at: Date
+}
+type MapDBData = {
+	id: number
+	sha: string
+	owner_auth: string
+	name: string
+	description: string
+	type: string
+	info: { info: string; color: string }[]
+	thumbnail: string
+	url: string
+	plays: number
+	likes: number
+	liked_by_me: number
+	shares: number
+	trending: boolean
+	created_at: Date
+	updated_at: Date
+}

@@ -12,10 +12,21 @@ export default {
 	theme: {
 		extend: {
 			fontFamily: 'Roboto, sans-serif',
+			backgroundSize: {
+				'size-200': '200% 200%',
+			},
+			backgroundPosition: {
+				'pos-0': '0% 0%',
+				'pos-100': '100% 100%',
+			},
 			colors: {
 				primary: {
 					'dark-blue': 'hsl(233, 26%, 24%)',
 					'lime-green': '#59e5c3',
+					purple: '#6b19cd',
+					'light-purple': '#3f7aff',
+					'baby-blue': '#22bbff',
+					'light-blue': '#59c2e5',
 					'bright-cyan': 'hsl(192, 70%, 51%)',
 				},
 				neutral: {

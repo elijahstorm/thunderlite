@@ -1,28 +1,25 @@
 import { error } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { createClient } from '@vercel/kv'
-import { createPool } from '@vercel/postgres'
-import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL, VERCEL_ENV } from '$env/static/private'
-import { logToErrorDb } from '$lib/Security/server-logs.js'
+import { KV_REST_API_TOKEN, KV_REST_API_URL, VERCEL_ENV } from '$env/static/private'
+import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
-
-export const prerender = false
-export const ssr = false
+import type postgres from 'postgres'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const userSession = locals.session
 	if (!userSession) throw error(401, 'User not logged in')
-	const { gameSession, sha } = await getGameSession(userSession)
+	const { gameSession, sha } = await getGameSession(locals.sql, userSession)
 	if (!gameSession || !sha) throw error(403, 'No game session found')
 
 	return {
 		userSession,
 		gameSession,
-		...(await getMapHash(sha)),
+		...(await getMapHash(locals.sql, sha)),
 	}
 }
 
-const getGameSession = async (userSession: string) => {
+const getGameSession = async (sql: postgres.Sql, userSession: string) => {
 	if (VERCEL_ENV !== 'production') {
 		return { gameSession: 'testSession', sha: 'hello' }
 	}
@@ -46,7 +43,7 @@ const getGameSession = async (userSession: string) => {
 		isMember =
 			gameSession !== null && (await kv.sismember(`game:${gameSession}`, userSession)) === 1
 	} catch (msg) {
-		logToErrorDb(createPool({ connectionString: POSTGRES_URL }))(msg)
+		logToErrorDb(sql)(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 

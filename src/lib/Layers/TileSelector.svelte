@@ -42,7 +42,7 @@
 		}px; width: ${cellWidth}px; height: ${cellHeight}px;`
 </script>
 
-<section class="grid relative w-full h-full">
+<section class="grid relative w-full h-full overflow-hidden">
 	<div class="col-start-1 row-start-1 cursor-pointer">
 		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight} />
 	</div>

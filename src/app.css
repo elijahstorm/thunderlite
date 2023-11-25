@@ -7,7 +7,7 @@
 		@apply self-start px-5 py-3 inline-block rounded-lg uppercase tracking-wider font-semibold text-sm lg:text-lg sm:text-base transition focus:outline-none focus:ring focus:ring-offset-2 focus:ring-opacity-50;
 	}
 	.btn-primary {
-		@apply bg-brand-500 px-7 py-3 rounded-full text-neutral-white text-xs bg-gradient-to-r from-brand-700 via-brand-500 to-primary-lime-green focus:outline-none focus:ring ring-brand-500;
+		@apply px-7 py-3 rounded-full text-neutral-white text-xs outline-none transition-all duration-300 ring-primary-purple bg-primary-purple bg-gradient-to-r from-primary-purple via-primary-light-purple to-primary-baby-blue via-70% to-100% bg-size-200 bg-pos-0 focus:ring hover:bg-pos-100;
 	}
 	.btn-secondary {
 		@apply bg-brand-500 text-white focus:ring-brand-300 focus:bg-brand-300 hover:bg-brand-200 active:bg-brand-400;

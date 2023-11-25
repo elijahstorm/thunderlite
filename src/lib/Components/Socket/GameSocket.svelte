@@ -8,18 +8,18 @@
 	import { fly } from 'svelte/transition'
 
 	export let map: () => MapObject | undefined
-	let requestRedraw: number
 
-	let socket = writable<WebSocket | null>(null)
 	const connectionTimeout = writable<NodeJS.Timeout | null>()
 	const TIMEOUT = 1000
+	let socket = writable<WebSocket | null>(null)
+	let requestRedraw: number
 	let error = false
-	let opened = false
+	let opened: boolean | undefined = undefined
 
 	const create = () => {
 		if (!browser) return null
 		const socket = new WebSocket(PUBLIC_SOCKET_CONNECTION)
-		socket.onopen = socketOpened(() => (opened = true))
+		socket.onopen = socketOpened(socket, () => (opened = true))
 		socket.onclose = socketClosed(() => (opened = false))
 		socket.onmessage = socketMessage(map, (now: number) => (requestRedraw = now))
 		return socket
@@ -30,7 +30,7 @@
 			$connectionTimeout = null
 			return
 		}
-		if (!$socket) {
+		if (!$socket || (typeof opened !== 'undefined' && !opened)) {
 			socket.set(create())
 		}
 		$connectionTimeout = setTimeout(connect, TIMEOUT)
