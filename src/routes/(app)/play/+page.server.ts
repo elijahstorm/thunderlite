@@ -8,9 +8,9 @@ import type postgres from 'postgres'
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const userSession = locals.session
-	if (!userSession) throw error(401, 'User not logged in')
+	if (!userSession) error(401, 'User not logged in');
 	const { gameSession, sha } = await getGameSession(locals.sql, userSession)
-	if (!gameSession || !sha) throw error(403, 'No game session found')
+	if (!gameSession || !sha) error(403, 'No game session found');
 
 	return {
 		userSession,
@@ -44,11 +44,11 @@ const getGameSession = async (sql: postgres.Sql, userSession: string) => {
 			gameSession !== null && (await kv.sismember(`game:${gameSession}`, userSession)) === 1
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Cannot get from Redis storage')
+		error(500, 'Cannot get from Redis storage');
 	}
 
 	if (!isMember) {
-		throw error(403, 'You are not a member of this game room')
+		error(403, 'You are not a member of this game room');
 	}
 
 	return { gameSession, sha }

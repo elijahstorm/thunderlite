@@ -7,10 +7,10 @@ import { isValidMapHash } from '$lib/Map/hashLoader.js'
 
 export const POST = async ({ request, locals }) => {
 	const userSession = locals.session
-	if (!userSession) throw error(401, 'User not logged in')
+	if (!userSession) error(401, 'User not logged in');
 	const { sha } = await request.json()
-	if (!sha) throw error(400, 'Please provide a map SHA')
-	if (!(await isValidMapHash(locals.sql, sha))) throw error(400, 'Map with that SHA does not exist')
+	if (!sha) error(400, 'Please provide a map SHA');
+	if (!(await isValidMapHash(locals.sql, sha))) error(400, 'Map with that SHA does not exist');
 
 	const kv = createClient({
 		url: KV_REST_API_URL,
@@ -28,7 +28,7 @@ export const POST = async ({ request, locals }) => {
 		await kv.sadd(`game:${session}`, userSession)
 	} catch (msg) {
 		logToErrorDb(locals.sql)(msg)
-		throw error(500, 'Cannot get from Redis storage')
+		error(500, 'Cannot get from Redis storage');
 	}
 
 	return json({ session })

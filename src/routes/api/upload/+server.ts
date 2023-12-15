@@ -8,7 +8,7 @@ export const POST = async ({ request, locals }) => {
 	const { name, encoded } = await request.json()
 
 	if (!encoded) {
-		throw error(400, { message: 'No map to upload.' })
+		error(400, { message: 'No map to upload.' });
 	}
 
 	const { url } = await put(name, encoded, {
@@ -22,7 +22,7 @@ export const POST = async ({ request, locals }) => {
 		await locals.sql`insert into maps (sha, url) values (${sha}, ${url})`
 	} catch (msg) {
 		logToErrorDb(locals.sql)(msg)
-		throw error(500, 'Could not save map to database')
+		error(500, 'Could not save map to database');
 	}
 
 	return json({ sha })

@@ -19,11 +19,11 @@ export const getUserDBDataFromAuth = async (sql: postgres.Sql, auth: string, me:
 		)[0] as UserDBData
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Could not get user from database')
+		error(500, 'Could not get user from database');
 	}
 
 	if (!user) {
-		throw error(400, { message: 'No user found.' })
+		error(400, { message: 'No user found.' });
 	}
 
 	return user
@@ -34,7 +34,7 @@ export const makeUserDBDataFromAuth = (auth: string) => async (sql: postgres.Sql
 		await sql`insert into users ${sql({ auth }, 'auth')}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Could not make user')
+		error(500, 'Could not make user');
 	}
 }
 
@@ -44,6 +44,6 @@ export const updateUserDBData =
 			await sql`update users set ${sql(user, ...entries)} where auth = ${auth}`
 		} catch (msg) {
 			logToErrorDb(sql)(msg)
-			throw error(500, 'Could not make user')
+			error(500, 'Could not make user');
 		}
 	}

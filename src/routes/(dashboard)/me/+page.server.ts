@@ -11,7 +11,7 @@ export const prerender = false
 export const ssr = false
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) throw error(403, 'You are not logged in')
+	if (!locals.user) error(403, 'You are not logged in');
 	let user: UserDBData | null = null
 
 	try {
@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				created_at: new Date(),
 			}
 		} catch (e) {
-			throw error(500, 'There was an issue making your new account')
+			error(500, 'There was an issue making your new account');
 		}
 	}
 

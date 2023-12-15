@@ -5,7 +5,7 @@ import { makeUserDBDataFromAuth, updateUserDBData } from '$lib/Database/getUserD
 
 export const GET = async ({ locals }) => {
 	const auth = locals.user
-	if (!auth) throw error(403, 'You are not logged in')
+	if (!auth) error(403, 'You are not logged in');
 	let status
 
 	try {
@@ -25,7 +25,7 @@ export const GET = async ({ locals }) => {
 		status = await faker(locals.sql, auth)
 	} catch (e) {
 		console.error(e)
-		throw error(500, 'failed to run migrations')
+		error(500, 'failed to run migrations');
 	}
 
 	return json(status)

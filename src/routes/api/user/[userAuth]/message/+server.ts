@@ -21,7 +21,7 @@ export const POST = async ({ params, request, locals }) => {
 		status = 'ok'
 	} catch (msg) {
 		logToErrorDb(locals.sql)(msg)
-		throw error(500, 'Invalid target auth or message string')
+		error(500, 'Invalid target auth or message string');
 	}
 
 	return json({ status })

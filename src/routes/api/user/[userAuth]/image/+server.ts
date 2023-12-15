@@ -9,7 +9,7 @@ export const POST = async ({ params, request, locals }) => {
 	const { userAuth } = params
 
 	if (!blob) {
-		throw error(400, { message: 'No image to upload.' })
+		error(400, { message: 'No image to upload.' });
 	}
 
 	const { url } = await put(`/user-images/${generateKey()}`, blob, {
@@ -21,7 +21,7 @@ export const POST = async ({ params, request, locals }) => {
 		await locals.sql`update users set profile_image_url = ${url} where auth = ${userAuth}`
 	} catch (msg) {
 		logToErrorDb(locals.sql)(msg)
-		throw error(500, 'Could not save image url to database')
+		error(500, 'Could not save image url to database');
 	}
 
 	return json({ url })

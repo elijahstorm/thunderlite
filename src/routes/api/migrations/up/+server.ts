@@ -10,7 +10,7 @@ export const GET = async ({ locals }) => {
 		status = await migrate(locals.sql)
 	} catch (e) {
 		console.error(e)
-		throw error(500, 'failed to run migrations')
+		error(500, 'failed to run migrations');
 	}
 
 	return json(status)

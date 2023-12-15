@@ -19,7 +19,7 @@ export const GET = async ({ params, locals }) => {
 		}
 	} catch (msg) {
 		logToErrorDb(locals.sql)(msg)
-		throw error(500, 'Could not access database')
+		error(500, 'Could not access database');
 	}
 
 	return json({ status })

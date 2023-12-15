@@ -12,7 +12,7 @@ export const load: LayoutServerLoad = async () => {
 	}
 
 	if (!config) {
-		throw error(404, 'Edge config not pulled')
+		error(404, 'Edge config not pulled');
 	}
 
 	return { config }

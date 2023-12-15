@@ -62,7 +62,7 @@ const query: (type: QueryType) => (
 				${(page ?? 0) * limit}`
 		} catch (msg) {
 			logToErrorDb(sql)(msg)
-			throw error(500, 'Could not get users from database')
+			error(500, 'Could not get users from database');
 		}
 
 		return {

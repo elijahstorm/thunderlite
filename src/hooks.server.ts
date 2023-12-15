@@ -22,7 +22,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	]
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!(await authenticatedUser(event))) {
-			throw redirect(303, '/login')
+			redirect(303, '/login');
 		}
 
 		sql = postgres(dbUri, {
@@ -44,7 +44,7 @@ const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
 
 	const userId = event.locals.user
 	if (!userId) {
-		throw error(500, 'User ID not set')
+		error(500, 'User ID not set');
 	}
 
 	const kv = createClient({
@@ -56,7 +56,7 @@ const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
 		session = await kv.get(`user:${userId}`)
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Cannot get from Redis storage')
+		error(500, 'Cannot get from Redis storage');
 	}
 
 	if (!session) {
@@ -66,7 +66,7 @@ const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
 			await kv.set(`user:${userId}`, session, { ex: fullDay, nx: true })
 		} catch (msg) {
 			logToErrorDb(sql)(msg)
-			throw error(500, 'Cannot set to Redis storage')
+			error(500, 'Cannot set to Redis storage');
 		}
 	}
 

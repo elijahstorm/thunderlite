@@ -12,11 +12,11 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
 	const text = clense(message)
 
 	if (!email || !subject || !message) {
-		throw error(400, 'All fields must be supplied')
+		error(400, 'All fields must be supplied');
 	}
 
 	try {
-		throw error(500, 'Not implemented')
+		error(500, 'Not implemented');
 
 		// await loginWithInfo("elijahstormai@gmail.com", "tester")
 
@@ -54,12 +54,12 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
 		if (e instanceof Error || typeof e === 'string') {
 			throw e
 		} else if (e && typeof e === 'object' && Object.hasOwn(e, 'code')) {
-			throw error(504, {
-				// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-				// @ts-ignore
-				message: e.code, // remove this when implementing emails
-				// message: ErrorMessaging(e.code),
-			})
+			error(504, {
+            				// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            				// @ts-ignore
+            				message: e.code, // remove this when implementing emails
+            				// message: ErrorMessaging(e.code),
+            			});
 		}
 		throw e
 	}

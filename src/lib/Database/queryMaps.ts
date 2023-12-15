@@ -60,7 +60,7 @@ export const queryMaps: (
 				${page * limit}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Could not get map from database')
+		error(500, 'Could not get map from database');
 	}
 
 	const users = (await Promise.all(

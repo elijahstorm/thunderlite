@@ -9,18 +9,18 @@ export const getMapHash = async (sql: postgres.Sql, sha: string) => {
 		map = await sql`select url from maps where sha = ${sha}`
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Could not get map from database')
+		error(500, 'Could not get map from database');
 	}
 
 	const url = map[0]?.url
 	if (!url) {
-		throw error(400, { message: 'No map with that SHA found.' })
+		error(400, { message: 'No map with that SHA found.' });
 	}
 
 	const mapResponse = await fetch(url)
 
 	if (!mapResponse.ok) {
-		throw error(404, 'No map data found')
+		error(404, 'No map data found');
 	}
 
 	const mapHash = await mapResponse.text()
@@ -36,11 +36,11 @@ export const isValidMapHash = async (sql: postgres.Sql, sha: string) => {
 		exists = results?.length > 0
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
-		throw error(500, 'Could not perform count check on database')
+		error(500, 'Could not perform count check on database');
 	}
 
 	if (!exists) {
-		throw error(400, { message: 'No map with that SHA found.' })
+		error(400, { message: 'No map with that SHA found.' });
 	}
 
 	return true

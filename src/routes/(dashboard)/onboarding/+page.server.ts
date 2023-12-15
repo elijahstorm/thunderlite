@@ -17,17 +17,17 @@ export const ssr = false
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const auth = locals.user
-	if (!auth) throw error(403, 'You are not logged in')
+	if (!auth) error(403, 'You are not logged in');
 
 	try {
 		const user = await getUserDBDataFromAuth(locals.sql, auth)
 		if (user.username && user.profile_image_url) {
-			throw redirect(302, '/make')
+			redirect(302, '/make');
 		}
 		return { auth, user }
 	} catch (e) {
 		if (e.status === 302) {
-			throw redirect(302, '/make')
+			redirect(302, '/make');
 		}
 		try {
 			await makeUserDBDataFromAuth(auth)(locals.sql)
@@ -39,7 +39,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				await makeUserDBDataFromAuth(auth)(locals.sql)
 				await faker(locals.sql, auth)
 			} else {
-				throw error(500, 'There was an issue making your new account')
+				error(500, 'There was an issue making your new account');
 			}
 		}
 	}
