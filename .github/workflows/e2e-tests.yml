@@ -26,7 +26,7 @@ jobs:
       - name: Run tests
         run: pnpm test:integration
         env:
-          VERCEL_ENV: 'preview'
+          NODE_ENV: 'preview'
           PUBLIC_SOCKET_CONNECTION: ${{ env.PUBLIC_SOCKET_CONNECTION }}
           PUBLIC_HANKO_API_URL: ${{ env.PUBLIC_HANKO_API_URL }}
           EDGE_CONFIG: ${{ secrets.EDGE_CONFIG }}

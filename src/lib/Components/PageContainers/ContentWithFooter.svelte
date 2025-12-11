@@ -45,11 +45,7 @@
 		<slot />
 	</div>
 
-	<footer
-		class="bg-primary-dark-blue py-10"
-		class:hidden={noFooterOnMobile}
-		class:md:block={noFooterOnMobile}
-	>
+	<footer class:hidden={noFooterOnMobile} class:md:block={noFooterOnMobile}>
 		<div class="container">
 			<div class="text-center grid grid-cols-1 justify-items-center gap-6 md:grid-cols-12 lg:gap-0">
 				<div class="flex flex-col gap-7 pb-1 justify-between md:justify-self-start md:col-span-3">
@@ -85,12 +81,7 @@
 					class="items-end grid grid-cols-1 gap-2 py-1 text-white text-sm md:text-left md:grid-flow-col-dense md:justify-self-start md:grid-rows-3 md:py-0 md:w-full md:col-span-5 lg:gap-x-24 lx:col-span-3"
 				>
 					{#each footerLinks as link (link.href)}
-						<a
-							class="hover:text-primary-baby-blue"
-							href={link.href}
-							target="_blank"
-							rel="noopener noreferrer"
-						>
+						<a href={link.href} target="_blank" rel="noopener noreferrer">
 							{link.text}
 						</a>
 					{/each}
