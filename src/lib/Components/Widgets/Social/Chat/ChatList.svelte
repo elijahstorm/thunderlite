@@ -168,7 +168,7 @@
 				<Loader type={9} />
 			</div>
 		{:then me}
-			<button
+			<div
 				type="button"
 				class="flex justify-between items-center mb-3 w-full"
 				on:click|stopPropagation={() => dispatch('toggle')}
@@ -198,7 +198,7 @@
 						X
 					</button>
 				</div>
-			</button>
+			</div>
 		{/await}
 		{#if settingsOpen}
 			<button

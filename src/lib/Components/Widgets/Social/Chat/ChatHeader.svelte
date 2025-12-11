@@ -15,7 +15,7 @@
 	const notifications = () => addToast('not implemented', 'warn')
 </script>
 
-<button type="button" on:click={() => dispatch('toggle')}>
+<div type="button" on:click={() => dispatch('toggle')}>
 	<header
 		class="flex px-4 sm:items-center justify-between pb-3 border-b border-gray-200"
 		class:pt-6={!highlight}
@@ -90,4 +90,4 @@
 			</button>
 		</div>
 	</header>
-</button>
+</div>

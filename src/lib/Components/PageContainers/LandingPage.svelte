@@ -16,7 +16,7 @@
 					class="h-1/2 flex flex-col justify-center items-center text-center lg:items-start lg:text-left"
 				>
 					<a
-						class="bg-primary-lime-green text-3xl px-12 py-4 rounded-full text-neutral-white bg-gradient-to-r from-primary-lime-green to-primary-bright-cyan hover:button-brightness mb-7 transition focus:outline-none focus:ring focus:ring-offset-2 focus:ring-opacity-80 focus:ring-green-400"
+						class="bg-primary-lime-green text-3xl px-12 py-4 rounded-full text-white bg-gradient-to-r from-primary-lime-green to-primary-bright-cyan hover:button-brightness mb-7 transition focus:outline-none focus:ring focus:ring-offset-2 focus:ring-opacity-80 focus:ring-green-400"
 						href="/login"
 					>
 						Get Started

@@ -1,8 +1,8 @@
-import { VERCEL_ENV } from '$env/static/private'
+import { NODE_ENV } from '$env/static/private'
 import type postgres from 'postgres'
 
 export const logToErrorDb = (sql: postgres.Sql) => async (e: unknown, info?: string) => {
-	if (VERCEL_ENV === 'development') {
+	if (NODE_ENV === 'development') {
 		console.error(e)
 		return
 	}

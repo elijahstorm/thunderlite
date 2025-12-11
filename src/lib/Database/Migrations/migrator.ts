@@ -1,4 +1,4 @@
-import { VERCEL_ENV } from '$env/static/private'
+import { NODE_ENV } from '$env/static/private'
 import { CreateDemoData } from '$lib/Migrations/seed_faker_data.sql'
 import { migrationsList } from '$lib/Migrations/list'
 import type postgres from 'postgres'
@@ -10,7 +10,7 @@ export const migrate = async (sql: postgres.Sql) => {
 }
 
 export const faker = async (sql: postgres.Sql, user?: string) => {
-	if (VERCEL_ENV === 'development' && user) {
+	if (NODE_ENV === 'development' && user) {
 		console.log('running demo data migration for user', user)
 		await CreateDemoData(sql, user)
 	}

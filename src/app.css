@@ -1,27 +1,252 @@
 @import 'tailwindcss';
 
-@layer components {
-	.btn {
-		@apply self-start px-5 py-3 inline-block rounded-lg uppercase tracking-wider font-semibold text-sm lg:text-lg sm:text-base transition focus:outline-none focus:ring focus:ring-offset-2 focus:ring-opacity-50;
-	}
-	.btn-primary {
-		@apply px-7 py-3 rounded-full text-neutral-white text-xs outline-none transition-all duration-300 ring-primary-purple bg-primary-purple bg-gradient-to-r from-primary-purple via-primary-light-purple to-primary-baby-blue via-70% to-100% bg-size-200 bg-pos-0 focus:ring hover:bg-pos-100;
-	}
-	.btn-secondary {
-		@apply bg-brand-500 text-white focus:ring-brand-300 focus:bg-brand-300 hover:bg-brand-200 active:bg-brand-400;
-	}
-	.btn-gray {
-		@apply bg-gray-300 text-gray-800 focus:ring-gray-300 focus:bg-gray-200 hover:bg-gray-200 active:bg-gray-400;
-	}
-	.btn-alert {
-		@apply inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-800 text-white text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-opacity-50 focus:ring-red-500  disabled:cursor-not-allowed disabled:bg-red-100 disabled:border disabled:border-red-200 disabled:text-gray-400 disabled:opacity-70;
-	}
-	.background-transparent {
-		background: transparent;
-	}
 
-	hanko-auth,
-	hanko-profile {
-		--background-color: transparent;
-	}
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+    :root {
+        --background: hsl(240 5% 96%);
+        --foreground: hsl(180 18% 7%);
+        --card: hsl(0 0% 100%);
+        --card-foreground: hsl(222.2 84% 4.9%);
+        --popover: hsl(0 0% 100%);
+        --popover-foreground: hsl(222.2 84% 4.9%);
+        --primary: hsl(184, 66%, 21%);
+        --primary-foreground: hsl(240 5% 96%);
+        --secondary: hsl(31, 58%, 55%);
+        --secondary-foreground: hsl(222.2 47.4% 11.2%);
+        --muted: hsl(210 40% 96.1%);
+        --muted-foreground: hsl(215.4 16.3% 46.9%);
+        --accent: hsl(151, 43%, 70%);
+        --accent-foreground: hsl(222.2 47.4% 11.2%);
+        --disabled: hsl(180, 5%, 43%);
+        --disabled-foreground: hsl(240, 11%, 81%);
+        --destructive: hsl(0 84.2% 60.2%);
+        --destructive-foreground: hsl(210 40% 98%);
+        --border: hsla(195, 2%, 42%, 50%);
+        --input: hsl(214.3 31.8% 91.4%);
+        --ring: hsl(222.2 84% 4.9%);
+        --radius: 16px;
+        --chart-1: hsl(12 76% 61%);
+        --chart-2: hsl(173 58% 39%);
+        --chart-3: hsl(197 37% 24%);
+        --chart-4: hsl(43 74% 66%);
+        --chart-5: hsl(27 87% 67%);
+    }
+
+    .dark {
+        --background: hsl(180 18% 7%);
+        --foreground: hsl(240 5% 96%);
+        --card: hsl(222.2 84% 4.9%);
+        --card-foreground: hsl(210 40% 98%);
+        --popover: hsl(222.2 84% 4.9%);
+        --popover-foreground: hsl(210 40% 98%);
+        --primary: hsl(151, 43%, 70%);
+        --primary-foreground: hsl(222.2 47.4% 11.2%);
+        --secondary: hsl(31, 58%, 55%);
+        --secondary-foreground: hsl(0 0% 100%);
+        --muted: hsl(217.2 32.6% 17.5%);
+        --muted-foreground: hsl(180 1% 48%);
+        --accent: hsl(184, 66%, 21%);
+        --accent-foreground: hsl(240 5% 96%);
+        --disabled: hsl(155, 9%, 73%);
+        --disabled-foreground: hsl(221, 13%, 46%);
+        --destructive: hsl(0, 82%, 65%);
+        --destructive-foreground: hsl(210 40% 98%);
+        --border: hsl(187 10% 17%);
+        --input: hsl(217.2 32.6% 17.5%);
+        --ring: hsl(58 100% 70%);
+        --chart-1: hsl(220 70% 50%);
+        --chart-2: hsl(160 60% 45%);
+        --chart-3: hsl(30 80% 55%);
+        --chart-4: hsl(280 65% 60%);
+        --chart-5: hsl(340 75% 55%);
+    }
+
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+
+    .glassContainer {
+        position: relative;
+    }
+
+    .glassContainer::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+        -webkit-box-shadow:
+            inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7),
+            inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
+        box-shadow:
+            inset 2px 2px 0px -2px rgba(255, 255, 255, 0.7),
+            inset 0 0 3px 1px rgba(255, 255, 255, 0.7);
+    }
+
+    .glassContainer::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        inset: 0;
+        backdrop-filter: blur(0px);
+        -webkit-filter: url(#glass-distortion);
+        filter: url(#glass-distortion);
+        overflow: hidden;
+        isolation: isolate;
+        pointer-events: none;
+    }
+
+    .glassContainer.rounded-4xl::before,
+    .glassContainer.rounded-4xl::after {
+        border-radius: 2rem;
+    }
+
+    .glassContainer.rounded-2xl::before,
+    .glassContainer.rounded-2xl::after {
+        border-radius: 1rem;
+    }
+
+    .glassContainer.rounded-xl::before,
+    .glassContainer.rounded-xl::after {
+        border-radius: 0.75rem;
+    }
+
+    .glassContainer.rounded-lg::before,
+    .glassContainer.rounded-lg::after {
+        border-radius: 0.5rem;
+    }
+
+    .glassContainer.rounded-full::before,
+    .glassContainer.rounded-full::after {
+        border-radius: calc(infinity * 1px);
+    }
+
+    @keyframes slideOutUp {
+        from {
+            transform: translateY(0) rotateX(0) scale(1);
+            opacity: 1;
+        }
+        to {
+            transform: translateY(-8px) rotateX(90deg) scale(0.95);
+            opacity: 0;
+        }
+    }
+
+    @keyframes slideInFromBelow {
+        from {
+            transform: translateY(8px) rotateX(-90deg) scale(0.95);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0) rotateX(0) scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes marquee {
+        0%,
+        10% {
+            transform: translateX(0%);
+        }
+        45%,
+        55% {
+            transform: translateX(-50%);
+        }
+        90%,
+        100% {
+            transform: translateX(0%);
+        }
+    }
+
+    .animate-marquee {
+        animation: marquee 60s linear infinite;
+    }
+}
+
+@utility container {
+    margin-inline: auto;
+    padding-inline: 2rem;
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-disabled: var(--disabled);
+    --color-disabled-foreground: var(--disabled-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --radius-xs: calc(var(--radius) - 8px);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+    --animate-accordion-down: accordion-down 0.2s ease-out;
+    --animate-accordion-up: accordion-up 0.2s ease-out;
+
+    --container-2xs: 16rem;
+    --container-4xs: 8rem;
+    --container-16xs: 4rem;
+
+    @keyframes accordion-down {
+        from {
+            height: 0;
+        }
+        to {
+            height: var(--radix-accordion-content-height);
+        }
+    }
+
+    @keyframes accordion-up {
+        from {
+            height: var(--radix-accordion-content-height);
+        }
+        to {
+            height: 0;
+        }
+    }
+}
+
+@layer utilities {
+    .mask-fade-top-bottom {
+        mask-image: linear-gradient(
+            to top,
+            transparent,
+            var(--background),
+            var(--background),
+            var(--background),
+            transparent
+        );
+        -webkit-mask-image: linear-gradient(
+            to top,
+            transparent,
+            var(--background),
+            var(--background),
+            var(--background),
+            transparent
+        );
+        mask-mode: match-source;
+        mask-size: 100% 100%;
+        mask-repeat: no-repeat;
+    }
 }

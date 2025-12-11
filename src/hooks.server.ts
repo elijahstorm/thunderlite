@@ -1,13 +1,13 @@
 import { error, redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
 import { createClient } from '@vercel/kv'
-import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL, VERCEL_ENV } from '$env/static/private'
+import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL, NODE_ENV } from '$env/static/private'
 import { authenticatedUser } from '$lib/Components/Auth/hanko-server'
 import { generateKey } from '$lib/Security/keys'
 import { logToErrorDb } from '$lib/Security/serverLogs'
 import postgres from 'postgres'
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const dbUri = `${POSTGRES_URL}${VERCEL_ENV !== 'development' ? '?sslmode=require' : ''}`
+	const dbUri = `${POSTGRES_URL}${NODE_ENV !== 'development' ? '?sslmode=require' : ''}`
 	let sql: postgres.Sql | null = null
 	const protectedRoutes = [
 		'/onboarding',
@@ -38,7 +38,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 }
 
 const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
-	if (VERCEL_ENV !== 'production') {
+	if (NODE_ENV !== 'production') {
 		return generateKey()
 	}
 
