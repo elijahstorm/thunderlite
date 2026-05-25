@@ -1,6 +1,12 @@
 import type { ModifierHandler } from '$lib/Engine/modifiers'
 import { healTeam } from '$lib/Engine/modifiers/healTeam'
 import { supplyIncome } from '$lib/Engine/modifiers/supplyIncome'
+import { capture } from '$lib/Engine/modifiers/capture'
+import {
+	captureAllowAir,
+	captureAllowGround,
+	captureAllowSea,
+} from '$lib/Engine/modifiers/captureAllow'
 
 export type ModifierPhase =
 	| 'Start_Turn'
@@ -29,11 +35,11 @@ export const modifierData = {
 	Port: { phase: 'Properties' },
 	'Start_Turn.Heal_Team': { phase: 'Start_Turn', run: healTeam },
 	'Capture.Insta_Lose': { phase: 'Capture' },
-	'Capture.Allow_Ground': { phase: 'Capture' },
-	'Capture.Allow_Air': { phase: 'Capture' },
-	'Capture.Allow_Sea': { phase: 'Capture' },
+	'Capture.Allow_Ground': { phase: 'Capture', run: captureAllowGround },
+	'Capture.Allow_Air': { phase: 'Capture', run: captureAllowAir },
+	'Capture.Allow_Sea': { phase: 'Capture', run: captureAllowSea },
 	'Each_Turn.Supply_Income': { phase: 'Each_Turn', run: supplyIncome },
-	'Start_Turn.Capture': { phase: 'Start_Turn' },
+	'Start_Turn.Capture': { phase: 'Start_Turn', run: capture },
 	'Move.Tracking': { phase: 'Move' },
 	'Self_Action.Transport': { phase: 'Self_Action' },
 	'Self_Action.Repairable': { phase: 'Self_Action' },

@@ -14,6 +14,7 @@ export type ModifierContext = {
 	tile: number
 	state: GameState
 	map?: MapObject | MapProcesser
+	previousTeam?: number
 }
 
 export type ModifierTarget = UnitObject | BuildingObject

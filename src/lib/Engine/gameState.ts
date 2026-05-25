@@ -1,10 +1,52 @@
 import { writable, get } from 'svelte/store'
+import { buildingData } from '$lib/GameData/building'
+
+export type PlayerControls = {
+	ground: boolean
+	air: boolean
+	sea: boolean
+}
 
 export type Player = {
 	team: number
 	name?: string
 	money: number
 	hasLost: boolean
+	controls?: PlayerControls
+}
+
+const emptyControls = (): PlayerControls => ({ ground: false, air: false, sea: false })
+
+const controlForModifier = (modifier: string): keyof PlayerControls | null => {
+	if (modifier === 'Capture.Allow_Ground') return 'ground'
+	if (modifier === 'Capture.Allow_Air') return 'air'
+	if (modifier === 'Capture.Allow_Sea') return 'sea'
+	return null
+}
+
+export const buildingGrants = (buildingType: number): (keyof PlayerControls)[] => {
+	const data = buildingData[buildingType]
+	if (!data) return []
+	const grants: (keyof PlayerControls)[] = []
+	for (const modifier of data.modifiers) {
+		const control = controlForModifier(modifier)
+		if (control) grants.push(control)
+	}
+	return grants
+}
+
+const controlsFromBuildings = (
+	map: MapProcesser | MapObject,
+	team: number
+): PlayerControls => {
+	const controls = emptyControls()
+	for (const building of map.layers.buildings) {
+		if (!building || building.team !== team) continue
+		for (const grant of buildingGrants(building.type)) {
+			controls[grant] = true
+		}
+	}
+	return controls
 }
 
 export type GamePhase = 'playing' | 'gameOver'
@@ -38,7 +80,12 @@ export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] =>
 	}
 	return [...teams]
 		.sort((a, b) => a - b)
-		.map((team) => ({ team, money: 0, hasLost: false }))
+		.map((team) => ({
+			team,
+			money: 0,
+			hasLost: false,
+			controls: controlsFromBuildings(map, team),
+		}))
 }
 
 export const initGameStateFromMap = (map: MapProcesser | MapObject): void => {

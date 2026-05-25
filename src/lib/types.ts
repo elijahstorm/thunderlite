@@ -20,7 +20,11 @@ type UnitObject = ObjectType &
 	TeamObject & {
 		health?: number
 	}
-type BuildingObject = ObjectType & AnimatedObject & TeamObject
+type BuildingObject = ObjectType &
+	AnimatedObject &
+	TeamObject & {
+		stature?: number
+	}
 
 type HighlightType = 0 | 1
 type HighlightMeta = {

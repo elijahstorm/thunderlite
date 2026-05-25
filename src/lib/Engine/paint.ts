@@ -1,4 +1,5 @@
 import { unitData } from '$lib/GameData/unit'
+import { buildingData } from '$lib/GameData/building'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { get } from 'svelte/store'
 
@@ -27,6 +28,7 @@ export const paint =
 		render.always(map.layers.ground[tile], renderData.ground)
 		render.highlights(map.highlights[tile])
 		render.conditionally(map.layers.buildings[tile], renderData.building)
+		render.captureProgress(map.layers.buildings[tile])
 		render.conditionally(map.layers.units[tile], renderData.unit)
 		render.playInfo(map.layers.units[tile])
 		render.conditionally(map.layers.sky[tile], renderData.sky)
@@ -47,6 +49,7 @@ const contextProvider = (
 	conditionally: conditionally(width, height, frame, scale)(context),
 	highlights: highlights(width, height)(context),
 	playInfo: playInfo(width, height, scale)(context),
+	captureProgress: captureProgress(width, height, scale)(context),
 	advice: advice(width, height)(context),
 	route: route(width, height)(context),
 })
@@ -150,6 +153,30 @@ const playInfo =
 		context.lineWidth = 2
 		context.fillRect(offset, height - offset * 3, percentage * (width - offset * 2), offset)
 		context.strokeRect(offset, height - offset * 3, width - offset * 2, offset)
+	}
+
+const captureProgress =
+	(width: number, height: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(building: BuildingObject | null) => {
+		if (!building) return
+		const max = buildingData[building.type]?.stature ?? 0
+		if (max <= 0) return
+		const current = typeof building.stature === 'number' ? building.stature : max
+		if (current >= max) return
+
+		const offset = 5 / scale
+		const fontSize = Math.max(8, Math.round(height / 4))
+		const text = String(current)
+		context.save()
+		context.font = `bold ${fontSize}px sans-serif`
+		context.textBaseline = 'top'
+		context.textAlign = 'left'
+		context.fillStyle = 'rgba(0,0,0,0.65)'
+		context.fillRect(offset, offset, fontSize * (text.length + 1), fontSize + offset)
+		context.fillStyle = '#fff'
+		context.fillText(text, offset * 1.5, offset * 1.5)
+		context.restore()
 	}
 
 const route =
