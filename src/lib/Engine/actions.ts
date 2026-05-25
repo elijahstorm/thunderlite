@@ -4,6 +4,12 @@ import { generateAttackList } from './Interactor/Pathing/attack'
 import { hasModifier } from './modifiers/canAttack'
 import { canMineAt } from './modifiers/miner'
 import { passableAdjacentTiles } from './modifiers/builder'
+import {
+	canShipOut,
+	findFriendlyTransporters,
+	hasRescuedUnit,
+	landTiles,
+} from './modifiers/transport'
 
 export type ActionMenuItemId =
 	| 'attack'
@@ -11,6 +17,9 @@ export type ActionMenuItemId =
 	| 'mine'
 	| 'build'
 	| 'repair'
+	| 'transport'
+	| 'ship_out'
+	| 'land'
 	| 'wait'
 
 export type ActionMenuItem = {
@@ -54,6 +63,22 @@ const isRepairable = (unit: UnitObject): boolean => {
 	return current < max
 }
 
+const canTransport = (map: MapObject, tile: number, unit: UnitObject): boolean => {
+	if (!hasModifier(unit, 'Self_Action.Transport')) return false
+	return findFriendlyTransporters(map, tile, unit.team).length > 0
+}
+
+const canShipOutHere = (map: MapObject, tile: number, unit: UnitObject): boolean => {
+	if (!hasModifier(unit, 'Self_Action.Ship_Out')) return false
+	return canShipOut(map, tile)
+}
+
+const canLand = (map: MapObject, tile: number, unit: UnitObject): boolean => {
+	if (!hasModifier(unit, 'Self_Action.Land')) return false
+	if (!hasRescuedUnit(unit)) return false
+	return landTiles(map, tile).length > 0
+}
+
 export const computeAvailableActions = (
 	ctx: AvailableActionsContext
 ): ActionMenuItem[] => {
@@ -74,6 +99,18 @@ export const computeAvailableActions = (
 
 	if (isBuilder(map, tile, unit)) {
 		items.push({ id: 'build', enabled: true })
+	}
+
+	if (canTransport(map, tile, unit)) {
+		items.push({ id: 'transport', enabled: true })
+	}
+
+	if (canShipOutHere(map, tile, unit)) {
+		items.push({ id: 'ship_out', enabled: true })
+	}
+
+	if (canLand(map, tile, unit)) {
+		items.push({ id: 'land', enabled: true })
 	}
 
 	if (isRepairable(unit)) {

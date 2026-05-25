@@ -66,4 +66,5 @@ export const modifierData = {
 	'Self_Action.Irreparable': { phase: 'Self_Action' },
 	'End_Turn.Vulture': { phase: 'End_Turn' },
 	'Self_Action.Land': { phase: 'Self_Action' },
+	'Self_Action.Ship_Out': { phase: 'Self_Action' },
 } as const satisfies Record<string, ModifierRecord>

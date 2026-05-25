@@ -14,6 +14,9 @@
 		mine: 'Mine',
 		build: 'Build',
 		repair: 'Repair',
+		transport: 'Transport',
+		ship_out: 'Ship Out',
+		land: 'Land',
 		wait: 'Wait',
 	}
 

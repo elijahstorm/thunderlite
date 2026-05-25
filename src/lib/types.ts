@@ -20,6 +20,7 @@ type UnitObject = ObjectType &
 	TeamObject & {
 		health?: number
 		hidden?: boolean
+		rescuedUnit?: UnitObject | null
 	}
 type BuildingObject = ObjectType &
 	AnimatedObject &

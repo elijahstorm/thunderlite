@@ -13,6 +13,13 @@ import { revealCloakedAdjacentTo } from '../modifiers/cloak'
 import { mine } from '../modifiers/miner'
 import { applyVultureKill } from '../modifiers/vulture'
 import { applyLancePassthrough } from '../modifiers/lance'
+import {
+	findFriendlyTransporters,
+	landTiles,
+	landUnload,
+	shipOut,
+	transportLoad,
+} from '../modifiers/transport'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -202,6 +209,24 @@ const selectAttackTarget: Interactor = ({ map, tile }) => {
 	performAttack(map, source, tile)
 }
 
+const selectLandTile: Interactor = ({ map, tile }) => {
+	const source = get(interactionSource)
+	if (source === null) return
+	const transport = map.layers.units[source]
+	if (!transport) return
+
+	const valid = landTiles(map, source)
+	if (!valid.includes(tile)) return
+
+	interactionSource.set(null)
+	interactionState.set('select')
+	highlightActionsList(map, [])
+
+	landUnload(map, source, tile)
+	markTileActed(tile)
+	applyWinConditions(map)
+}
+
 const hud: Interactor = () => {}
 
 const actionsDecision = {
@@ -210,6 +235,7 @@ const actionsDecision = {
 	move,
 	attack,
 	selectAttackTarget,
+	selectLandTile,
 	hud,
 } as const
 
@@ -273,6 +299,39 @@ export const performMenuAction = (
 			closeActionMenu()
 			markTileActed(tile)
 			applyWinConditions(map)
+			return
+		}
+		case 'transport': {
+			closeActionMenu()
+			const transports = findFriendlyTransporters(map, tile, unit.team)
+			const target = transports[0]
+			if (typeof target !== 'number') return
+			const result = transportLoad(map, tile, target)
+			if (result.ok) {
+				markTileActed(target)
+				applyWinConditions(map)
+			}
+			return
+		}
+		case 'ship_out': {
+			closeActionMenu()
+			const result = shipOut(map, tile)
+			if (result.ok) {
+				markTileActed(result.transportTile)
+				applyWinConditions(map)
+			}
+			return
+		}
+		case 'land': {
+			closeActionMenu()
+			interactionSource.set(tile)
+			interactionState.set('selectLandTile')
+			const targets = landTiles(map, tile)
+			highlightActionsList(
+				map,
+				targets.map((t) => ({ tile: t, type: 0, tip: 0 } as unknown as Highlight))
+			)
+			markTileActed(tile)
 			return
 		}
 	}
