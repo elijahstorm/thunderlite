@@ -78,13 +78,16 @@ export const drag = (unit: UnitObject, terrain: GroundObject) =>
 const notBlocked = (map: MapObject, tile: number, unit: UnitObject) =>
 	!map.layers.units[tile] || map.layers.units[tile]?.team === unit.team
 
-export const validTerrain = (terrain: GroundObject, unit: UnitObject) =>
-	unitData[unit.type].movementType !== 'none' &&
-	terrainData[terrain.type].details !== 'impassable' &&
-	(unitData[unit.type].type === 'air' ||
-		terrainData[terrain.type].name === 'Shore' ||
-		(terrainData[terrain.type].ocean && unitData[unit.type].type === 'sea') ||
-		(!terrainData[terrain.type].ocean && unitData[unit.type].type === 'ground'))
+export const validTerrain = (terrain: GroundObject, unit: UnitObject) => {
+	const u = unitData[unit.type]
+	const t = terrainData[terrain.type]
+	if (u.movementType === 'none') return false
+	if (t.details === 'impassable') return false
+	if (u.type === 'air') return true
+	if (t.name === 'Shore') return true
+	if (t.ocean) return u.type === 'sea'
+	return u.type === 'ground'
+}
 
 const updateTileDecision = {
 	right: (map: MapObject, tile: number) => tile + 1,

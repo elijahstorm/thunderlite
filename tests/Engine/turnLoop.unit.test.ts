@@ -8,7 +8,13 @@ import {
 	markTileActed,
 	type Player,
 } from '../../src/lib/Engine/gameState'
-import { endTurn, nextActiveTeam } from '../../src/lib/Engine/turnLoop'
+import {
+	applyTerrainEndOfTurnDamage,
+	endTurn,
+	nextActiveTeam,
+} from '../../src/lib/Engine/turnLoop'
+import { terrainData } from '../../src/lib/GameData/terrain'
+import { unitData } from '../../src/lib/GameData/unit'
 import {
 	clearModifierRegistry,
 	registerModifier,
@@ -191,6 +197,70 @@ describe('endTurn', () => {
 
 		expect(() => endTurn()).not.toThrow()
 		expect(get(gameState).currentTeam).toBe(1)
+	})
+
+	it('applies terrain end-of-turn damage to the outgoing team only and kills units that reach 0 HP', () => {
+		const wastelandIdx = terrainData.findIndex((t) => t.name === 'Wasteland')
+		const rockFormationIdx = terrainData.findIndex((t) => t.name === 'Rock Formation')
+		const corvetteIdx = unitData.findIndex((u) => u.name === 'Corvette')
+		const strikeMax = unitData[STRIKE_COMMANDO_TYPE].health
+		const corvetteMax = unitData[corvetteIdx].health
+
+		const map = makeMap()
+		map.layers.ground[0] = { type: wastelandIdx, state: 0 }
+		map.layers.ground[1] = { type: wastelandIdx, state: 0 }
+		map.layers.ground[4] = { type: rockFormationIdx, state: 0 }
+		map.layers.ground[5] = { type: wastelandIdx, state: 0 }
+		map.layers.units[0] = unit(0, STRIKE_COMMANDO_TYPE)
+		map.layers.units[1] = unit(0, STRIKE_COMMANDO_TYPE, 5)
+		map.layers.units[4] = unit(0, corvetteIdx)
+		map.layers.units[5] = unit(1, STRIKE_COMMANDO_TYPE)
+		initGameStateFromMap(map)
+
+		endTurn({ map })
+
+		expect(map.layers.units[0]!.health).toBe(strikeMax - 10)
+		expect(map.layers.units[1]).toBeNull()
+		expect(map.layers.units[4]!.health).toBe(corvetteMax - 20)
+		expect(map.layers.units[5]!.health ?? strikeMax).toBe(strikeMax)
+	})
+
+	it('applyTerrainEndOfTurnDamage helper reports per-unit damage and death', () => {
+		const wastelandIdx = terrainData.findIndex((t) => t.name === 'Wasteland')
+		const plainsIdx = terrainData.findIndex((t) => t.name === 'Plains')
+		const map = makeMap()
+		map.layers.ground[0] = { type: wastelandIdx, state: 0 }
+		map.layers.ground[1] = { type: plainsIdx, state: 0 }
+		map.layers.ground[2] = { type: wastelandIdx, state: 0 }
+		map.layers.units[0] = unit(0, STRIKE_COMMANDO_TYPE, 25)
+		map.layers.units[1] = unit(0, STRIKE_COMMANDO_TYPE)
+		map.layers.units[2] = unit(0, STRIKE_COMMANDO_TYPE, 8)
+
+		const events = applyTerrainEndOfTurnDamage(map, 0)
+
+		expect(events).toEqual([
+			expect.objectContaining({ tile: 0, damage: 10, died: false }),
+			expect.objectContaining({ tile: 2, damage: 10, died: true }),
+		])
+		expect(map.layers.units[0]!.health).toBe(15)
+		expect(map.layers.units[1]!.health ?? unitData[STRIKE_COMMANDO_TYPE].health).toBe(
+			unitData[STRIKE_COMMANDO_TYPE].health
+		)
+		expect(map.layers.units[2]).toBeNull()
+	})
+
+	it('applyTerrainEndOfTurnDamage ignores enemy units', () => {
+		const wastelandIdx = terrainData.findIndex((t) => t.name === 'Wasteland')
+		const map = makeMap()
+		map.layers.ground[0] = { type: wastelandIdx, state: 0 }
+		map.layers.units[0] = unit(1, STRIKE_COMMANDO_TYPE)
+
+		const events = applyTerrainEndOfTurnDamage(map, 0)
+
+		expect(events).toEqual([])
+		expect(map.layers.units[0]!.health ?? unitData[STRIKE_COMMANDO_TYPE].health).toBe(
+			unitData[STRIKE_COMMANDO_TYPE].health
+		)
 	})
 
 	it('does nothing meaningful when no players are eligible', () => {

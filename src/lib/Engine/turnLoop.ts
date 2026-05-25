@@ -1,4 +1,7 @@
 import { get } from 'svelte/store'
+import { terrainData } from '$lib/GameData/terrain'
+import { unitData } from '$lib/GameData/unit'
+import { animateExplosion } from './Animator/animator'
 import { gameState, type GameState, type Player } from './gameState'
 import { runModifiers, type ModifierContext, type ModifierPhase } from './modifiers'
 
@@ -57,6 +60,39 @@ const runPhaseForTeam = (
 	}
 }
 
+export type TerrainDamageEvent = {
+	tile: number
+	unit: UnitObject
+	damage: number
+	died: boolean
+}
+
+export const applyTerrainEndOfTurnDamage = (
+	map: MapObject | MapProcesser,
+	team: number
+): TerrainDamageEvent[] => {
+	const events: TerrainDamageEvent[] = []
+	for (let tile = 0; tile < map.layers.units.length; tile++) {
+		const unit = map.layers.units[tile]
+		if (!unit) continue
+		if (unit.team !== team) continue
+		const ground = map.layers.ground[tile]
+		if (!ground) continue
+		const damage = terrainData[ground.type]?.damage ?? 0
+		if (damage <= 0) continue
+		const maxHealth = unitData[unit.type]?.health ?? 0
+		const current = unit.health ?? maxHealth
+		const next = Math.max(0, current - damage)
+		unit.health = next
+		const died = next <= 0
+		if (died) {
+			map.layers.units[tile] = null
+		}
+		events.push({ tile, unit, damage, died })
+	}
+	return events
+}
+
 export type EndTurnOptions = {
 	map?: MapObject | MapProcesser
 }
@@ -67,6 +103,12 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 
 	if (map) {
 		runPhaseForTeam(map, before.currentTeam, 'End_Turn', ['unit'], before)
+		const damageEvents = applyTerrainEndOfTurnDamage(map, before.currentTeam)
+		for (const event of damageEvents) {
+			if (event.died) {
+				void animateExplosion(map as MapObject, event.tile)
+			}
+		}
 	}
 
 	const advance = nextActiveTeam(before.players, before.currentTeam)
