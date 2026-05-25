@@ -8,7 +8,7 @@ import {
 	resetGameState,
 } from '../../src/lib/Engine/gameState'
 import { runModifiers } from '../../src/lib/Engine/modifiers'
-import { cloak, hasAdjacentEnemy } from '../../src/lib/Engine/modifiers/cloak'
+import { cloak, hasAdjacentEnemy, revealCloakedAdjacentTo } from '../../src/lib/Engine/modifiers/cloak'
 import { tracking } from '../../src/lib/Engine/modifiers/tracking'
 import { radar, tilesInRange } from '../../src/lib/Engine/modifiers/radar'
 import {
@@ -141,6 +141,30 @@ describe('End_Turn.Cloak', () => {
 		const tile = 2 * 5 + 2
 		map.layers.units[tile - 1] = unit(STRIKE_COMMANDO, 1)
 		expect(hasAdjacentEnemy(map, tile, 0)).toBe(true)
+	})
+
+	it('reveals a cloaked enemy when any unit (non-tracker) moves adjacent', () => {
+		const map = makeMap(5, 5)
+		const cloakedTile = 2 * 5 + 2
+		const moverTile = cloakedTile + 1
+		const cloaked = unit(STEALTH_TANK, 0)
+		cloaked.hidden = true
+		map.layers.units[cloakedTile] = cloaked
+		map.layers.units[moverTile] = unit(SCORPION_TANK, 1)
+		revealCloakedAdjacentTo(map, moverTile, 1)
+		expect(cloaked.hidden).toBe(false)
+	})
+
+	it('does not reveal friendly cloaked units when an ally moves adjacent', () => {
+		const map = makeMap(5, 5)
+		const cloakedTile = 2 * 5 + 2
+		const moverTile = cloakedTile + 1
+		const cloaked = unit(STEALTH_TANK, 0)
+		cloaked.hidden = true
+		map.layers.units[cloakedTile] = cloaked
+		map.layers.units[moverTile] = unit(SCORPION_TANK, 0)
+		revealCloakedAdjacentTo(map, moverTile, 0)
+		expect(cloaked.hidden).toBe(true)
 	})
 })
 

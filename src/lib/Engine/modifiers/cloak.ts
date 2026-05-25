@@ -33,3 +33,16 @@ export const cloak: ModifierHandler = (target: ModifierTarget, ctx: ModifierCont
 	const unit = target as UnitObject
 	unit.hidden = !hasAdjacentEnemy(ctx.map, ctx.tile, unit.team)
 }
+
+export const revealCloakedAdjacentTo = (
+	map: MapObject | MapProcesser,
+	tile: number,
+	moverTeam: number
+): void => {
+	for (const adj of adjacentTiles(map, tile)) {
+		const other = map.layers.units[adj]
+		if (!other) continue
+		if (other.team === moverTeam) continue
+		if (other.hidden) other.hidden = false
+	}
+}

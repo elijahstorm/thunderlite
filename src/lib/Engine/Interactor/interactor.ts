@@ -9,6 +9,7 @@ import { canSelectUnit, gameState, markTileActed } from '../gameState'
 import { calculateDamage, canCounterAttack, type AttackRole } from '../combat'
 import { openBuildMenu } from '../HUD/buildMenuStore'
 import { runModifiers } from '../modifiers'
+import { revealCloakedAdjacentTo } from '../modifiers/cloak'
 import { mine } from '../modifiers/miner'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
@@ -91,6 +92,7 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 			state: get(gameState),
 			map,
 		})
+		revealCloakedAdjacentTo(map, destination, unit.team)
 		if (callback) {
 			callback()
 		} else {
