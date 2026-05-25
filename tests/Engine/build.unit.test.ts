@@ -25,22 +25,35 @@ const makeMap = (overrides: Partial<MapProcesser> = {}): MapProcesser => ({
 const building = (team: number, type: number): BuildingObject => ({ type, state: 0, team })
 
 describe('buildableUnits', () => {
-	it('returns nothing when no controls are unlocked', () => {
+	it('marks every entry as non-buildable when no controls are unlocked', () => {
 		const player = {
 			money: 9999,
 			controls: { ground: false, air: false, sea: false },
 		}
-		expect(buildableUnits(player)).toEqual([])
+		const list = buildableUnits(player)
+		expect(list.length).toBeGreaterThan(0)
+		for (const entry of list) {
+			expect(entry.controlled).toBe(false)
+			expect(entry.buildable).toBe(false)
+		}
 	})
 
-	it('includes ground units only when ground control is set', () => {
+	it('marks only ground units as buildable when only ground control is set', () => {
 		const player = {
 			money: 9999,
 			controls: { ground: true, air: false, sea: false },
 		}
 		const list = buildableUnits(player)
 		expect(list.length).toBeGreaterThan(0)
-		for (const entry of list) expect(entry.data.type).toBe('ground')
+		for (const entry of list) {
+			if (entry.data.type === 'ground') {
+				expect(entry.controlled).toBe(true)
+				expect(entry.buildable).toBe(true)
+			} else {
+				expect(entry.controlled).toBe(false)
+				expect(entry.buildable).toBe(false)
+			}
+		}
 	})
 
 	it('marks unaffordable units as not affordable but still in the list', () => {
@@ -50,8 +63,12 @@ describe('buildableUnits', () => {
 		}
 		const list = buildableUnits(player)
 		for (const entry of list) {
-			if (entry.data.cost > 50) expect(entry.affordable).toBe(false)
-			else expect(entry.affordable).toBe(true)
+			if (entry.data.cost > 50) {
+				expect(entry.affordable).toBe(false)
+				expect(entry.buildable).toBe(false)
+			} else {
+				expect(entry.affordable).toBe(true)
+			}
 		}
 		expect(list.some((e) => e.type === SCORPION_TANK_TYPE)).toBe(true)
 	})
@@ -70,24 +87,34 @@ describe('buildableUnits', () => {
 		expect(names).not.toContain('Transporter')
 	})
 
-	it('handles missing controls gracefully', () => {
-		expect(buildableUnits({ money: 9999 })).toEqual([])
+	it('treats missing controls as no categories unlocked', () => {
+		const list = buildableUnits({ money: 9999 })
+		expect(list.length).toBeGreaterThan(0)
+		for (const entry of list) {
+			expect(entry.controlled).toBe(false)
+			expect(entry.buildable).toBe(false)
+		}
 	})
 
-	it('air units appear only with air control', () => {
+	it('shows air units as locked (not buildable) without air control', () => {
 		const groundOnly = {
 			money: 9999,
 			controls: { ground: true, air: false, sea: false },
 		}
 		const groundList = buildableUnits(groundOnly)
-		expect(groundList.some((e) => e.type === RAPTOR_FIGHTER_TYPE)).toBe(false)
+		const raptor = groundList.find((e) => e.type === RAPTOR_FIGHTER_TYPE)
+		expect(raptor).toBeDefined()
+		expect(raptor?.controlled).toBe(false)
+		expect(raptor?.buildable).toBe(false)
 
 		const withAir = {
 			money: 9999,
 			controls: { ground: true, air: true, sea: false },
 		}
 		const withAirList = buildableUnits(withAir)
-		expect(withAirList.some((e) => e.type === RAPTOR_FIGHTER_TYPE)).toBe(true)
+		const raptorWithAir = withAirList.find((e) => e.type === RAPTOR_FIGHTER_TYPE)
+		expect(raptorWithAir?.controlled).toBe(true)
+		expect(raptorWithAir?.buildable).toBe(true)
 	})
 })
 

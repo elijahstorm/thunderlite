@@ -6,6 +6,8 @@ export type BuildableUnit = {
 	type: number
 	data: (typeof unitData)[number]
 	affordable: boolean
+	controlled: boolean
+	buildable: boolean
 }
 
 export type SpawnResult =
@@ -45,11 +47,14 @@ export const buildableUnits = (
 	for (let type = 0; type < unitData.length; type++) {
 		const data = unitData[type]
 		if (data.cost <= 0) continue
-		if (!playerCanBuildType(player, data.type)) continue
+		const controlled = playerCanBuildType(player, data.type)
+		const affordable = player.money >= data.cost
 		out.push({
 			type,
 			data,
-			affordable: player.money >= data.cost,
+			controlled,
+			affordable,
+			buildable: controlled && affordable,
 		})
 	}
 	return out

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte'
+	import { addToast } from 'as-toast'
 	import { gameState } from '../gameState'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
 	import { unitData } from '$lib/GameData/unit'
-	import { buildableUnits, spawnBuiltUnit } from '../build'
+	import { buildableUnits, spawnBuiltUnit, type BuildableUnit } from '../build'
 	import { buildMenuState, closeBuildMenu } from './buildMenuStore'
 
 	export let map: MapObject | undefined = undefined
@@ -16,12 +17,18 @@
 			? buildableUnits(currentPlayer)
 			: []
 
-	const handleSelect = (type: number, affordable: boolean) => {
-		if (!affordable) return
+	const handleSelect = (entry: BuildableUnit) => {
+		if (!entry.buildable) return
 		if (!map) return
 		if (menu.buildingTile == null || menu.team == null) return
-		const result = spawnBuiltUnit(map, menu.buildingTile, type, menu.team)
-		if (result.ok) closeBuildMenu()
+		const result = spawnBuiltUnit(map, menu.buildingTile, entry.type, menu.team)
+		if (result.ok) {
+			closeBuildMenu()
+			return
+		}
+		if (result.reason === 'no-space') {
+			addToast('No space to deploy unit', 'warn')
+		}
 	}
 
 	const handleCancel = () => closeBuildMenu()
@@ -75,10 +82,15 @@
 					{#each entries as entry (entry.type)}
 						<button
 							type="button"
-							class="flex items-center gap-2 px-2 py-2 rounded bg-neutral-800 text-left font-mono text-sm border border-neutral-700 hover:border-white disabled:opacity-40 disabled:cursor-not-allowed"
+							class="flex items-center gap-2 px-2 py-2 rounded bg-neutral-800 text-left font-mono text-sm border border-neutral-700 hover:border-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-neutral-700"
 							data-testid={`build-option-${entry.type}`}
-							disabled={!entry.affordable}
-							on:click={() => handleSelect(entry.type, entry.affordable)}
+							disabled={!entry.buildable}
+							title={!entry.controlled
+								? `Requires ${entry.data.type} control`
+								: !entry.affordable
+									? `Need $${entry.data.cost}`
+									: entry.data.name}
+							on:click={() => handleSelect(entry)}
 						>
 							<div
 								class="w-10 h-10 overflow-hidden bg-black/40 flex items-center justify-center shrink-0"
@@ -94,7 +106,11 @@
 							</div>
 							<div class="flex flex-col">
 								<span>{entry.data.name}</span>
-								<span class="text-xs opacity-75">${entry.data.cost}</span>
+								<span class="text-xs opacity-75">
+									${entry.data.cost}{#if !entry.controlled}
+										<span class="ml-1 uppercase">· locked</span>
+									{/if}
+								</span>
 							</div>
 						</button>
 					{/each}
