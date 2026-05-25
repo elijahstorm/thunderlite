@@ -7,8 +7,18 @@ type ActiveObject = { state: number; type: number; team?: number }
 
 const spriteSize = 60
 
+export type VisibilityProvider = () => {
+	visible: Set<number>
+	team: number
+} | null
+
 export const paint =
-	(renderData: ObjectRenderer, hudImages: HUDImages, paused: boolean = false) =>
+	(
+		renderData: ObjectRenderer,
+		hudImages: HUDImages,
+		paused: boolean = false,
+		getVisibility: VisibilityProvider = () => null
+	) =>
 	(getMap: () => MapObject) =>
 	(context: CanvasRenderingContext2D) =>
 	(row: number, col: number, left: number, top: number, width: number, height: number) => {
@@ -21,19 +31,38 @@ export const paint =
 		)
 		const map = getMap()
 		const tile = row * map.cols + col
+		const fog = getVisibility()
+		const tileVisible = !fog || fog.visible.has(tile)
+		const unitAtTile = map.layers.units[tile]
+		const hideEnemyUnit =
+			!tileVisible && unitAtTile !== null && fog !== null && unitAtTile.team !== fog.team
 
 		context.save()
 		context.translate(left, top)
 
 		render.always(map.layers.ground[tile], renderData.ground)
 		render.highlights(map.highlights[tile])
+		const hideEnemyBuildingCapture =
+			!tileVisible &&
+			fog !== null &&
+			map.layers.buildings[tile] !== null &&
+			(map.layers.buildings[tile] as BuildingObject).team !== fog.team
 		render.conditionally(map.layers.buildings[tile], renderData.building)
-		render.captureProgress(map.layers.buildings[tile])
-		render.conditionally(map.layers.units[tile], renderData.unit)
-		render.playInfo(map.layers.units[tile])
+		if (!hideEnemyBuildingCapture) {
+			render.captureProgress(map.layers.buildings[tile])
+		}
+		if (!hideEnemyUnit) {
+			render.conditionally(unitAtTile, renderData.unit)
+			render.playInfo(unitAtTile)
+		}
 		render.conditionally(map.layers.sky[tile], renderData.sky)
 		render.advice(map.highlights[tile], hudImages.advice)
 		render.route(map.route[tile], hudImages.arrow)
+
+		if (!tileVisible) {
+			context.fillStyle = 'rgba(0, 0, 0, 0.45)'
+			context.fillRect(0, 0, width, height)
+		}
 
 		context.restore()
 	}

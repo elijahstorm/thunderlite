@@ -26,7 +26,7 @@
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				let:select
 			>
-				<MapRender {map} {requestRedraw} {select} />
+				<MapRender {map} {requestRedraw} {select} fogOfWar />
 			</GameStateManager>
 		</GameSocket>
 
@@ -34,7 +34,7 @@
 			<div
 				class="fixed right-0 top-0 border-l-2 border-b-2 border-black opacity-30 hover:opacity-100"
 			>
-				<MapRender mini pause {map} {contextLoaded} />
+				<MapRender mini pause fogOfWar {map} {contextLoaded} />
 			</div>
 		{/if}
 	</MapLoader>

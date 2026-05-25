@@ -1,11 +1,15 @@
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 import { canAttackTarget } from '$lib/Engine/modifiers/canAttack'
+import { computeTeamVisibility } from '$lib/Engine/visibility'
 
 export const generateAttackList = (map: MapObject, tile: number, unit: UnitObject) => {
 	const [start, end] = unitData[unit.type].range
+	const visible = computeTeamVisibility(map, unit.team)
 
-	return [...new Set(diamond(map, tile, unit, start, end))]
+	return [...new Set(diamond(map, tile, unit, start, end))].filter((target) =>
+		visible.has(target)
+	)
 }
 
 const diamond = (map: MapObject, tile: number, unit: UnitObject, start: number, end: number) => {

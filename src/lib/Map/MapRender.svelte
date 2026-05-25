@@ -4,7 +4,9 @@
 	import TileSelector from '$lib/Layers/TileSelector.svelte'
 	import Game from '$lib/Engine/Game.svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
-	import { paint } from '$lib/Engine/paint'
+	import { paint, type VisibilityProvider } from '$lib/Engine/paint'
+	import { gameState } from '$lib/Engine/gameState'
+	import { computeTeamVisibility } from '$lib/Engine/visibility'
 	import { onDestroy, onMount } from 'svelte'
 	import { animationFrame, animationTimer } from '$lib/Sprites/animationFrameCount'
 	import { connectionDecision } from '$lib/Sprites/spriteConnector'
@@ -20,6 +22,7 @@
 	export let map: MapObject
 	export let mini: boolean = false
 	export let pause = false
+	export let fogOfWar: boolean = false
 	export let requestRedraw = 0
 	export let hud = {
 		advice: '/game/play/icon/move/advice.png',
@@ -34,6 +37,36 @@
 	export let select: ((x: number, y: number) => void) | undefined = undefined
 
 	const render = () => (requestRedraw = performance.now())
+
+	let cachedVisibility: { team: number; turnNumber: number; tile: number; visible: Set<number> } | null =
+		null
+
+	const visibilityProvider: VisibilityProvider = fogOfWar
+		? () => {
+				const state = $gameState
+				const team = state.currentTeam
+				if (
+					!cachedVisibility ||
+					cachedVisibility.team !== team ||
+					cachedVisibility.turnNumber !== state.turnNumber ||
+					cachedVisibility.tile !== state.actedTiles.size
+				) {
+					cachedVisibility = {
+						team,
+						turnNumber: state.turnNumber,
+						tile: state.actedTiles.size,
+						visible: computeTeamVisibility(map, team),
+					}
+				}
+				return { visible: cachedVisibility.visible, team }
+		  }
+		: () => null
+
+	$: if (fogOfWar) {
+		// invalidate cache when units move or turn changes
+		$gameState
+		cachedVisibility = null
+	}
 
 	// @ts-ignore
 	let hudImages: HUDImages = {}
@@ -125,7 +158,7 @@
 							tileHeight={cellHeight}
 							contentWidth={cellWidth * map.cols}
 							contentHeight={cellHeight * map.rows}
-							paint={paint(renderData, hudImages, pause)(() => map)}
+							paint={paint(renderData, hudImages, pause, visibilityProvider)(() => map)}
 							{requestRedraw}
 							{handleClick}
 							{handleHover}
