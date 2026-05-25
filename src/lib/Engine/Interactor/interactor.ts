@@ -4,9 +4,8 @@ import { animateRoute, animateAttack, animateExplosion } from '../Animator/anima
 import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
-import { generateAttackList } from './Pathing/attack'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
-import { calculateDamage } from '../combat'
+import { calculateDamage, canCounterAttack, type AttackRole } from '../combat'
 
 type Interaction = {
 	map: MapObject
@@ -79,8 +78,14 @@ const attack: Interactor = ({ map, tile, choice }) => {
 
 	const path = pathFinder(map, attacker, tile, destination)
 	const movementEndTile = path[path.length - 1] ?? tile
-	const reduceHealth = (map: MapObject, attacker: UnitObject, target: UnitObject, tile: number) => {
-		const damage = calculateDamage(attacker, target, { map, defenderTile: tile })
+	const reduceHealth = (
+		map: MapObject,
+		attacker: UnitObject,
+		target: UnitObject,
+		tile: number,
+		role: AttackRole = 'attack'
+	) => {
+		const damage = calculateDamage(attacker, target, { map, defenderTile: tile, role })
 		target.health = Math.max(
 			(target.health ?? unitData[target.type].health) - damage,
 			0
@@ -97,11 +102,14 @@ const attack: Interactor = ({ map, tile, choice }) => {
 			const targetDied = reduceHealth(map, attacker, target, destination)
 			if (
 				!targetDied &&
-				unitData[target.type].power !== 0 &&
-				generateAttackList(map, destination, target).includes(movementEndTile)
+				canCounterAttack(attacker, target, {
+					map,
+					attackerTile: movementEndTile,
+					defenderTile: destination,
+				})
 			) {
 				animateAttack(map, target, destination, movementEndTile).then(() =>
-					reduceHealth(map, target, attacker, movementEndTile)
+					reduceHealth(map, target, attacker, movementEndTile, 'counter')
 				)
 			}
 			markTileActed(movementEndTile)

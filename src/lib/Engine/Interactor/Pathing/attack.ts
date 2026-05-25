@@ -1,5 +1,6 @@
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
+import { canAttackTarget } from '$lib/Engine/modifiers/canAttack'
 
 export const generateAttackList = (map: MapObject, tile: number, unit: UnitObject) => {
 	const [start, end] = unitData[unit.type].range
@@ -42,11 +43,15 @@ const findTargetTile = (
 const addAttackable = (map: MapObject, target: number | null, unit: UnitObject) =>
 	isAttackable(map, target, unit) ? [target as number] : []
 
-const isAttackable = (map: MapObject, tile: number | null, unit: UnitObject) =>
-	tile !== null &&
-	map.layers.units[tile] &&
-	map.layers.units[tile]?.team !== unit.team &&
-	notHidden(map, tile)
+const isAttackable = (map: MapObject, tile: number | null, unit: UnitObject) => {
+	if (tile === null) return false
+	const target = map.layers.units[tile]
+	if (!target) return false
+	if (target.team === unit.team) return false
+	if (!notHidden(map, tile)) return false
+	if (!canAttackTarget(unit, target)) return false
+	return true
+}
 
 const notHidden = (map: MapObject, tile: number) =>
 	(terrainData[map.layers.ground[tile].type].name !== 'Canyon' ||
