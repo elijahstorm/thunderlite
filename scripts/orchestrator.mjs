@@ -583,14 +583,30 @@ async function main() {
 
 async function processOneCard({ mission, card, state }) {
     // --- CODER ---
+    const headBeforeCoder = gitHead()
     const coder = await runCoderPhase({ mission, card, state })
 
+    // Crash recovery: if the coder process errored (timeout, non-zero exit)
+    // but a commit landed during the run, treat it as a successful coder
+    // run for QA purposes. The bot may have committed cleanly and then
+    // been killed during cleanup.
     if (!coder.ok) {
-        log(`Coder phase errored. Advancing to avoid blocking pipeline.`, ANSI.red)
-        return {
-            action: 'ADVANCE',
-            reason: 'coder crash; skipped',
-            finalCommitSha: null,
+        const headAfterCoder = gitHead()
+        if (headAfterCoder !== headBeforeCoder) {
+            log(
+                `Coder process errored but a commit landed (${headAfterCoder.slice(0, 8)}). Proceeding to QA.`,
+                ANSI.yellow
+            )
+            coder.ok = true
+            coder.committed = true
+            coder.commitSha = headAfterCoder
+        } else {
+            log(`Coder phase errored with no commit. Advancing to avoid blocking pipeline.`, ANSI.red)
+            return {
+                action: 'ADVANCE',
+                reason: 'coder crash, no commit; skipped',
+                finalCommitSha: null,
+            }
         }
     }
 
