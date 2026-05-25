@@ -13,6 +13,7 @@ import { revealCloakedAdjacentTo } from '../modifiers/cloak'
 import { mine } from '../modifiers/miner'
 import { applyVultureKill } from '../modifiers/vulture'
 import { applyLancePassthrough } from '../modifiers/lance'
+import { repair } from '../modifiers/repair'
 import {
 	findFriendlyTransporters,
 	landTiles,
@@ -297,7 +298,7 @@ export const performMenuAction = (
 		}
 		case 'repair': {
 			closeActionMenu()
-			markTileActed(tile)
+			repair(map, tile, unit.team)
 			applyWinConditions(map)
 			return
 		}

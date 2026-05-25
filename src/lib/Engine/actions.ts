@@ -113,11 +113,7 @@ export const computeAvailableActions = (
 	}
 
 	if (isRepairable(unit)) {
-		items.push({
-			id: 'repair',
-			enabled: false,
-			reason: 'Repair not yet implemented (G4)',
-		})
+		items.push({ id: 'repair', enabled: true })
 	}
 
 	items.push({ id: 'wait', enabled: true })

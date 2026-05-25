@@ -100,15 +100,14 @@ describe('computeAvailableActions', () => {
 		expect(ids(items)).not.toContain('mine')
 	})
 
-	it('Damaged unit with Self_Action.Repairable shows Repair (disabled, G4 pending)', () => {
+	it('Damaged unit with Self_Action.Repairable shows Repair (enabled)', () => {
 		const map = makeMap()
 		const u = unit(SCORPION_TANK, 0, 10)
 		map.layers.units[12] = u
 		const items = computeAvailableActions({ map, tile: 12, unit: u })
 		const repair = items.find((i) => i.id === 'repair')
 		expect(repair).toBeDefined()
-		expect(repair?.enabled).toBe(false)
-		expect(repair?.reason).toMatch(/G4|Repair/)
+		expect(repair?.enabled).toBe(true)
 	})
 
 	it('Full-HP unit does not show Repair', () => {
