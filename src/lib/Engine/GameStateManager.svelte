@@ -5,6 +5,7 @@
 	import { setSelectedTile } from './uiState'
 	import HUDRoot from './HUD/HUDRoot.svelte'
 	import BuildMenu from './HUD/BuildMenu.svelte'
+	import ActionMenu from './HUD/ActionMenu.svelte'
 	import GameOverModal from './HUD/GameOverModal.svelte'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
@@ -43,4 +44,5 @@
 
 <HUDRoot {map} onEndTurn={handleEndTurn} />
 <BuildMenu {map} />
+<ActionMenu {map} />
 <GameOverModal />

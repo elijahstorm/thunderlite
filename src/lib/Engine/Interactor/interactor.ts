@@ -9,15 +9,15 @@ import { canSelectUnit, gameState, markTileActed } from '../gameState'
 import { calculateDamage, canCounterAttack, type AttackRole } from '../combat'
 import { openBuildMenu } from '../HUD/buildMenuStore'
 import { runModifiers } from '../modifiers'
-import { canMineAt } from '../modifiers/miner'
-import { passableAdjacentTiles } from '../modifiers/builder'
+import { mine } from '../modifiers/miner'
 import { applyWinConditions } from '../winConditions'
+import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
-	openWarmachineActions,
-	closeWarmachineActions,
-} from '../HUD/warmachineActionsStore'
-
-const WARMACHINE_TYPE = unitData.findIndex((u) => u.name === 'Warmachine')
+	openActionMenu,
+	closeActionMenu,
+	actionMenuState,
+} from '../HUD/actionMenuStore'
+import { generateAttackList } from './Pathing/attack'
 
 type Interaction = {
 	map: MapObject
@@ -46,28 +46,15 @@ const select: Interactor = ({ map, tile }) => {
 			if (state.actedTiles.has(tile)) return
 			openBuildMenu(tile, building.team)
 		}
-		closeWarmachineActions()
 		return
 	}
 	if (!canSelectUnit(unit, tile, get(gameState))) {
-		closeWarmachineActions()
 		return
 	}
 
 	highlightActionsList(map, generateActionsList(map, tile, unit))
 	interactionSource.set(tile)
 	interactionState.set('choice')
-
-	// C4 temporary coupling: surface Warmachine builder/miner actions until E2
-	// adds a proper action menu. Remove this branch when E2 lands.
-	if (unit.type === WARMACHINE_TYPE) {
-		openWarmachineActions(tile, unit.team, {
-			canMine: canMineAt(map, tile),
-			canBuild: passableAdjacentTiles(map, tile).length > 0,
-		})
-	} else {
-		closeWarmachineActions()
-	}
 }
 
 const choice: Interactor = ({ map, tile }) => {
@@ -93,17 +80,22 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 
 	const destination = generateActionsList(map, tile, unit).find((action) => action.tile === choice)
 		?.tile
-	if (!destination) return
+	if (typeof destination !== 'number') return
 
 	map.layers.units[tile] = null
 	animateRoute(map, unit, tile, destination).then(() => {
 		map.layers.units[destination] = unit
-		if (callback) callback()
-		else {
-			markTileActed(destination)
-			applyWinConditions(map)
+		if (callback) {
+			callback()
+		} else {
+			openPostMoveMenu(map, destination, unit)
 		}
 	})
+}
+
+const openPostMoveMenu = (map: MapObject, tile: number, unit: UnitObject) => {
+	const items = computeAvailableActions({ map, tile, unit })
+	openActionMenu(tile, unit.team, items)
 }
 
 const attack: Interactor = ({ map, tile, choice }) => {
@@ -118,82 +110,164 @@ const attack: Interactor = ({ map, tile, choice }) => {
 
 	const path = pathFinder(map, attacker, tile, destination)
 	const movementEndTile = path[path.length - 1] ?? tile
-	const reduceHealth = (
-		map: MapObject,
-		attacker: UnitObject,
-		target: UnitObject,
-		tile: number,
-		role: AttackRole = 'attack'
-	) => {
-		const damage = calculateDamage(attacker, target, { map, defenderTile: tile, role })
-		target.health = Math.max(
-			(target.health ?? unitData[target.type].health) - damage,
-			0
-		)
-		if (target.health === 0) {
-			map.layers.units[tile] = null
-			animateExplosion(map, tile)
-			runModifiers(target, 'Death', {
-				kind: 'unit',
-				tile,
-				state: get(gameState),
-				map,
-			})
-			return true
-		}
-		return false
-	}
-	const performAttack = () =>
-		animateAttack(map, attacker, movementEndTile, destination).then(() => {
-			const targetDied = reduceHealth(map, attacker, target, destination)
-			if (
-				!targetDied &&
-				canCounterAttack(attacker, target, {
-					map,
-					attackerTile: movementEndTile,
-					defenderTile: destination,
-				})
-			) {
-				animateAttack(map, target, destination, movementEndTile).then(() => {
-					reduceHealth(map, target, attacker, movementEndTile, 'counter')
-					applyWinConditions(map)
-				})
-			} else {
-				applyWinConditions(map)
-			}
-			markTileActed(movementEndTile)
-		})
 
 	if (path.length > 1) {
 		move({
 			map,
 			tile,
 			choice: path[path.length - 1],
-			callback: performAttack,
+			callback: () => performAttack(map, movementEndTile, destination),
 		})
 	} else {
-		performAttack()
+		performAttack(map, movementEndTile, destination)
 	}
 }
 
-const hud: Interactor = () => {
-	/**
-	 * gameplay sprint
-	 * ---
-	 * todo
-	 * 4 add game state (user turn)
-	 * 5 add selectable unit HUD UI
-	 * 7 synch auth states (fake and real) in both servers
-	 * 8 socket logic for auth and game management
-	 */
+const reduceHealth = (
+	map: MapObject,
+	attacker: UnitObject,
+	target: UnitObject,
+	tile: number,
+	role: AttackRole = 'attack'
+) => {
+	const damage = calculateDamage(attacker, target, { map, defenderTile: tile, role })
+	target.health = Math.max((target.health ?? unitData[target.type].health) - damage, 0)
+	if (target.health === 0) {
+		map.layers.units[tile] = null
+		animateExplosion(map, tile)
+		runModifiers(target, 'Death', {
+			kind: 'unit',
+			tile,
+			state: get(gameState),
+			map,
+		})
+		return true
+	}
+	return false
 }
+
+const performAttack = (map: MapObject, attackerTile: number, targetTile: number) => {
+	const attacker = map.layers.units[attackerTile]
+	const target = map.layers.units[targetTile]
+	if (!attacker || !target) return
+	animateAttack(map, attacker, attackerTile, targetTile).then(() => {
+		const targetDied = reduceHealth(map, attacker, target, targetTile)
+		if (
+			!targetDied &&
+			canCounterAttack(attacker, target, {
+				map,
+				attackerTile,
+				defenderTile: targetTile,
+			})
+		) {
+			animateAttack(map, target, targetTile, attackerTile).then(() => {
+				reduceHealth(map, target, attacker, attackerTile, 'counter')
+				applyWinConditions(map)
+			})
+		} else {
+			applyWinConditions(map)
+		}
+		markTileActed(attackerTile)
+	})
+}
+
+const selectAttackTarget: Interactor = ({ map, tile }) => {
+	const source = get(interactionSource)
+	if (source === null) return
+	const attacker = map.layers.units[source]
+	if (!attacker) return
+
+	const enemies = generateAttackList(map, source, attacker)
+	if (!enemies.includes(tile)) return
+
+	interactionSource.set(null)
+	interactionState.set('select')
+	highlightActionsList(map, [])
+
+	performAttack(map, source, tile)
+}
+
+const hud: Interactor = () => {}
 
 const actionsDecision = {
 	select,
 	choice,
 	move,
 	attack,
+	selectAttackTarget,
 	hud,
 } as const
 
 const actionType = [move, attack] as const
+
+export const performMenuAction = (
+	map: MapObject,
+	actionId: ActionMenuItemId
+): void => {
+	const menu = get(actionMenuState)
+	if (!menu.open || menu.unitTile === null) return
+	const tile = menu.unitTile
+	const unit = map.layers.units[tile]
+	if (!unit) {
+		closeActionMenu()
+		return
+	}
+
+	switch (actionId) {
+		case 'wait': {
+			closeActionMenu()
+			markTileActed(tile)
+			applyWinConditions(map)
+			return
+		}
+		case 'attack': {
+			closeActionMenu()
+			interactionSource.set(tile)
+			interactionState.set('selectAttackTarget')
+			const targets = generateAttackList(map, tile, unit)
+			highlightActionsList(
+				map,
+				targets.map((t) => ({ tile: t, type: 1, tip: 1 } as unknown as Highlight))
+			)
+			return
+		}
+		case 'capture': {
+			closeActionMenu()
+			runModifiers(unit, 'Start_Turn', {
+				kind: 'unit',
+				tile,
+				state: get(gameState),
+				map,
+			})
+			markTileActed(tile)
+			applyWinConditions(map)
+			return
+		}
+		case 'mine': {
+			closeActionMenu()
+			mine(map, tile, unit.team)
+			applyWinConditions(map)
+			return
+		}
+		case 'build': {
+			closeActionMenu()
+			openBuildMenu(tile, unit.team, 'builder')
+			return
+		}
+		case 'repair': {
+			closeActionMenu()
+			markTileActed(tile)
+			applyWinConditions(map)
+			return
+		}
+	}
+}
+
+export const cancelMenuAsWait = (map: MapObject): void => {
+	const menu = get(actionMenuState)
+	if (!menu.open || menu.unitTile === null) {
+		closeActionMenu()
+		return
+	}
+	performMenuAction(map, 'wait')
+}
