@@ -11,6 +11,7 @@ const WARMACHINE = unitData.findIndex((u) => u.name === 'Warmachine')
 const CITY = buildingData.findIndex((b) => b.name === 'City')
 const PLAINS = terrainData.findIndex((t) => t.name === 'Plains')
 const ENRICHED_ORE = terrainData.findIndex((t) => t.name === 'Enriched Ore Deposit')
+const SHORE = terrainData.findIndex((t) => t.name === 'Shore')
 
 const makeMap = (groundType = PLAINS): MapObject => ({
 	cols: 5,
@@ -116,6 +117,23 @@ describe('computeAvailableActions', () => {
 		map.layers.units[12] = u
 		const items = computeAvailableActions({ map, tile: 12, unit: u })
 		expect(ids(items)).not.toContain('repair')
+	})
+
+	it('Ground unit on Shore shows ship_out action', () => {
+		const map = makeMap()
+		const tank = unit(SCORPION_TANK, 0)
+		map.layers.ground[12] = { type: SHORE, state: 0 }
+		map.layers.units[12] = tank
+		const items = computeAvailableActions({ map, tile: 12, unit: tank })
+		expect(ids(items)).toContain('ship_out')
+	})
+
+	it('Ground unit on Plains does NOT show ship_out action', () => {
+		const map = makeMap()
+		const tank = unit(SCORPION_TANK, 0)
+		map.layers.units[12] = tank
+		const items = computeAvailableActions({ map, tile: 12, unit: tank })
+		expect(ids(items)).not.toContain('ship_out')
 	})
 
 	it('Strike Commando on enemy City with adjacent enemy shows Capture + Attack + Wait', () => {

@@ -68,8 +68,7 @@ const canTransport = (map: MapObject, tile: number, unit: UnitObject): boolean =
 	return findFriendlyTransporters(map, tile, unit.team).length > 0
 }
 
-const canShipOutHere = (map: MapObject, tile: number, unit: UnitObject): boolean => {
-	if (!hasModifier(unit, 'Self_Action.Ship_Out')) return false
+const canShipOutHere = (map: MapObject, tile: number, _unit: UnitObject): boolean => {
 	return canShipOut(map, tile)
 }
 
