@@ -24,7 +24,7 @@
 				{gameSession}
 				{map}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
-				endTurnAction={socket ? socketEndTurn(socket) : undefined}
+				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 				let:select
 			>
 				<MapRender {map} {requestRedraw} {select} fogOfWar />

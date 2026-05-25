@@ -2,25 +2,13 @@ import { highlightActionsList, generateActionsList } from '$lib/Layers/tileHighl
 import { get } from 'svelte/store'
 import { animateRoute, animateAttack, animateExplosion } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
-import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { pathFinder } from './Pathing/pathFinder'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
-import { calculateDamage, canCounterAttack, type AttackRole } from '../combat'
 import { openBuildMenu } from '../HUD/buildMenuStore'
-import { runModifiers } from '../modifiers'
-import { revealCloakedAdjacentTo } from '../modifiers/cloak'
-import { mine } from '../modifiers/miner'
-import { applyVultureKill } from '../modifiers/vulture'
-import { applyLancePassthrough } from '../modifiers/lance'
-import { repair } from '../modifiers/repair'
-import {
-	findFriendlyTransporters,
-	landTiles,
-	landUnload,
-	shipOut,
-	transportLoad,
-} from '../modifiers/transport'
+import { applyAction } from '../applyAction'
+import { emitOutgoingAction } from '../outgoingActions'
+import { findFriendlyTransporters, shipOut } from '../modifiers/transport'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -29,6 +17,7 @@ import {
 	actionMenuState,
 } from '../HUD/actionMenuStore'
 import { generateAttackList } from './Pathing/attack'
+import type { SerializedAction } from './serializedAction'
 
 type Interaction = {
 	map: MapObject
@@ -45,6 +34,11 @@ export const interactor: Interactor = (interaction) =>
 	actionsDecision[interaction.action ?? get(interactionState)](interaction)
 
 const verifyInteraction = (obj: object) => Object.hasOwn(obj, 'tile') && Object.hasOwn(obj, 'map')
+
+const commit = (map: MapObject, action: SerializedAction): void => {
+	applyAction(map, action)
+	emitOutgoingAction(action)
+}
 
 const select: Interactor = ({ map, tile }) => {
 	const unit = map.layers.units[tile]
@@ -95,14 +89,8 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 
 	map.layers.units[tile] = null
 	animateRoute(map, unit, tile, destination).then(() => {
-		map.layers.units[destination] = unit
-		runModifiers(unit, 'Move', {
-			kind: 'unit',
-			tile: destination,
-			state: get(gameState),
-			map,
-		})
-		revealCloakedAdjacentTo(map, destination, unit.team)
+		map.layers.units[tile] = unit
+		commit(map, { kind: 'move', from: tile, to: destination })
 		if (callback) {
 			callback()
 		} else {
@@ -141,56 +129,19 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	}
 }
 
-const reduceHealth = (
-	map: MapObject,
-	attacker: UnitObject,
-	target: UnitObject,
-	tile: number,
-	role: AttackRole = 'attack'
-) => {
-	const damage = calculateDamage(attacker, target, { map, defenderTile: tile, role })
-	target.health = Math.max((target.health ?? unitData[target.type].health) - damage, 0)
-	if (target.health === 0) {
-		map.layers.units[tile] = null
-		animateExplosion(map, tile)
-		runModifiers(target, 'Death', {
-			kind: 'unit',
-			tile,
-			state: get(gameState),
-			map,
-		})
-		return true
-	}
-	return false
-}
-
 const performAttack = (map: MapObject, attackerTile: number, targetTile: number) => {
 	const attacker = map.layers.units[attackerTile]
 	const target = map.layers.units[targetTile]
 	if (!attacker || !target) return
 	animateAttack(map, attacker, attackerTile, targetTile).then(() => {
-		const targetDied = reduceHealth(map, attacker, target, targetTile)
-		const lanceResult = applyLancePassthrough(map, attackerTile, targetTile)
-		if (lanceResult?.killed) {
-			animateExplosion(map, lanceResult.tile)
+		const targetWillDie = (target.health ?? 0) > 0
+		commit(map, { kind: 'attack', from: attackerTile, to: targetTile })
+		if (targetWillDie && map.layers.units[targetTile] == null) {
+			animateExplosion(map, targetTile)
 		}
-		if (
-			!targetDied &&
-			canCounterAttack(attacker, target, {
-				map,
-				attackerTile,
-				defenderTile: targetTile,
-			})
-		) {
-			animateAttack(map, target, targetTile, attackerTile).then(() => {
-				reduceHealth(map, target, attacker, attackerTile, 'counter')
-				applyWinConditions(map)
-			})
-		} else {
-			applyWinConditions(map)
+		if (map.layers.units[attackerTile] == null) {
+			animateExplosion(map, attackerTile)
 		}
-		markTileActed(attackerTile)
-		if (targetDied) applyVultureKill(attacker, attackerTile)
 	})
 }
 
@@ -216,16 +167,11 @@ const selectLandTile: Interactor = ({ map, tile }) => {
 	const transport = map.layers.units[source]
 	if (!transport) return
 
-	const valid = landTiles(map, source)
-	if (!valid.includes(tile)) return
-
 	interactionSource.set(null)
 	interactionState.set('select')
 	highlightActionsList(map, [])
 
-	landUnload(map, source, tile)
-	markTileActed(tile)
-	applyWinConditions(map)
+	commit(map, { kind: 'transport-unload', transport: source, tile })
 }
 
 const hud: Interactor = () => {}
@@ -258,8 +204,7 @@ export const performMenuAction = (
 	switch (actionId) {
 		case 'wait': {
 			closeActionMenu()
-			markTileActed(tile)
-			applyWinConditions(map)
+			commit(map, { kind: 'wait', tile })
 			return
 		}
 		case 'attack': {
@@ -275,20 +220,12 @@ export const performMenuAction = (
 		}
 		case 'capture': {
 			closeActionMenu()
-			runModifiers(unit, 'Start_Turn', {
-				kind: 'unit',
-				tile,
-				state: get(gameState),
-				map,
-			})
-			markTileActed(tile)
-			applyWinConditions(map)
+			commit(map, { kind: 'capture', tile })
 			return
 		}
 		case 'mine': {
 			closeActionMenu()
-			mine(map, tile, unit.team)
-			applyWinConditions(map)
+			commit(map, { kind: 'mine', tile })
 			return
 		}
 		case 'build': {
@@ -298,20 +235,15 @@ export const performMenuAction = (
 		}
 		case 'repair': {
 			closeActionMenu()
-			repair(map, tile, unit.team)
-			applyWinConditions(map)
+			commit(map, { kind: 'repair', tile })
 			return
 		}
 		case 'transport': {
 			closeActionMenu()
 			const transports = findFriendlyTransporters(map, tile, unit.team)
-			const target = transports[0]
-			if (typeof target !== 'number') return
-			const result = transportLoad(map, tile, target)
-			if (result.ok) {
-				markTileActed(target)
-				applyWinConditions(map)
-			}
+			const transport = transports[0]
+			if (typeof transport !== 'number') return
+			commit(map, { kind: 'transport-load', transport, passenger: tile })
 			return
 		}
 		case 'ship_out': {
@@ -327,11 +259,6 @@ export const performMenuAction = (
 			closeActionMenu()
 			interactionSource.set(tile)
 			interactionState.set('selectLandTile')
-			const targets = landTiles(map, tile)
-			highlightActionsList(
-				map,
-				targets.map((t) => ({ tile: t, type: 0, tip: 0 } as unknown as Highlight))
-			)
 			markTileActed(tile)
 			return
 		}

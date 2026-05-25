@@ -7,42 +7,56 @@ import {
 } from '../../src/lib/Engine/Interactor/serializedAction'
 
 describe('isValidSerializedAction', () => {
-	it('accepts a tile action with a non-negative integer tile', () => {
-		expect(isValidSerializedAction({ kind: 'tile', tile: 0 })).toBe(true)
-		expect(isValidSerializedAction({ kind: 'tile', tile: 42 })).toBe(true)
-	})
-
-	it('accepts an endTurn action', () => {
-		expect(isValidSerializedAction({ kind: 'endTurn' })).toBe(true)
+	it('accepts each kind in the new union', () => {
+		expect(isValidSerializedAction({ kind: 'move', from: 0, to: 1 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'attack', from: 2, to: 5 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'capture', tile: 4 })).toBe(true)
+		expect(
+			isValidSerializedAction({ kind: 'build', building: 3, unitType: 0 })
+		).toBe(true)
+		expect(
+			isValidSerializedAction({ kind: 'build', building: 3, unitType: 0, direction: 1 })
+		).toBe(true)
+		expect(isValidSerializedAction({ kind: 'mine', tile: 9 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'repair', tile: 6 })).toBe(true)
+		expect(
+			isValidSerializedAction({ kind: 'transport-load', transport: 1, passenger: 2 })
+		).toBe(true)
+		expect(
+			isValidSerializedAction({ kind: 'transport-unload', transport: 1, tile: 3 })
+		).toBe(true)
+		expect(isValidSerializedAction({ kind: 'wait', tile: 7 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'end-turn' })).toBe(true)
 	})
 
 	it('rejects malformed payloads', () => {
 		expect(isValidSerializedAction(null)).toBe(false)
 		expect(isValidSerializedAction(undefined)).toBe(false)
-		expect(isValidSerializedAction('endTurn')).toBe(false)
+		expect(isValidSerializedAction('end-turn')).toBe(false)
 		expect(isValidSerializedAction({})).toBe(false)
 		expect(isValidSerializedAction({ kind: 'unknown' })).toBe(false)
-		expect(isValidSerializedAction({ kind: 'tile' })).toBe(false)
-		expect(isValidSerializedAction({ kind: 'tile', tile: -1 })).toBe(false)
-		expect(isValidSerializedAction({ kind: 'tile', tile: '5' })).toBe(false)
-		expect(isValidSerializedAction({ kind: 'tile', tile: Number.NaN })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'move' })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'move', from: -1, to: 2 })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'attack', from: 1 })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'wait', tile: '5' })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'wait', tile: Number.NaN })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'tile', tile: 12 })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'endTurn' })).toBe(false)
 	})
 })
 
 describe('normalizeAction', () => {
 	it('returns the action as-is when valid', () => {
-		const action: SerializedAction = { kind: 'tile', tile: 7 }
+		const action: SerializedAction = { kind: 'move', from: 0, to: 1 }
 		expect(normalizeAction(action)).toEqual(action)
-		expect(normalizeAction({ kind: 'endTurn' })).toEqual({ kind: 'endTurn' })
+		expect(normalizeAction({ kind: 'end-turn' })).toEqual({ kind: 'end-turn' })
 	})
 
-	it('upgrades legacy {tile} payloads to SerializedAction', () => {
-		expect(normalizeAction({ tile: 12 })).toEqual({ kind: 'tile', tile: 12 })
-	})
-
-	it('returns null for anything unrecognized', () => {
+	it('returns null for legacy or unrecognized shapes', () => {
 		expect(normalizeAction(null)).toBeNull()
-		expect(normalizeAction({ tile: -3 })).toBeNull()
+		expect(normalizeAction({ tile: 12 })).toBeNull()
+		expect(normalizeAction({ kind: 'tile', tile: 12 })).toBeNull()
+		expect(normalizeAction({ kind: 'endTurn' })).toBeNull()
 		expect(normalizeAction({ foo: 'bar' })).toBeNull()
 		expect(normalizeAction('hello')).toBeNull()
 	})
@@ -50,7 +64,7 @@ describe('normalizeAction', () => {
 
 describe('SerializedAction JSON round-trip', () => {
 	it('survives a JSON encode/decode pair', () => {
-		const original: SerializedAction = { kind: 'tile', tile: 99 }
+		const original: SerializedAction = { kind: 'attack', from: 4, to: 12 }
 		const round = JSON.parse(JSON.stringify(original))
 		expect(isValidSerializedAction(round)).toBe(true)
 		expect(round).toEqual(original)

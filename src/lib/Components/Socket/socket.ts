@@ -1,5 +1,8 @@
 import { browser } from '$app/environment'
 import { get } from 'svelte/store'
+import { interactor } from '$lib/Engine/Interactor/interactor'
+import { applyAction } from '$lib/Engine/applyAction'
+import { emitOutgoingAction } from '$lib/Engine/outgoingActions'
 import {
 	dispatchSerializedAction,
 	normalizeAction,
@@ -40,12 +43,17 @@ export const socketMessage =
 	}
 
 export const socketSelect =
-	(socket: Pick<WebSocket, 'send'>, getMap: () => MapObject) =>
+	(_socket: Pick<WebSocket, 'send'>, getMap: () => MapObject | undefined) =>
 	(x: number, y: number) => {
 		const map = getMap()
-		socket.send(JSON.stringify({ kind: 'tile', tile: y * map.cols + x }))
+		if (!map) return
+		interactor({ map, tile: y * map.cols + x })
 	}
 
-export const socketEndTurn = (socket: Pick<WebSocket, 'send'>) => () => {
-	socket.send(JSON.stringify({ kind: 'endTurn' }))
-}
+export const socketEndTurn =
+	(_socket: Pick<WebSocket, 'send'>, getMap?: () => MapObject | undefined) =>
+	() => {
+		const map = getMap?.()
+		if (map) applyAction(map, { kind: 'end-turn' })
+		emitOutgoingAction({ kind: 'end-turn' })
+	}

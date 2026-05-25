@@ -58,7 +58,7 @@ export const POST = async ({ request, params, locals }) => {
 		}
 		await kv.rpush(EVENTS_KEY(session), JSON.stringify(event))
 
-		if (action.kind === 'endTurn' && members.length > 1) {
+		if (action.kind === 'end-turn' && members.length > 1) {
 			const idx = members.indexOf(userSession)
 			const nextIdx = (idx + 1) % members.length
 			await kv.set(CURRENT_KEY(session), members[nextIdx])

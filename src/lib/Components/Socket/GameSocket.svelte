@@ -8,6 +8,7 @@
 		type GameEvent,
 		type SerializedAction,
 	} from '$lib/Engine/Interactor/serializedAction'
+	import { outgoingActions } from '$lib/Engine/outgoingActions'
 	import { fly } from 'svelte/transition'
 
 	export let map: () => MapObject | undefined
@@ -27,9 +28,11 @@
 	let multiplayer = false
 	let lastEventId = -1
 	let pollTimer: ReturnType<typeof setInterval> | null = null
+	let outgoingUnsubscribe: (() => void) | null = null
 	let requestRedraw: number = 0
 	let wrongTurn = false
 	let wrongTurnTimer: ReturnType<typeof setTimeout> | null = null
+	const locallyEmitted = new Set<string>()
 
 	const applyEvent = (event: GameEvent): boolean => {
 		const m = map()
@@ -41,7 +44,12 @@
 			lastEventId = event.id
 			return true
 		}
-		dispatchSerializedAction(m, action)
+		const fingerprint = JSON.stringify(action)
+		if (locallyEmitted.has(fingerprint)) {
+			locallyEmitted.delete(fingerprint)
+		} else {
+			dispatchSerializedAction(m, action)
+		}
 		lastEventId = event.id
 		requestRedraw = performance.now()
 		return true
@@ -70,15 +78,7 @@
 		}, 1500)
 	}
 
-	const send = async (data: string) => {
-		let parsed: unknown
-		try {
-			parsed = JSON.parse(data)
-		} catch {
-			return
-		}
-		const action: SerializedAction | null = normalizeAction(parsed)
-		if (!action) return
+	const relay = async (action: SerializedAction) => {
 		try {
 			const res = await fetch(`/api/game/${gameSession}/move`, {
 				method: 'POST',
@@ -91,18 +91,41 @@
 			}
 			if (!res.ok) return
 			const result = (await res.json()) as { event?: GameEvent }
-			if (result?.event) applyEvent(result.event)
+			if (result?.event && typeof result.event.id === 'number') {
+				lastEventId = Math.max(lastEventId, result.event.id)
+			}
 		} catch {
 			// network errors swallowed; polling will pick up the canonical state.
 		}
 	}
 
+	const send = (data: string) => {
+		let parsed: unknown
+		try {
+			parsed = JSON.parse(data)
+		} catch {
+			return
+		}
+		const action: SerializedAction | null = normalizeAction(parsed)
+		if (!action) return
+		locallyEmitted.add(JSON.stringify(action))
+		void relay(action)
+	}
+
 	const socket = { send } as unknown as WebSocket
+
+	const onOutgoing = (action: SerializedAction | null) => {
+		if (!action) return
+		if (!multiplayer) return
+		locallyEmitted.add(JSON.stringify(action))
+		void relay(action)
+	}
 
 	onMount(() => {
 		if (!browser) return
 		multiplayer = isMultiplayer()
 		if (!multiplayer) return
+		outgoingUnsubscribe = outgoingActions.subscribe(onOutgoing)
 		void poll().then(() => {
 			pollTimer = setInterval(poll, POLL_INTERVAL)
 		})
@@ -111,6 +134,7 @@
 	onDestroy(() => {
 		if (pollTimer) clearInterval(pollTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
+		if (outgoingUnsubscribe) outgoingUnsubscribe()
 	})
 </script>
 
