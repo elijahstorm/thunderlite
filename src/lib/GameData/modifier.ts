@@ -1,35 +1,57 @@
+import type { ModifierHandler } from '$lib/Engine/modifiers'
+import { healTeam } from '$lib/Engine/modifiers/healTeam'
+
+export type ModifierPhase =
+	| 'Start_Turn'
+	| 'End_Turn'
+	| 'Each_Turn'
+	| 'Capture'
+	| 'Move'
+	| 'Idle'
+	| 'Self_Action'
+	| 'Can_Attack'
+	| 'Damage'
+	| 'Attack'
+	| 'Death'
+	| 'Properties'
+
+export type ModifierRecord = {
+	phase: ModifierPhase
+	run?: ModifierHandler
+}
+
 export const modifierData = {
-	hidden: '',
-	treacherous: '',
-	Extra_Sight: '',
-	Trench: '',
-	Port: '',
-	'Start_Turn.Heal_Team': '',
-	'Capture.Insta_Lose': '',
-	'Capture.Allow_Ground': '',
-	'Capture.Allow_Air': '',
-	'Capture.Allow_Sea': '',
-	'Each_Turn.Supply_Income': '',
-	'Start_Turn.Capture': '',
-	'Move.Tracking': '',
-	'Self_Action.Transport': '',
-	'Self_Action.Repairable': '',
-	'Can_Attack.Air_Raid': '',
-	'Damage.Flak': '',
-	'Damage.Fast_Attack': '',
-	'Can_Attack.Bombard': '',
-	'Attack.Lance': '',
-	'Attack.Stun': '',
-	'End_Turn.Cloak': '',
-	'Damage.Slow_Attack': '',
-	'Can_Attack.Counter_Range': '',
-	'Move.Radar': '',
-	'Idle.Jamming': '',
-	'Self_Action.Miner': '',
-	'Self_Action.Builder': '',
-	'Death.Insta_Lose': '',
-	'Can_Attack.Ground_Assult': '',
-	'Self_Action.Irreparable': '',
-	'End_Turn.Vulture': '',
-	'Self_Action.Land': '',
-} as const
+	hidden: { phase: 'Properties' },
+	treacherous: { phase: 'Properties' },
+	Extra_Sight: { phase: 'Properties' },
+	Trench: { phase: 'Properties' },
+	Port: { phase: 'Properties' },
+	'Start_Turn.Heal_Team': { phase: 'Start_Turn', run: healTeam },
+	'Capture.Insta_Lose': { phase: 'Capture' },
+	'Capture.Allow_Ground': { phase: 'Capture' },
+	'Capture.Allow_Air': { phase: 'Capture' },
+	'Capture.Allow_Sea': { phase: 'Capture' },
+	'Each_Turn.Supply_Income': { phase: 'Each_Turn' },
+	'Start_Turn.Capture': { phase: 'Start_Turn' },
+	'Move.Tracking': { phase: 'Move' },
+	'Self_Action.Transport': { phase: 'Self_Action' },
+	'Self_Action.Repairable': { phase: 'Self_Action' },
+	'Can_Attack.Air_Raid': { phase: 'Can_Attack' },
+	'Damage.Flak': { phase: 'Damage' },
+	'Damage.Fast_Attack': { phase: 'Damage' },
+	'Can_Attack.Bombard': { phase: 'Can_Attack' },
+	'Attack.Lance': { phase: 'Attack' },
+	'Attack.Stun': { phase: 'Attack' },
+	'End_Turn.Cloak': { phase: 'End_Turn' },
+	'Damage.Slow_Attack': { phase: 'Damage' },
+	'Can_Attack.Counter_Range': { phase: 'Can_Attack' },
+	'Move.Radar': { phase: 'Move' },
+	'Idle.Jamming': { phase: 'Idle' },
+	'Self_Action.Miner': { phase: 'Self_Action' },
+	'Self_Action.Builder': { phase: 'Self_Action' },
+	'Death.Insta_Lose': { phase: 'Death' },
+	'Can_Attack.Ground_Assult': { phase: 'Can_Attack' },
+	'Self_Action.Irreparable': { phase: 'Self_Action' },
+	'End_Turn.Vulture': { phase: 'End_Turn' },
+	'Self_Action.Land': { phase: 'Self_Action' },
+} as const satisfies Record<string, ModifierRecord>
