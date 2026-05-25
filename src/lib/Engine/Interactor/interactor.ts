@@ -11,6 +11,7 @@ import { openBuildMenu } from '../HUD/buildMenuStore'
 import { runModifiers } from '../modifiers'
 import { revealCloakedAdjacentTo } from '../modifiers/cloak'
 import { mine } from '../modifiers/miner'
+import { applyVultureKill } from '../modifiers/vulture'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -176,6 +177,7 @@ const performAttack = (map: MapObject, attackerTile: number, targetTile: number)
 			applyWinConditions(map)
 		}
 		markTileActed(attackerTile)
+		if (targetDied) applyVultureKill(attacker, attackerTile)
 	})
 }
 
