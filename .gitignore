@@ -24,3 +24,4 @@ demo_data/
 .orchestrator.log
 .orchestrator.pid
 .orchestrator-reports/
+.caffeinate.pid
