@@ -11,6 +11,7 @@ import { openBuildMenu } from '../HUD/buildMenuStore'
 import { runModifiers } from '../modifiers'
 import { canMineAt } from '../modifiers/miner'
 import { passableAdjacentTiles } from '../modifiers/builder'
+import { applyWinConditions } from '../winConditions'
 import {
 	openWarmachineActions,
 	closeWarmachineActions,
@@ -98,7 +99,10 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	animateRoute(map, unit, tile, destination).then(() => {
 		map.layers.units[destination] = unit
 		if (callback) callback()
-		else markTileActed(destination)
+		else {
+			markTileActed(destination)
+			applyWinConditions(map)
+		}
 	})
 }
 
@@ -150,9 +154,12 @@ const attack: Interactor = ({ map, tile, choice }) => {
 					defenderTile: destination,
 				})
 			) {
-				animateAttack(map, target, destination, movementEndTile).then(() =>
+				animateAttack(map, target, destination, movementEndTile).then(() => {
 					reduceHealth(map, target, attacker, movementEndTile, 'counter')
-				)
+					applyWinConditions(map)
+				})
+			} else {
+				applyWinConditions(map)
 			}
 			markTileActed(movementEndTile)
 		})

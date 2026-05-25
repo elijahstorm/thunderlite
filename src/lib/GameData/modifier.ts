@@ -8,6 +8,7 @@ import {
 	captureAllowSea,
 } from '$lib/Engine/modifiers/captureAllow'
 import { instaLose } from '$lib/Engine/modifiers/instaLose'
+import { captureInstaLose } from '$lib/Engine/modifiers/captureInstaLose'
 
 export type ModifierPhase =
 	| 'Start_Turn'
@@ -35,7 +36,7 @@ export const modifierData = {
 	Trench: { phase: 'Properties' },
 	Port: { phase: 'Properties' },
 	'Start_Turn.Heal_Team': { phase: 'Start_Turn', run: healTeam },
-	'Capture.Insta_Lose': { phase: 'Capture' },
+	'Capture.Insta_Lose': { phase: 'Capture', run: captureInstaLose },
 	'Capture.Allow_Ground': { phase: 'Capture', run: captureAllowGround },
 	'Capture.Allow_Air': { phase: 'Capture', run: captureAllowAir },
 	'Capture.Allow_Sea': { phase: 'Capture', run: captureAllowSea },

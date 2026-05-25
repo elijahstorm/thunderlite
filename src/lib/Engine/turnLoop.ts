@@ -4,6 +4,7 @@ import { unitData } from '$lib/GameData/unit'
 import { animateExplosion } from './Animator/animator'
 import { gameState, type GameState, type Player } from './gameState'
 import { runModifiers, type ModifierContext, type ModifierPhase } from './modifiers'
+import { applyWinConditions } from './winConditions'
 
 export type NextTeamResult = {
 	team: number
@@ -126,5 +127,6 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 		const after = get(gameState)
 		runPhaseForTeam(map, advance.team, 'Start_Turn', ['unit', 'building'], after)
 		runPhaseForTeam(map, advance.team, 'Each_Turn', ['unit', 'building'], after)
+		applyWinConditions(map)
 	}
 }
