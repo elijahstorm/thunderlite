@@ -1,5 +1,6 @@
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
+import { isJammedFor } from '$lib/Engine/modifiers/jamming'
 
 export const generateMovementList = (map: MapObject, tile: number, unit: UnitObject) => [
 	...new Set([
@@ -52,7 +53,13 @@ const isWalkable = (
 	directionDecision[direction](map, tile) &&
 	movement >= drag(unit, map.layers.ground[tile]) &&
 	notBlocked(map, tile, unit) &&
+	notJammed(map, tile, unit) &&
 	validTerrain(map.layers.ground[tile], unit)
+
+const notJammed = (map: MapObject, tile: number, unit: UnitObject): boolean => {
+	if (unitData[unit.type].type !== 'air') return true
+	return !isJammedFor(map, tile, unit.team)
+}
 
 const IMPASSABLE = 9999
 export const drag = (unit: UnitObject, terrain: GroundObject) =>

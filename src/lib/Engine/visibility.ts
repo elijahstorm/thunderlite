@@ -1,6 +1,11 @@
 import { unitData } from '$lib/GameData/unit'
 import { extraSightBonus } from './modifiers/extraSight'
 
+export const isUnitVisibleTo = (unit: UnitObject, team: number): boolean => {
+	if (unit.team === team) return true
+	return !unit.hidden
+}
+
 export type VisibilityMap = Pick<MapObject, 'cols' | 'rows' | 'layers'>
 
 export const computeUnitSight = (

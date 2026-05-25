@@ -1,5 +1,6 @@
 import { unitData } from '$lib/GameData/unit'
 import { drag, validTerrain } from './movement'
+import { isJammedFor } from '$lib/Engine/modifiers/jamming'
 
 export const pathFinder = (map: MapObject, unit: UnitObject, start: number, end: number) => {
 	if (start === end) return []
@@ -51,7 +52,8 @@ export const pathFinder = (map: MapObject, unit: UnitObject, start: number, end:
 					!validTerrain(map.layers.ground[newTile], unit) ||
 					visited[newXY.y * map.cols + newXY.x] ||
 					Math.abs(newXY.x - x) > 1 ||
-					Math.abs(newXY.y - y) > 1
+					Math.abs(newXY.y - y) > 1 ||
+					(unitData[unit.type].type === 'air' && isJammedFor(map, newTile, unit.team))
 				) {
 					continue
 				}

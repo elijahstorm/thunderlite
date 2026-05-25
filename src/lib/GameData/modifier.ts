@@ -9,6 +9,9 @@ import {
 } from '$lib/Engine/modifiers/captureAllow'
 import { instaLose } from '$lib/Engine/modifiers/instaLose'
 import { captureInstaLose } from '$lib/Engine/modifiers/captureInstaLose'
+import { cloak } from '$lib/Engine/modifiers/cloak'
+import { tracking } from '$lib/Engine/modifiers/tracking'
+import { radar } from '$lib/Engine/modifiers/radar'
 
 export type ModifierPhase =
 	| 'Start_Turn'
@@ -42,7 +45,7 @@ export const modifierData = {
 	'Capture.Allow_Sea': { phase: 'Capture', run: captureAllowSea },
 	'Each_Turn.Supply_Income': { phase: 'Each_Turn', run: supplyIncome },
 	'Start_Turn.Capture': { phase: 'Start_Turn', run: capture },
-	'Move.Tracking': { phase: 'Move' },
+	'Move.Tracking': { phase: 'Move', run: tracking },
 	'Self_Action.Transport': { phase: 'Self_Action' },
 	'Self_Action.Repairable': { phase: 'Self_Action' },
 	'Can_Attack.Air_Raid': { phase: 'Can_Attack' },
@@ -51,10 +54,10 @@ export const modifierData = {
 	'Can_Attack.Bombard': { phase: 'Can_Attack' },
 	'Attack.Lance': { phase: 'Attack' },
 	'Attack.Stun': { phase: 'Attack' },
-	'End_Turn.Cloak': { phase: 'End_Turn' },
+	'End_Turn.Cloak': { phase: 'End_Turn', run: cloak },
 	'Damage.Slow_Attack': { phase: 'Damage' },
 	'Can_Attack.Counter_Range': { phase: 'Can_Attack' },
-	'Move.Radar': { phase: 'Move' },
+	'Move.Radar': { phase: 'Move', run: radar },
 	'Idle.Jamming': { phase: 'Idle' },
 	'Self_Action.Miner': { phase: 'Self_Action' },
 	'Self_Action.Builder': { phase: 'Self_Action' },

@@ -85,6 +85,12 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	map.layers.units[tile] = null
 	animateRoute(map, unit, tile, destination).then(() => {
 		map.layers.units[destination] = unit
+		runModifiers(unit, 'Move', {
+			kind: 'unit',
+			tile: destination,
+			state: get(gameState),
+			map,
+		})
 		if (callback) {
 			callback()
 		} else {
