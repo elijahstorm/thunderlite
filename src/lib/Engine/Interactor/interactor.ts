@@ -6,6 +6,7 @@ import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
 import { generateAttackList } from './Pathing/attack'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
+import { calculateDamage } from '../combat'
 
 type Interaction = {
 	map: MapObject
@@ -79,8 +80,9 @@ const attack: Interactor = ({ map, tile, choice }) => {
 	const path = pathFinder(map, attacker, tile, destination)
 	const movementEndTile = path[path.length - 1] ?? tile
 	const reduceHealth = (map: MapObject, attacker: UnitObject, target: UnitObject, tile: number) => {
+		const damage = calculateDamage(attacker, target, { map, defenderTile: tile })
 		target.health = Math.max(
-			(target.health ?? unitData[target.type].health) - unitData[attacker.type].power,
+			(target.health ?? unitData[target.type].health) - damage,
 			0
 		)
 		if (target.health === 0) {
