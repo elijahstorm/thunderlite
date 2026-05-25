@@ -3,9 +3,11 @@ import { get } from 'svelte/store'
 import { animateRoute, animateAttack, animateExplosion } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
+import { buildingData } from '$lib/GameData/building'
 import { pathFinder } from './Pathing/pathFinder'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
 import { calculateDamage, canCounterAttack, type AttackRole } from '../combat'
+import { openBuildMenu } from '../HUD/buildMenuStore'
 
 type Interaction = {
 	map: MapObject
@@ -25,7 +27,17 @@ const verifyInteraction = (obj: object) => Object.hasOwn(obj, 'tile') && Object.
 
 const select: Interactor = ({ map, tile }) => {
 	const unit = map.layers.units[tile]
-	if (!unit) return
+	if (!unit) {
+		const building = map.layers.buildings[tile]
+		if (building && buildingData[building.type]?.actable) {
+			const state = get(gameState)
+			if (state.phase !== 'playing') return
+			if (building.team !== state.currentTeam) return
+			if (state.actedTiles.has(tile)) return
+			openBuildMenu(tile, building.team)
+		}
+		return
+	}
 	if (!canSelectUnit(unit, tile, get(gameState))) return
 
 	highlightActionsList(map, generateActionsList(map, tile, unit))
