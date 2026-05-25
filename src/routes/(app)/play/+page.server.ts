@@ -6,9 +6,21 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
 import type postgres from 'postgres'
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const userSession = locals.session
 	if (!userSession) throw error(401, 'User not logged in')
+
+	// Ephemeral session: the editor launched an unsaved map. The client-side
+	// `mapStore` already holds the map, so we skip the DB lookup. `MapLoader`
+	// prefers `$mapStore` over `mapHash`, so this still renders correctly.
+	if (url.searchParams.get('ephemeral') === '1') {
+		return {
+			userSession,
+			gameSession: 'ephemeral',
+			mapHash: url.searchParams.get('sha') ?? '',
+		}
+	}
+
 	const { gameSession, sha } = await getGameSession(locals.sql, userSession)
 	if (!gameSession || !sha) throw error(403, 'No game session found')
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { writable } from 'svelte/store'
+	import { goto } from '$app/navigation'
 	import ButtonGrid from './Editor/ButtonGrid.svelte'
 	import MapRender from './MapRender.svelte'
 	import Icon from '@iconify/svelte'
@@ -8,7 +9,6 @@
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
 	import { mapStore } from './mapStore'
-	import { addToast } from 'as-toast'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
@@ -60,8 +60,21 @@
 		{
 			label: 'play',
 			icon: 'solar:play-bold',
-			act: () => {
-				addToast(`Loading... JK not implemented yet!`)
+			act: async () => {
+				const sha = mapHasher(map)
+				mapStore.set(map)
+				let ok = false
+				try {
+					const response = await fetch('/api/game', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ sha }),
+					})
+					ok = response.ok
+				} catch {
+					ok = false
+				}
+				await goto(ok ? '/play' : `/play?ephemeral=1&sha=${encodeURIComponent(sha)}`)
 			},
 		},
 		{
