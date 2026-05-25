@@ -9,8 +9,7 @@
 	import GameOverModal from './HUD/GameOverModal.svelte'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
-	// Sessions are wired in from the page but are not used here yet — they
-	// will feed into networked turn ownership in a later card.
+	export let endTurnAction: (() => void) | undefined = undefined
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	export let userSession: string
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,6 +35,10 @@
 	}
 
 	const handleEndTurn = () => {
+		if (endTurnAction) {
+			endTurnAction()
+			return
+		}
 		endTurn({ map })
 	}
 </script>

@@ -1,6 +1,9 @@
 import { browser } from '$app/environment'
-import { interactor } from '$lib/Engine/Interactor/interactor'
 import { get } from 'svelte/store'
+import {
+	dispatchSerializedAction,
+	normalizeAction,
+} from '$lib/Engine/Interactor/serializedAction'
 
 export const socketOpened = (socket: WebSocket, callback?: VoidFunction) => () => {
 	if (browser) {
@@ -23,12 +26,26 @@ export const socketMessage =
 	(evt: MessageEvent<string>) => {
 		const map = getMap()
 		if (!map) return
-		interactor({ ...JSON.parse(evt.data), map })
-		render(performance.now())
+		let data: unknown
+		try {
+			data = JSON.parse(evt.data)
+		} catch {
+			return
+		}
+		const action = normalizeAction(data)
+		if (action) {
+			dispatchSerializedAction(map, action)
+			render(performance.now())
+		}
 	}
 
 export const socketSelect =
-	(socket: WebSocket, getMap: () => MapObject) => (x: number, y: number) => {
+	(socket: Pick<WebSocket, 'send'>, getMap: () => MapObject) =>
+	(x: number, y: number) => {
 		const map = getMap()
-		socket.send(JSON.stringify({ tile: y * map.cols + x }))
+		socket.send(JSON.stringify({ kind: 'tile', tile: y * map.cols + x }))
 	}
+
+export const socketEndTurn = (socket: Pick<WebSocket, 'send'>) => () => {
+	socket.send(JSON.stringify({ kind: 'endTurn' }))
+}

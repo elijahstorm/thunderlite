@@ -4,7 +4,7 @@
 	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
 	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
 	import MapRender from '$lib/Map/MapRender.svelte'
-	import { socketSelect } from '$lib/Components/Socket/socket'
+	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { writable } from 'svelte/store'
 
@@ -18,12 +18,13 @@
 
 <section class="h-screen overflow-clip">
 	<MapLoader {mapHash} let:map>
-		<GameSocket map={() => map} let:socket let:requestRedraw>
+		<GameSocket map={() => map} {gameSession} {userSession} let:socket let:requestRedraw>
 			<GameStateManager
 				{userSession}
 				{gameSession}
 				{map}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
+				endTurnAction={socket ? socketEndTurn(socket) : undefined}
 				let:select
 			>
 				<MapRender {map} {requestRedraw} {select} fogOfWar />
