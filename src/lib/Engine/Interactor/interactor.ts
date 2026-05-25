@@ -5,6 +5,7 @@ import { interactionSource, interactionState } from './interactionState'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
 import { generateAttackList } from './Pathing/attack'
+import { canSelectUnit, gameState, markTileActed } from '../gameState'
 
 type Interaction = {
 	map: MapObject
@@ -25,6 +26,7 @@ const verifyInteraction = (obj: object) => Object.hasOwn(obj, 'tile') && Object.
 const select: Interactor = ({ map, tile }) => {
 	const unit = map.layers.units[tile]
 	if (!unit) return
+	if (!canSelectUnit(unit, tile, get(gameState))) return
 
 	highlightActionsList(map, generateActionsList(map, tile, unit))
 	interactionSource.set(tile)
@@ -60,6 +62,7 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	animateRoute(map, unit, tile, destination).then(() => {
 		map.layers.units[destination] = unit
 		if (callback) callback()
+		else markTileActed(destination)
 	})
 }
 
@@ -99,6 +102,7 @@ const attack: Interactor = ({ map, tile, choice }) => {
 					reduceHealth(map, target, attacker, movementEndTile)
 				)
 			}
+			markTileActed(movementEndTile)
 		})
 
 	if (path.length > 1) {

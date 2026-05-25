@@ -22,6 +22,7 @@
 			<GameStateManager
 				{userSession}
 				{gameSession}
+				{map}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				let:select
 			>
