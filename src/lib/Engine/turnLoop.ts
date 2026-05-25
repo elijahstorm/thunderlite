@@ -1,10 +1,14 @@
 import { get } from 'svelte/store'
+import { skyData } from '$lib/GameData/sky'
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 import { animateExplosion } from './Animator/animator'
 import { gameState, type GameState, type Player } from './gameState'
 import { runModifiers, type ModifierContext, type ModifierPhase } from './modifiers'
+import { applySkyHiding } from './visibility'
 import { applyWinConditions } from './winConditions'
+
+export const STORM_DAMAGE = 10
 
 export type NextTeamResult = {
 	team: number
@@ -95,6 +99,33 @@ export const applyTerrainEndOfTurnDamage = (
 	return events
 }
 
+export const applySkyEndOfTurnDamage = (
+	map: MapObject | MapProcesser,
+	team: number
+): TerrainDamageEvent[] => {
+	const events: TerrainDamageEvent[] = []
+	for (let tile = 0; tile < map.layers.units.length; tile++) {
+		const unit = map.layers.units[tile]
+		if (!unit) continue
+		if (unit.team !== team) continue
+		if (unitData[unit.type]?.type !== 'air') continue
+		const sky = map.layers.sky[tile]
+		if (!sky) continue
+		if (!skyData[sky.type]?.modifiers.includes('treacherous')) continue
+		const maxHealth = unitData[unit.type]?.health ?? 0
+		const current = unit.health ?? maxHealth
+		const next = Math.max(0, current - STORM_DAMAGE)
+		unit.health = next
+		const died = next <= 0
+		if (died) {
+			map.layers.units[tile] = null
+			runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+		}
+		events.push({ tile, unit, damage: STORM_DAMAGE, died })
+	}
+	return events
+}
+
 export type EndTurnOptions = {
 	map?: MapObject | MapProcesser
 }
@@ -106,11 +137,18 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 	if (map) {
 		runPhaseForTeam(map, before.currentTeam, 'End_Turn', ['unit'], before)
 		const damageEvents = applyTerrainEndOfTurnDamage(map, before.currentTeam)
+		const skyEvents = applySkyEndOfTurnDamage(map, before.currentTeam)
 		for (const event of damageEvents) {
 			if (event.died) {
 				void animateExplosion(map as MapObject, event.tile)
 			}
 		}
+		for (const event of skyEvents) {
+			if (event.died) {
+				void animateExplosion(map as MapObject, event.tile)
+			}
+		}
+		applySkyHiding(map, before.currentTeam)
 	}
 
 	const advance = nextActiveTeam(before.players, before.currentTeam)

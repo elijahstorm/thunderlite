@@ -1,3 +1,4 @@
+import { skyData } from '$lib/GameData/sky'
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 import { isJammedFor } from '$lib/Engine/modifiers/jamming'
@@ -40,7 +41,15 @@ const addWalkableTiles = (
 	direction: keyof typeof directionDecision
 ) =>
 	isWalkable(map, tile, unit, movement, direction)
-		? [tile, ...increment(map, tile, unit, movement - drag(unit, map.layers.ground[tile]))]
+		? [
+				tile,
+				...increment(
+					map,
+					tile,
+					unit,
+					movement - drag(unit, map.layers.ground[tile], map.layers.sky[tile])
+				),
+		  ]
 		: []
 
 const isWalkable = (
@@ -51,7 +60,7 @@ const isWalkable = (
 	direction: keyof typeof directionDecision
 ) =>
 	directionDecision[direction](map, tile) &&
-	movement >= drag(unit, map.layers.ground[tile]) &&
+	movement >= drag(unit, map.layers.ground[tile], map.layers.sky[tile]) &&
 	notBlocked(map, tile, unit) &&
 	notJammed(map, tile, unit) &&
 	validTerrain(map.layers.ground[tile], unit)
@@ -62,9 +71,11 @@ const notJammed = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 }
 
 const IMPASSABLE = 9999
-export const drag = (unit: UnitObject, terrain: GroundObject) =>
+export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | null) =>
 	unitData[unit.type].type === 'air'
-		? 1
+		? sky && skyData[sky.type]?.modifiers.includes('treacherous')
+			? skyData[sky.type].drag
+			: 1
 		: ((terrainData[terrain.type].name === 'Shore' &&
 				unitData[unit.type].movementType === 'warship') ||
 		  (terrainData[terrain.type].details === 'rugged' &&

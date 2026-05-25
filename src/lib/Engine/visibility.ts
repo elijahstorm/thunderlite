@@ -1,4 +1,6 @@
+import { skyData } from '$lib/GameData/sky'
 import { unitData } from '$lib/GameData/unit'
+import { hasAdjacentEnemy } from './modifiers/cloak'
 import { extraSightBonus } from './modifiers/extraSight'
 
 export const isUnitVisibleTo = (unit: UnitObject, team: number): boolean => {
@@ -7,6 +9,30 @@ export const isUnitVisibleTo = (unit: UnitObject, team: number): boolean => {
 }
 
 export type VisibilityMap = Pick<MapObject, 'cols' | 'rows' | 'layers'>
+
+export const isAirHiddenBySky = (
+	map: VisibilityMap,
+	tile: number,
+	unit: UnitObject
+): boolean => {
+	if (unitData[unit.type]?.type !== 'air') return false
+	const sky = map.layers.sky[tile]
+	if (!sky) return false
+	return skyData[sky.type]?.modifiers.includes('hidden') ?? false
+}
+
+export const applySkyHiding = (
+	map: MapObject | MapProcesser,
+	team: number
+): void => {
+	for (let tile = 0; tile < map.layers.units.length; tile++) {
+		const unit = map.layers.units[tile]
+		if (!unit) continue
+		if (unit.team !== team) continue
+		if (!isAirHiddenBySky(map, tile, unit)) continue
+		unit.hidden = !hasAdjacentEnemy(map, tile, unit.team)
+	}
+}
 
 export const computeUnitSight = (
 	map: VisibilityMap,
