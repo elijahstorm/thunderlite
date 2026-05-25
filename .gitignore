@@ -17,3 +17,8 @@ playwright-report
 .vercel
 demo_data/
 .env*.local
+
+# Orchestrator artifacts
+.orchestrator-state.json
+.orchestrator.log
+.orchestrator-reports/
