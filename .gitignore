@@ -20,5 +20,7 @@ demo_data/
 
 # Orchestrator artifacts
 .orchestrator-state.json
+.orchestrator.stdout
 .orchestrator.log
+.orchestrator.pid
 .orchestrator-reports/
