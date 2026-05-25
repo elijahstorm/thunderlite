@@ -8,6 +8,15 @@ import { pathFinder } from './Pathing/pathFinder'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
 import { calculateDamage, canCounterAttack, type AttackRole } from '../combat'
 import { openBuildMenu } from '../HUD/buildMenuStore'
+import { runModifiers } from '../modifiers'
+import { canMineAt } from '../modifiers/miner'
+import { passableAdjacentTiles } from '../modifiers/builder'
+import {
+	openWarmachineActions,
+	closeWarmachineActions,
+} from '../HUD/warmachineActionsStore'
+
+const WARMACHINE_TYPE = unitData.findIndex((u) => u.name === 'Warmachine')
 
 type Interaction = {
 	map: MapObject
@@ -36,13 +45,28 @@ const select: Interactor = ({ map, tile }) => {
 			if (state.actedTiles.has(tile)) return
 			openBuildMenu(tile, building.team)
 		}
+		closeWarmachineActions()
 		return
 	}
-	if (!canSelectUnit(unit, tile, get(gameState))) return
+	if (!canSelectUnit(unit, tile, get(gameState))) {
+		closeWarmachineActions()
+		return
+	}
 
 	highlightActionsList(map, generateActionsList(map, tile, unit))
 	interactionSource.set(tile)
 	interactionState.set('choice')
+
+	// C4 temporary coupling: surface Warmachine builder/miner actions until E2
+	// adds a proper action menu. Remove this branch when E2 lands.
+	if (unit.type === WARMACHINE_TYPE) {
+		openWarmachineActions(tile, unit.team, {
+			canMine: canMineAt(map, tile),
+			canBuild: passableAdjacentTiles(map, tile).length > 0,
+		})
+	} else {
+		closeWarmachineActions()
+	}
 }
 
 const choice: Interactor = ({ map, tile }) => {
@@ -105,6 +129,12 @@ const attack: Interactor = ({ map, tile, choice }) => {
 		if (target.health === 0) {
 			map.layers.units[tile] = null
 			animateExplosion(map, tile)
+			runModifiers(target, 'Death', {
+				kind: 'unit',
+				tile,
+				state: get(gameState),
+				map,
+			})
 			return true
 		}
 		return false

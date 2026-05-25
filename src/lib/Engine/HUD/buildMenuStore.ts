@@ -1,21 +1,31 @@
 import { writable } from 'svelte/store'
 
+export type BuildMenuMode = 'building' | 'builder'
+
 export type BuildMenuState = {
 	open: boolean
 	buildingTile: number | null
 	team: number | null
+	mode: BuildMenuMode
 }
 
-export const buildMenuState = writable<BuildMenuState>({
+const closed = (): BuildMenuState => ({
 	open: false,
 	buildingTile: null,
 	team: null,
+	mode: 'building',
 })
 
-export const openBuildMenu = (buildingTile: number, team: number): void => {
-	buildMenuState.set({ open: true, buildingTile, team })
+export const buildMenuState = writable<BuildMenuState>(closed())
+
+export const openBuildMenu = (
+	buildingTile: number,
+	team: number,
+	mode: BuildMenuMode = 'building'
+): void => {
+	buildMenuState.set({ open: true, buildingTile, team, mode })
 }
 
 export const closeBuildMenu = (): void => {
-	buildMenuState.set({ open: false, buildingTile: null, team: null })
+	buildMenuState.set(closed())
 }

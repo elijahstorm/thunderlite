@@ -87,6 +87,7 @@ export const applyTerrainEndOfTurnDamage = (
 		const died = next <= 0
 		if (died) {
 			map.layers.units[tile] = null
+			runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
 		}
 		events.push({ tile, unit, damage, died })
 	}

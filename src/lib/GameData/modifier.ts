@@ -7,6 +7,7 @@ import {
 	captureAllowGround,
 	captureAllowSea,
 } from '$lib/Engine/modifiers/captureAllow'
+import { instaLose } from '$lib/Engine/modifiers/instaLose'
 
 export type ModifierPhase =
 	| 'Start_Turn'
@@ -56,7 +57,7 @@ export const modifierData = {
 	'Idle.Jamming': { phase: 'Idle' },
 	'Self_Action.Miner': { phase: 'Self_Action' },
 	'Self_Action.Builder': { phase: 'Self_Action' },
-	'Death.Insta_Lose': { phase: 'Death' },
+	'Death.Insta_Lose': { phase: 'Death', run: instaLose },
 	'Can_Attack.Ground_Assult': { phase: 'Can_Attack' },
 	'Self_Action.Irreparable': { phase: 'Self_Action' },
 	'End_Turn.Vulture': { phase: 'End_Turn' },

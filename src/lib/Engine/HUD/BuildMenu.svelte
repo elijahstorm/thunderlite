@@ -5,6 +5,7 @@
 	import { spriteStore } from '$lib/Sprites/spriteStore'
 	import { unitData } from '$lib/GameData/unit'
 	import { buildableUnits, spawnBuiltUnit, type BuildableUnit } from '../build'
+	import { buildAdjacent } from '../modifiers/builder'
 	import { buildMenuState, closeBuildMenu } from './buildMenuStore'
 
 	export let map: MapObject | undefined = undefined
@@ -21,7 +22,10 @@
 		if (!entry.buildable) return
 		if (!map) return
 		if (menu.buildingTile == null || menu.team == null) return
-		const result = spawnBuiltUnit(map, menu.buildingTile, entry.type, menu.team)
+		const result =
+			menu.mode === 'builder'
+				? buildAdjacent(map, menu.buildingTile, entry.type, menu.team)
+				: spawnBuiltUnit(map, menu.buildingTile, entry.type, menu.team)
 		if (result.ok) {
 			closeBuildMenu()
 			return
