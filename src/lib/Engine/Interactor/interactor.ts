@@ -12,6 +12,7 @@ import { runModifiers } from '../modifiers'
 import { revealCloakedAdjacentTo } from '../modifiers/cloak'
 import { mine } from '../modifiers/miner'
 import { applyVultureKill } from '../modifiers/vulture'
+import { applyLancePassthrough } from '../modifiers/lance'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -161,6 +162,10 @@ const performAttack = (map: MapObject, attackerTile: number, targetTile: number)
 	if (!attacker || !target) return
 	animateAttack(map, attacker, attackerTile, targetTile).then(() => {
 		const targetDied = reduceHealth(map, attacker, target, targetTile)
+		const lanceResult = applyLancePassthrough(map, attackerTile, targetTile)
+		if (lanceResult?.killed) {
+			animateExplosion(map, lanceResult.tile)
+		}
 		if (
 			!targetDied &&
 			canCounterAttack(attacker, target, {
