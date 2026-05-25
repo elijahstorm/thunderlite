@@ -2,8 +2,8 @@
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 	import { initGameStateFromMap } from './gameState'
 	import { endTurn } from './turnLoop'
-	import TurnPill from './HUD/TurnPill.svelte'
-	import Treasury from './HUD/Treasury.svelte'
+	import { setSelectedTile } from './uiState'
+	import HUDRoot from './HUD/HUDRoot.svelte'
 	import BuildMenu from './HUD/BuildMenu.svelte'
 	import GameOverModal from './HUD/GameOverModal.svelte'
 
@@ -30,6 +30,7 @@
 		if (state !== 'waiting') return
 		if (active) return
 
+		if (map) setSelectedTile(y * map.cols + x)
 		interactor(x, y)
 	}
 
@@ -40,7 +41,6 @@
 
 <slot {select} />
 
-<TurnPill onEndTurn={handleEndTurn} />
-<Treasury />
+<HUDRoot {map} onEndTurn={handleEndTurn} />
 <BuildMenu {map} />
 <GameOverModal />

@@ -14,6 +14,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
+	import { setHoverTile } from '$lib/Engine/uiState'
 	import { ANIMATION_TIME, routeAnimation, animations } from '$lib/Engine/Animator/animator'
 
 	export let map: MapObject
@@ -37,8 +38,11 @@
 	// @ts-ignore
 	let hudImages: HUDImages = {}
 
-	const hover = (x: number, y: number) =>
-		(map.route = updateRoute(map, $interactionSource, [...map.route], y * map.cols + x))
+	const hover = (x: number, y: number) => {
+		const tile = y * map.cols + x
+		if (!mini) setHoverTile(tile)
+		map.route = updateRoute(map, $interactionSource, [...map.route], tile)
+	}
 
 	const inc = () => {
 		if (pause) {
