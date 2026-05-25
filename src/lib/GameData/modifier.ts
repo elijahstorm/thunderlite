@@ -1,5 +1,6 @@
 import type { ModifierHandler } from '$lib/Engine/modifiers'
 import { healTeam } from '$lib/Engine/modifiers/healTeam'
+import { supplyIncome } from '$lib/Engine/modifiers/supplyIncome'
 
 export type ModifierPhase =
 	| 'Start_Turn'
@@ -31,7 +32,7 @@ export const modifierData = {
 	'Capture.Allow_Ground': { phase: 'Capture' },
 	'Capture.Allow_Air': { phase: 'Capture' },
 	'Capture.Allow_Sea': { phase: 'Capture' },
-	'Each_Turn.Supply_Income': { phase: 'Each_Turn' },
+	'Each_Turn.Supply_Income': { phase: 'Each_Turn', run: supplyIncome },
 	'Start_Turn.Capture': { phase: 'Start_Turn' },
 	'Move.Tracking': { phase: 'Move' },
 	'Self_Action.Transport': { phase: 'Self_Action' },

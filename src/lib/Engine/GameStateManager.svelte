@@ -3,6 +3,7 @@
 	import { initGameStateFromMap } from './gameState'
 	import { endTurn } from './turnLoop'
 	import TurnPill from './HUD/TurnPill.svelte'
+	import Treasury from './HUD/Treasury.svelte'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	// Sessions are wired in from the page but are not used here yet — they
@@ -38,3 +39,4 @@
 <slot {select} />
 
 <TurnPill onEndTurn={handleEndTurn} />
+<Treasury />
