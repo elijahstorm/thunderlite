@@ -14,7 +14,15 @@ const COMMON_PREAMBLE = `You are working autonomously inside a SvelteKit project
 
 When you commit, the message subject MUST start with the card id in square brackets (e.g. "[A1] ..."). Use a HEREDOC body describing what changed.
 
-When you finish, output a final REPORT block in the exact format below. The orchestrator parses this block.
+## EFFICIENCY RULES (READ CAREFULLY — recent runs wasted 60+ minutes each by ignoring these)
+
+1. Land the minimum viable solution. Acceptance criteria are the bar, not a starting point.
+2. Implement → run targeted tests once → commit → emit the REPORT block → STOP. Do not iterate further "to be sure" or to polish.
+3. Do NOT run the full test suite multiple times. Run vitest on YOUR new test files only.
+4. Do NOT keep editing after you commit. The commit IS the deliverable.
+5. Once you emit the REPORT block below, you are done. No further tool calls. End the session.
+
+## REPORT BLOCK (mandatory — emit exactly once, immediately after committing)
 
 \`\`\`
 === REPORT ===
@@ -30,6 +38,8 @@ NOTES FOR REVIEWER:
 - <bullet, or "nothing">
 === END REPORT ===
 \`\`\`
+
+After \`=== END REPORT ===\` you MUST stop. Do not write further prose. Do not call further tools.
 `
 
 export function buildCoderPrompt({ mission, card, cardId }) {
@@ -113,7 +123,14 @@ ${commitSha}
 5. Be HONEST and CONSERVATIVE. The coder will push back on false positives. Don't demand things outside the card's scope. Don't make stylistic preferences sound critical.
 6. If the coder skipped work but DOCUMENTED IT in their REPORT's SKIPPED OR DEFERRED, evaluate whether the skip was reasonable; if so, do not flag it.
 
-## OUTPUT FORMAT (mandatory)
+## EFFICIENCY RULES (CRITICAL — recent QA runs took 60 min producing zero bytes)
+
+1. Use a single \`git show\` and at most 3-4 targeted file reads. Do NOT read the entire repo.
+2. Spend at most ~10 minutes total. Brief is better than thorough.
+3. Emit the QA REPORT block below as soon as you have enough evidence. Do NOT keep researching.
+4. Once you emit \`=== END QA REPORT ===\` you MUST stop. No further tool calls. End the session.
+
+## OUTPUT FORMAT (mandatory — emit exactly once)
 
 \`\`\`
 === QA REPORT ===
@@ -139,6 +156,6 @@ VERDICT: PASS | NEEDS-FIX
 === END QA REPORT ===
 \`\`\`
 
-Output ONLY this block. No prose around it.
+Output ONLY this block. No prose around it. Stop immediately after \`=== END QA REPORT ===\`.
 `
 }

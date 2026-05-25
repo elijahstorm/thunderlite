@@ -52,8 +52,8 @@ const REPORTS_DIR = resolve(ROOT, '.orchestrator-reports')
 // ---------------------------------------------------------------------------
 
 const CYCLE_DELAY_MS = 5 * 60 * 1000 // 5 minutes between phases
-const CODER_TIMEOUT_MS = 90 * 60 * 1000 // 90 min budget per coder run (A2 was killed at 75)
-const QA_TIMEOUT_MS = 60 * 60 * 1000 // 60 min budget per QA run (A3 QA was killed at 30)
+const CODER_TIMEOUT_MS = 45 * 60 * 1000 // 45 min — real work is <30 min; cap the post-commit busywork
+const QA_TIMEOUT_MS = 20 * 60 * 1000 // 20 min — QA was producing zero bytes anyway; cut the dead wait
 const MAX_FIX_ITERATIONS = 2 // after this many fix passes on one card, advance regardless
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude'
