@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { socketSelect } from '$lib/Components/Socket/socket'
-	import { gameState, initGameStateFromMap } from './gameState'
+	import { initGameStateFromMap } from './gameState'
+	import { endTurn } from './turnLoop'
+	import TurnPill from './HUD/TurnPill.svelte'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	// Sessions are wired in from the page but are not used here yet — they
@@ -20,16 +22,6 @@
 		initGameStateFromMap(map)
 	}
 
-	$: currentPlayer = $gameState.players.find((p) => p.team === $gameState.currentTeam)
-	$: turnLabel =
-		$gameState.phase === 'gameOver'
-			? `Game Over${
-					typeof $gameState.winner === 'number' ? ` — Player ${$gameState.winner + 1} wins` : ''
-			  }`
-			: `Turn ${$gameState.turnNumber} — Player ${($gameState.currentTeam ?? 0) + 1}${
-					currentPlayer?.name ? ` (${currentPlayer.name})` : ''
-			  }`
-
 	const select = (x: number, y: number) => {
 		if (!interactor) return
 		if (state !== 'waiting') return
@@ -37,13 +29,12 @@
 
 		interactor(x, y)
 	}
+
+	const handleEndTurn = () => {
+		endTurn({ map })
+	}
 </script>
 
 <slot {select} />
 
-<div
-	class="fixed left-4 top-4 px-3 py-1 rounded bg-black/70 text-white text-sm font-mono pointer-events-none select-none z-50"
-	data-testid="turn-pill"
->
-	{turnLabel}
-</div>
+<TurnPill onEndTurn={handleEndTurn} />
