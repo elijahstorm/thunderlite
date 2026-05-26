@@ -67,17 +67,12 @@ describe('calculateDamage', () => {
 		const attacker = unit(HEAVY_COMMANDO, 0)
 
 		// Heavy Commando vs Strike Commando (heavy vs light) — no matchup bonus.
-		const mismatchDamage = calculateDamage(
-			attacker,
-			unit(STRIKE_COMMANDO, 1),
-			{ map, defenderTile: 0 }
-		)
+		const mismatchDamage = calculateDamage(attacker, unit(STRIKE_COMMANDO, 1), {
+			map,
+			defenderTile: 0,
+		})
 		// Heavy Commando vs Annihilator (heavy vs heavy) — full 1.5x bonus.
-		const matchupDamage = calculateDamage(
-			attacker,
-			unit(ANNIHILATOR, 1),
-			{ map, defenderTile: 0 }
-		)
+		const matchupDamage = calculateDamage(attacker, unit(ANNIHILATOR, 1), { map, defenderTile: 0 })
 
 		expect(mismatchDamage).toBeLessThan(matchupDamage)
 	})
@@ -198,8 +193,9 @@ describe('damage multipliers (B2)', () => {
 		// Scorpion: power 35, weapon=medium, armor=medium → 1.5× matchup.
 		// As attacker, Fast_Attack adds 1.2×.
 		// base = round(35 * 1.5 * 1.0 * 1.2) = round(63) = 63.
-		expect(calculateDamage(scorpion, otherScorpion, { map, defenderTile: 0, role: 'attack' }))
-			.toBe(63)
+		expect(calculateDamage(scorpion, otherScorpion, { map, defenderTile: 0, role: 'attack' })).toBe(
+			63
+		)
 	})
 
 	it('Damage.Fast_Attack — no bonus when countering', () => {
@@ -208,8 +204,9 @@ describe('damage multipliers (B2)', () => {
 		const otherScorpion = unit(SCORPION, 1)
 
 		// Countering, no Fast_Attack bonus. round(35 * 1.5) = 53.
-		expect(calculateDamage(scorpion, otherScorpion, { map, defenderTile: 0, role: 'counter' }))
-			.toBe(53)
+		expect(
+			calculateDamage(scorpion, otherScorpion, { map, defenderTile: 0, role: 'counter' })
+		).toBe(53)
 	})
 
 	it('Damage.Slow_Attack — Annihilator counter-attacks at 0.85×', () => {
@@ -269,9 +266,7 @@ const makeFullMap = (): MapObject => ({
 	cols: COLS,
 	rows: ROWS,
 	layers: {
-		ground: new Array(COLS * ROWS)
-			.fill(0)
-			.map(() => ({ type: ROAD, state: 0 })),
+		ground: new Array(COLS * ROWS).fill(0).map(() => ({ type: ROAD, state: 0 })),
 		sky: new Array(COLS * ROWS).fill(null),
 		units: new Array(COLS * ROWS).fill(null),
 		buildings: new Array(COLS * ROWS).fill(null),

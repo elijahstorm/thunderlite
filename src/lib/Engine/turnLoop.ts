@@ -27,7 +27,7 @@ export const nextActiveTeam = (
 	const startIndex = currentIndex >= 0 ? currentIndex : -1
 
 	for (let step = 1; step <= players.length; step++) {
-		const idx = ((startIndex + step) % players.length + players.length) % players.length
+		const idx = (((startIndex + step) % players.length) + players.length) % players.length
 		const candidate = players[idx]
 		if (candidate.hasLost) continue
 		const wrapped = startIndex < 0 ? false : idx <= startIndex

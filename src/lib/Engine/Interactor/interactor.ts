@@ -11,11 +11,7 @@ import { emitOutgoingAction } from '../outgoingActions'
 import { findFriendlyTransporters, shipOut } from '../modifiers/transport'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
-import {
-	openActionMenu,
-	closeActionMenu,
-	actionMenuState,
-} from '../HUD/actionMenuStore'
+import { openActionMenu, closeActionMenu, actionMenuState } from '../HUD/actionMenuStore'
 import { generateAttackList } from './Pathing/attack'
 import type { SerializedAction } from './serializedAction'
 
@@ -83,8 +79,9 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	const unit = map.layers.units[tile]
 	if (!unit || !choice) return
 
-	const destination = generateActionsList(map, tile, unit).find((action) => action.tile === choice)
-		?.tile
+	const destination = generateActionsList(map, tile, unit).find(
+		(action) => action.tile === choice
+	)?.tile
 	if (typeof destination !== 'number') return
 
 	map.layers.units[tile] = null
@@ -188,10 +185,7 @@ const actionsDecision = {
 
 const actionType = [move, attack] as const
 
-export const performMenuAction = (
-	map: MapObject,
-	actionId: ActionMenuItemId
-): void => {
+export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): void => {
 	const menu = get(actionMenuState)
 	if (!menu.open || menu.unitTile === null) return
 	const tile = menu.unitTile
@@ -214,7 +208,7 @@ export const performMenuAction = (
 			const targets = generateAttackList(map, tile, unit)
 			highlightActionsList(
 				map,
-				targets.map((t) => ({ tile: t, type: 1, tip: 1 } as unknown as Highlight))
+				targets.map((t) => ({ tile: t, type: 1, tip: 1 }) as unknown as Highlight)
 			)
 			return
 		}

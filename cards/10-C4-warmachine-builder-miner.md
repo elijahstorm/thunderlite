@@ -15,9 +15,9 @@ The Warmachine ([`unitData` "Warmachine"](../src/lib/GameData/unit.ts)) declares
 
 - `Self_Action.Builder` handler: opens the same BuildMenu as C3 but constrained to spawn on an **adjacent** passable empty tile (the player picks the direction after selecting a unit). Deducts cost from player money. Newly-built unit is marked as acted this turn.
 - `Self_Action.Miner` handler: only available when standing on Ore Deposit terrain (`Ore Deposit`, `Enriched Ore Deposit`, `Depleted Ore Deposit`). On use:
-    - Adds 500 money to the player.
-    - Downgrades the tile: Enriched → Ore → Depleted → Plains. (Mirror the old engine's `Source + 1` logic.)
-    - Marks the Warmachine as acted.
+  - Adds 500 money to the player.
+  - Downgrades the tile: Enriched → Ore → Depleted → Plains. (Mirror the old engine's `Source + 1` logic.)
+  - Marks the Warmachine as acted.
 - `Death.Insta_Lose` handler: when a unit with this modifier dies, check the owner — if they have no other unit with `Death.Insta_Lose` AND no Command Center, set `player.hasLost = true` (and run the D1 win-check loop).
 
 ## Acceptance criteria

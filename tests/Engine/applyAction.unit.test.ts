@@ -2,11 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { get } from 'svelte/store'
 import { applyAction } from '../../src/lib/Engine/applyAction'
-import {
-	gameState,
-	initGameStateFromMap,
-	resetGameState,
-} from '../../src/lib/Engine/gameState'
+import { gameState, initGameStateFromMap, resetGameState } from '../../src/lib/Engine/gameState'
 import type { SerializedAction } from '../../src/lib/Engine/Interactor/serializedAction'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { unitData } from '../../src/lib/GameData/unit'
@@ -50,13 +46,7 @@ const makeMap = (cols: number, rows: number): MapObject =>
 		filters: {} as never,
 	}) as MapObject
 
-const placeUnit = (
-	map: MapObject,
-	tile: number,
-	type: number,
-	team: number,
-	health?: number
-) => {
+const placeUnit = (map: MapObject, tile: number, type: number, team: number, health?: number) => {
 	map.layers.units[tile] = {
 		type,
 		state: 0,
@@ -65,12 +55,7 @@ const placeUnit = (
 	}
 }
 
-const placeBuilding = (
-	map: MapObject,
-	tile: number,
-	type: number,
-	team: number
-) => {
+const placeBuilding = (map: MapObject, tile: number, type: number, team: number) => {
 	map.layers.buildings[tile] = { type, state: 0, team }
 }
 

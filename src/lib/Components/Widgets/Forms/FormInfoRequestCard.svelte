@@ -69,7 +69,9 @@
 			<div class="flex h-80 justify-center items-center">
 				<p class="text-red-500 py-4 px-4">
 					{response &&
-						(response?.error ? response.error : response.message ?? 'Finished processing request')}
+						(response?.error
+							? response.error
+							: (response.message ?? 'Finished processing request'))}
 				</p>
 			</div>
 		{/await}

@@ -22,8 +22,8 @@
 				? scrollWidth - clientWidth + scrollLeft
 				: scrollHeight - clientHeight + scrollTop
 			: horizontal
-			? scrollWidth - clientWidth - scrollLeft
-			: scrollHeight - clientHeight - scrollTop
+				? scrollWidth - clientWidth - scrollLeft
+				: scrollHeight - clientHeight - scrollTop
 
 		if (offset <= threshold) {
 			if (!isLoadMore) {

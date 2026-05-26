@@ -58,11 +58,7 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number): voi
 	revealCloakedAdjacentTo(map as MapObject, to, unit.team)
 }
 
-const applyAttack = (
-	map: MapObject | MapProcesser,
-	from: number,
-	to: number
-): void => {
+const applyAttack = (map: MapObject | MapProcesser, from: number, to: number): void => {
 	const attacker = map.layers.units[from]
 	const target = map.layers.units[to]
 	if (!attacker || !target) return
@@ -87,10 +83,7 @@ const applyAttack = (
 	applyWinConditions(map as MapObject)
 }
 
-export const applyAction = (
-	map: MapObject | MapProcesser,
-	action: SerializedAction
-): void => {
+export const applyAction = (map: MapObject | MapProcesser, action: SerializedAction): void => {
 	switch (action.kind) {
 		case 'move': {
 			applyMove(map, action.from, action.to)

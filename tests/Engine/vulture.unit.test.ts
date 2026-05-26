@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	markTileActed,
-} from '../../src/lib/Engine/gameState'
+import { gameState, resetGameState, markTileActed } from '../../src/lib/Engine/gameState'
 import { applyVultureKill } from '../../src/lib/Engine/modifiers/vulture'
 import { unitData } from '../../src/lib/GameData/unit'
 

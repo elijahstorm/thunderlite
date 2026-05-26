@@ -68,7 +68,7 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 					: {
 							type: Math.floor(Math.random() * 2),
 							state: 0,
-					  }
+						}
 			),
 			units: new Array(rows * cols).fill(0).map((_, index) =>
 				index % cols !== 2
@@ -77,7 +77,7 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 							type: Math.floor(Math.random() * unitData.length),
 							team: index % 2,
 							state: 4,
-					  }
+						}
 			),
 			buildings: new Array(rows * cols).fill(0).map((_, index) =>
 				index % cols !== 4
@@ -86,7 +86,7 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 							type: Math.floor(Math.random() * buildingData.length),
 							team: index % 2,
 							state: 0,
-					  }
+						}
 			),
 		},
 		filters: {

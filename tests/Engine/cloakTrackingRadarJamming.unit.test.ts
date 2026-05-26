@@ -3,18 +3,16 @@ import { describe, it, expect } from 'vitest'
 import { get } from 'svelte/store'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
-import {
-	gameState,
-	resetGameState,
-} from '../../src/lib/Engine/gameState'
+import { gameState, resetGameState } from '../../src/lib/Engine/gameState'
 import { runModifiers } from '../../src/lib/Engine/modifiers'
-import { cloak, hasAdjacentEnemy, revealCloakedAdjacentTo } from '../../src/lib/Engine/modifiers/cloak'
+import {
+	cloak,
+	hasAdjacentEnemy,
+	revealCloakedAdjacentTo,
+} from '../../src/lib/Engine/modifiers/cloak'
 import { tracking } from '../../src/lib/Engine/modifiers/tracking'
 import { radar, tilesInRange } from '../../src/lib/Engine/modifiers/radar'
-import {
-	computeJammedTiles,
-	isJammedFor,
-} from '../../src/lib/Engine/modifiers/jamming'
+import { computeJammedTiles, isJammedFor } from '../../src/lib/Engine/modifiers/jamming'
 import { isUnitVisibleTo } from '../../src/lib/Engine/visibility'
 import { pathFinder } from '../../src/lib/Engine/Interactor/Pathing/pathFinder'
 import { generateMovementList } from '../../src/lib/Engine/Interactor/Pathing/movement'
@@ -66,12 +64,7 @@ const makeMap = (cols: number, rows: number): MapObject => ({
 const runOn = (
 	map: MapObject,
 	tile: number,
-	phase:
-		| 'End_Turn'
-		| 'Move'
-		| 'Start_Turn'
-		| 'Idle'
-		| 'Each_Turn'
+	phase: 'End_Turn' | 'Move' | 'Start_Turn' | 'Idle' | 'Each_Turn'
 ) => {
 	const u = map.layers.units[tile]
 	if (!u) throw new Error(`no unit at tile ${tile}`)

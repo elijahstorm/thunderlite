@@ -15,18 +15,19 @@ Today [`src/lib/Engine/GameData/modifier.ts`](../src/lib/GameData/modifier.ts) m
 
 Convert the registry seam from A2 into a real, typed dispatcher and **port these specific modifiers** (the rest land in their own cards):
 
-| Modifier key                  | Behavior to port                                                                 |
-| ----------------------------- | -------------------------------------------------------------------------------- |
-| `Start_Turn.Capture`          | Skip — landing in C2.                                                            |
-| `Each_Turn.Supply_Income`     | Skip — landing in C1.                                                            |
-| `Capture.Insta_Lose`          | Skip — landing in D1.                                                            |
-| `Capture.Allow_Ground/Air/Sea`| Skip — landing in C2/C3.                                                         |
-| `Start_Turn.Heal_Team`        | Heal every friendly unit standing on the Command Center by `+10 HP` (cap at max).|
-| **All others**                | Register as a typed no-op for now (so the dispatcher won't throw on lookup).     |
+| Modifier key                   | Behavior to port                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| `Start_Turn.Capture`           | Skip — landing in C2.                                                             |
+| `Each_Turn.Supply_Income`      | Skip — landing in C1.                                                             |
+| `Capture.Insta_Lose`           | Skip — landing in D1.                                                             |
+| `Capture.Allow_Ground/Air/Sea` | Skip — landing in C2/C3.                                                          |
+| `Start_Turn.Heal_Team`         | Heal every friendly unit standing on the Command Center by `+10 HP` (cap at max). |
+| **All others**                 | Register as a typed no-op for now (so the dispatcher won't throw on lookup).      |
 
-The **deliverable here is the *dispatcher shape*, not all 30 modifiers**. A3 just makes the registry production-shaped: typed key, typed phase, typed context, typed handler. Subsequent cards (B/C/F/G) drop handlers into this registry without changing call sites.
+The **deliverable here is the _dispatcher shape_, not all 30 modifiers**. A3 just makes the registry production-shaped: typed key, typed phase, typed context, typed handler. Subsequent cards (B/C/F/G) drop handlers into this registry without changing call sites.
 
 Change `modifier.ts` so each key resolves to an object:
+
 ```ts
 { phase: 'Start_Turn' | 'End_Turn' | 'Each_Turn' | 'Capture' | 'Move' | 'Idle' | 'Self_Action' | 'Can_Attack' | 'Damage' | 'Attack' | 'Death' | 'Properties', run?: ModifierHandler }
 ```
@@ -34,9 +35,9 @@ Change `modifier.ts` so each key resolves to an object:
 ## Acceptance criteria
 
 - [ ] `src/lib/Engine/modifiers/index.ts` exports `runModifiers(target, phase, ctx)` that:
-    - filters the target's declared modifiers by phase
-    - calls each handler in declared order
-    - safely no-ops if a handler is missing
+  - filters the target's declared modifiers by phase
+  - calls each handler in declared order
+  - safely no-ops if a handler is missing
 - [ ] Modifier handler signature is typed: `(ctx: { target, map, players, getPlayer, ... }) => void`.
 - [ ] At least one real handler (`Start_Turn.Heal_Team`) is wired and unit-tested: starting your turn with a wounded friendly unit on a Command Center heals it by 10 (or to max).
 - [ ] Vitest covers: dispatcher correctly filters by phase, handlers run in declaration order, missing handlers don't throw.

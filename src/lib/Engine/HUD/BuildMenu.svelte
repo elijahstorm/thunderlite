@@ -13,10 +13,7 @@
 	$: menu = $buildMenuState
 	$: state = $gameState
 	$: currentPlayer = state.players.find((p) => p.team === state.currentTeam)
-	$: entries =
-		menu.open && currentPlayer
-			? buildableUnits(currentPlayer)
-			: []
+	$: entries = menu.open && currentPlayer ? buildableUnits(currentPlayer) : []
 
 	const handleSelect = (entry: BuildableUnit) => {
 		if (!entry.buildable) return

@@ -1,9 +1,6 @@
 import type { ModifierContext, ModifierHandler, ModifierTarget } from './index'
 
-export const adjacentTiles = (
-	map: Pick<MapObject, 'cols' | 'rows'>,
-	tile: number
-): number[] => {
+export const adjacentTiles = (map: Pick<MapObject, 'cols' | 'rows'>, tile: number): number[] => {
 	const x = tile % map.cols
 	const y = Math.floor(tile / map.cols)
 	const tiles: number[] = []

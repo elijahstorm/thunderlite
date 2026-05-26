@@ -9,10 +9,7 @@ const hasJammingModifier = (type: number): boolean => {
 	return (modifiers as readonly string[]).includes(JAMMING_MODIFIER)
 }
 
-export const computeJammedTiles = (
-	map: MapObject | MapProcesser,
-	team: number
-): Set<number> => {
+export const computeJammedTiles = (map: MapObject | MapProcesser, team: number): Set<number> => {
 	const jammed = new Set<number>()
 	const units = map.layers.units
 	for (let tile = 0; tile < units.length; tile++) {
@@ -28,11 +25,7 @@ export const computeJammedTiles = (
 	return jammed
 }
 
-export const isJammedFor = (
-	map: MapObject | MapProcesser,
-	tile: number,
-	team: number
-): boolean => {
+export const isJammedFor = (map: MapObject | MapProcesser, tile: number, team: number): boolean => {
 	const units = map.layers.units
 	for (let i = 0; i < units.length; i++) {
 		const u = units[i]

@@ -7,9 +7,9 @@ const config = {
 
 	kit: {
 		adapter: vercel({
-			runtime: 'nodejs24.x'
-		})
-	}
+			runtime: 'nodejs24.x',
+		}),
+	},
 }
 
 export default config

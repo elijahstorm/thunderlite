@@ -28,14 +28,14 @@ const max = (entry: unknown, max: string) =>
 	typeof entry === 'string'
 		? entry.length < parseInt(max)
 		: typeof entry === 'number'
-		? entry < parseInt(max)
-		: false
+			? entry < parseInt(max)
+			: false
 const min = (entry: unknown, min: string) =>
 	typeof entry === 'string'
 		? entry.length > parseInt(min)
 		: typeof entry === 'number'
-		? entry > parseInt(min)
-		: false
+			? entry > parseInt(min)
+			: false
 
 const Validators = {
 	required,

@@ -35,7 +35,11 @@ const grantsControl =
 						const controls = player.controls ?? { ground: false, air: false, sea: false }
 						return { ...player, controls: { ...controls, [control]: true } }
 					}
-					if (typeof previousTeam === 'number' && player.team === previousTeam && !previousHasOther) {
+					if (
+						typeof previousTeam === 'number' &&
+						player.team === previousTeam &&
+						!previousHasOther
+					) {
 						const controls = player.controls ?? { ground: false, air: false, sea: false }
 						return { ...player, controls: { ...controls, [control]: false } }
 					}

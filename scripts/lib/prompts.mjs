@@ -43,7 +43,7 @@ After \`=== END REPORT ===\` you MUST stop. Do not write further prose. Do not c
 `
 
 export function buildCoderPrompt({ mission, card, cardId }) {
-    return `# ROLE: Implementation Engineer
+	return `# ROLE: Implementation Engineer
 
 ${COMMON_PREAMBLE}
 
@@ -68,7 +68,7 @@ Implement card ${cardId} now.
 }
 
 export function buildCoderFixPrompt({ mission, card, cardId, qaReport, priorCommitSha }) {
-    return `# ROLE: Implementation Engineer (FIX PASS)
+	return `# ROLE: Implementation Engineer (FIX PASS)
 
 ${COMMON_PREAMBLE}
 
@@ -98,7 +98,7 @@ ${qaReport}
 }
 
 export function buildQaPrompt({ mission, card, cardId, commitSha }) {
-    return `# ROLE: Quality Assurance Reviewer
+	return `# ROLE: Quality Assurance Reviewer
 
 You are reviewing one commit against one card's acceptance criteria. You DO NOT write code. You DO NOT commit anything. Your only deliverable is a structured findings report.
 

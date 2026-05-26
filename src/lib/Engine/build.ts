@@ -89,9 +89,7 @@ export const spawnBuiltUnit = (
 
 	gameState.update((s) => ({
 		...s,
-		players: s.players.map((p) =>
-			p.team === team ? { ...p, money: p.money - data.cost } : p
-		),
+		players: s.players.map((p) => (p.team === team ? { ...p, money: p.money - data.cost } : p)),
 	}))
 
 	markTileActed(spawnTile)

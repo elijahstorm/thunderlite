@@ -11,20 +11,16 @@ describe('isValidSerializedAction', () => {
 		expect(isValidSerializedAction({ kind: 'move', from: 0, to: 1 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'attack', from: 2, to: 5 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'capture', tile: 4 })).toBe(true)
-		expect(
-			isValidSerializedAction({ kind: 'build', building: 3, unitType: 0 })
-		).toBe(true)
-		expect(
-			isValidSerializedAction({ kind: 'build', building: 3, unitType: 0, direction: 1 })
-		).toBe(true)
+		expect(isValidSerializedAction({ kind: 'build', building: 3, unitType: 0 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'build', building: 3, unitType: 0, direction: 1 })).toBe(
+			true
+		)
 		expect(isValidSerializedAction({ kind: 'mine', tile: 9 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'repair', tile: 6 })).toBe(true)
-		expect(
-			isValidSerializedAction({ kind: 'transport-load', transport: 1, passenger: 2 })
-		).toBe(true)
-		expect(
-			isValidSerializedAction({ kind: 'transport-unload', transport: 1, tile: 3 })
-		).toBe(true)
+		expect(isValidSerializedAction({ kind: 'transport-load', transport: 1, passenger: 2 })).toBe(
+			true
+		)
+		expect(isValidSerializedAction({ kind: 'transport-unload', transport: 1, tile: 3 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'wait', tile: 7 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'end-turn' })).toBe(true)
 	})

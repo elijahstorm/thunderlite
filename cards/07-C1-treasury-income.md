@@ -14,8 +14,8 @@ Players have a `money` field (from A1) but nothing fills it. Buildings declare i
 ## Scope
 
 - Implement the `Each_Turn.Supply_Income` modifier handler. On start-of-turn for player P:
-    1. Iterate `map.layers.buildings` for all buildings owned by P (`team === P.team`).
-    2. For each, look up `buildingData[building.type].income` and add it to `P.money`.
+  1. Iterate `map.layers.buildings` for all buildings owned by P (`team === P.team`).
+  2. For each, look up `buildingData[building.type].income` and add it to `P.money`.
 - Add a small HUD widget `src/lib/Engine/HUD/Treasury.svelte` showing the **current player's** money. It should be a sibling of `TurnPill.svelte`.
 - Optional: pin a small starting-money config on the game state (`startingMoney = 0` for now; later cards may set it from map metadata).
 

@@ -16,11 +16,7 @@ export const canRepair = (unit: UnitObject): boolean => {
 	return current < max
 }
 
-export const repair = (
-	map: MapObject | MapProcesser,
-	tile: number,
-	team: number
-): RepairResult => {
+export const repair = (map: MapObject | MapProcesser, tile: number, team: number): RepairResult => {
 	const unit = map.layers.units[tile]
 	if (!unit) return { ok: false, reason: 'no-unit' }
 	if (unit.team !== team) return { ok: false, reason: 'wrong-team' }

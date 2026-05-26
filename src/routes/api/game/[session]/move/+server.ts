@@ -2,10 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { createClient } from '@vercel/kv'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import {
-	isValidSerializedAction,
-	type GameEvent,
-} from '$lib/Engine/Interactor/serializedAction.js'
+import { isValidSerializedAction, type GameEvent } from '$lib/Engine/Interactor/serializedAction.js'
 
 const EVENTS_KEY = (session: string) => `game-events:${session}`
 const CURRENT_KEY = (session: string) => `game-current:${session}`

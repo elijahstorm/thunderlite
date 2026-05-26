@@ -30,9 +30,7 @@ export const GET = async ({ url, params, locals }) => {
 		}
 
 		const startIndex = Math.max(0, since + 1)
-		const raw = ((await kv.lrange(EVENTS_KEY(session), startIndex, -1)) as
-			| unknown[]
-			| null) ?? []
+		const raw = ((await kv.lrange(EVENTS_KEY(session), startIndex, -1)) as unknown[] | null) ?? []
 		const events: GameEvent[] = []
 		for (const entry of raw) {
 			try {

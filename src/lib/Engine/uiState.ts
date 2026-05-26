@@ -5,7 +5,7 @@ export const selectedTile = writable<number | null>(null)
 
 export const focusedTile = derived(
 	[selectedTile, hoverTile],
-	([$selected, $hover]) => ($selected ?? $hover)
+	([$selected, $hover]) => $selected ?? $hover
 )
 
 export const setHoverTile = (tile: number | null): void => hoverTile.set(tile)

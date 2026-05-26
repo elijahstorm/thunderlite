@@ -14,8 +14,8 @@ depends_on: [A1]
 ## Scope
 
 - New `src/lib/Engine/visibility.ts`:
-    - `computeTeamVisibility(map, team) → Set<number>`: union of every owned unit's sight diamond.
-    - Modifier hook: `Properties.Extra_Sight` on terrain (`Hills`, `Mountain`) adds +1 to ranged units and +1-2 to non-ranged when *standing* on that terrain.
+  - `computeTeamVisibility(map, team) → Set<number>`: union of every owned unit's sight diamond.
+  - Modifier hook: `Properties.Extra_Sight` on terrain (`Hills`, `Mountain`) adds +1 to ranged units and +1-2 to non-ranged when _standing_ on that terrain.
 - Renderer: in `paint.ts`, dim tiles not in the current player's visibility. Enemy units on non-visible tiles are not drawn (renderer-level hiding, not deletion).
 - Attack/hover highlighting must respect visibility — you can't target what you can't see.
 

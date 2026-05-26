@@ -97,10 +97,7 @@
 		<p class="text-sm text-gray-600 dark:text-gray-300">
 			Paste a session code shared by another player:
 		</p>
-		<form
-			class="flex flex-col sm:flex-row gap-2"
-			on:submit|preventDefault={join}
-		>
+		<form class="flex flex-col sm:flex-row gap-2" on:submit|preventDefault={join}>
 			<input
 				type="text"
 				bind:value={joinCode}
@@ -109,18 +106,12 @@
 				class="flex-1 px-3 py-2 rounded border bg-white dark:bg-gray-900 font-mono"
 				disabled={joinStatus === 'sending'}
 			/>
-			<button
-				type="submit"
-				class="btn btn-primary"
-				disabled={joinStatus === 'sending'}
-			>
+			<button type="submit" class="btn btn-primary" disabled={joinStatus === 'sending'}>
 				{joinStatus === 'sending' ? 'Joining…' : 'Join'}
 			</button>
 		</form>
 		{#if joinStatus === 'error' && joinError}
-			<p
-				class="text-red-500 block p-3 w-full text-sm bg-red-50 rounded-lg border border-red-300"
-			>
+			<p class="text-red-500 block p-3 w-full text-sm bg-red-50 rounded-lg border border-red-300">
 				{joinError}
 			</p>
 		{/if}

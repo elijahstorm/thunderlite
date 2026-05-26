@@ -10,21 +10,14 @@ export const isUnitVisibleTo = (unit: UnitObject, team: number): boolean => {
 
 export type VisibilityMap = Pick<MapObject, 'cols' | 'rows' | 'layers'>
 
-export const isAirHiddenBySky = (
-	map: VisibilityMap,
-	tile: number,
-	unit: UnitObject
-): boolean => {
+export const isAirHiddenBySky = (map: VisibilityMap, tile: number, unit: UnitObject): boolean => {
 	if (unitData[unit.type]?.type !== 'air') return false
 	const sky = map.layers.sky[tile]
 	if (!sky) return false
 	return skyData[sky.type]?.modifiers.includes('hidden') ?? false
 }
 
-export const applySkyHiding = (
-	map: MapObject | MapProcesser,
-	team: number
-): void => {
+export const applySkyHiding = (map: MapObject | MapProcesser, team: number): void => {
 	for (let tile = 0; tile < map.layers.units.length; tile++) {
 		const unit = map.layers.units[tile]
 		if (!unit) continue
@@ -34,22 +27,13 @@ export const applySkyHiding = (
 	}
 }
 
-export const computeUnitSight = (
-	map: VisibilityMap,
-	tile: number,
-	unit: UnitObject
-): number => {
+export const computeUnitSight = (map: VisibilityMap, tile: number, unit: UnitObject): number => {
 	const base = unitData[unit.type]?.sight ?? 0
 	if (base <= 0) return 0
 	return base + extraSightBonus(map, tile, unit)
 }
 
-const addDiamond = (
-	map: VisibilityMap,
-	center: number,
-	radius: number,
-	out: Set<number>
-): void => {
+const addDiamond = (map: VisibilityMap, center: number, radius: number, out: Set<number>): void => {
 	if (radius < 0) return
 	const cx = center % map.cols
 	const cy = Math.floor(center / map.cols)
@@ -65,10 +49,7 @@ const addDiamond = (
 	}
 }
 
-export const computeTeamVisibility = (
-	map: VisibilityMap,
-	team: number
-): Set<number> => {
+export const computeTeamVisibility = (map: VisibilityMap, team: number): Set<number> => {
 	const visible = new Set<number>()
 	const units = map.layers.units
 	for (let tile = 0; tile < units.length; tile++) {

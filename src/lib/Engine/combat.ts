@@ -12,11 +12,7 @@ export type CombatContext = {
 	role?: AttackRole
 }
 
-const computeDamage = (
-	attacker: UnitObject,
-	defender: UnitObject,
-	ctx: CombatContext
-): number => {
+const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatContext): number => {
 	const attackerStats = unitData[attacker.type]
 	const defenderStats = unitData[defender.type]
 	if (!attackerStats || !defenderStats) return 0
@@ -29,7 +25,7 @@ const computeDamage = (
 	const matchupBonus = attackerStats.weaponType === defenderStats.armorType ? 1.5 : 1.0
 
 	const ground = ctx.map.layers.ground[ctx.defenderTile]
-	const protection = ground ? terrainData[ground.type]?.protection ?? 0 : 0
+	const protection = ground ? (terrainData[ground.type]?.protection ?? 0) : 0
 	const terrainGuard = 1 - protection
 
 	const modMultiplier = computeDamageMultiplier({

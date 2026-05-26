@@ -101,10 +101,7 @@ export type ShipOutResult =
 	| { ok: true; transportTile: number }
 	| { ok: false; reason: 'no-unit' | 'not-on-shore' | 'not-ground' }
 
-export const shipOut = (
-	map: MapObject | MapProcesser,
-	unitTile: number
-): ShipOutResult => {
+export const shipOut = (map: MapObject | MapProcesser, unitTile: number): ShipOutResult => {
 	const unit = map.layers.units[unitTile]
 	if (!unit) return { ok: false, reason: 'no-unit' }
 	if (unitData[unit.type].type !== 'ground') return { ok: false, reason: 'not-ground' }
@@ -128,10 +125,7 @@ export const shipOut = (
 export const hasRescuedUnit = (unit: UnitObject | null | undefined): boolean =>
 	!!(unit && unit.rescuedUnit)
 
-export const landTiles = (
-	map: MapObject | MapProcesser,
-	transportTile: number
-): number[] => {
+export const landTiles = (map: MapObject | MapProcesser, transportTile: number): number[] => {
 	const transport = map.layers.units[transportTile]
 	if (!transport || !transport.rescuedUnit) return []
 	const rescued = transport.rescuedUnit

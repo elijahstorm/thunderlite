@@ -12,7 +12,7 @@ depends_on: [A2]
 Two declared but unimplemented terrain rules:
 
 - `terrainData[].damage` is set on Wasteland (10) and Rock Formation (20) but nothing applies it.
-- [`movement.ts:84`](../src/lib/Engine/Interactor/Pathing/movement.ts) lets air units cross *any* terrain, including Volcanoes which the wiki says are impassable to everyone.
+- [`movement.ts:84`](../src/lib/Engine/Interactor/Pathing/movement.ts) lets air units cross _any_ terrain, including Volcanoes which the wiki says are impassable to everyone.
 
 ## Scope
 
@@ -42,6 +42,6 @@ Two declared but unimplemented terrain rules:
 
 ## Notes for the coder
 
-- Damage at end-of-turn applies to the *team that just ended its turn*, before turn advances. Apply before `currentTeam` increments.
+- Damage at end-of-turn applies to the _team that just ended its turn_, before turn advances. Apply before `currentTeam` increments.
 - Use the existing `animateExplosion` helper from `animator.ts` when a unit dies from terrain.
 - Don't introduce new terrain types or modifier keys.

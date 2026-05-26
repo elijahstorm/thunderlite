@@ -269,8 +269,8 @@
 					our Services, we may process personal information depending on how you interact with
 					<bdt class="block-component" />
 					<bdt class="question">ThunderLite</bdt>
-					<bdt class="statement-end-if-in-editor" /> and the Services, the choices you make, and the
-					products and features you use. Click
+					<bdt class="statement-end-if-in-editor" /> and the Services, the choices you make, and the products
+					and features you use. Click
 				</span>
 			</span>
 			<a data-custom-class="link" href="#personalinfo">
@@ -1315,11 +1315,10 @@
 																								<strong
 																									>To evaluate and improve our Services, products,
 																									marketing, and your experience.</strong
-																								> We may process your information when we believe it
-																								is necessary to identify usage trends, determine the
-																								effectiveness of our promotional campaigns, and to evaluate
-																								and improve our Services, products, marketing, and your
-																								experience.</span
+																								> We may process your information when we believe it is
+																								necessary to identify usage trends, determine the effectiveness
+																								of our promotional campaigns, and to evaluate and improve
+																								our Services, products, marketing, and your experience.</span
 																							>
 																						</span>
 																						<bdt class="statement-end-if-in-editor">
@@ -1341,9 +1340,8 @@
 																						<span data-custom-class="body_text">
 																							<span style="font-size: 15px;">
 																								<strong>To identify usage trends.</strong> We may process
-																								information about how you use our Services to better
-																								understand how they are being used so we can improve
-																								them.</span
+																								information about how you use our Services to better understand
+																								how they are being used so we can improve them.</span
 																							>
 																						</span>
 																						<bdt class="statement-end-if-in-editor">
@@ -1435,8 +1433,7 @@
 																													/>
 																													legal basis) to do so under applicable law,
 																													like with your consent, to comply with laws,
-																													to provide you with services to enter into
-																													or
+																													to provide you with services to enter into or
 																													<bdt class="block-component" />fulfill<bdt
 																														class="statement-end-if-in-editor"
 																													/>
@@ -2320,14 +2317,13 @@
 																																		/>anonymize<bdt
 																																			class="statement-end-if-in-editor"
 																																		/>
-																																		such information, or, if this is
-																																		not possible (for example, because
-																																		your personal information has been
-																																		stored in backup archives), then
-																																		we will securely store your personal
-																																		information and isolate it from any
-																																		further processing until deletion
-																																		is possible.<span
+																																		such information, or, if this is not
+																																		possible (for example, because your
+																																		personal information has been stored
+																																		in backup archives), then we will
+																																		securely store your personal information
+																																		and isolate it from any further processing
+																																		until deletion is possible.<span
 																																			style="color: rgb(89, 89, 89);"
 																																		>
 																																			<bdt
@@ -2426,14 +2422,13 @@
 																																		/>
 																																		security measures designed to protect
 																																		the security of any personal information
-																																		we process. However, despite our
-																																		safeguards and efforts to secure
-																																		your information, no electronic transmission
-																																		over the Internet or information
-																																		storage technology can be guaranteed
-																																		to be 100% secure, so we cannot promise
-																																		or guarantee that hackers, cybercriminals,
-																																		or other
+																																		we process. However, despite our safeguards
+																																		and efforts to secure your information,
+																																		no electronic transmission over the
+																																		Internet or information storage technology
+																																		can be guaranteed to be 100% secure,
+																																		so we cannot promise or guarantee
+																																		that hackers, cybercriminals, or other
 																																		<bdt
 																																			class="block-component"
 																																		/>unauthorized<bdt
@@ -3032,8 +3027,8 @@
 																																	/>
 																																	will it affect the processing of your
 																																	personal information conducted in reliance
-																																	on lawful processing grounds other
-																																	than consent.<bdt
+																																	on lawful processing grounds other than
+																																	consent.<bdt
 																																		class="block-component"
 																																	/>
 																																</span>
@@ -3274,8 +3269,7 @@
 																																		/>recognizing<bdt
 																																			class="statement-end-if-in-editor"
 																																		/>
-																																		and implementing DNT signals has
-																																		been
+																																		and implementing DNT signals has been
 																																		<bdt
 																																			class="block-component"
 																																		/>finalized<bdt
@@ -3388,8 +3382,8 @@
 																																		of all third parties with which we
 																																		shared personal information in the
 																																		immediately preceding calendar year.
-																																		If you are a California resident
-																																		and would like to make such a request,
+																																		If you are a California resident and
+																																		would like to make such a request,
 																																		please submit your request in writing
 																																		to us using the contact information
 																																		provided below.</span
@@ -3539,10 +3533,10 @@
 																																		privacy notice, we may notify you
 																																		either by prominently posting a notice
 																																		of such changes or by directly sending
-																																		you a notification. We encourage
-																																		you to review this privacy notice
-																																		frequently to be informed of how
-																																		we are protecting your information.</span
+																																		you a notification. We encourage you
+																																		to review this privacy notice frequently
+																																		to be informed of how we are protecting
+																																		your information.</span
 																																	>
 																																</span>
 																															</span>

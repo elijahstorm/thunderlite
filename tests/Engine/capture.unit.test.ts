@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	initGameStateFromMap,
-} from '../../src/lib/Engine/gameState'
+import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import { endTurn } from '../../src/lib/Engine/turnLoop'
 import {
 	clearModifierRegistry,
@@ -49,8 +45,7 @@ const building = (team: number, type: number, stature?: number): BuildingObject 
 	...(typeof stature === 'number' ? { stature } : {}),
 })
 
-const controlsOf = (team: number) =>
-	get(gameState).players.find((p) => p.team === team)?.controls
+const controlsOf = (team: number) => get(gameState).players.find((p) => p.team === team)?.controls
 
 const runCaptureFor = (map: MapProcesser, tile: number) => {
 	const ctx: ModifierContext = {

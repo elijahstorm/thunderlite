@@ -7,9 +7,7 @@ export const generateAttackList = (map: MapObject, tile: number, unit: UnitObjec
 	const [start, end] = unitData[unit.type].range
 	const visible = computeTeamVisibility(map, unit.team)
 
-	return [...new Set(diamond(map, tile, unit, start, end))].filter((target) =>
-		visible.has(target)
-	)
+	return [...new Set(diamond(map, tile, unit, start, end))].filter((target) => visible.has(target))
 }
 
 const diamond = (map: MapObject, tile: number, unit: UnitObject, start: number, end: number) => {

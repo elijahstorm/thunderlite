@@ -22,19 +22,19 @@ node scripts/orchestrator.mjs
 
 ## Flags
 
-| flag                 | purpose                                                                       |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `--reset`            | wipe `.orchestrator-state.json` and start from card 1                         |
-| `--no-delay`         | skip the 30-min phase delays (debug/dev)                                      |
-| `--dry-run`          | don't actually spawn Claude; print what would happen                          |
-| `--only A1`          | run a single card and exit                                                    |
-| `--skip-to B2`       | jump the state pointer to a specific card and resume                          |
+| flag           | purpose                                               |
+| -------------- | ----------------------------------------------------- |
+| `--reset`      | wipe `.orchestrator-state.json` and start from card 1 |
+| `--no-delay`   | skip the 30-min phase delays (debug/dev)              |
+| `--dry-run`    | don't actually spawn Claude; print what would happen  |
+| `--only A1`    | run a single card and exit                            |
+| `--skip-to B2` | jump the state pointer to a specific card and resume  |
 
 ## State and reports
 
 - `.orchestrator-state.json` — persistent pointer (which card, which iteration). Resumable.
-- `.orchestrator.log`        — append-only timestamped log of every event.
-- `.orchestrator-reports/`   — one file per coder/qa run with the full transcript.
+- `.orchestrator.log` — append-only timestamped log of every event.
+- `.orchestrator-reports/` — one file per coder/qa run with the full transcript.
 
 ## Phase cadence
 

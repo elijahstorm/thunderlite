@@ -8,17 +8,10 @@ import {
 	markTileActed,
 	type Player,
 } from '../../src/lib/Engine/gameState'
-import {
-	applyTerrainEndOfTurnDamage,
-	endTurn,
-	nextActiveTeam,
-} from '../../src/lib/Engine/turnLoop'
+import { applyTerrainEndOfTurnDamage, endTurn, nextActiveTeam } from '../../src/lib/Engine/turnLoop'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { unitData } from '../../src/lib/GameData/unit'
-import {
-	clearModifierRegistry,
-	registerModifier,
-} from '../../src/lib/Engine/modifiers'
+import { clearModifierRegistry, registerModifier } from '../../src/lib/Engine/modifiers'
 
 const makeMap = (overrides: Partial<MapProcesser> = {}): MapProcesser => ({
 	cols: 4,

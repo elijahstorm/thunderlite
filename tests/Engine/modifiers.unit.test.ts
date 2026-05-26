@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	initGameStateFromMap,
-} from '../../src/lib/Engine/gameState'
+import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import {
 	clearModifierRegistry,
 	registerModifier,

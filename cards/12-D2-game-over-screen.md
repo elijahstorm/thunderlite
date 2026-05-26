@@ -16,9 +16,9 @@ When `phase === 'gameOver'` the screen needs to announce a winner and offer a pa
 - New `src/lib/Engine/HUD/GameOverModal.svelte`.
 - When `phase === 'gameOver'`, render the modal centered over the map (existing pointer-events overlay pattern is fine).
 - Show:
-    - "Victory" or "Defeat" relative to the local user's team (game state already tracks `currentTeam` and we know which team the local user is — use `userSession` matching for now, or default team 0).
-    - Player summary (winner team number + each player's `hasLost` status).
-    - A button "Back to Rooms" linking to `/rooms`.
+  - "Victory" or "Defeat" relative to the local user's team (game state already tracks `currentTeam` and we know which team the local user is — use `userSession` matching for now, or default team 0).
+  - Player summary (winner team number + each player's `hasLost` status).
+  - A button "Back to Rooms" linking to `/rooms`.
 - Do not implement re-match or replay yet.
 
 ## Acceptance criteria

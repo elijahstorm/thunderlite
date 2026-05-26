@@ -14,10 +14,10 @@ depends_on: [A2, C1]
 ## Scope
 
 - Create `src/lib/Engine/HUD/HUDRoot.svelte` that composes:
-    - `TurnPill` (already from A2) — current player and turn number
-    - `Treasury` (from C1) — current player money
-    - `EndTurnButton` (already from A2)
-    - `TileInfoPanel` (new) — when a tile is selected or hovered, show: terrain name + protection bonus, building (if any) + owner + stature, unit (if any) + team + HP + power + range + modifier badges.
+  - `TurnPill` (already from A2) — current player and turn number
+  - `Treasury` (from C1) — current player money
+  - `EndTurnButton` (already from A2)
+  - `TileInfoPanel` (new) — when a tile is selected or hovered, show: terrain name + protection bonus, building (if any) + owner + stature, unit (if any) + team + HP + power + range + modifier badges.
 - Replace the debug overlay in `GameStateManager.svelte` with `<HUDRoot />`.
 - Keep the HUD a single column on the right side of the screen. Functional. No tooltips. No animations.
 

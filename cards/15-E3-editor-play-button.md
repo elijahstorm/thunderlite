@@ -14,9 +14,9 @@ depends_on: [A1]
 ## Scope
 
 - Replace the JK toast with:
-    1. Compute the map hash via `mapHasher(map)`.
-    2. POST to `/api/game` with `{ sha }`. If the map isn't saved to DB yet, fall back to passing the hash to `/play` via querystring/state and letting `MapLoader` derive the map from the hash directly (the editor already has it in the `mapStore`, so the in-memory `mapStore` should be picked up by `MapLoader`).
-    3. `goto('/play')`.
+  1. Compute the map hash via `mapHasher(map)`.
+  2. POST to `/api/game` with `{ sha }`. If the map isn't saved to DB yet, fall back to passing the hash to `/play` via querystring/state and letting `MapLoader` derive the map from the hash directly (the editor already has it in the `mapStore`, so the in-memory `mapStore` should be picked up by `MapLoader`).
+  3. `goto('/play')`.
 - The user is allowed to play an unsaved editor map for one session. Save flow is unchanged.
 
 ## Acceptance criteria

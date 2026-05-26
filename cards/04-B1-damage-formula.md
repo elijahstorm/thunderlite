@@ -24,6 +24,7 @@ Add a pure damage module:
   terrainGuard    = 1 - defender.terrainProtection      // from terrainData[defender.tile.ground].protection
   finalDamage     = round(baseDamage * matchupBonus * terrainGuard)
   ```
+
 - Replace the inline damage math in `interactor.ts → attack` with a call to `calculateDamage`. Round to an integer. Never go negative.
 - Add a damage-preview function exported from the same module — `previewDamage(attacker, defender, ctx)` — for future HUD use, identical implementation.
 
@@ -52,5 +53,5 @@ Add a pure damage module:
 ## Notes for the coder
 
 - Wiki spec is informal — "same class hits at ~1.5×". Use exactly 1.5. Don't overengineer with a matrix unless a later card asks.
-- HP scaling: in the original engine the attacker's current HP relative to max determines power. Defender HP doesn't factor into damage *dealt to defender*.
+- HP scaling: in the original engine the attacker's current HP relative to max determines power. Defender HP doesn't factor into damage _dealt to defender_.
 - `unitData[i].health` is the max HP; the live HP is on `UnitObject.health` (optional, defaults to max).

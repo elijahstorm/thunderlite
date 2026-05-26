@@ -8,7 +8,7 @@
 			? `Game Over${typeof state.winner === 'number' ? ` — Player ${state.winner + 1} wins` : ''}`
 			: `Turn ${state.turnNumber} — Player ${(state.currentTeam ?? 0) + 1}${
 					currentPlayer?.name ? ` (${currentPlayer.name})` : ''
-			  }`
+				}`
 </script>
 
 <span

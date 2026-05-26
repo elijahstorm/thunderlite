@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	initGameStateFromMap,
-} from '../../src/lib/Engine/gameState'
+import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import { mine, canMineAt, MINE_REWARD } from '../../src/lib/Engine/modifiers/miner'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
@@ -35,8 +31,7 @@ const warmachine = (team: number): UnitObject => ({
 	health: unitData[WARMACHINE_TYPE].health,
 })
 
-const moneyOf = (team: number) =>
-	get(gameState).players.find((p) => p.team === team)?.money ?? 0
+const moneyOf = (team: number) => get(gameState).players.find((p) => p.team === team)?.money ?? 0
 
 describe('miner.canMineAt', () => {
 	it('returns true on the three ore deposit tiers', () => {

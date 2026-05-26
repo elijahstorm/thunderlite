@@ -3,14 +3,8 @@ import { describe, it, expect } from 'vitest'
 import { skyData } from '../../src/lib/GameData/sky'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { unitData } from '../../src/lib/GameData/unit'
-import {
-	applySkyEndOfTurnDamage,
-	STORM_DAMAGE,
-} from '../../src/lib/Engine/turnLoop'
-import {
-	applySkyHiding,
-	isAirHiddenBySky,
-} from '../../src/lib/Engine/visibility'
+import { applySkyEndOfTurnDamage, STORM_DAMAGE } from '../../src/lib/Engine/turnLoop'
+import { applySkyHiding, isAirHiddenBySky } from '../../src/lib/Engine/visibility'
 import { generateMovementList } from '../../src/lib/Engine/Interactor/Pathing/movement'
 
 const terrainIndex = (name: string) => {

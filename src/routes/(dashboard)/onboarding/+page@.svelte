@@ -106,7 +106,7 @@
 							invalid={usernameTaken || Object.hasOwn(errors, 'username')}
 							message={usernameTaken
 								? 'Sorry! This username is already taken'
-								: errors.username ?? ''}
+								: (errors.username ?? '')}
 							on:change={checkUsernameTaken}
 						/>
 

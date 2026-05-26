@@ -55,21 +55,15 @@ export const evaluateWinConditions = (
 	return { gameOver: false, losers }
 }
 
-export const applyWinConditions = (
-	map?: MapObject | MapProcesser
-): WinConditionsResult => {
+export const applyWinConditions = (map?: MapObject | MapProcesser): WinConditionsResult => {
 	const state = get(gameState)
 	const result = evaluateWinConditions(state, map)
 	const losersSet = new Set(result.losers)
 
 	gameState.update((s) => {
-		const needsPlayerUpdate = s.players.some(
-			(p) => losersSet.has(p.team) && !p.hasLost
-		)
+		const needsPlayerUpdate = s.players.some((p) => losersSet.has(p.team) && !p.hasLost)
 		const players = needsPlayerUpdate
-			? s.players.map((p) =>
-					losersSet.has(p.team) && !p.hasLost ? { ...p, hasLost: true } : p
-				)
+			? s.players.map((p) => (losersSet.has(p.team) && !p.hasLost ? { ...p, hasLost: true } : p))
 			: s.players
 
 		if (result.gameOver && s.phase !== 'gameOver') {

@@ -1,15 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	initGameStateFromMap,
-} from '../../src/lib/Engine/gameState'
-import {
-	buildAdjacent,
-	passableAdjacentTiles,
-} from '../../src/lib/Engine/modifiers/builder'
+import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
+import { buildAdjacent, passableAdjacentTiles } from '../../src/lib/Engine/modifiers/builder'
 import {
 	instaLose,
 	playerHasOtherInstaLoseUnit,
@@ -48,7 +41,11 @@ const warmachine = (team: number): UnitObject => ({
 
 const building = (team: number, type: number): BuildingObject => ({ type, state: 0, team })
 
-const giveMoneyAndControls = (team: number, money: number, controls: { ground?: boolean; air?: boolean; sea?: boolean } = {}) => {
+const giveMoneyAndControls = (
+	team: number,
+	money: number,
+	controls: { ground?: boolean; air?: boolean; sea?: boolean } = {}
+) => {
 	gameState.update((s) => ({
 		...s,
 		players: s.players.map((p) =>

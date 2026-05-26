@@ -17,11 +17,7 @@ const closed = (): ActionMenuState => ({
 
 export const actionMenuState = writable<ActionMenuState>(closed())
 
-export const openActionMenu = (
-	unitTile: number,
-	team: number,
-	items: ActionMenuItem[]
-): void => {
+export const openActionMenu = (unitTile: number, team: number, items: ActionMenuItem[]): void => {
 	actionMenuState.set({ open: true, unitTile, team, items })
 }
 

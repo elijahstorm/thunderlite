@@ -26,7 +26,7 @@
 							type: Math.floor(Math.random() * 2),
 							tile: index * cols + rows,
 							state: 0,
-					  }
+						}
 			),
 			units: Array.from({ length: rows * cols }, (_, index) =>
 				Math.random() * 4 > 1
@@ -36,7 +36,7 @@
 							tile: index * cols + rows,
 							team: index % 2,
 							state: 4,
-					  }
+						}
 			),
 			buildings: Array.from({ length: rows * cols }, (_, index) =>
 				Math.random() * 4 > 1
@@ -46,7 +46,7 @@
 							tile: index * cols + rows,
 							team: index % 2,
 							state: 0,
-					  }
+						}
 			),
 		},
 		filters: {

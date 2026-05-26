@@ -15,9 +15,9 @@ Capture and Warmachine death have triggers but nothing closes the loop into a ga
 
 - New `src/lib/Engine/winConditions.ts` exporting `evaluateWinConditions(state) → { gameOver: boolean, winner?: number, losers: number[] }`.
 - Conditions:
-    1. **Command Center captured**: handled by `Capture.Insta_Lose` — set `player.hasLost = true` for the previous owner of the Command Center.
-    2. **Last-team-standing**: if exactly one player has `hasLost === false`, that's the winner.
-    3. **No units AND no Command Center**: a player with zero units and zero Command Centers is set to `hasLost = true` (this catches the "Blitz Warmachine dies" path even if D1's evaluation runs before C4's handler).
+  1. **Command Center captured**: handled by `Capture.Insta_Lose` — set `player.hasLost = true` for the previous owner of the Command Center.
+  2. **Last-team-standing**: if exactly one player has `hasLost === false`, that's the winner.
+  3. **No units AND no Command Center**: a player with zero units and zero Command Centers is set to `hasLost = true` (this catches the "Blitz Warmachine dies" path even if D1's evaluation runs before C4's handler).
 - Run `evaluateWinConditions` after every action that could change unit/building counts (move, attack, capture, build, mine) AND at start-of-turn.
 - On `gameOver`, set `state.phase = 'gameOver'` and `state.winner`.
 

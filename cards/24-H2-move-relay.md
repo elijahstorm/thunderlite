@@ -14,8 +14,8 @@ depends_on: [H1]
 ## Scope (MVP — no WS server)
 
 - Replace the websocket assumption with REST polling backed by Vercel KV:
-    - `POST /api/game/:session/move` — body: `{ event: SerializedAction }`. Server validates it's the sender's turn (compare game state in KV) and appends to the move log.
-    - `GET /api/game/:session/events?since=:eventId` — returns events newer than `since`.
+  - `POST /api/game/:session/move` — body: `{ event: SerializedAction }`. Server validates it's the sender's turn (compare game state in KV) and appends to the move log.
+  - `GET /api/game/:session/events?since=:eventId` — returns events newer than `since`.
 - `GameSocket.svelte` polls every 1-2 seconds; on new events, dispatches them through the existing interactor.
 - An action's authoritative effect happens on the server's KV state (which is updated when a move is accepted) — clients render from their local game state but trust the server's accepted log.
 

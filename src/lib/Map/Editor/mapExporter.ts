@@ -107,7 +107,7 @@ const addLocation = <T extends ObjectType>(object: T | null, index: number) =>
 		: ({
 				type: object.type,
 				l: index,
-		  } as LocationObject)
+			} as LocationObject)
 
 const addUnitLocation = <T extends ObjectType & TeamObject>(object: T | null, index: number) =>
 	!object
@@ -116,4 +116,4 @@ const addUnitLocation = <T extends ObjectType & TeamObject>(object: T | null, in
 				type: object.type,
 				team: object.team,
 				l: index,
-		  } as LocationObject)
+			} as LocationObject)

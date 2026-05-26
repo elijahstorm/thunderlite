@@ -18,12 +18,12 @@ Restructure the interactor's `choice` step to:
 1. Compute the move path (existing).
 2. Animate the move (existing).
 3. After the move completes, open an `ActionMenu` (new component) listing valid actions:
-    - **Attack** — if any enemy is in range from the new tile
-    - **Capture** — if standing on enemy/neutral building and unit has `Start_Turn.Capture`
-    - **Mine** — if Warmachine on Ore Deposit
-    - **Build** — if Warmachine
-    - **Repair** — if unit has `Self_Action.Repairable` and HP < max (G4)
-    - **Wait** — always
+   - **Attack** — if any enemy is in range from the new tile
+   - **Capture** — if standing on enemy/neutral building and unit has `Start_Turn.Capture`
+   - **Mine** — if Warmachine on Ore Deposit
+   - **Build** — if Warmachine
+   - **Repair** — if unit has `Self_Action.Repairable` and HP < max (G4)
+   - **Wait** — always
 4. On the player's choice, dispatch the corresponding sub-action.
 
 This card is the last in the HUD epic and depends on most game-logic cards being in place. If any of (C2, C3, C4, G4) didn't land, gate the corresponding menu item to "disabled" with a tooltip explaining why.

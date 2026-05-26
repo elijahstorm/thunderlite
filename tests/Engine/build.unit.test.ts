@@ -130,9 +130,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0
-					? { ...p, money: 270, controls: { ground: true, air: false, sea: false } }
-					: p
+				p.team === 0 ? { ...p, money: 270, controls: { ground: true, air: false, sea: false } } : p
 			),
 		}))
 
@@ -154,9 +152,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0
-					? { ...p, money: 10, controls: { ground: true, air: false, sea: false } }
-					: p
+				p.team === 0 ? { ...p, money: 10, controls: { ground: true, air: false, sea: false } } : p
 			),
 		}))
 
@@ -192,9 +188,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0
-					? { ...p, money: 270, controls: { ground: true, air: false, sea: false } }
-					: p
+				p.team === 0 ? { ...p, money: 270, controls: { ground: true, air: false, sea: false } } : p
 			),
 		}))
 
@@ -216,9 +210,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0
-					? { ...p, money: 270, controls: { ground: true, air: false, sea: false } }
-					: p
+				p.team === 0 ? { ...p, money: 270, controls: { ground: true, air: false, sea: false } } : p
 			),
 		}))
 

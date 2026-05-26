@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	initGameStateFromMap,
-} from '../../src/lib/Engine/gameState'
+import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import { repair, canRepair, REPAIR_RATIO } from '../../src/lib/Engine/modifiers/repair'
 import { computeAvailableActions } from '../../src/lib/Engine/actions'
 import { unitData } from '../../src/lib/GameData/unit'
@@ -16,19 +12,20 @@ const RAPTOR_FIGHTER = unitData.findIndex((u) => u.name === 'Raptor Fighter')
 const BLOCKADE = unitData.findIndex((u) => u.name === 'Blockade')
 const PLAINS = terrainData.findIndex((t) => t.name === 'Plains')
 
-const makeMap = (): MapObject => ({
-	cols: 5,
-	rows: 5,
-	layers: {
-		ground: new Array(25).fill(0).map(() => ({ type: PLAINS, state: 0 })),
-		sky: new Array(25).fill(null),
-		units: new Array(25).fill(null),
-		buildings: new Array(25).fill(null),
-	},
-	highlights: [],
-	route: [],
-	filters: {} as any,
-}) as MapObject
+const makeMap = (): MapObject =>
+	({
+		cols: 5,
+		rows: 5,
+		layers: {
+			ground: new Array(25).fill(0).map(() => ({ type: PLAINS, state: 0 })),
+			sky: new Array(25).fill(null),
+			units: new Array(25).fill(null),
+			buildings: new Array(25).fill(null),
+		},
+		highlights: [],
+		route: [],
+		filters: {} as any,
+	}) as MapObject
 
 const unit = (type: number, team: number, health: number): UnitObject => ({
 	type,
@@ -92,7 +89,7 @@ describe('repair.repair', () => {
 		if (result.ok) expect(result.healed).toBe(1)
 	})
 
-	it('marks the tile as acted (consumes the unit\'s action)', () => {
+	it("marks the tile as acted (consumes the unit's action)", () => {
 		const map = makeMap()
 		const tank = unit(SCORPION_TANK, 0, 10)
 		map.layers.units[12] = tank

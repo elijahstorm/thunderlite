@@ -459,7 +459,7 @@ const scrollerMembers = function () {
 	 * @param deactivateCallback Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled.
 	 * @param startCallback Callback to execute to start the real async refresh action. Call {@link #finishPullToRefresh} after finish of refresh.
 	 */
-	;(scroller.activatePullToRefresh = function (
+	;((scroller.activatePullToRefresh = function (
 		height: number,
 		activateCallback: VoidFunction | null,
 		deactivateCallback: VoidFunction | null,
@@ -690,7 +690,7 @@ const scrollerMembers = function () {
 			const startTop = scroller.__isAnimating ? scroller.__scheduledTop : scroller.__scrollTop
 
 			scroller.scrollTo(startLeft + (left || 0), startTop + (top || 0), animate)
-		})
+		}))
 
 	/*
 		---------------------------------------------------------------------------

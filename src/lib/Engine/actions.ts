@@ -78,9 +78,7 @@ const canLand = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 	return landTiles(map, tile).length > 0
 }
 
-export const computeAvailableActions = (
-	ctx: AvailableActionsContext
-): ActionMenuItem[] => {
+export const computeAvailableActions = (ctx: AvailableActionsContext): ActionMenuItem[] => {
 	const { map, tile, unit } = ctx
 	const items: ActionMenuItem[] = []
 

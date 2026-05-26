@@ -34,11 +34,7 @@ export type MineResult =
 	| { ok: true; reward: number; nextTerrain: number }
 	| { ok: false; reason: 'not-mineable' | 'no-unit' | 'wrong-team' | 'invalid-player' }
 
-export const mine = (
-	map: MapObject | MapProcesser,
-	tile: number,
-	team: number
-): MineResult => {
+export const mine = (map: MapObject | MapProcesser, tile: number, team: number): MineResult => {
 	const unit = map.layers.units[tile]
 	if (!unit) return { ok: false, reason: 'no-unit' }
 	if (unit.team !== team) return { ok: false, reason: 'wrong-team' }
@@ -59,9 +55,7 @@ export const mine = (
 
 	gameState.update((s) => ({
 		...s,
-		players: s.players.map((p) =>
-			p.team === team ? { ...p, money: p.money + MINE_REWARD } : p
-		),
+		players: s.players.map((p) => (p.team === team ? { ...p, money: p.money + MINE_REWARD } : p)),
 	}))
 
 	markTileActed(tile)

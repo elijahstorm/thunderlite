@@ -14,19 +14,19 @@ H2 introduces a server-side event log. H3 cements the event schema and uses it f
 ## Scope
 
 - Solidify the `SerializedAction` discriminated union:
-    ```ts
-    type SerializedAction =
-      | { kind: 'move'; from: number; to: number }
-      | { kind: 'attack'; from: number; to: number }
-      | { kind: 'capture'; tile: number }
-      | { kind: 'build'; building: number; unitType: number; direction?: number }
-      | { kind: 'mine'; tile: number }
-      | { kind: 'repair'; tile: number }
-      | { kind: 'transport-load'; transport: number; passenger: number }
-      | { kind: 'transport-unload'; transport: number; tile: number }
-      | { kind: 'wait'; tile: number }
-      | { kind: 'end-turn' };
-    ```
+  ```ts
+  type SerializedAction =
+  	| { kind: 'move'; from: number; to: number }
+  	| { kind: 'attack'; from: number; to: number }
+  	| { kind: 'capture'; tile: number }
+  	| { kind: 'build'; building: number; unitType: number; direction?: number }
+  	| { kind: 'mine'; tile: number }
+  	| { kind: 'repair'; tile: number }
+  	| { kind: 'transport-load'; transport: number; passenger: number }
+  	| { kind: 'transport-unload'; transport: number; tile: number }
+  	| { kind: 'wait'; tile: number }
+  	| { kind: 'end-turn' }
+  ```
 - `applyAction(state, action)` pure function: deterministic, used both for server-side validation and client replay.
 - On `GameSocket` connect/reconnect, fetch the full event log and replay through `applyAction` to reach current state.
 

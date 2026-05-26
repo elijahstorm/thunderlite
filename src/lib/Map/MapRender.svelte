@@ -38,8 +38,12 @@
 
 	const render = () => (requestRedraw = performance.now())
 
-	let cachedVisibility: { team: number; turnNumber: number; tile: number; visible: Set<number> } | null =
-		null
+	let cachedVisibility: {
+		team: number
+		turnNumber: number
+		tile: number
+		visible: Set<number>
+	} | null = null
 
 	const visibilityProvider: VisibilityProvider = fogOfWar
 		? () => {
@@ -59,7 +63,7 @@
 					}
 				}
 				return { visible: cachedVisibility.visible, team }
-		  }
+			}
 		: () => null
 
 	$: if (fogOfWar) {

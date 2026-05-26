@@ -1,6 +1,11 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
-import { runModifiers, type ModifierContext, type ModifierHandler, type ModifierTarget } from './index'
+import {
+	runModifiers,
+	type ModifierContext,
+	type ModifierHandler,
+	type ModifierTarget,
+} from './index'
 
 export const captureMaxStature = (buildingType: number): number =>
 	buildingData[buildingType]?.stature ?? 0

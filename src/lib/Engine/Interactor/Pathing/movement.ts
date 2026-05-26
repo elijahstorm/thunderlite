@@ -49,7 +49,7 @@ const addWalkableTiles = (
 					unit,
 					movement - drag(unit, map.layers.ground[tile], map.layers.sky[tile])
 				),
-		  ]
+			]
 		: []
 
 const isWalkable = (
@@ -78,20 +78,20 @@ export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | 
 			: 1
 		: ((terrainData[terrain.type].name === 'Shore' &&
 				unitData[unit.type].movementType === 'warship') ||
-		  (terrainData[terrain.type].details === 'rugged' &&
+			(terrainData[terrain.type].details === 'rugged' &&
 				(unitData[unit.type].movementType === 'wheel' ||
 					unitData[unit.type].movementType === 'tank'))
 				? IMPASSABLE
 				: terrainData[terrain.type].details === 'rough' &&
-				  (unitData[unit.type].movementType === 'wheel' ||
-						unitData[unit.type].movementType === 'boat')
-				? 3
-				: (terrainData[terrain.type].details === 'slippery' &&
-						unitData[unit.type].movementType === 'foot') ||
-				  (terrainData[terrain.type].details === 'dirty' &&
-						unitData[unit.type].movementType === 'wheel')
-				? 2
-				: 1) * terrainData[terrain.type].drag
+					  (unitData[unit.type].movementType === 'wheel' ||
+							unitData[unit.type].movementType === 'boat')
+					? 3
+					: (terrainData[terrain.type].details === 'slippery' &&
+								unitData[unit.type].movementType === 'foot') ||
+						  (terrainData[terrain.type].details === 'dirty' &&
+								unitData[unit.type].movementType === 'wheel')
+						? 2
+						: 1) * terrainData[terrain.type].drag
 
 const notBlocked = (map: MapObject, tile: number, unit: UnitObject) =>
 	!map.layers.units[tile] || map.layers.units[tile]?.team === unit.team

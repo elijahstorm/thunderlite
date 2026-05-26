@@ -14,9 +14,9 @@ depends_on: [D1]
 ## Scope
 
 - New endpoint `POST /api/game/join` accepting `{ session }`. It:
-    1. Verifies the session exists (KV `game:${session}` is a non-empty set).
-    2. Verifies room isn't full (max 2 for now).
-    3. Adds the joining user to the set; writes `user-game:${joiner}` = `{ session, sha }`.
+  1. Verifies the session exists (KV `game:${session}` is a non-empty set).
+  2. Verifies room isn't full (max 2 for now).
+  3. Adds the joining user to the set; writes `user-game:${joiner}` = `{ session, sha }`.
 - UI on `/rooms`: a small "Join a game" form taking a session code. On submit, POST `/api/game/join`, then `goto('/play')`.
 - The creator's `/rooms` page should display the active session code so they can share it.
 

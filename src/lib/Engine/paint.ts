@@ -119,7 +119,7 @@ const conditionally =
 			? renderObject(width, height, frame, scale)(context)(
 					object,
 					renderer(object.type) as ObjectSpriteRenderer
-			  )
+				)
 			: null
 
 const highlights =

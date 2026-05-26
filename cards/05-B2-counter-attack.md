@@ -16,19 +16,19 @@ Counter-attacks in [`interactor.ts:90-102`](../src/lib/Engine/Interactor/interac
 Implement the full counter-attack rule and wire combat modifiers through the A3 dispatcher:
 
 - `canCounterAttack(attacker, defender, ctx) → boolean` in `combat.ts`:
-    - defender must be alive after primary hit
-    - defender's range must include the attacker's stand-tile (use `generateAttackList` from `Pathing/attack.ts`)
-    - attacker must not be `Attack.Stun`-flagged for this exchange
-    - defender's `Can_Attack.*` gates must accept the attacker's type (e.g. ground unit cannot counter air without `Air_Raid`)
+  - defender must be alive after primary hit
+  - defender's range must include the attacker's stand-tile (use `generateAttackList` from `Pathing/attack.ts`)
+  - attacker must not be `Attack.Stun`-flagged for this exchange
+  - defender's `Can_Attack.*` gates must accept the attacker's type (e.g. ground unit cannot counter air without `Air_Raid`)
 - New phase in the modifier registry: `'Damage.Attack'` and `'Damage.Counter'`. Handlers return a numeric multiplier that compounds on the damage formula:
-    - `Damage.Fast_Attack` → 1.2 when the unit is the **attacker** of this exchange.
-    - `Damage.Slow_Attack` → 0.85 when the unit is the **defender** (i.e. countering).
-    - `Damage.Flak` → 2.0 when the **defender** has `armorType === 'light'`.
+  - `Damage.Fast_Attack` → 1.2 when the unit is the **attacker** of this exchange.
+  - `Damage.Slow_Attack` → 0.85 when the unit is the **defender** (i.e. countering).
+  - `Damage.Flak` → 2.0 when the **defender** has `armorType === 'light'`.
 - `Attack.Stun` declares an effect on the defender for the rest of this exchange (no counter-attack). The flag does not persist past the exchange.
 - `Can_Attack.Air_Raid` → permits attacking units of `type === 'air'`. Without it, ground/sea units cannot select or counter air.
 - `Can_Attack.Bombard` → permits attacking sea units from non-sea.
 - `Can_Attack.Ground_Assult` → sea units can attack ground.
-- `Can_Attack.Counter_Range` → ranged units can counter when struck by a ranged attacker (default rule is that ranged units *don't* counter melee, see notes).
+- `Can_Attack.Counter_Range` → ranged units can counter when struck by a ranged attacker (default rule is that ranged units _don't_ counter melee, see notes).
 
 ## Acceptance criteria
 

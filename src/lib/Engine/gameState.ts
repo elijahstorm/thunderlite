@@ -35,10 +35,7 @@ export const buildingGrants = (buildingType: number): (keyof PlayerControls)[] =
 	return grants
 }
 
-const controlsFromBuildings = (
-	map: MapProcesser | MapObject,
-	team: number
-): PlayerControls => {
+const controlsFromBuildings = (map: MapProcesser | MapObject, team: number): PlayerControls => {
 	const controls = emptyControls()
 	for (const building of map.layers.buildings) {
 		if (!building || building.team !== team) continue

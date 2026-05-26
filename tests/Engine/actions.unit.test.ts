@@ -13,19 +13,20 @@ const PLAINS = terrainData.findIndex((t) => t.name === 'Plains')
 const ENRICHED_ORE = terrainData.findIndex((t) => t.name === 'Enriched Ore Deposit')
 const SHORE = terrainData.findIndex((t) => t.name === 'Shore')
 
-const makeMap = (groundType = PLAINS): MapObject => ({
-	cols: 5,
-	rows: 5,
-	layers: {
-		ground: new Array(25).fill(0).map(() => ({ type: groundType, state: 0 })),
-		sky: new Array(25).fill(null),
-		units: new Array(25).fill(null),
-		buildings: new Array(25).fill(null),
-	},
-	highlights: [],
-	route: [],
-	filters: {} as any,
-}) as MapObject
+const makeMap = (groundType = PLAINS): MapObject =>
+	({
+		cols: 5,
+		rows: 5,
+		layers: {
+			ground: new Array(25).fill(0).map(() => ({ type: groundType, state: 0 })),
+			sky: new Array(25).fill(null),
+			units: new Array(25).fill(null),
+			buildings: new Array(25).fill(null),
+		},
+		highlights: [],
+		route: [],
+		filters: {} as any,
+	}) as MapObject
 
 const unit = (type: number, team: number, health?: number): UnitObject => ({
 	type,

@@ -21,10 +21,7 @@ const adjacentTiles = (map: MapObject | MapProcesser, tile: number): number[] =>
 	return out
 }
 
-export const passableAdjacentTiles = (
-	map: MapObject | MapProcesser,
-	tile: number
-): number[] =>
+export const passableAdjacentTiles = (map: MapObject | MapProcesser, tile: number): number[] =>
 	adjacentTiles(map, tile).filter((t) => {
 		if (map.layers.units[t] != null) return false
 		const ground = map.layers.ground[t]
@@ -72,9 +69,7 @@ export const buildAdjacent = (
 
 	gameState.update((s) => ({
 		...s,
-		players: s.players.map((p) =>
-			p.team === team ? { ...p, money: p.money - data.cost } : p
-		),
+		players: s.players.map((p) => (p.team === team ? { ...p, money: p.money - data.cost } : p)),
 	}))
 
 	markTileActed(spawnTile)

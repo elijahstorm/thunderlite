@@ -1,15 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import {
-	gameState,
-	resetGameState,
-	initGameStateFromMap,
-} from '../../src/lib/Engine/gameState'
-import {
-	evaluateWinConditions,
-	applyWinConditions,
-} from '../../src/lib/Engine/winConditions'
+import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
+import { evaluateWinConditions, applyWinConditions } from '../../src/lib/Engine/winConditions'
 import { endTurn } from '../../src/lib/Engine/turnLoop'
 import { clearModifierRegistry } from '../../src/lib/Engine/modifiers'
 import { buildingData } from '../../src/lib/GameData/building'
@@ -111,9 +104,7 @@ describe('evaluateWinConditions (pure)', () => {
 		// Mark team 0 lost so only team 1 survives.
 		gameState.update((s) => ({
 			...s,
-			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, hasLost: true } : p
-			),
+			players: s.players.map((p) => (p.team === 0 ? { ...p, hasLost: true } : p)),
 		}))
 
 		const result = evaluateWinConditions(get(gameState), map)
@@ -130,9 +121,7 @@ describe('evaluateWinConditions (pure)', () => {
 		initGameStateFromMap(map)
 		gameState.update((s) => ({
 			...s,
-			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, hasLost: true } : p
-			),
+			players: s.players.map((p) => (p.team === 0 ? { ...p, hasLost: true } : p)),
 		}))
 
 		const a = evaluateWinConditions(get(gameState), map)
@@ -179,9 +168,7 @@ describe('applyWinConditions (side-effects)', () => {
 		initGameStateFromMap(map)
 		gameState.update((s) => ({
 			...s,
-			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, hasLost: true } : p
-			),
+			players: s.players.map((p) => (p.team === 0 ? { ...p, hasLost: true } : p)),
 		}))
 
 		const result = applyWinConditions(map)
@@ -226,9 +213,7 @@ describe('applyWinConditions (side-effects)', () => {
 			...s,
 			phase: 'gameOver',
 			winner: 1,
-			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, hasLost: true } : p
-			),
+			players: s.players.map((p) => (p.team === 0 ? { ...p, hasLost: true } : p)),
 		}))
 
 		applyWinConditions(map)

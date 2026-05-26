@@ -15,8 +15,8 @@ Infantry units have `Start_Turn.Capture` declared. Buildings have a `stature` va
 
 - Add `building.stature: number` to runtime building objects (default = `buildingData[type].stature`). Persist on the building layer.
 - Implement `Start_Turn.Capture` handler:
-    1. If unit standing on an enemy or neutral building → reduce `building.stature` by `unit.health / unitMaxHealth * 10`, rounded.
-    2. If `building.stature <= 0` → set `building.team = unit.team`, reset `stature` to its max, fire any `Capture.*` modifiers on the building (`Capture.Allow_Ground`, `Capture.Allow_Air`, `Capture.Allow_Sea`). `Capture.Insta_Lose` is wired in D1.
+  1. If unit standing on an enemy or neutral building → reduce `building.stature` by `unit.health / unitMaxHealth * 10`, rounded.
+  2. If `building.stature <= 0` → set `building.team = unit.team`, reset `stature` to its max, fire any `Capture.*` modifiers on the building (`Capture.Allow_Ground`, `Capture.Allow_Air`, `Capture.Allow_Sea`). `Capture.Insta_Lose` is wired in D1.
 - Show capture progress in the unit-info HUD (E1 will create the panel; for C2, just add a small numeric overlay on captured buildings — keep it minimal).
 - Player gains/loses control flags when capture flips: a `controls: { ground, air, sea }` map on Player. When an Allow_X building is captured, set that flag true for the new owner; if the old owner had it as their only such building, clear it for them.
 
@@ -44,4 +44,4 @@ Infantry units have `Start_Turn.Capture` declared. Buildings have a `stature` va
 ## Notes for the coder
 
 - The map layer stores `BuildingObject = ObjectType & AnimatedObject & TeamObject`. To add `stature` you'll likely widen this type — fine, but update the editor's serializer to default it.
-- `Start_Turn.Capture` runs at *start* of the capturing unit's player's turn. Make sure the dispatcher walks units in the right order.
+- `Start_Turn.Capture` runs at _start_ of the capturing unit's player's turn. Make sure the dispatcher walks units in the right order.

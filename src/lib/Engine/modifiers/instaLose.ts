@@ -32,10 +32,7 @@ export const playerHasOtherInstaLoseUnit = (
 	return false
 }
 
-export const playerHasCommandCenter = (
-	map: MapObject | MapProcesser,
-	team: number
-): boolean => {
+export const playerHasCommandCenter = (map: MapObject | MapProcesser, team: number): boolean => {
 	for (const building of map.layers.buildings) {
 		if (!building) continue
 		if (building.team !== team) continue
@@ -51,10 +48,7 @@ export const markPlayerLost = (team: number): void => {
 	}))
 }
 
-export const instaLose: ModifierHandler = (
-	target: ModifierTarget,
-	ctx: ModifierContext
-): void => {
+export const instaLose: ModifierHandler = (target: ModifierTarget, ctx: ModifierContext): void => {
 	if (ctx.kind !== 'unit') return
 	if (!ctx.map) return
 

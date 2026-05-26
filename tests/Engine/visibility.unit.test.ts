@@ -1,9 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import {
-	computeTeamVisibility,
-	computeUnitSight,
-} from '../../src/lib/Engine/visibility'
+import { computeTeamVisibility, computeUnitSight } from '../../src/lib/Engine/visibility'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { unitData } from '../../src/lib/GameData/unit'
 
@@ -29,11 +26,7 @@ const ROCKET_TRUCK = unitIndex('Rocket Truck') // sight 4, range [3,5] (ranged)
 const ground = (type: number): GroundObject => ({ type, state: 0 })
 const unit = (type: number, team = 0): UnitObject => ({ type, state: 0, team })
 
-const makeMap = (
-	cols: number,
-	rows: number,
-	groundType: number = PLAINS
-): MapProcesser => ({
+const makeMap = (cols: number, rows: number, groundType: number = PLAINS): MapProcesser => ({
 	cols,
 	rows,
 	layers: {

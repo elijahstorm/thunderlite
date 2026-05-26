@@ -15,9 +15,9 @@ depends_on: [C1, C2]
 
 - When the active player selects their own actable building (`actable: true`), open a `BuildMenu` modal in `src/lib/Engine/HUD/BuildMenu.svelte`.
 - Menu lists every unit from `unitData` filtered by:
-    - The unit's `type` (`ground` / `air` / `sea`) is allowed by the player's `controls` flags (set via C2 Allow_* capture).
-    - `unit.cost > 0` (excludes Turret, Blockade, Leviathan, Transporter — those have 0 cost and aren't player-buildable).
-    - Player has enough money.
+  - The unit's `type` (`ground` / `air` / `sea`) is allowed by the player's `controls` flags (set via C2 Allow\_\* capture).
+  - `unit.cost > 0` (excludes Turret, Blockade, Leviathan, Transporter — those have 0 cost and aren't player-buildable).
+  - Player has enough money.
 - On select: deduct cost from player money, spawn unit on the building's tile (or adjacent if occupied — fail and toast if both impossible), mark unit as **already acted this turn** (push tile to `actedTiles`), close menu.
 
 ## Acceptance criteria

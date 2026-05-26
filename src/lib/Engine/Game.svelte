@@ -27,11 +27,12 @@
 
 	let renderData: ObjectRenderer = {
 		ground: (type: number) => $rendererStore.ground[type],
-		sky: (type?: number) => (typeof type !== 'undefined' ? $rendererStore.sky[type] ?? null : null),
+		sky: (type?: number) =>
+			typeof type !== 'undefined' ? ($rendererStore.sky[type] ?? null) : null,
 		unit: (type?: number) =>
-			typeof type !== 'undefined' ? $rendererStore.units[type] ?? null : null,
+			typeof type !== 'undefined' ? ($rendererStore.units[type] ?? null) : null,
 		building: (type?: number) =>
-			typeof type !== 'undefined' ? $rendererStore.buildings[type] ?? null : null,
+			typeof type !== 'undefined' ? ($rendererStore.buildings[type] ?? null) : null,
 	}
 
 	onMount(() => {

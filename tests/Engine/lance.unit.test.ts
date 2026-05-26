@@ -3,10 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { resetGameState } from '../../src/lib/Engine/gameState'
-import {
-	applyLancePassthrough,
-	computeBehindTile,
-} from '../../src/lib/Engine/modifiers/lance'
+import { applyLancePassthrough, computeBehindTile } from '../../src/lib/Engine/modifiers/lance'
 
 const unitIndex = (name: string) => {
 	const idx = unitData.findIndex((u) => u.name === name)
