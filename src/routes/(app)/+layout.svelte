@@ -21,7 +21,7 @@
 	}
 </script>
 
-<slot />
+<slot></slot>
 
 <ChatSocket let:populate let:socketMessages>
 	<section

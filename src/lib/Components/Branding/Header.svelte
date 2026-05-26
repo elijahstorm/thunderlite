@@ -37,7 +37,7 @@
 		<a href={logoLink}>
 			<Logo width={156} height={40} />
 		</a>
-		<div class="flex-1" />
+		<div class="flex-1"></div>
 		<LoginLogoutButton />
 	</div>
 </div>

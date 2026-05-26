@@ -11,13 +11,13 @@
 		<div
 			class="m-auto max-w-full"
 			style="background-image: url({icon}); width: {height}px; height: {height}px;"
-		/>
+		></div>
 	{/if}
 	{#if url}
 		<div
 			class="m-auto max-w-full"
 			style="background-image: url({url}); width: {width}px; height: {height}px;"
-		/>
+		></div>
 	{/if}
 </div>
 

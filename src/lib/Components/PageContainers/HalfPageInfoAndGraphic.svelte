@@ -38,7 +38,7 @@
 		<div class="my-0 mx-auto block opacity-100 md:opacity-0 md:hidden">
 			<Logo height={100} />
 		</div>
-		<slot />
+		<slot></slot>
 		<img class="m-auto block opacity-100 md:hidden md:opacity-0" src={icons[icon]} alt="bg-icon" />
 	</div>
 </div>

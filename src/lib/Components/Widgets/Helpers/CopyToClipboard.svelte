@@ -12,4 +12,4 @@
 	})
 </script>
 
-<textarea class="hidden" bind:value bind:this={textarea} />
+<textarea class="hidden" bind:value bind:this={textarea}></textarea>

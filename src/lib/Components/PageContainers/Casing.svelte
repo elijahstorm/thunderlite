@@ -9,6 +9,6 @@
 
 <div class="pb-16 flex justify-center">
 	<div class="container w-full break break-word">
-		<slot />
+		<slot></slot>
 	</div>
 </div>

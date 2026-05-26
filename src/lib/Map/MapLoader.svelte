@@ -9,4 +9,4 @@
 	mapStore.set(map)
 </script>
 
-<slot {map} />
+<slot {map}></slot>

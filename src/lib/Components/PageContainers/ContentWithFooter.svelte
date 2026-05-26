@@ -42,7 +42,7 @@
 
 <div class="h-screen flex flex-col">
 	<div class="flex-1 bg-slate-50">
-		<slot />
+		<slot></slot>
 	</div>
 
 	<footer class:hidden={noFooterOnMobile} class:md:block={noFooterOnMobile}>

@@ -3,5 +3,5 @@
 </script>
 
 <ContentWithFooter>
-	<slot />
+	<slot></slot>
 </ContentWithFooter>

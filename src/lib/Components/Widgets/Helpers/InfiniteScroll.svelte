@@ -37,5 +37,5 @@
 </script>
 
 <div bind:this={component} class="overflow-auto {tailwind}" on:scroll={scroll} on:resize={scroll}>
-	<slot />
+	<slot></slot>
 </div>

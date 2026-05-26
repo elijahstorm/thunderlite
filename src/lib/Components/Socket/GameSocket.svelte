@@ -14,7 +14,7 @@
 	export let map: () => MapObject | undefined
 	export let gameSession: string = ''
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	export let userSession: string = ''
+	export const userSession: string = ''
 
 	const POLL_INTERVAL = 1500
 
@@ -139,7 +139,7 @@
 </script>
 
 {#if multiplayer}
-	<slot {socket} {requestRedraw} />
+	<slot {socket} {requestRedraw}></slot>
 	{#if wrongTurn}
 		<div
 			class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm font-mono px-4 py-2 rounded shadow-lg z-50 pointer-events-none"
@@ -152,6 +152,6 @@
 	{/if}
 {:else}
 	<LocalInteracter {map} let:socket let:requestRedraw>
-		<slot {socket} {requestRedraw} />
+		<slot {socket} {requestRedraw}></slot>
 	</LocalInteracter>
 {/if}

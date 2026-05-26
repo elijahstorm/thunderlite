@@ -115,7 +115,7 @@
 				easing: linear,
 				opacity: 1,
 			}}
-		/>
+		></div>
 	{/key}
 {/if}
 
@@ -123,5 +123,5 @@
 	<div
 		class="absolute overflow-clip"
 		style={render(animation, $animationFrame - animation.startingFrame)}
-	/>
+	></div>
 {/each}

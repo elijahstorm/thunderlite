@@ -132,7 +132,7 @@
 						rows="6"
 						placeholder="Leave a comment..."
 						bind:value={message}
-					/>
+					></textarea>
 				</div>
 
 				<button

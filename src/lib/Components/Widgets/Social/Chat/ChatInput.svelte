@@ -41,6 +41,7 @@
 		<span class="absolute inset-y-0 flex items-center">
 			<button
 				type="button"
+				aria-label="Voice input"
 				class="inline-flex items-center justify-center rounded-full h-12 w-12 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 			>
 				<svg
@@ -72,6 +73,7 @@
 		<div class="absolute right-0 items-center inset-y-0 flex">
 			<button
 				type="button"
+				aria-label="Attach file"
 				class="hidden md:inline-flex items-center justify-center rounded-full h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 				on:click={attach}
 			>
@@ -93,6 +95,7 @@
 			</button>
 			<button
 				type="button"
+				aria-label="Attach picture"
 				class="hidden md:inline-flex items-center justify-center rounded-full h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 				on:click={picture}
 			>
@@ -121,6 +124,7 @@
 			</button>
 			<button
 				type="button"
+				aria-label="Insert emoji"
 				class="hidden md:inline-flex items-center justify-center rounded-full h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 				on:click={emoji}
 			>

@@ -25,3 +25,4 @@ demo_data/
 .orchestrator.pid
 .orchestrator-reports/
 .caffeinate.pid
+.env*

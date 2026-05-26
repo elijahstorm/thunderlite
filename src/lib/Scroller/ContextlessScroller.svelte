@@ -110,4 +110,4 @@
 		scroller
 	)(handleHover)}
 	class="h-full outline-none"
-/>
+></section>

@@ -8,7 +8,7 @@
 
 	<div class="md:container w-full break break-word">
 		<div class="absolute pt-[72px] inset-0 md:relative md:pt-6 md:pb-16">
-			<slot />
+			<slot></slot>
 		</div>
 	</div>
 </ContentWithFooter>

@@ -58,12 +58,13 @@
 						class:border-2={selectedDir === dir}
 						class:bg-slate-100={selectedDir === dir}
 						on:click={() => (selectedDir = dir)}
-					/>
+						aria-label="Direction {dir}"
+					></button>
 				{/each}
 			</grid>
 
 			{#if open}
-				<slot {updatedMap} />
+				<slot {updatedMap}></slot>
 			{/if}
 		</flex>
 	</section>

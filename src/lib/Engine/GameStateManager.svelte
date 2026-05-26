@@ -11,9 +11,9 @@
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	export let endTurnAction: (() => void) | undefined = undefined
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	export let userSession: string
+	export const userSession: string = ''
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	export let gameSession: string
+	export const gameSession: string = ''
 	export let map: MapObject | undefined = undefined
 
 	let state: 'waiting' | 'animating' | 'overlay' = 'waiting'
@@ -43,7 +43,7 @@
 	}
 </script>
 
-<slot {select} />
+<slot {select}></slot>
 
 <HUDRoot {map} onEndTurn={handleEndTurn} />
 <BuildMenu {map} />

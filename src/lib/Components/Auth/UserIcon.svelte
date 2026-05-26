@@ -74,7 +74,7 @@
 		aria-label="Close profile popup modal"
 		role="button"
 		tabindex="0"
-	/>
+	></div>
 
 	{#if open}
 		<div

@@ -26,7 +26,7 @@
 				class:pr-2={scrollX && group === filler.length - 1}
 			>
 				{#each sub as _, item}
-					<slot index={group * (rows || cols) + item} />
+					<slot index={group * (rows || cols) + item}></slot>
 				{/each}
 			</div>
 		{/each}

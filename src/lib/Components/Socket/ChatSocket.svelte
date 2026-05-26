@@ -83,9 +83,9 @@
 </script>
 
 {#if error}
-	<div class="fixed" />
+	<div class="fixed"></div>
 {:else}
-	<slot {populate} {socketMessages} />
+	<slot {populate} {socketMessages}></slot>
 
 	{#if !opened}
 		<div class="fixed bottom-0 group" in:fly={{ y: -20 }} out:fly={{ y: -20 }}>
@@ -96,7 +96,7 @@
 				<div
 					class="absolute left-2 bottom-1 w-8 h-8 bg-red-500 transition-all delay-300 duration-700 ease-out overflow-clip rounded-[20px] group-hover:rounded-[0px] group-hover:rounded-tr-2xl group-hover:left-0 group-hover:bottom-0 group-hover:w-full group-hover:h-14 sm:h-8 sm:group-hover:h-9"
 					role="alert"
-				/>
+				></div>
 				<svg
 					class="relative fill-current w-4 h-4 mr-2"
 					style="min-width: 16px; min-height: 16px;"

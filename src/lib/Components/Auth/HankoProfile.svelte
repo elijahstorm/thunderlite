@@ -5,4 +5,4 @@
 	onMount(mountAuth)
 </script>
 
-<hanko-profile on:onUserLoggedOut={redirectAfterLogout} />
+<hanko-profile on:onUserLoggedOut={redirectAfterLogout}></hanko-profile>

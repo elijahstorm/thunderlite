@@ -39,18 +39,19 @@
 				<span style="color: rgb(89, 89, 89); font-size: 15px;">
 					<span data-custom-class="body_text"
 						>This privacy notice for <bdt class="question"
-							>ThunderLite<bdt class="block-component" />
+							>ThunderLite<bdt class="block-component"></bdt>
 						</bdt>
 						("<strong>we</strong>," "<strong>us</strong>," or "<strong>our</strong>"<bdt
 							class="statement-end-if-in-editor"
-						/>
+						></bdt>
 					</span>
 					<span data-custom-class="body_text"
 						>), describes how and why we might collect, store, use, and/or share (<bdt
 							class="block-component"
-						/>"<strong>process</strong>"<bdt class="statement-end-if-in-editor" />) your information
-						when you use our services (<bdt class="block-component" />"<strong>Services</strong
-						>"<bdt class="statement-end-if-in-editor" />), such as when you:</span
+						></bdt>"<strong>process</strong>"<bdt class="statement-end-if-in-editor"></bdt>) your
+						information when you use our services (<bdt class="block-component"></bdt>"<strong
+							>Services</strong
+						>"<bdt class="statement-end-if-in-editor"></bdt>), such as when you:</span
 					>
 				</span>
 			</span>
@@ -59,7 +60,7 @@
 					<span data-custom-class="body_text">
 						<span style="color: rgb(89, 89, 89);">
 							<span data-custom-class="body_text">
-								<bdt class="block-component" />
+								<bdt class="block-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -71,7 +72,7 @@
 				<span style="font-size: 15px; color: rgb(89, 89, 89);">
 					<span style="font-size: 15px; color: rgb(89, 89, 89);">
 						<span data-custom-class="body_text"
-							>Visit our website<bdt class="block-component" /> at
+							>Visit our website<bdt class="block-component"></bdt> at
 							<bdt class="question">
 								<a
 									href="https://thunderlite.vercel.app/"
@@ -106,7 +107,7 @@
 							<span data-custom-class="body_text">
 								<span style="color: rgb(89, 89, 89);">
 									<span data-custom-class="body_text">
-										<bdt class="block-component" />
+										<bdt class="block-component"></bdt>
 									</span>
 								</span>
 							</span>
@@ -120,9 +121,9 @@
 				<span style="font-size: 15px; color: rgb(89, 89, 89);">
 					<span style="font-size: 15px; color: rgb(89, 89, 89);">
 						<span data-custom-class="body_text"
-							>Download and use<bdt class="block-component" /> our mobile application<bdt
+							>Download and use<bdt class="block-component"></bdt> our mobile application<bdt
 								class="block-component"
-							/>
+							></bdt>
 							(<bdt class="question"
 								>ThunderLite)<span style="font-size: 15px; color: rgb(89, 89, 89);">
 									<span style="font-size: 15px; color: rgb(89, 89, 89);">
@@ -170,7 +171,7 @@
 					<span data-custom-class="body_text">
 						<span style="color: rgb(89, 89, 89);">
 							<span data-custom-class="body_text">
-								<bdt class="block-component" />
+								<bdt class="block-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -189,7 +190,7 @@
 									<span data-custom-class="body_text">
 										<span style="font-size: 15px;">
 											<span style="color: rgb(89, 89, 89);">
-												<bdt class="statement-end-if-in-editor" />
+												<bdt class="statement-end-if-in-editor"></bdt>
 											</span>
 										</span>
 									</span>
@@ -267,10 +268,10 @@
 				<span data-custom-class="body_text">
 					<strong>What personal information do we process?</strong> When you visit, use, or navigate
 					our Services, we may process personal information depending on how you interact with
-					<bdt class="block-component" />
+					<bdt class="block-component"></bdt>
 					<bdt class="question">ThunderLite</bdt>
-					<bdt class="statement-end-if-in-editor" /> and the Services, the choices you make, and the products
-					and features you use. Click
+					<bdt class="statement-end-if-in-editor"></bdt> and the Services, the choices you make, and the
+					products and features you use. Click
 				</span>
 			</span>
 			<a data-custom-class="link" href="#personalinfo">
@@ -289,9 +290,9 @@
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
 					<strong>Do we process any sensitive personal information?</strong>
-					<bdt class="block-component" />We do not process sensitive personal information.<bdt
+					<bdt class="block-component"></bdt>We do not process sensitive personal information.<bdt
 						class="else-block"
-					/>
+					></bdt>
 				</span>
 			</span>
 		</div>
@@ -302,9 +303,9 @@
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
 					<strong>Do we receive any information from third parties?</strong>
-					<bdt class="block-component" />We do not receive any information from third parties.<bdt
+					<bdt class="block-component"></bdt>We do not receive any information from third parties.<bdt
 						class="else-block"
-					/>
+					></bdt>
 				</span>
 			</span>
 		</div>
@@ -336,11 +337,11 @@
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
 					<strong
-						>In what situations and with which <bdt class="block-component" />parties do we share
-						personal information?</strong
+						>In what situations and with which <bdt class="block-component"></bdt>parties do we
+						share personal information?</strong
 					>
 					We may share information in specific situations and with specific
-					<bdt class="block-component" />third parties. Click
+					<bdt class="block-component"></bdt>third parties. Click
 				</span>
 			</span>
 			<a data-custom-class="link" href="#whoshare">
@@ -350,7 +351,7 @@
 			</a>
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
-					to learn more.<bdt class="block-component" />
+					to learn more.<bdt class="block-component"></bdt>
 				</span>
 			</span>
 		</div>
@@ -361,13 +362,14 @@
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
 					<strong>How do we keep your information safe?</strong> We have
-					<bdt class="block-component" />organizational<bdt class="statement-end-if-in-editor" />
+					<bdt class="block-component"></bdt>organizational<bdt class="statement-end-if-in-editor"
+					></bdt>
 					and technical processes and procedures in place to protect your personal information. However,
 					no electronic transmission over the internet or information storage technology can be guaranteed
 					to be 100% secure, so we cannot promise or guarantee that hackers, cybercriminals, or other
-					<bdt class="block-component" />unauthorized<bdt class="statement-end-if-in-editor" /> third
-					parties will not be able to defeat our security and improperly collect, access, steal, or modify
-					your information. Click
+					<bdt class="block-component"></bdt>unauthorized<bdt class="statement-end-if-in-editor"
+					></bdt> third parties will not be able to defeat our security and improperly collect, access,
+					steal, or modify your information. Click
 				</span>
 			</span>
 			<a data-custom-class="link" href="#infosafe">
@@ -377,7 +379,7 @@
 			</a>
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
-					to learn more.<bdt class="statement-end-if-in-editor" />
+					to learn more.<bdt class="statement-end-if-in-editor"></bdt>
 				</span>
 			</span>
 		</div>
@@ -409,7 +411,7 @@
 				<span data-custom-class="body_text">
 					<strong>How do you exercise your rights?</strong> The easiest way to exercise your rights
 					is by filling out our data subject request form available
-					<bdt class="block-component" />here:
+					<bdt class="block-component"></bdt>here:
 					<bdt class="question">
 						<a
 							href="https://thunderlite.vercel.app/data-request"
@@ -418,8 +420,8 @@
 							data-custom-class="link">https://thunderlite.vercel.app/data-request</a
 						>
 					</bdt>
-					<bdt class="else-block" />, or by contacting us. We will consider and act upon any request
-					in accordance with applicable data protection laws.</span
+					<bdt class="else-block"></bdt>, or by contacting us. We will consider and act upon any
+					request in accordance with applicable data protection laws.</span
 				>
 			</span>
 		</div>
@@ -429,9 +431,9 @@
 		<div style="line-height: 1.5;">
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text"
-					>Want to learn more about what <bdt class="block-component" />
+					>Want to learn more about what <bdt class="block-component"></bdt>
 					<bdt class="question">ThunderLite</bdt>
-					<bdt class="statement-end-if-in-editor" /> does with any information we collect? Click
+					<bdt class="statement-end-if-in-editor"></bdt> does with any information we collect? Click
 				</span>
 			</span>
 			<a data-custom-class="link" href="#toc">
@@ -474,7 +476,7 @@
 			<span style="font-size: 15px;">
 				<a data-custom-class="link" href="#infouse">
 					<span style="color: rgb(89, 89, 89);"
-						>2. HOW DO WE PROCESS YOUR INFORMATION?<bdt class="block-component" />
+						>2. HOW DO WE PROCESS YOUR INFORMATION?<bdt class="block-component"></bdt>
 					</span>
 				</a>
 			</span>
@@ -488,7 +490,7 @@
 								>WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR PERSONAL INFORMATION?</span
 							>
 						</span>
-						<bdt class="statement-end-if-in-editor" />
+						<bdt class="statement-end-if-in-editor"></bdt>
 					</span>
 				</a>
 			</span>
@@ -501,20 +503,20 @@
 					>
 				</span>
 				<span data-custom-class="body_text">
-					<bdt class="block-component" />
+					<bdt class="block-component"></bdt>
 				</span>
 				<span style="color: rgb(127, 127, 127);">
 					<span style="color: rgb(89, 89, 89);">
 						<span data-custom-class="body_text">
 							<span style="color: rgb(89, 89, 89);">
-								<bdt class="block-component" />
+								<bdt class="block-component"></bdt>
 							</span>
 						</span>
 						<span data-custom-class="body_text">
 							<span style="color: rgb(89, 89, 89);">
 								<span style="color: rgb(89, 89, 89);">
 									<span style="color: rgb(89, 89, 89);">
-										<bdt class="block-component" />
+										<bdt class="block-component"></bdt>
 									</span>
 								</span>
 							</span>
@@ -538,10 +540,10 @@
 							<span style="color: rgb(89, 89, 89);">
 								<span style="color: rgb(89, 89, 89);">
 									<span style="color: rgb(89, 89, 89);">
-										<bdt class="statement-end-if-in-editor" />
+										<bdt class="statement-end-if-in-editor"></bdt>
 									</span>
 								</span>
-								<bdt class="block-component" />
+								<bdt class="block-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -558,7 +560,7 @@
 						<span data-custom-class="body_text">
 							<span style="color: rgb(89, 89, 89);">
 								<span style="color: rgb(89, 89, 89);">
-									<bdt class="block-component" />
+									<bdt class="block-component"></bdt>
 								</span>
 							</span>
 						</span>
@@ -575,8 +577,8 @@
 					<span style="color: rgb(89, 89, 89);">
 						<span data-custom-class="body_text">
 							<span style="color: rgb(89, 89, 89);">
-								<bdt class="statement-end-if-in-editor" />
-								<bdt class="block-component" />
+								<bdt class="statement-end-if-in-editor"></bdt>
+								<bdt class="block-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -592,7 +594,7 @@
 					<span style="color: rgb(89, 89, 89);">
 						<span data-custom-class="body_text">
 							<span style="color: rgb(89, 89, 89);">
-								<bdt class="statement-end-if-in-editor" />
+								<bdt class="statement-end-if-in-editor"></bdt>
 							</span>
 						</span>
 					</span>
@@ -623,7 +625,7 @@
 			</span>
 			<bdt class="block-component">
 				<span style="font-size: 15px;">
-					<span data-custom-class="body_text" />
+					<span data-custom-class="body_text"></span>
 				</span>
 			</bdt>
 		</div>
@@ -702,7 +704,7 @@
 								<span style="font-size: 15px; color: rgb(89, 89, 89);">
 									<span data-custom-class="body_text">
 										<strong>
-											<em />
+											<em></em>
 										</strong>
 										<em>We collect personal information that you provide to us.</em>
 									</span>
@@ -723,13 +725,13 @@
 						>We collect personal information that you voluntarily provide to us when you <span
 							style="font-size: 15px;"
 						>
-							<bdt class="block-component" />
+							<bdt class="block-component"></bdt>
 						</span>register on the Services,
 					</span>
 					<span style="font-size: 15px;">
 						<span data-custom-class="body_text">
 							<span style="font-size: 15px;">
-								<bdt class="statement-end-if-in-editor" />
+								<bdt class="statement-end-if-in-editor"></bdt>
 							</span>
 						</span>
 						<span data-custom-class="body_text"
@@ -748,7 +750,7 @@
 				<span style="font-size: 15px; color: rgb(89, 89, 89);">
 					<span data-custom-class="body_text">
 						<span style="font-size: 15px;">
-							<bdt class="block-component" />
+							<bdt class="block-component"></bdt>
 						</span>
 					</span>
 				</span>
@@ -763,7 +765,7 @@
 						choices you make, and the products and features you use. The personal information we
 						collect may include the following:<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
-								<bdt class="forloop-component" />
+								<bdt class="forloop-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -791,7 +793,7 @@
 					<span data-custom-class="body_text">
 						<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
-								<bdt class="forloop-component" />
+								<bdt class="forloop-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -819,7 +821,7 @@
 					<span data-custom-class="body_text">
 						<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
-								<bdt class="forloop-component" />
+								<bdt class="forloop-component"></bdt>
 							</span>
 						</span>
 					</span>
@@ -847,10 +849,10 @@
 					<span data-custom-class="body_text">
 						<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
-								<bdt class="forloop-component" />
+								<bdt class="forloop-component"></bdt>
 							</span>
 							<span data-custom-class="body_text">
-								<bdt class="statement-end-if-in-editor" />
+								<bdt class="statement-end-if-in-editor"></bdt>
 							</span>
 						</span>
 					</span>
@@ -860,8 +862,8 @@
 		<div id="sensitiveinfo" style="line-height: 1.5;">
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
-					<strong>Sensitive Information.</strong> <bdt class="block-component" />We do not process
-					sensitive information.</span
+					<strong>Sensitive Information.</strong> <bdt class="block-component"></bdt>We do not
+					process sensitive information.</span
 				>
 			</span>
 		</div>
@@ -871,7 +873,7 @@
 		<div style="line-height: 1.5;">
 			<span style="font-size: 15px;">
 				<span data-custom-class="body_text">
-					<bdt class="else-block" />
+					<bdt class="else-block"></bdt>
 				</span>
 			</span>
 			<span style="font-size: 15px; color: rgb(89, 89, 89);">
@@ -880,7 +882,7 @@
 						<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
 								<bdt class="block-component">
-									<bdt class="block-component" />
+									<bdt class="block-component"></bdt>
 								</bdt>
 							</span>
 						</span>
@@ -895,9 +897,9 @@
 						<strong>Social Media Login Data. </strong>We may provide you with the option to register
 						with us using your existing social media account details, like your Facebook, Twitter,
 						or other social media account. If you choose to register in this way, we will collect
-						the information described in the section called <bdt class="block-component" />"<bdt
+						the information described in the section called <bdt class="block-component"></bdt>"<bdt
 							class="statement-end-if-in-editor"
-						/>
+						></bdt>
 						<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
 								<span style="font-size: 15px;">
@@ -909,7 +911,7 @@
 								</span>
 							</span>
 						</span>
-						<bdt class="block-component" />"<bdt class="statement-end-if-in-editor" /> below.</span
+						<bdt class="block-component"></bdt>"<bdt class="statement-end-if-in-editor"></bdt> below.</span
 					>
 				</span>
 			</span>
@@ -923,14 +925,14 @@
 					<span data-custom-class="body_text">
 						<span style="font-size: 15px;">
 							<bdt class="statement-end-if-in-editor">
-								<bdt class="statement-end-if-in-editor" />
+								<bdt class="statement-end-if-in-editor"></bdt>
 							</bdt>
 						</span>
 					</span>
 				</span>
 			</span>
 			<bdt class="block-component">
-				<bdt class="block-component" />
+				<bdt class="block-component"></bdt>
 			</bdt>
 		</div>
 		<div style="line-height: 1.5;">
@@ -939,25 +941,25 @@
 					<strong>Application Data.</strong> If you use our application(s), we also may collect the
 					following information if you choose to provide us with access or permission:<bdt
 						class="block-component"
-					/>
+					></bdt>
 				</span>
 			</span>
 			<div style="line-height: 1.5;">
 				<bdt class="block-component">
 					<span style="font-size: 15px;">
-						<span data-custom-class="body_text" />
+						<span data-custom-class="body_text"></span>
 					</span>
 				</bdt>
 				<div style="line-height: 1.5;">
 					<bdt class="block-component">
 						<span style="font-size: 15px;">
-							<span data-custom-class="body_text" />
+							<span data-custom-class="body_text"></span>
 						</span>
 					</bdt>
 					<div style="line-height: 1.5;">
 						<bdt class="block-component">
 							<span style="font-size: 15px;">
-								<span data-custom-class="body_text" />
+								<span data-custom-class="body_text"></span>
 							</span>
 						</bdt>
 					</div>
@@ -968,7 +970,7 @@
 									<em>Push Notifications.</em> We may request to send you push notifications
 									regarding your account or certain features of the application(s). If you wish to
 									opt out from receiving these types of communications, you may turn them off in
-									your device's settings.<bdt class="statement-end-if-in-editor" />
+									your device's settings.<bdt class="statement-end-if-in-editor"></bdt>
 								</span>
 							</span>
 						</li>
@@ -988,7 +990,7 @@
 					<div style="line-height: 1.5;">
 						<bdt class="statement-end-if-in-editor">
 							<span style="font-size: 15px;">
-								<span data-custom-class="body_text" />
+								<span data-custom-class="body_text"></span>
 							</span>
 						</bdt>
 					</div>
@@ -1009,7 +1011,7 @@
 						<span style="font-size: 15px; color: rgb(89, 89, 89);">
 							<span style="font-size: 15px; color: rgb(89, 89, 89);">
 								<span data-custom-class="body_text">
-									<bdt class="block-component" />
+									<bdt class="block-component"></bdt>
 								</span>
 								<span data-custom-class="body_text">
 									<span style="color: rgb(89, 89, 89); font-size: 15px;">
@@ -1017,7 +1019,7 @@
 											<span style="color: rgb(89, 89, 89); font-size: 15px;">
 												<span data-custom-class="body_text">
 													<bdt class="statement-end-if-in-editor">
-														<bdt class="block-component" />
+														<bdt class="block-component"></bdt>
 													</bdt>
 												</span>
 											</span>
@@ -1028,7 +1030,7 @@
 						</span>
 						<span style="font-size: 15px;">
 							<span data-custom-class="body_text">
-								<bdt class="block-component" />
+								<bdt class="block-component"></bdt>
 							</span>
 						</span>
 					</div>
@@ -1088,7 +1090,7 @@
 										>We process your personal information for a variety of reasons, depending on how
 										you interact with our Services, including:</strong
 									>
-									<bdt class="block-component" />
+									<bdt class="block-component"></bdt>
 								</span>
 							</span>
 						</span>
@@ -1113,7 +1115,7 @@
 																<span style="font-size: 15px;">
 																	<span style="color: rgb(89, 89, 89);">
 																		<span data-custom-class="body_text">
-																			<bdt class="statement-end-if-in-editor" />
+																			<bdt class="statement-end-if-in-editor"></bdt>
 																		</span>
 																	</span>
 																</span>
@@ -1132,7 +1134,7 @@
 						<span style="font-size: 15px; color: rgb(89, 89, 89);">
 							<span style="font-size: 15px; color: rgb(89, 89, 89);">
 								<span data-custom-class="body_text">
-									<bdt class="block-component" />
+									<bdt class="block-component"></bdt>
 								</span>
 							</span>
 						</span>
@@ -1140,7 +1142,7 @@
 							<span style="font-size: 15px; color: rgb(89, 89, 89);">
 								<span style="font-size: 15px; color: rgb(89, 89, 89);">
 									<span data-custom-class="body_text">
-										<bdt class="block-component" />
+										<bdt class="block-component"></bdt>
 									</span>
 								</span>
 							</span>
@@ -1148,7 +1150,7 @@
 								<span style="font-size: 15px; color: rgb(89, 89, 89);">
 									<span style="font-size: 15px; color: rgb(89, 89, 89);">
 										<span data-custom-class="body_text">
-											<bdt class="block-component" />
+											<bdt class="block-component"></bdt>
 										</span>
 									</span>
 								</span>
@@ -1171,7 +1173,7 @@
 																		<span style="font-size: 15px;">
 																			<span style="color: rgb(89, 89, 89);">
 																				<span data-custom-class="body_text">
-																					<bdt class="statement-end-if-in-editor" />
+																					<bdt class="statement-end-if-in-editor"></bdt>
 																				</span>
 																			</span>
 																		</span>
@@ -1190,40 +1192,40 @@
 								<span style="font-size: 15px; color: rgb(89, 89, 89);">
 									<span style="font-size: 15px; color: rgb(89, 89, 89);">
 										<span data-custom-class="body_text">
-											<bdt class="block-component" />
+											<bdt class="block-component"></bdt>
 										</span>
 									</span>
 								</span>
 								<div style="line-height: 1.5;">
 									<bdt class="block-component">
-										<span style="font-size: 15px;" />
+										<span style="font-size: 15px;"></span>
 									</bdt>
 									<div style="line-height: 1.5;">
 										<bdt class="block-component">
-											<span style="font-size: 15px;" />
+											<span style="font-size: 15px;"></span>
 										</bdt>
 										<div style="line-height: 1.5;">
 											<bdt class="block-component">
-												<span style="font-size: 15px;" />
+												<span style="font-size: 15px;"></span>
 											</bdt>
 											<div style="line-height: 1.5;">
 												<bdt class="block-component">
 													<span style="font-size: 15px;">
-														<span data-custom-class="body_text" />
+														<span data-custom-class="body_text"></span>
 													</span>
 												</bdt>
 												<p style="font-size: 15px; line-height: 1.5;">
 													<bdt class="block-component">
-														<span style="font-size: 15px;" />
+														<span style="font-size: 15px;"></span>
 													</bdt>
 												</p>
 												<p style="font-size: 15px; line-height: 1.5;">
 													<bdt class="block-component">
-														<span style="font-size: 15px;" />
+														<span style="font-size: 15px;"></span>
 													</bdt>
 												</p>
 												<p style="font-size: 15px; line-height: 1.5;">
-													<bdt class="block-component" />
+													<bdt class="block-component"></bdt>
 												</p>
 												<ul>
 													<li style="line-height: 1.5;">
@@ -1242,7 +1244,7 @@
 																						<span data-custom-class="body_text">
 																							<span style="color: rgb(89, 89, 89);">
 																								<span data-custom-class="body_text">
-																									<bdt class="statement-end-if-in-editor" />
+																									<bdt class="statement-end-if-in-editor"></bdt>
 																								</span>
 																							</span>
 																						</span>
@@ -1257,54 +1259,54 @@
 													</li>
 												</ul>
 												<p style="font-size: 15px; line-height: 1.5;">
-													<bdt class="block-component" />
+													<bdt class="block-component"></bdt>
 												</p>
 												<div style="line-height: 1.5;">
 													<bdt class="block-component">
-														<span style="font-size: 15px;" />
+														<span style="font-size: 15px;"></span>
 													</bdt>
 													<div style="line-height: 1.5;">
 														<bdt class="block-component">
-															<span style="font-size: 15px;" />
+															<span style="font-size: 15px;"></span>
 														</bdt>
 														<div style="line-height: 1.5;">
 															<bdt class="block-component">
-																<span style="font-size: 15px;" />
+																<span style="font-size: 15px;"></span>
 															</bdt>
 															<div style="line-height: 1.5;">
 																<span style="font-size: 15px;">
 																	<bdt class="block-component">
-																		<span data-custom-class="body_text" />
+																		<span data-custom-class="body_text"></span>
 																	</bdt>
 																</span>
 																<div style="line-height: 1.5;">
 																	<bdt class="block-component">
 																		<span style="font-size: 15px;">
-																			<span data-custom-class="body_text" />
+																			<span data-custom-class="body_text"></span>
 																		</span>
 																	</bdt>
 																	<div style="line-height: 1.5;">
 																		<bdt class="block-component">
 																			<span style="font-size: 15px;">
-																				<span data-custom-class="body_text" />
+																				<span data-custom-class="body_text"></span>
 																			</span>
 																		</bdt>
 																		<div style="line-height: 1.5;">
 																			<bdt class="block-component">
 																				<span style="font-size: 15px;">
-																					<span data-custom-class="body_text" />
+																					<span data-custom-class="body_text"></span>
 																				</span>
 																			</bdt>
 																			<div style="line-height: 1.5;">
 																				<bdt class="block-component">
 																					<span style="font-size: 15px;">
-																						<span data-custom-class="body_text" />
+																						<span data-custom-class="body_text"></span>
 																					</span>
 																				</bdt>
 																				<div style="line-height: 1.5;">
 																					<bdt class="block-component">
 																						<span style="font-size: 15px;">
-																							<span data-custom-class="body_text" />
+																							<span data-custom-class="body_text"></span>
 																						</span>
 																					</bdt>
 																				</div>
@@ -1323,7 +1325,7 @@
 																						</span>
 																						<bdt class="statement-end-if-in-editor">
 																							<span style="font-size: 15px;">
-																								<span data-custom-class="body_text" />
+																								<span data-custom-class="body_text"></span>
 																							</span>
 																						</bdt>
 																					</li>
@@ -1331,7 +1333,7 @@
 																				<div style="line-height: 1.5;">
 																					<bdt class="block-component">
 																						<span style="font-size: 15px;">
-																							<span data-custom-class="body_text" />
+																							<span data-custom-class="body_text"></span>
 																						</span>
 																					</bdt>
 																				</div>
@@ -1346,7 +1348,7 @@
 																						</span>
 																						<bdt class="statement-end-if-in-editor">
 																							<span style="font-size: 15px;">
-																								<span data-custom-class="body_text" />
+																								<span data-custom-class="body_text"></span>
 																							</span>
 																						</bdt>
 																					</li>
@@ -1354,52 +1356,52 @@
 																				<div style="line-height: 1.5;">
 																					<bdt class="block-component">
 																						<span style="font-size: 15px;">
-																							<span data-custom-class="body_text" />
+																							<span data-custom-class="body_text"></span>
 																						</span>
 																					</bdt>
 																					<div style="line-height: 1.5;">
 																						<bdt class="block-component">
 																							<span style="font-size: 15px;">
-																								<span data-custom-class="body_text" />
+																								<span data-custom-class="body_text"></span>
 																							</span>
 																						</bdt>
 																						<div style="line-height: 1.5;">
 																							<bdt class="block-component">
 																								<span style="font-size: 15px;">
-																									<span data-custom-class="body_text" />
+																									<span data-custom-class="body_text"></span>
 																								</span>
 																							</bdt>
 																							<div style="line-height: 1.5;">
 																								<bdt class="block-component">
 																									<span style="font-size: 15px;">
-																										<span data-custom-class="body_text" />
+																										<span data-custom-class="body_text"></span>
 																									</span>
 																								</bdt>
 																								<div style="line-height: 1.5;">
 																									<bdt class="block-component">
 																										<span style="font-size: 15px;">
-																											<span data-custom-class="body_text" />
+																											<span data-custom-class="body_text"></span>
 																										</span>
 																									</bdt>
 																									<div style="line-height: 1.5;">
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																									</div>
@@ -1426,39 +1428,40 @@
 																													<strong>In Short: </strong>We only process
 																													your personal information when we believe
 																													it is necessary and we have a valid legal
-																													reason (i.e.<bdt
-																														class="block-component"
-																													/>,<bdt
+																													reason (i.e.<bdt class="block-component"
+																													></bdt>,<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																													legal basis) to do so under applicable law,
 																													like with your consent, to comply with laws,
 																													to provide you with services to enter into or
-																													<bdt class="block-component" />fulfill<bdt
+																													<bdt class="block-component"
+																													></bdt>fulfill<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																													our contractual obligations, to protect your
 																													rights, or to
-																													<bdt class="block-component" />fulfill<bdt
+																													<bdt class="block-component"
+																													></bdt>fulfill<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																													our legitimate business interests.</span
 																												>
 																											</span>
 																										</em>
 																										<span style="font-size: 15px;">
 																											<span data-custom-class="body_text">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																										<span data-custom-class="body_text">
 																											<span style="font-size: 15px;">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1476,7 +1479,8 @@
 																														>
 																													</u>
 																												</strong>
-																												<bdt class="statement-end-if-in-editor" />
+																												<bdt class="statement-end-if-in-editor"
+																												></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1489,16 +1493,16 @@
 																												>We may process your information if you have
 																												given us specific permission (i.e.<bdt
 																													class="block-component"
-																												/>,<bdt
+																												></bdt>,<bdt
 																													class="statement-end-if-in-editor"
-																												/>
+																												></bdt>
 																												express consent) to use your personal information
 																												for a specific purpose, or in situations where
 																												your permission can be inferred (i.e.<bdt
 																													class="block-component"
-																												/>,<bdt
+																												></bdt>,<bdt
 																													class="statement-end-if-in-editor"
-																												/>
+																												></bdt>
 																												implied consent). You can withdraw your consent
 																												at any time. Click
 																											</span>
@@ -1544,7 +1548,7 @@
 																									<div style="line-height: 1.5;">
 																										<span data-custom-class="body_text">
 																											<span style="font-size: 15px;">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1555,7 +1559,7 @@
 																													>For investigations and fraud detection
 																													and prevention<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																												</span>
 																											</span>
 																										</li>
@@ -1563,7 +1567,7 @@
 																									<div style="line-height: 1.5;">
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																									</div>
@@ -1577,7 +1581,8 @@
 																											</span>
 																											<bdt class="statement-end-if-in-editor">
 																												<span style="font-size: 15px;">
-																													<span data-custom-class="body_text" />
+																													<span data-custom-class="body_text"
+																													></span>
 																												</span>
 																											</bdt>
 																										</li>
@@ -1585,7 +1590,7 @@
 																									<div style="line-height: 1.5;">
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																									</div>
@@ -1600,7 +1605,8 @@
 																											</span>
 																											<bdt class="statement-end-if-in-editor">
 																												<span style="font-size: 15px;">
-																													<span data-custom-class="body_text" />
+																													<span data-custom-class="body_text"
+																													></span>
 																												</span>
 																											</bdt>
 																										</li>
@@ -1608,7 +1614,7 @@
 																									<div style="line-height: 1.5;">
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																									</div>
@@ -1622,7 +1628,8 @@
 																											</span>
 																											<bdt class="statement-end-if-in-editor">
 																												<span style="font-size: 15px;">
-																													<span data-custom-class="body_text" />
+																													<span data-custom-class="body_text"
+																													></span>
 																												</span>
 																											</bdt>
 																										</li>
@@ -1630,7 +1637,7 @@
 																									<div style="line-height: 1.5;">
 																										<span data-custom-class="body_text">
 																											<span style="font-size: 15px;">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1642,7 +1649,7 @@
 																													an individual has been, is, or may be
 																													victim of financial abuse<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																												</span>
 																											</span>
 																										</li>
@@ -1650,7 +1657,7 @@
 																									<div style="line-height: 1.5;">
 																										<span data-custom-class="body_text">
 																											<span style="font-size: 15px;">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1667,7 +1674,7 @@
 																													a contravention of the laws of Canada or a
 																													province<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																												</span>
 																											</span>
 																										</li>
@@ -1675,7 +1682,7 @@
 																									<div style="line-height: 1.5;">
 																										<span data-custom-class="body_text">
 																											<span style="font-size: 15px;">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1688,7 +1695,7 @@
 																													of the court relating to the production of
 																													records<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																												</span>
 																											</span>
 																										</li>
@@ -1696,7 +1703,7 @@
 																									<div style="line-height: 1.5;">
 																										<bdt class="block-component">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																									</div>
@@ -1710,7 +1717,7 @@
 																													consistent with the purposes for which the
 																													information was produced<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																												</span>
 																											</span>
 																										</li>
@@ -1718,7 +1725,7 @@
 																									<div style="line-height: 1.5;">
 																										<span style="font-size: 15px;">
 																											<span data-custom-class="body_text">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1730,7 +1737,7 @@
 																													journalistic, artistic, or literary
 																													purposes<bdt
 																														class="statement-end-if-in-editor"
-																													/>
+																													></bdt>
 																												</span>
 																											</span>
 																										</li>
@@ -1738,7 +1745,7 @@
 																									<div style="line-height: 1.5;">
 																										<span style="font-size: 15px;">
 																											<span data-custom-class="body_text">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																									</div>
@@ -1750,7 +1757,8 @@
 																													and is specified by the regulations</span
 																												>
 																												<bdt class="statement-end-if-in-editor">
-																													<span data-custom-class="body_text" />
+																													<span data-custom-class="body_text"
+																													></span>
 																												</bdt>
 																											</span>
 																										</li>
@@ -1758,12 +1766,12 @@
 																									<div style="line-height: 1.5;">
 																										<bdt class="statement-end-if-in-editor">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																										<bdt class="statement-end-if-in-editor">
 																											<span style="font-size: 15px;">
-																												<span data-custom-class="body_text" />
+																												<span data-custom-class="body_text"></span>
 																											</span>
 																										</bdt>
 																									</div>
@@ -1815,7 +1823,7 @@
 																														We may share information in specific
 																														situations described in this section
 																														and/or with the following
-																														<bdt class="block-component" />third
+																														<bdt class="block-component"></bdt>third
 																														parties.</em
 																													>
 																												</span>
@@ -1830,7 +1838,7 @@
 																												style="font-size: 15px; color: rgb(89, 89, 89);"
 																											>
 																												<span data-custom-class="body_text">
-																													<bdt class="block-component" />
+																													<bdt class="block-component"></bdt>
 																												</span>
 																											</span>
 																										</span>
@@ -1842,8 +1850,8 @@
 																										<span style="font-size: 15px;">
 																											<span data-custom-class="body_text"
 																												>We
-																												<bdt class="block-component" />may need to
-																												share your personal information in the
+																												<bdt class="block-component"></bdt>may need
+																												to share your personal information in the
 																												following situations:</span
 																											>
 																										</span>
@@ -1865,45 +1873,46 @@
 																									<div style="line-height: 1.5;">
 																										<span style="font-size: 15px;">
 																											<span data-custom-class="body_text">
-																												<bdt class="block-component" />
+																												<bdt class="block-component"></bdt>
 																											</span>
 																										</span>
 																										<div style="line-height: 1.5;">
 																											<span style="font-size: 15px;">
 																												<bdt class="block-component">
-																													<span data-custom-class="body_text" />
+																													<span data-custom-class="body_text"
+																													></span>
 																												</bdt>
 																											</span>
 																											<div style="line-height: 1.5;">
 																												<bdt class="block-component">
 																													<span style="font-size: 15px;">
-																														<span data-custom-class="body_text" />
+																														<span data-custom-class="body_text"
+																														></span>
 																													</span>
 																												</bdt>
 																												<div style="line-height: 1.5;">
 																													<bdt class="block-component">
 																														<span style="font-size: 15px;">
-																															<span data-custom-class="body_text" />
+																															<span data-custom-class="body_text"
+																															></span>
 																														</span>
 																													</bdt>
 																													<div style="line-height: 1.5;">
 																														<bdt class="block-component">
 																															<span style="font-size: 15px;">
-																																<span
-																																	data-custom-class="body_text"
-																																/>
+																																<span data-custom-class="body_text"
+																																></span>
 																															</span>
 																														</bdt>
 																														<span data-custom-class="body_text">
 																															<span style="font-size: 15px;">
-																																<bdt class="block-component" />
+																																<bdt class="block-component"></bdt>
 																															</span>
 																														</span>
 																														<bdt class="statement-end-if-in-editor">
 																															<span style="font-size: 15px;">
-																																<span
-																																	data-custom-class="body_text"
-																																/>
+																																<span data-custom-class="body_text"
+																																></span>
 																															</span>
 																														</bdt>
 																														<div style="line-height: 1.5;">
@@ -1911,7 +1920,7 @@
 																																<span style="font-size: 15px;">
 																																	<span
 																																		data-custom-class="body_text"
-																																	/>
+																																	></span>
 																																</span>
 																															</bdt>
 																															<span
@@ -1930,7 +1939,7 @@
 																																				>
 																																					<span
 																																						data-custom-class="heading_1"
-																																					/>
+																																					></span>
 																																				</bdt>
 																																			</span>
 																																		</span>
@@ -1964,7 +1973,7 @@
 																																							>
 																																								<bdt
 																																									class="block-component"
-																																								/>
+																																								></bdt>
 																																							</span>
 																																						</span>
 																																					</span>
@@ -2077,7 +2086,7 @@
 																																				>
 																																					<bdt
 																																						class="block-component"
-																																					/>
+																																					></bdt>
 																																				</span>
 																																			</span>
 																																		</span>
@@ -2143,7 +2152,7 @@
 																																										>
 																																											<bdt
 																																												class="statement-end-if-in-editor"
-																																											/>
+																																											></bdt>
 																																										</span>
 																																										<bdt
 																																											class="block-component"
@@ -2153,7 +2162,7 @@
 																																											>
 																																												<bdt
 																																													class="block-component"
-																																												/>
+																																												></bdt>
 																																											</span>
 																																										</bdt>
 																																									</span>
@@ -2223,11 +2232,10 @@
 																																		<em
 																																			>We keep your information for
 																																			as long as necessary to
-																																			<bdt
-																																				class="block-component"
-																																			/>fulfill<bdt
+																																			<bdt class="block-component"
+																																			></bdt>fulfill<bdt
 																																				class="statement-end-if-in-editor"
-																																			/>
+																																			></bdt>
 																																			the purposes outlined in this privacy
 																																			notice unless otherwise required
 																																			by law.</em
@@ -2257,7 +2265,7 @@
 																																		(such as tax, accounting, or
 																																		other legal requirements).<bdt
 																																			class="block-component"
-																																		/>
+																																		></bdt>
 																																		No purpose in this notice will require
 																																		us keeping your personal information
 																																		for longer than
@@ -2270,16 +2278,15 @@
 																																				>
 																																					<bdt
 																																						class="block-component"
-																																					/>
+																																					></bdt>
 																																				</span>
 																																			</span>
 																																		</span>
-																																		<bdt
-																																			class="block-component"
-																																		/>the period of time in which
-																																		users have an account with us<bdt
-																																			class="block-component"
-																																		/>
+																																		<bdt class="block-component"
+																																		></bdt>the period of time in
+																																		which users have an account with
+																																		us<bdt class="block-component"
+																																		></bdt>
 																																		<span style="font-size: 15px;">
 																																			<span
 																																				style="color: rgb(89, 89, 89);"
@@ -2287,7 +2294,8 @@
 																																				<span
 																																					data-custom-class="body_text"
 																																				>
-																																					<bdt class="else-block" />
+																																					<bdt class="else-block"
+																																					></bdt>
 																																				</span>
 																																			</span>
 																																		</span>.</span
@@ -2312,11 +2320,10 @@
 																																		process your personal
 																																		information, we will either
 																																		delete or
-																																		<bdt
-																																			class="block-component"
-																																		/>anonymize<bdt
+																																		<bdt class="block-component"
+																																		></bdt>anonymize<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		such information, or, if this is not
 																																		possible (for example, because your
 																																		personal information has been stored
@@ -2326,9 +2333,8 @@
 																																		until deletion is possible.<span
 																																			style="color: rgb(89, 89, 89);"
 																																		>
-																																			<bdt
-																																				class="block-component"
-																																			/>
+																																			<bdt class="block-component"
+																																			></bdt>
 																																		</span>
 																																	</span>
 																																</span>
@@ -2390,11 +2396,10 @@
 																																			>We aim to protect your
 																																			personal information through a
 																																			system of
-																																			<bdt
-																																				class="block-component"
-																																			/>organizational<bdt
+																																			<bdt class="block-component"
+																																			></bdt>organizational<bdt
 																																				class="statement-end-if-in-editor"
-																																			/>
+																																			></bdt>
 																																			and technical security measures.</em
 																																		>
 																																	</span>
@@ -2415,11 +2420,10 @@
 																																		data-custom-class="body_text"
 																																		>We have implemented appropriate
 																																		and reasonable technical and
-																																		<bdt
-																																			class="block-component"
-																																		/>organizational<bdt
+																																		<bdt class="block-component"
+																																		></bdt>organizational<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		security measures designed to protect
 																																		the security of any personal information
 																																		we process. However, despite our safeguards
@@ -2429,11 +2433,10 @@
 																																		can be guaranteed to be 100% secure,
 																																		so we cannot promise or guarantee
 																																		that hackers, cybercriminals, or other
-																																		<bdt
-																																			class="block-component"
-																																		/>unauthorized<bdt
+																																		<bdt class="block-component"
+																																		></bdt>unauthorized<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		third parties will not be able to
 																																		defeat our security and improperly
 																																		collect, access, steal, or modify
@@ -2448,7 +2451,7 @@
 																																		>
 																																			<bdt
 																																				class="statement-end-if-in-editor"
-																																			/>
+																																			></bdt>
 																																		</span>
 																																		<span
 																																			style="color: rgb(89, 89, 89); font-size: 15px;"
@@ -2456,9 +2459,8 @@
 																																			<span
 																																				data-custom-class="body_text"
 																																			>
-																																				<bdt
-																																					class="block-component"
-																																				/>
+																																				<bdt class="block-component"
+																																				></bdt>
 																																			</span>
 																																		</span>
 																																	</span>
@@ -2520,14 +2522,13 @@
 																																		<em>
 																																			We do not knowingly collect
 																																			data from or market to
-																																			<bdt
-																																				class="block-component"
-																																			/>children under 18 years of
-																																			age<bdt
-																																				class="else-block"
-																																			/>.</em
+																																			<bdt class="block-component"
+																																			></bdt>children under 18 years
+																																			of age<bdt class="else-block"
+																																			></bdt>.</em
 																																		>
-																																		<bdt class="block-component" />
+																																		<bdt class="block-component"
+																																		></bdt>
 																																	</span>
 																																</span>
 																															</span>
@@ -2569,20 +2570,20 @@
 																																			<span
 																																				data-custom-class="body_text"
 																																			>
-																																				<bdt
-																																					class="block-component"
-																																				/>
+																																				<bdt class="block-component"
+																																				></bdt>
 																																				<bdt class="question"
 																																					>elijahstormai@gmail.com</bdt
 																																				>
-																																				<bdt class="else-block" />
+																																				<bdt class="else-block"
+																																				></bdt>
 																																			</span>
 																																		</span>.</span
 																																	>
 																																	<span
 																																		data-custom-class="body_text"
 																																	>
-																																		<bdt class="else-block" />
+																																		<bdt class="else-block"></bdt>
 																																	</span>
 																																</span>
 																															</span>
@@ -2652,19 +2653,18 @@
 																																						<em>
 																																							<bdt
 																																								class="block-component"
-																																							/>
+																																							></bdt>
 																																						</em>
 																																					</span>
 																																				</span>
 																																			</span>In some regions, such
 																																			as
-																																			<bdt
-																																				class="block-component"
-																																			/>Canada<bdt
+																																			<bdt class="block-component"
+																																			></bdt>Canada<bdt
 																																				class="statement-end-if-in-editor"
-																																			/>, you have rights that allow
-																																			you greater access to and
-																																			control over your personal
+																																			></bdt>, you have rights that
+																																			allow you greater access to
+																																			and control over your personal
 																																			information.<span
 																																				style="color: rgb(89, 89, 89);"
 																																			>
@@ -2677,7 +2677,7 @@
 																																						<em>
 																																							<bdt
 																																								class="statement-end-if-in-editor"
-																																							/>
+																																							></bdt>
 																																						</em>
 																																					</span>
 																																				</span>
@@ -2691,9 +2691,8 @@
 																																			<span
 																																				style="font-size: 15px;"
 																																			>
-																																				<bdt
-																																					class="block-component"
-																																				/>
+																																				<bdt class="block-component"
+																																				></bdt>
 																																			</span>
 																																		</span>
 																																	</span>
@@ -2713,33 +2712,32 @@
 																																	<span
 																																		data-custom-class="body_text"
 																																		>In some regions (like
-																																		<bdt
-																																			class="block-component"
-																																		/>Canada<bdt
+																																		<bdt class="block-component"
+																																		></bdt>Canada<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>), you have certain rights
-																																		under applicable data protection
-																																		laws. These may include the
-																																		right (i) to request access and
-																																		obtain a copy of your personal
-																																		information, (ii) to request
-																																		rectification or erasure; (iii)
-																																		to restrict the processing of
-																																		your personal information; and
-																																		(iv) if applicable, to data
-																																		portability. In certain
-																																		circumstances, you may also have
-																																		the right to object to the
+																																		></bdt>), you have certain
+																																		rights under applicable data
+																																		protection laws. These may
+																																		include the right (i) to request
+																																		access and obtain a copy of your
+																																		personal information, (ii) to
+																																		request rectification or
+																																		erasure; (iii) to restrict the
 																																		processing of your personal
-																																		information. You can make such a
-																																		request by contacting us by
-																																		using the contact details
-																																		provided in the section
-																																		<bdt
-																																			class="block-component"
-																																		/>"<bdt
+																																		information; and (iv) if
+																																		applicable, to data portability.
+																																		In certain circumstances, you
+																																		may also have the right to
+																																		object to the processing of your
+																																		personal information. You can
+																																		make such a request by
+																																		contacting us by using the
+																																		contact details provided in the
+																																		section
+																																		<bdt class="block-component"
+																																		></bdt>"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																	</span>
 																																</span>
 																															</span>
@@ -2770,11 +2768,10 @@
 																																	<span
 																																		data-custom-class="body_text"
 																																	>
-																																		<bdt
-																																			class="block-component"
-																																		/>"<bdt
+																																		<bdt class="block-component"
+																																		></bdt>"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		below.</span
 																																	>
 																																</span>
@@ -2814,7 +2811,7 @@
 																																						>
 																																							<bdt
 																																								class="statement-end-if-in-editor"
-																																							/>
+																																							></bdt>
 																																						</span>
 																																					</span>
 																																				</span>
@@ -2827,7 +2824,7 @@
 																														<div style="line-height: 1.5;">
 																															<span
 																																style="font-size: 15px; color: rgb(89, 89, 89);"
-																															/>
+																															></span>
 																														</div>
 																														<div style="line-height: 1.5;">
 																															<span
@@ -2952,22 +2949,21 @@
 																																		If we are relying on your consent
 																																		to process your personal information,<bdt
 																																			class="block-component"
-																																		/>
+																																		></bdt>
 																																		which may be express and/or implied
 																																		consent depending on the applicable
 																																		law,<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		you have the right to withdraw your
 																																		consent at any time. You can withdraw
 																																		your consent at any time by contacting
 																																		us by using the contact details provided
 																																		in the section
-																																		<bdt
-																																			class="block-component"
-																																		/>"<bdt
+																																		<bdt class="block-component"
+																																		></bdt>"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																	</span>
 																																</span>
 																															</span>
@@ -2998,14 +2994,13 @@
 																																	<span
 																																		data-custom-class="body_text"
 																																	>
-																																		<bdt
-																																			class="block-component"
-																																		/>"<bdt
+																																		<bdt class="block-component"
+																																		></bdt>"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		below<bdt
 																																			class="block-component"
-																																		/>.</span
+																																		></bdt>.</span
 																																	>
 																																</span>
 																															</span>
@@ -3021,23 +3016,23 @@
 																																	the processing before its
 																																	withdrawal nor,<bdt
 																																		class="block-component"
-																																	/>
+																																	></bdt>
 																																	when applicable law allows,<bdt
 																																		class="statement-end-if-in-editor"
-																																	/>
+																																	></bdt>
 																																	will it affect the processing of your
 																																	personal information conducted in reliance
 																																	on lawful processing grounds other than
 																																	consent.<bdt
 																																		class="block-component"
-																																	/>
+																																	></bdt>
 																																</span>
 																															</span>
 																															<bdt class="block-component">
 																																<span style="font-size: 15px;">
 																																	<span
 																																		data-custom-class="body_text"
-																																	/>
+																																	></span>
 																																</span>
 																															</bdt>
 																														</div>
@@ -3064,7 +3059,7 @@
 																																	in your account or terminate your
 																																	account, you can:<bdt
 																																		class="forloop-component"
-																																	/>
+																																	></bdt>
 																																</span>
 																															</span>
 																														</div>
@@ -3084,7 +3079,8 @@
 																														<div style="line-height: 1.5;">
 																															<span data-custom-class="body_text">
 																																<span style="font-size: 15px;">
-																																	<bdt class="forloop-component" />
+																																	<bdt class="forloop-component"
+																																	></bdt>
 																																</span>
 																															</span>
 																														</div>
@@ -3103,7 +3099,8 @@
 																														<div style="line-height: 1.5;">
 																															<span data-custom-class="body_text">
 																																<span style="font-size: 15px;">
-																																	<bdt class="forloop-component" />
+																																	<bdt class="forloop-component"
+																																	></bdt>
 																																</span>
 																															</span>
 																														</div>
@@ -3129,7 +3126,7 @@
 																																<span style="font-size: 15px;">
 																																	<span
 																																		data-custom-class="body_text"
-																																	/>
+																																	></span>
 																																</span>
 																															</bdt>
 																															<span
@@ -3162,7 +3159,7 @@
 																																								>
 																																									<bdt
 																																										class="block-component"
-																																									/>
+																																									></bdt>
 																																								</span>
 																																							</span>
 																																						</span>
@@ -3177,7 +3174,7 @@
 																																<span style="font-size: 15px;">
 																																	<span
 																																		data-custom-class="body_text"
-																																	/>
+																																	></span>
 																																</span>
 																															</bdt>
 																														</div>
@@ -3201,7 +3198,7 @@
 																																<span style="font-size: 15px;">
 																																	<span
 																																		data-custom-class="body_text"
-																																	/>
+																																	></span>
 																																</span>
 																															</bdt>
 																														</div>
@@ -3255,31 +3252,29 @@
 																																		mobile applications include a
 																																		Do-Not-Track (<bdt
 																																			class="block-component"
-																																		/>"DNT"<bdt
+																																		></bdt>"DNT"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>) feature or setting you can
-																																		activate to signal your privacy
-																																		preference not to have data
-																																		about your online browsing
+																																		></bdt>) feature or setting you
+																																		can activate to signal your
+																																		privacy preference not to have
+																																		data about your online browsing
 																																		activities monitored and
 																																		collected. At this stage no
 																																		uniform technology standard for
-																																		<bdt
-																																			class="block-component"
-																																		/>recognizing<bdt
+																																		<bdt class="block-component"
+																																		></bdt>recognizing<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		and implementing DNT signals has been
-																																		<bdt
-																																			class="block-component"
-																																		/>finalized<bdt
+																																		<bdt class="block-component"
+																																		></bdt>finalized<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>. As such, we do not currently
-																																		respond to DNT browser signals
-																																		or any other mechanism that
-																																		automatically communicates your
-																																		choice not to be tracked online.
-																																		If a standard for online
+																																		></bdt>. As such, we do not
+																																		currently respond to DNT browser
+																																		signals or any other mechanism
+																																		that automatically communicates
+																																		your choice not to be tracked
+																																		online. If a standard for online
 																																		tracking is adopted that we must
 																																		follow in the future, we will
 																																		inform you about that practice
@@ -3367,11 +3362,10 @@
 																																		data-custom-class="body_text"
 																																		>California Civil Code Section
 																																		1798.83, also known as the
-																																		<bdt
-																																			class="block-component"
-																																		/>"Shine The Light"<bdt
+																																		<bdt class="block-component"
+																																		></bdt>"Shine The Light"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		law, permits our users who are California
 																																		residents to request and obtain from
 																																		us, once a year and free of charge,
@@ -3424,25 +3418,25 @@
 																																		removed from all our systems
 																																		(e.g.<bdt
 																																			class="block-component"
-																																		/>,<bdt
+																																		></bdt>,<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		backups, etc.).<span
 																																			style="color: rgb(89, 89, 89); font-size: 15px;"
 																																		>
 																																			<span
 																																				data-custom-class="body_text"
 																																			>
-																																				<bdt
-																																					class="block-component"
-																																				/>
+																																				<bdt class="block-component"
+																																				></bdt>
 																																			</span>
 																																		</span>
 																																	</span>
 																																</span>
 																															</span>
 																															<bdt class="block-component">
-																																<span style="font-size: 15px;" />
+																																<span style="font-size: 15px;"
+																																></span>
 																															</bdt>
 																														</div>
 																														<div style="line-height: 1.5;">
@@ -3522,11 +3516,10 @@
 																																		notice from time to time. The
 																																		updated version will be
 																																		indicated by an updated
-																																		<bdt
-																																			class="block-component"
-																																		/>"Revised"<bdt
+																																		<bdt class="block-component"
+																																		></bdt>"Revised"<bdt
 																																			class="statement-end-if-in-editor"
-																																		/>
+																																		></bdt>
 																																		date and the updated version will
 																																		be effective as soon as it is accessible.
 																																		If we make material changes to this
@@ -3598,15 +3591,14 @@
 																																			<span
 																																				data-custom-class="body_text"
 																																			>
-																																				<bdt
-																																					class="block-component"
-																																				/>email us at
+																																				<bdt class="block-component"
+																																				></bdt>email us at
 																																				<bdt class="question"
 																																					>elijahstormai@gmail.com.</bdt
 																																				>
 																																				<bdt
 																																					class="statement-end-if-in-editor"
-																																				/>
+																																				></bdt>
 																																			</span>
 																																		</span>
 																																	</span>
@@ -3664,19 +3656,19 @@
 																																	<span
 																																		data-custom-class="body_text"
 																																	>
-																																		<bdt
-																																			class="block-component"
-																																		/>Based on the applicable laws
-																																		of your country, you may have
-																																		the right to request access to
-																																		the personal information we
+																																		<bdt class="block-component"
+																																		></bdt>Based on the applicable
+																																		laws of your country, you may
+																																		have the right to request access
+																																		to the personal information we
 																																		collect from you, change that
 																																		information, or delete it.
-																																		<bdt class="else-block" />To
+																																		<bdt class="else-block"></bdt>To
 																																		request to review, update, or
 																																		delete your personal
 																																		information, please
-																																		<bdt class="block-component" />
+																																		<bdt class="block-component"
+																																		></bdt>
 																																	</span>
 																																	<span
 																																		data-custom-class="body_text"
@@ -3690,7 +3682,7 @@
 																																				>https://thunderlite.vercel.app/data-request</a
 																																			>
 																																		</bdt>
-																																		<bdt class="else-block" />
+																																		<bdt class="else-block"></bdt>
 																																	</span>
 																																</span>
 																																<span data-custom-class="body_text"

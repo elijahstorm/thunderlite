@@ -25,7 +25,7 @@
 			aria-label="Close navigation side bar"
 			role="button"
 			tabindex="0"
-		/>
+		></div>
 
 		<section class="flex gap-4 py-4">
 			<aside
@@ -211,7 +211,7 @@
 				<div
 					class="p-4 pt-0 divide-y space-y-6 font-light rounded-md border border-gray-200 dark:border-gray-700"
 				>
-					<slot />
+					<slot></slot>
 				</div>
 			</div>
 		</section>

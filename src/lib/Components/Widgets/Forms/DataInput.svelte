@@ -60,11 +60,11 @@
 		{placeholder}
 		bind:value
 		on:change={(e) => dispatch('change', e)}
-	/>
+	></textarea>
 {:else}
 	<div class="relative my-4 mx-0">
 		{#if icon}
-			<div class="input-icon absolute -mt-2 w-6 h-6 left-3 bottom-4" style={iconHref} />
+			<div class="input-icon absolute -mt-2 w-6 h-6 left-3 bottom-4" style={iconHref}></div>
 		{/if}
 
 		<input

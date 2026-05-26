@@ -15,7 +15,18 @@
 	const notifications = () => addToast('not implemented', 'warn')
 </script>
 
-<div type="button" on:click={() => dispatch('toggle')}>
+<div
+	role="button"
+	tabindex="0"
+	aria-label="Toggle chat header"
+	on:click={() => dispatch('toggle')}
+	on:keydown={(e) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault()
+			dispatch('toggle')
+		}
+	}}
+>
 	<header
 		class="flex px-4 sm:items-center justify-between pb-3 border-b border-gray-200"
 		class:pt-6={!highlight}
@@ -27,6 +38,7 @@
 		<div class="flex items-center space-x-2">
 			<button
 				type="button"
+				aria-label="Search messages"
 				class="inline-flex items-center justify-center rounded-lg border h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 				on:click|stopPropagation={search}
 			>
@@ -48,6 +60,7 @@
 			</button>
 			<button
 				type="button"
+				aria-label="Favorite"
 				class="inline-flex items-center justify-center rounded-lg border h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 				on:click|stopPropagation={favorite}
 			>
@@ -69,6 +82,7 @@
 			</button>
 			<button
 				type="button"
+				aria-label="Notifications"
 				class="inline-flex items-center justify-center rounded-lg border h-10 w-10 transition duration-500 ease-in-out text-gray-500 hover:bg-gray-300 focus:outline-none"
 				on:click|stopPropagation={notifications}
 			>

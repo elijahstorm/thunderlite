@@ -7,7 +7,7 @@
 		<card
 			class="max-w-md min-w-[24rem] flex flex-col justify-center items-center self-center m-0 px-6 py-10 gap-6 rounded-2xl border border-brand-400 bg-[#ffffffee] transition-all"
 		>
-			<slot />
+			<slot></slot>
 		</card>
 	</div>
 </HalfPageInfoAndGraphic>

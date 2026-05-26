@@ -1,18 +1,11 @@
-FROM node:24-slim AS base
+FROM node:24-slim
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /app
 
-FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-FROM deps AS build
-COPY . .
-RUN pnpm run build
-
-FROM base
-COPY --from=build /app /app
-EXPOSE 4173
-CMD ["pnpm", "preview"]
+EXPOSE 5173
+CMD ["pnpm", "dev"]

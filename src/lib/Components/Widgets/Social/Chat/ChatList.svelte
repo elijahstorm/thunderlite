@@ -169,9 +169,17 @@
 			</div>
 		{:then me}
 			<div
-				type="button"
+				role="button"
+				tabindex="0"
+				aria-label="Toggle chat"
 				class="flex justify-between items-center mb-3 w-full"
 				on:click|stopPropagation={() => dispatch('toggle')}
+				on:keydown|stopPropagation={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault()
+						dispatch('toggle')
+					}
+				}}
 			>
 				{#if me}
 					<UserImageAndName user={me} text noClick />
@@ -204,7 +212,8 @@
 			<button
 				class="fixed inset-0 cursor-default"
 				on:click|stopPropagation={() => (settingsOpen = false)}
-			/>
+				aria-label="Close settings menu"
+			></button>
 			<!-- Dropdown menu -->
 			<div
 				class="absolute top-14 right-4 z-10 bg-gray-50 divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600"

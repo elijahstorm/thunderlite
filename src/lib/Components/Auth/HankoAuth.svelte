@@ -5,4 +5,4 @@
 	onMount(mountAuth)
 </script>
 
-<hanko-auth on:onAuthFlowCompleted={redirectAfterLogin} />
+<hanko-auth on:onAuthFlowCompleted={redirectAfterLogin}></hanko-auth>

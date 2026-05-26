@@ -15,4 +15,4 @@
 	} as WebSocket
 </script>
 
-<slot {socket} {requestRedraw} />
+<slot {socket} {requestRedraw}></slot>

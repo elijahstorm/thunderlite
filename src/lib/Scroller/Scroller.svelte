@@ -127,5 +127,5 @@
 	)(handleHover)}
 	class="h-full outline-none"
 >
-	<canvas bind:this={content} />
+	<canvas bind:this={content}></canvas>
 </section>

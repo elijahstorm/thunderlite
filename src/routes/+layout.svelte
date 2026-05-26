@@ -28,6 +28,6 @@
 	<link href={googleFonts} rel="stylesheet" />
 </svelte:head>
 
-<slot />
+<slot></slot>
 
 <Toasts />

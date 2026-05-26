@@ -59,4 +59,4 @@
 	})
 </script>
 
-<slot {interfacer} {select} {validTile} {renderData} />
+<slot {interfacer} {select} {validTile} {renderData}></slot>

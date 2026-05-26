@@ -7,6 +7,6 @@
 	<Header />
 
 	<div class="md:container w-full break break-word">
-		<slot />
+		<slot></slot>
 	</div>
 </ContentWithFooter>

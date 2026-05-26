@@ -127,6 +127,6 @@
 			</div>
 		</div>
 
-		<slot name="bottom" />
+		<slot name="bottom"></slot>
 	{/if}
 </section>

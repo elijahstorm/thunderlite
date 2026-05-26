@@ -17,5 +17,5 @@
 	{disabled}
 	{style}
 >
-	<slot />
+	<slot></slot>
 </button>
