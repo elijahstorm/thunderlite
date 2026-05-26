@@ -29,19 +29,13 @@ export const getMapHash = async (sql: postgres.Sql, sha: string) => {
 }
 
 export const isValidMapHash = async (sql: postgres.Sql, sha: string) => {
-	let exists = false
-
 	try {
-		const results = await sql`select count(url) from maps where sha = ${sha}`
-		exists = results?.length > 0
+		const results = await sql<{ count: number | bigint }[]>`
+			select count(url) from maps where sha = ${sha}
+		`
+		return Number(results[0]?.count ?? 0) > 0
 	} catch (msg) {
 		logToErrorDb(sql)(msg)
 		throw error(500, 'Could not perform count check on database')
 	}
-
-	if (!exists) {
-		throw error(400, { message: 'No map with that SHA found.' })
-	}
-
-	return true
 }

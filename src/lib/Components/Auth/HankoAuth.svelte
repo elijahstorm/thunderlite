@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import { mountAuth, redirectAfterLogin } from './hanko'
+	import { hanko, mountAuth, redirectAfterLogin } from './hanko'
 
-	onMount(mountAuth)
+	onMount(() => {
+		mountAuth()
+		return hanko.onAfterStateChange((detail) => {
+			if (detail.state?.name === 'success') redirectAfterLogin()
+		})
+	})
 </script>
 
-<hanko-auth on:onAuthFlowCompleted={redirectAfterLogin}></hanko-auth>
+<hanko-auth></hanko-auth>

@@ -33,7 +33,7 @@ export const paint =
 		const tile = row * map.cols + col
 		const fog = getVisibility()
 		const tileVisible = !fog || fog.visible.has(tile)
-		const unitAtTile = map.layers.units[tile]
+		const unitAtTile = map.layers.units[tile] ?? null
 		const hideEnemyUnit =
 			!tileVisible && unitAtTile !== null && fog !== null && unitAtTile.team !== fog.team
 
@@ -42,11 +42,12 @@ export const paint =
 
 		render.always(map.layers.ground[tile], renderData.ground)
 		render.highlights(map.highlights[tile])
+		const buildingAtTile = map.layers.buildings[tile] ?? null
 		const hideEnemyBuildingCapture =
 			!tileVisible &&
 			fog !== null &&
-			map.layers.buildings[tile] !== null &&
-			(map.layers.buildings[tile] as BuildingObject).team !== fog.team
+			buildingAtTile !== null &&
+			buildingAtTile.team !== fog.team
 		render.conditionally(map.layers.buildings[tile], renderData.building)
 		if (!hideEnemyBuildingCapture) {
 			render.captureProgress(map.layers.buildings[tile])

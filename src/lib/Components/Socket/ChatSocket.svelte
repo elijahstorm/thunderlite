@@ -29,6 +29,7 @@
 
 	const create = () => {
 		if (!browser) return null
+		if (!PUBLIC_SOCKET_CONNECTION) return null
 		const socket = new WebSocket(PUBLIC_SOCKET_CONNECTION)
 		socket.onopen = socketOpened(socket, () => (opened = true))
 		socket.onclose = socketClosed(() => (opened = false))
@@ -52,6 +53,10 @@
 			$connectionTimeout = null
 			return
 		}
+		if (!PUBLIC_SOCKET_CONNECTION) {
+			$connectionTimeout = null
+			return
+		}
 		if (!$socket || (typeof opened !== 'undefined' && !opened)) {
 			socket.set(create())
 		}
@@ -59,6 +64,7 @@
 	}
 
 	onMount(() => {
+		if (!PUBLIC_SOCKET_CONNECTION) return
 		if (!$connectionTimeout) {
 			$connectionTimeout = setTimeout(connect, TIMEOUT)
 		}
@@ -87,7 +93,7 @@
 {:else}
 	<slot {populate} {socketMessages}></slot>
 
-	{#if !opened}
+	{#if !opened && PUBLIC_SOCKET_CONNECTION}
 		<div class="fixed bottom-0 group" in:fly={{ y: -20 }} out:fly={{ y: -20 }}>
 			<div
 				class="relative flex items-end truncate text-clip text-white text-sm font-bold px-4 py-3 transition-all delay-300 duration-700 ease-out overflow-clip w-10 group-hover:w-full"

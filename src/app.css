@@ -207,6 +207,46 @@
 	--container-4xs: 8rem;
 	--container-16xs: 4rem;
 
+	/* Brand palette — restored from the pre-v4 tailwind.config.js */
+	--color-brand-50: #c5e6fc;
+	--color-brand-100: #9ed5fa;
+	--color-brand-200: #77c4f8;
+	--color-brand-300: #3dfbfa;
+	--color-brand-400: #169bf3;
+	--color-brand-500: #0a78c2;
+	--color-brand-600: #096cae;
+	--color-brand-700: #075488;
+	--color-brand-800: #042f4b;
+	--color-brand-900: #021827;
+
+	/* Named primary palette — restored from the pre-v4 tailwind.config.js.
+	   Coexists with the semantic --color-primary token above. */
+	--color-primary-dark-blue: hsl(233, 26%, 24%);
+	--color-primary-lime-green: #59e5c3;
+	--color-primary-purple: #6b19cd;
+	--color-primary-light-purple: #3f7aff;
+	--color-primary-baby-blue: #22bbff;
+	--color-primary-light-blue: #59c2e5;
+	--color-primary-bright-cyan: hsl(192, 70%, 51%);
+
+	/* Numeric primary palette — referenced by Flowbite-style classes
+	   (e.g. bg-primary-700, focus:ring-primary-500). Mirrors brand. */
+	--color-primary-50: #c5e6fc;
+	--color-primary-100: #9ed5fa;
+	--color-primary-200: #77c4f8;
+	--color-primary-300: #3dfbfa;
+	--color-primary-400: #169bf3;
+	--color-primary-500: #0a78c2;
+	--color-primary-600: #096cae;
+	--color-primary-700: #075488;
+	--color-primary-800: #042f4b;
+	--color-primary-900: #021827;
+
+	/* Neutral named palette — restored from the pre-v4 tailwind.config.js */
+	--color-neutral-grayish-blue: hsl(233, 8%, 62%);
+	--color-neutral-light-grayish-blue: hsl(220, 16%, 96%);
+	--color-neutral-very-light-gray: hsl(0, 0%, 98%);
+
 	@keyframes accordion-down {
 		from {
 			height: 0;
@@ -224,6 +264,25 @@
 			height: 0;
 		}
 	}
+}
+
+@layer components {
+	.btn {
+		@apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed;
+	}
+	.btn-primary {
+		@apply bg-primary text-primary-foreground hover:opacity-90 focus:ring-ring;
+	}
+	.btn-secondary {
+		@apply bg-secondary text-secondary-foreground hover:opacity-90 focus:ring-ring;
+	}
+	.btn-gray {
+		@apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-400 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+	}
+}
+
+@utility button-brightness {
+	filter: brightness(1.15);
 }
 
 @layer utilities {

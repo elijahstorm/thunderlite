@@ -1,10 +1,15 @@
-<div class="relative overflow-hidden">
-	<div class="hidden lg:block w-full h-full absolute">
-		<div
-			class="bg-image-mockups absolute w-full h-full bg-no-repeat bg-auto bg-right-top -right-72 xl:-right-28"
-		></div>
-	</div>
+<script lang="ts">
+	import { browser } from '$app/environment'
+	import { writable, type Readable } from 'svelte/store'
 
+	let loggedIn: Readable<boolean> = writable(false)
+
+	if (browser) {
+		import('$lib/Components/Auth/hanko').then((m) => (loggedIn = m.loggedIn))
+	}
+</script>
+
+<div class="relative overflow-hidden">
 	<section class="relative">
 		<div
 			class="absolute w-full h-full bg-no-repeat bg-top -top-12 lg:left-32"
@@ -16,8 +21,8 @@
 					class="h-1/2 flex flex-col justify-center items-center text-center lg:items-start lg:text-left"
 				>
 					<a
-						class="bg-primary-lime-green text-3xl px-12 py-4 rounded-full text-white bg-gradient-to-r from-primary-lime-green to-primary-bright-cyan hover:button-brightness mb-7 transition focus:outline-none focus:ring focus:ring-offset-2 focus:ring-opacity-80 focus:ring-green-400"
-						href="/login"
+						class="bg-primary-lime-green text-3xl px-12 py-4 rounded-full text-white bg-gradient-to-r from-primary-lime-green to-primary-bright-cyan hover:button-brightness mb-7 transition focus:outline-none focus:ring focus:ring-offset-2 focus:ring-green-400/80"
+						href={$loggedIn ? '/play' : '/login'}
 					>
 						Get Started
 					</a>
