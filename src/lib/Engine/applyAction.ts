@@ -110,6 +110,8 @@ const applyAttack = (map: MapObject | MapProcesser, from: number, to: number, fx
 			defenderTile: to,
 		})
 	) {
+		// The defender returns fire — sound its own weapon before resolving the hit.
+		fx('attack', target)
 		attackerDied = reduceHealth(map, target, attacker, from, 'counter', fx)
 	}
 

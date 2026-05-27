@@ -1,4 +1,5 @@
 import { audioEngine, type PlaySingleOptions } from '$lib/Audio/audioEngine'
+import { skyData } from '$lib/GameData/sky'
 
 /**
  * Environmental weather audio — loops the matching ambience on the single-active
@@ -24,6 +25,45 @@ const ENV_TRACK: Record<WeatherId, string> = {
 /** Pure mapping: weather → env track id, or `null` when no weather is active. */
 export function envForWeather(weather: WeatherId | null | undefined): string | null {
 	return weather ? ENV_TRACK[weather] : null
+}
+
+/**
+ * Sky-weather (F3) → env-ambience bridge.
+ *
+ * The in-game weather model is the per-tile *sky* layer (`Cloud` / `Storm`, see
+ * `skyData`), but the audio bank ships only `rain / snow / desert / sunny`
+ * ambiences — there is no dedicated cloud or storm loop. We map the available
+ * sky weather to its nearest audible ambience: any active sky cover reads as
+ * overcast `rain`. Keyed by sky *name* (not numeric index) so re-ordering
+ * `skyData` can't silently break the mapping, and any future sky type falls
+ * back to silence until it's mapped here.
+ */
+const SKY_WEATHER_AUDIO: Record<string, WeatherId> = {
+	Cloud: 'rain',
+	Storm: 'rain',
+}
+
+/**
+ * Derive the env ambience for a map's current sky layer, or `null` when the map
+ * carries no audible sky weather. `Storm` outranks `Cloud` when both are on the
+ * board (it's the more significant condition), though both currently sound the
+ * same.
+ */
+export function weatherForMap(
+	map: Pick<MapObject, 'layers'> | null | undefined
+): WeatherId | null {
+	const sky = map?.layers?.sky
+	if (!sky) return null
+	let found: WeatherId | null = null
+	for (const cell of sky) {
+		if (!cell) continue
+		const name = skyData[cell.type]?.name
+		const weather = name ? SKY_WEATHER_AUDIO[name] : undefined
+		if (!weather) continue
+		if (name === 'Storm') return weather // most significant — short-circuit
+		found = weather
+	}
+	return found
 }
 
 /** Default ducked `env` gain so weather ambience sits under the music bed. */

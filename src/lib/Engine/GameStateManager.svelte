@@ -6,6 +6,7 @@
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
 	import { MusicDirector } from '$lib/Audio/musicDirector'
+	import { weatherAudio, weatherForMap } from '$lib/Audio/weatherAudio'
 	import HUDRoot from './HUD/HUDRoot.svelte'
 	import BuildMenu from './HUD/BuildMenu.svelte'
 	import ActionMenu from './HUD/ActionMenu.svelte'
@@ -29,6 +30,10 @@
 	$: if (map && map !== lastMap) {
 		lastMap = map
 		initGameStateFromMap(map)
+		// F3 weather → env ambience: loop the matching track while sky weather is
+		// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
+		// re-renders and replayed states never restack the loop.
+		weatherAudio.setWeather(weatherForMap(map))
 	}
 
 	const select = (x: number, y: number) => {
@@ -88,6 +93,7 @@
 
 	onDestroy(() => {
 		if (cpuHandle) cpuHandle.cancel()
+		weatherAudio.clear()
 	})
 </script>
 

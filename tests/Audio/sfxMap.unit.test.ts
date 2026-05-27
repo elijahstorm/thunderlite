@@ -4,10 +4,12 @@ import { sfxForAction } from '../../src/lib/Audio/sfxMap'
 import {
 	WeatherAudio,
 	envForWeather,
+	weatherForMap,
 	WEATHER_DUCK,
 	type WeatherId,
 } from '../../src/lib/Audio/weatherAudio'
 import { unitData } from '../../src/lib/GameData/unit'
+import { skyData } from '../../src/lib/GameData/sky'
 
 const typeOf = (name: string): number => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -97,6 +99,36 @@ describe('envForWeather (pure)', () => {
 	it('maps no weather to null', () => {
 		expect(envForWeather(null)).toBeNull()
 		expect(envForWeather(undefined)).toBeNull()
+	})
+})
+
+describe('weatherForMap (sky layer → ambience)', () => {
+	const skyOf = (name: string): number => {
+		const idx = skyData.findIndex((s) => s.name === name)
+		if (idx < 0) throw new Error(`unknown sky: ${name}`)
+		return idx
+	}
+	const mapWithSky = (sky: ({ type: number; state: number } | null)[]) =>
+		({ layers: { sky } }) as unknown as Pick<MapObject, 'layers'>
+
+	it('returns rain when any Cloud tile is on the board', () => {
+		const map = mapWithSky([null, { type: skyOf('Cloud'), state: 0 }, null])
+		expect(weatherForMap(map)).toBe('rain')
+	})
+
+	it('returns rain when any Storm tile is on the board', () => {
+		const map = mapWithSky([{ type: skyOf('Storm'), state: 0 }, null])
+		expect(weatherForMap(map)).toBe('rain')
+	})
+
+	it('returns null for a clear sky', () => {
+		expect(weatherForMap(mapWithSky([null, null]))).toBeNull()
+	})
+
+	it('returns null when the map / sky layer is missing', () => {
+		expect(weatherForMap(null)).toBeNull()
+		expect(weatherForMap(undefined)).toBeNull()
+		expect(weatherForMap({ layers: {} } as unknown as Pick<MapObject, 'layers'>)).toBeNull()
 	})
 })
 
