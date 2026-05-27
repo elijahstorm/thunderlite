@@ -8,8 +8,10 @@
 	export let localTeam = 0
 	/** Restart the same board (hotseat/online). Optional; button hidden when absent. */
 	export let onRematch: (() => void) | undefined = undefined
-	/** Advance to the next campaign level. Wired by K4; until then a no-op stub. */
+	/** Advance to the next campaign level (campaign win). Wired by K4. */
 	export let onContinue: (() => void) | undefined = undefined
+	/** Reload the same campaign level (campaign loss). Wired by K4. */
+	export let onRetry: (() => void) | undefined = undefined
 	/** Where "Exit to rooms" points (online/hotseat). */
 	export let roomsHref = '/rooms'
 	/** Where "Exit to campaign" points (campaign). */
@@ -57,11 +59,10 @@
 
 	$: isCampaign = result?.mode === 'campaign'
 
-	const handleContinue = () => {
-		// TODO(K4): wire to the campaign runner's "advance to next level" action.
-		// Until K4 lands this falls back to the consumer-provided handler or no-op.
-		onContinue?.()
-	}
+	// Campaign win → Continue (auto-advance to the next level, decided by the host
+	// route). Campaign loss/draw → Retry (reload the same level).
+	const handleContinue = () => onContinue?.()
+	const handleRetry = () => onRetry?.()
 </script>
 
 {#if result}
@@ -120,14 +121,25 @@
 
 			<footer class="mt-1 flex justify-center gap-3">
 				{#if isCampaign}
-					<button
-						type="button"
-						class="rounded bg-emerald-500/80 px-4 py-2 text-sm hover:bg-emerald-500"
-						on:click={handleContinue}
-						data-testid="stats-continue"
-					>
-						Continue
-					</button>
+					{#if localWon}
+						<button
+							type="button"
+							class="rounded bg-emerald-500/80 px-4 py-2 text-sm hover:bg-emerald-500"
+							on:click={handleContinue}
+							data-testid="stats-continue"
+						>
+							Continue
+						</button>
+					{:else}
+						<button
+							type="button"
+							class="rounded bg-amber-500/80 px-4 py-2 text-sm hover:bg-amber-500"
+							on:click={handleRetry}
+							data-testid="stats-retry"
+						>
+							Retry
+						</button>
+					{/if}
 					<a
 						href={campaignHref}
 						class="rounded bg-white/10 px-4 py-2 text-sm hover:bg-white/20"

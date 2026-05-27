@@ -1,0 +1,132 @@
+<script lang="ts">
+	import { onDestroy, onMount } from 'svelte'
+	import MapRender from '$lib/Map/MapRender.svelte'
+	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
+	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
+	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
+	import { deriveFromHash } from '$lib/Map/Editor/mapExporter'
+	import { unitData } from '$lib/GameData/unit'
+	import { gameState } from '$lib/Engine/gameState'
+	import { onMatchEnd } from '$lib/Engine/matchEnd'
+	import { createCampaignRunner, type CampaignRunner } from './campaignRunner'
+	import { createCampaignInterface } from './campaignInterface'
+	import { parseCutsceneScript } from './cutsceneScript'
+	import type { CutsceneScript } from './cutsceneTypes'
+	import type { CampaignLevel } from './levels'
+
+	/** The level to host. Re-mounted by the route via `{#key levelId}` per level. */
+	export let level: CampaignLevel
+	/** Campaign win → advance. The route decides next-level vs campaign-complete. */
+	export let onContinue: (() => void) | undefined = undefined
+	/** Campaign loss → reload this same level cleanly. */
+	export let onRetry: (() => void) | undefined = undefined
+
+	// Single-player is always team 0 vs CPU(s). A non-multiplayer game session makes
+	// GameSocket fall back to its LocalInteracter, so the match runs entirely
+	// client-side with no server round-trips.
+	const localTeam = 0
+	const gameSession = 'ephemeral'
+
+	const EMPTY_SCRIPT: CutsceneScript = { start: [], win: [], lose: [], turns: {} }
+
+	/**
+	 * Resolve the level's board. K5 fills in real `mapSha` values; until then a
+	 * stub level (empty `mapSha`) gets a minimal two-team placeholder so the shell
+	 * mounts a genuine match (players, treasury, a CPU opponent) and the
+	 * navigation flow is exercisable end to end.
+	 */
+	const buildMap = (lvl: CampaignLevel): MapObject => {
+		const base = deriveFromHash(lvl.mapSha || undefined)
+		if (lvl.mapSha) return base
+
+		const cols = base.cols
+		const rows = base.rows
+		const unitType = 0
+		const health = unitData[unitType]?.health ?? 10
+		const units: (UnitObject | null)[] = []
+		units[0] = { type: unitType, state: 0, team: 0, health } as UnitObject
+		units[(rows - 1) * cols + (cols - 1)] = {
+			type: unitType,
+			state: 0,
+			team: 1,
+			health,
+		} as UnitObject
+
+		return {
+			...base,
+			layers: {
+				ground: base.layers.ground.map((g) => ({ ...g })),
+				sky: [],
+				units,
+				buildings: [],
+			},
+			highlights: [],
+			route: [],
+		} as MapObject
+	}
+
+	const map: MapObject = buildMap(level)
+
+	// K2 runner: bind the level's parsed script to the engine-backed interface.
+	// Stub levels (no scriptPath) run an empty script — the runner mounts cleanly
+	// and is simply inert until K5 supplies real cutscene content.
+	let runner: CampaignRunner | null = null
+	let offMatchEnd: (() => void) | undefined
+
+	const loadScript = async (): Promise<CutsceneScript> => {
+		if (!level.scriptPath) return EMPTY_SCRIPT
+		try {
+			const res = await fetch(level.scriptPath)
+			if (!res.ok) return EMPTY_SCRIPT
+			return parseCutsceneScript(await res.text())
+		} catch {
+			return EMPTY_SCRIPT
+		}
+	}
+
+	onMount(() => {
+		// Test-only hook: drive the match to a terminal state without playing it
+		// out, so the campaign navigation (Continue/auto-advance and Retry) can be
+		// verified by the Playwright smoke. Local single-player only — there is no
+		// server authority to subvert here.
+		const w = window as unknown as Record<string, unknown>
+		w.__thunderliteCampaign = {
+			win: () => gameState.update((s) => ({ ...s, phase: 'gameOver', winner: localTeam })),
+			lose: () =>
+				gameState.update((s) => ({
+					...s,
+					phase: 'gameOver',
+					winner: localTeam === 0 ? 1 : 0,
+				})),
+		}
+
+		void loadScript().then((script) => {
+			runner = createCampaignRunner(script, createCampaignInterface({ map }))
+			offMatchEnd = onMatchEnd((result) => void runner?.finish(result))
+			void runner.start()
+		})
+
+		return () => {
+			if (w.__thunderliteCampaign) delete w.__thunderliteCampaign
+		}
+	})
+
+	onDestroy(() => offMatchEnd?.())
+</script>
+
+<GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
+	<GameStateManager
+		{map}
+		{gameSession}
+		{localTeam}
+		mode="campaign"
+		campaignLevelId={level.id}
+		{onContinue}
+		{onRetry}
+		interactor={socket ? socketSelect(socket, () => map) : undefined}
+		endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+		let:select
+	>
+		<MapRender {map} {requestRedraw} {select} />
+	</GameStateManager>
+</GameSocket>

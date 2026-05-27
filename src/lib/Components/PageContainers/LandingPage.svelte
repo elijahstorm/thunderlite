@@ -60,10 +60,22 @@
 				</p>
 
 				<div class="flex flex-wrap items-center gap-3 pt-2">
-					<a class="btn btn-primary btn-lg" href={$loggedIn ? '/play' : '/login'}>
-						<Icon icon="lucide:play" width={18} />
+					<!-- Two clearly separate modes. Single Player (campaign) is its own
+						 path → /campaign; multiplayer "Get started" is the live session → /play. -->
+					<a class="btn btn-primary btn-lg" href="/campaign" data-testid="cta-single-player">
+						<Icon icon="lucide:flag" width={18} />
+						Single Player
+					</a>
+					<a
+						class="btn btn-primary btn-lg"
+						href={$loggedIn ? '/play' : '/login'}
+						data-testid="cta-multiplayer"
+					>
+						<Icon icon="lucide:users" width={18} />
 						Get started
 					</a>
+				</div>
+				<div class="flex flex-wrap items-center gap-3">
 					<a class="btn btn-outline btn-lg" href="/make">
 						Browse maps
 						<Icon icon="lucide:arrow-right" width={16} />

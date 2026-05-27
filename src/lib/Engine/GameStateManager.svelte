@@ -2,9 +2,10 @@
 	import { onDestroy, onMount } from 'svelte'
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 	import { gameState, initGameStateFromMap } from './gameState'
-	import { emitMatchEnd, resetMatchEnd, buildMatchResult } from './matchEnd'
+	import { emitMatchEnd, resetMatchEnd, buildMatchResult, type MatchMode } from './matchEnd'
 	import { resetMatchStats, matchStatsList } from './matchStats'
 	import { registerRecordMatch } from '$lib/Database/recordMatch'
+	import { registerCampaignProgress } from '$lib/Campaign/progress'
 	import { endTurn } from './turnLoop'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
@@ -23,8 +24,21 @@
 	export let gameSession: string = ''
 	export let map: MapObject | undefined = undefined
 
+	// K4 — campaign integration. When `mode` is supplied it overrides the
+	// hotseat/online derivation (campaign is single-player, never a socket match);
+	// `campaignLevelId` rides into the match result so K3's unlock subscriber knows
+	// which level was beaten, and the Continue/Retry callbacks wire the stats
+	// screen to the campaign shell's auto-advance / reload flow.
+	export let mode: MatchMode | undefined = undefined
+	export let campaignLevelId: string | undefined = undefined
+	export let onContinue: (() => void) | undefined = undefined
+	export let onRetry: (() => void) | undefined = undefined
+	export let campaignHref: string = '/campaign'
+
 	const isMultiplayer =
 		gameSession !== '' && gameSession !== 'ephemeral' && gameSession !== 'testSession'
+
+	$: resolvedMode = mode ?? (isMultiplayer ? 'online' : 'hotseat')
 
 	let state: 'waiting' | 'animating' | 'overlay' = 'waiting'
 	let active = false
@@ -53,7 +67,8 @@
 			buildMatchResult({
 				state: $gameState,
 				winner: typeof $gameState.winner === 'number' ? $gameState.winner : null,
-				mode: isMultiplayer ? 'online' : 'hotseat',
+				mode: resolvedMode,
+				campaignLevelId,
 				localTeam,
 				isCpuTeam: (team) => !isMultiplayer && team !== localTeam,
 				sessionId: isMultiplayer ? gameSession : undefined,
@@ -120,8 +135,13 @@
 	// the stats screen and (later) campaign unlocks. It owns no game logic; it
 	// only writes results when a match ends.
 	let offRecordMatch: (() => void) | undefined
+	// K3 — campaign unlock is another match-end subscriber, peer to recordMatch. It
+	// is a no-op for non-campaign results (it checks `result.mode`), so registering
+	// it for every match is safe and keeps the wiring in one place.
+	let offCampaignProgress: (() => void) | undefined
 	onMount(() => {
 		offRecordMatch = registerRecordMatch()
+		offCampaignProgress = registerCampaignProgress()
 		musicDirector = new MusicDirector({
 			localTeam,
 			isCpuTeam: () => !isMultiplayer,
@@ -137,6 +157,7 @@
 		if (cpuHandle) cpuHandle.cancel()
 		weatherAudio.clear()
 		offRecordMatch?.()
+		offCampaignProgress?.()
 	})
 </script>
 
@@ -145,4 +166,4 @@
 <HUDRoot {map} onEndTurn={handleEndTurn} />
 <BuildMenu {map} />
 <ActionMenu {map} />
-<StatsScreen {localTeam} onRematch={handleRematch} />
+<StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />
