@@ -1,0 +1,27 @@
+<start>
+move: 12,1
+talk Gannon: "So it ends here, on this miserable coast. Good.", "My Warmachine, my Annihilator, my fleet — everything I have, against everything you are."
+move: 13,10
+talk Gannon: "And my warships will shell you from the water while my armor grinds you flat. There is no answer to this."
+move: 2,7
+talk Torrial: "There's always an answer, Link. Everything we've learned comes down to this — matchups, terrain, range, the economy, the air.", "Take his Warmachine or capture his Command Center and Gannon falls. Mind his ships, hold your line, and finish him."
+talk Link: "This is the last of it, Torrial. For everyone he's taken — we end Gannon today."
+</start>
+
+<turn 3>
+wait: 1
+move: 10,3
+talk Gannon: "Is that all? I have steel without end!"
+add unit: 1,"Scorpion Tank",10,3
+talk Torrial: "Don't let the ships pin you to the shore. Press the Warmachine — break it and this is over."
+</turn>
+
+<win>
+talk Torrial: "It's done. Gannon is finished, and the war with him.", "You walked in a green recruit and you end it a commander, Link. Well fought — all of it."
+talk Link: "We did it together, Torrial. All of us."
+</win>
+
+<lose>
+talk Gannon: "This is the end you chose. The coast is mine, and so is everything beyond it."
+talk Torrial: "Not yet — not while we can still stand. Up, Link. We try again. We do not let him win."
+</lose>

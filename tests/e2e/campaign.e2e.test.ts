@@ -17,9 +17,9 @@ test('campaign auto-advances to the next level on a win', async ({ page }) => {
 	await page.goto('/campaign')
 
 	// First visit: level 1 is launchable; later levels are locked.
-	await expect(page.locator('[data-level-id="k-02-first-blood"][data-testid="level-locked"]')).toBeVisible()
-	await page.click('[data-level-id="k-01-awakening"][data-testid="level-card"]')
-	await expect(page).toHaveURL(/\/campaign\/k-01-awakening/)
+	await expect(page.locator('[data-level-id="02-hold-the-line"][data-testid="level-locked"]')).toBeVisible()
+	await page.click('[data-level-id="01-first-contact"][data-testid="level-card"]')
+	await expect(page).toHaveURL(/\/campaign\/01-first-contact/)
 
 	// Force a win without playing the match out.
 	await page.waitForFunction(
@@ -29,7 +29,9 @@ test('campaign auto-advances to the next level on a win', async ({ page }) => {
 		(window as unknown as { __thunderliteCampaign: { win: () => void } }).__thunderliteCampaign.win()
 	)
 
-	// The stats screen offers Continue; it auto-advances to level 2's host route.
+	// Clear any scripted dialogue, then Continue auto-advances to level 2's route.
+	const skip = page.getByTestId('dialogue-skip')
+	if (await skip.isVisible().catch(() => false)) await skip.click().catch(() => {})
 	await page.click('[data-testid="stats-continue"]')
-	await expect(page).toHaveURL(/\/campaign\/k-02-first-blood/)
+	await expect(page).toHaveURL(/\/campaign\/02-hold-the-line/)
 })

@@ -1,0 +1,24 @@
+<start>
+move: 10,1
+talk Gannon: "Behold my Annihilator. Heaviest armor on the field.", "Throw yourselves at it. I'll enjoy watching."
+move: 1,8
+talk Torrial: "He's not bluffing — light and medium guns barely scratch heavy armor.", "But heavy weapons bite back. Your Heavy Commandos and that Rocket Truck are the answer."
+talk Torrial: "And don't charge in alone. When you attack in range, the enemy counter-attacks. Hit it from range, or gang up so it can only strike one of you."
+talk Link: "So we don't fight it head-on. We surround it."
+</start>
+
+<turn 2>
+move: 10,3
+talk Gannon: "My Scorpion will flank you while the Annihilator grinds you down!"
+add unit: 1,"Scorpion Tank",10,3
+talk Torrial: "Deal with the Annihilator with your heavy guns. Let the Scorpion come to you."
+</turn>
+
+<win>
+talk Torrial: "Even the heaviest armor falls to the right weapon and good positioning.", "Remember that. Gannon won't stop building bigger machines."
+</win>
+
+<lose>
+talk Gannon: "Tin soldiers against a god of war. Predictable."
+talk Torrial: "Heavy guns, Link — and never trade blows you can't win. Again."
+</lose>

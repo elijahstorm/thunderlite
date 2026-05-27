@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte'
+	import { onMount } from 'svelte'
 	import MapRender from '$lib/Map/MapRender.svelte'
 	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
 	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
@@ -7,10 +7,8 @@
 	import { deriveFromHash } from '$lib/Map/Editor/mapExporter'
 	import { unitData } from '$lib/GameData/unit'
 	import { gameState } from '$lib/Engine/gameState'
-	import { onMatchEnd } from '$lib/Engine/matchEnd'
-	import { createCampaignRunner, type CampaignRunner } from './campaignRunner'
-	import { createCampaignInterface } from './campaignInterface'
 	import { parseCutsceneScript } from './cutsceneScript'
+	import { getLevelMap, getLevelScriptText } from './levelContent'
 	import type { CutsceneScript } from './cutsceneTypes'
 	import type { CampaignLevel } from './levels'
 
@@ -27,30 +25,22 @@
 	const localTeam = 0
 	const gameSession = 'ephemeral'
 
-	const EMPTY_SCRIPT: CutsceneScript = { start: [], win: [], lose: [], turns: {} }
-
 	/**
-	 * Resolve the level's board. K5 fills in real `mapSha` values; until then a
-	 * stub level (empty `mapSha`) gets a minimal two-team placeholder so the shell
-	 * mounts a genuine match (players, treasury, a CPU opponent) and the
-	 * navigation flow is exercisable end to end.
+	 * Resolve the level's board. K5 ships each level as `./levels/<id>.json`
+	 * (bundled by `levelContent.ts`). A level without an authored map falls back
+	 * to a minimal two-team placeholder so the shell still mounts a genuine match
+	 * (players, treasury, a CPU opponent) and the navigation flow stays
+	 * exercisable end to end.
 	 */
-	const buildMap = (lvl: CampaignLevel): MapObject => {
-		const base = deriveFromHash(lvl.mapSha || undefined)
-		if (lvl.mapSha) return base
-
+	const stubMap = (): MapObject => {
+		const base = deriveFromHash(undefined)
 		const cols = base.cols
 		const rows = base.rows
 		const unitType = 0
 		const health = unitData[unitType]?.health ?? 10
 		const units: (UnitObject | null)[] = []
 		units[0] = { type: unitType, state: 0, team: 0, health } as UnitObject
-		units[(rows - 1) * cols + (cols - 1)] = {
-			type: unitType,
-			state: 0,
-			team: 1,
-			health,
-		} as UnitObject
+		units[(rows - 1) * cols + (cols - 1)] = { type: unitType, state: 0, team: 1, health } as UnitObject
 
 		return {
 			...base,
@@ -65,24 +55,25 @@
 		} as MapObject
 	}
 
-	const map: MapObject = buildMap(level)
+	const map: MapObject = getLevelMap(level.id) ?? stubMap()
 
-	// K2 runner: bind the level's parsed script to the engine-backed interface.
-	// Stub levels (no scriptPath) run an empty script — the runner mounts cleanly
-	// and is simply inert until K5 supplies real cutscene content.
-	let runner: CampaignRunner | null = null
-	let offMatchEnd: (() => void) | undefined
-
-	const loadScript = async (): Promise<CutsceneScript> => {
-		if (!level.scriptPath) return EMPTY_SCRIPT
+	// K1/K2: parse the level's script up front (bundled content is synchronous) and
+	// hand it to `Game` via `MapRender`. `Game` owns the canonical campaign wiring —
+	// it runs the `start` block on mount, fires each turn's block off the engine's
+	// turn counter, and plays `win`/`lose` off the J1 match-end hook — and renders
+	// the dialogue overlay. Levels with no script run nothing extra.
+	const parseScript = (): CutsceneScript | undefined => {
+		const text = getLevelScriptText(level.id)
+		if (!text) return undefined
 		try {
-			const res = await fetch(level.scriptPath)
-			if (!res.ok) return EMPTY_SCRIPT
-			return parseCutsceneScript(await res.text())
+			return parseCutsceneScript(text)
 		} catch {
-			return EMPTY_SCRIPT
+			// A malformed script should never brick the level; play it scriptless.
+			return undefined
 		}
 	}
+
+	const campaign: CutsceneScript | undefined = parseScript()
 
 	onMount(() => {
 		// Test-only hook: drive the match to a terminal state without playing it
@@ -100,18 +91,10 @@
 				})),
 		}
 
-		void loadScript().then((script) => {
-			runner = createCampaignRunner(script, createCampaignInterface({ map }))
-			offMatchEnd = onMatchEnd((result) => void runner?.finish(result))
-			void runner.start()
-		})
-
 		return () => {
 			if (w.__thunderliteCampaign) delete w.__thunderliteCampaign
 		}
 	})
-
-	onDestroy(() => offMatchEnd?.())
 </script>
 
 <GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
@@ -127,6 +110,6 @@
 		endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 		let:select
 	>
-		<MapRender {map} {requestRedraw} {select} />
+		<MapRender {map} {requestRedraw} {select} {campaign} />
 	</GameStateManager>
 </GameSocket>

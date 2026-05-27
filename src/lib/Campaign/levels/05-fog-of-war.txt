@@ -1,0 +1,26 @@
+<start>
+move: 2,9
+talk Torrial: "This forest swallows sight. Units only see a few tiles — and Gannon knows it."
+move: 10,0
+talk Gannon: "Somewhere in these trees are my Stealth Tanks. You won't see them until they're on top of you."
+move: 1,9
+talk Torrial: "Don't panic. That Jammer Truck is our eyes — drive it forward and it uncloaks anything hiding nearby.", "Scout with the Jammer, then bring your tanks up behind it. Never advance blind."
+talk Link: "Flush them out, then hit them. Got it."
+</start>
+
+<turn 2>
+wait: 1
+move: 8,3
+talk Gannon: "More ghosts for you to find. Hahaha!"
+add unit: 1,"Strike Commando",8,3
+talk Torrial: "Keep the Jammer between you and the unknown. Sight wins this fight."
+</turn>
+
+<win>
+talk Torrial: "Every hidden blade dragged into the light. That's how you beat an ambush.", "Reveal, then strike. You'll need that again."
+</win>
+
+<lose>
+talk Gannon: "You never even saw the blow that finished you."
+talk Torrial: "We advanced blind. Lead with the Jammer next time, Link."
+</lose>

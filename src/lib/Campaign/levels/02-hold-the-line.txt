@@ -1,0 +1,26 @@
+<start>
+move: 6,4
+talk Torrial: "This river is the only way through. That bridge is the choke point — hold it.", "See the enemy Command Center across the water? That's Gannon's capital here."
+move: 10,4
+talk Gannon: "You'll never cross. My garrison will hold this bank forever."
+move: 6,4
+talk Torrial: "Forever is a long time. Push a Commando onto his Command Center and capture it.", "Take a capital and the battle is over — instantly. Lose yours and it's you who falls."
+talk Link: "Then we cross the bridge and end this fast."
+</start>
+
+<turn 3>
+move: 10,6
+talk Gannon: "Send the tank! Keep them off my capital!"
+add unit: 1,"Scorpion Tank",10,6
+talk Torrial: "He's defending the capture point. Clear a path, then take the Command Center."
+</turn>
+
+<win>
+talk Torrial: "The capital is ours — Gannon's line collapses. That's how you win a siege.", "Capture the heart, and the body falls."
+talk Link: "On to the next."
+</win>
+
+<lose>
+talk Gannon: "Hahaha! My capital still stands, and yours is dust."
+talk Torrial: "We pushed too thin. Guard your own Command Center while you reach for his."
+</lose>

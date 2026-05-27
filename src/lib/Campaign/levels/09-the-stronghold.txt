@@ -1,0 +1,26 @@
+<start>
+move: 7,4
+talk Torrial: "Gannon's fortress. Stone walls, an Annihilator at the gate — and that, in the center, is his Warmachine.", "It builds his army. Destroy the Warmachine and Gannon loses outright. There's your target."
+move: 4,9
+talk Torrial: "No single arm cracks a fortress. Use everything — artillery to soften the walls, your Condor Bomber to fly over them, ground troops to pour through the breach."
+move: 7,3
+talk Gannon: "My stronghold has never fallen. You will break upon it like all the rest."
+talk Link: "Every wall has a crack. We'll find his."
+</start>
+
+<turn 3>
+wait: 1
+move: 7,7
+talk Gannon: "Sally forth! Drive them from my gate!"
+add unit: 1,"Scorpion Tank",7,7
+talk Torrial: "He's sortieing to break our momentum. Hold formation — combined arms, like we planned. Strike the Warmachine."
+</turn>
+
+<win>
+talk Torrial: "The Warmachine is wreckage and the fortress is silent. You assaulted a stronghold and won, Link.", "Only Gannon himself remains now."
+</win>
+
+<lose>
+talk Gannon: "Shattered against my walls. The Warmachine builds on while you bleed."
+talk Torrial: "We hit it piecemeal. Bring every arm to bear at once — fly the bomber over the walls."
+</lose>

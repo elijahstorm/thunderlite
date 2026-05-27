@@ -1,0 +1,27 @@
+<start>
+move: 4,7
+talk Torrial: "Gannon's column is rolling down the coast. We can't beat it in the open — so we don't fight in the open."
+talk Torrial: "Dig in. A unit in a canyon trench takes far less damage. Let the terrain be your armor."
+terrain: "Canyon",4,8
+terrain: "Canyon",5,8
+talk Torrial: "There — trenches dug. Hold this line and make every charge cost them."
+move: 5,1
+talk Gannon: "Cowering in ditches? Pathetic. My armor will bury you in them."
+talk Link: "Let them come. We hold."
+</start>
+
+<turn 2>
+wait: 1
+move: 6,0
+talk Gannon: "Second wave — overrun the trench!"
+add unit: 1,"Scorpion Tank",6,0
+talk Torrial: "Stay in cover and let them break on your line. Patience wins this."
+</turn>
+
+<win>
+talk Torrial: "The assault is spent and we're still standing. Terrain held the line.", "You're learning to make the map fight for you."
+</win>
+
+<lose>
+talk Torrial: "They've overrun us... we left the trenches too soon.", "Hold your cover next time, Link. Let them come to you."
+</lose>

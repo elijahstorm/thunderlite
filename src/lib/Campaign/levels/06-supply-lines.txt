@@ -1,0 +1,27 @@
+<start>
+move: 2,7
+talk Torrial: "A war runs on money, Link. See your Oil Refinery and Warfactory? The refinery pays you every turn; the factory spends it on new units."
+talk Torrial: "Hold your income, build a force, and you can outlast anyone. Lose your supply and your army starves."
+move: 12,1
+talk Gannon: "My coffers are deep, boy. I'll bury you under wave after wave."
+move: 2,7
+talk Torrial: "Then we take his. Push toward his refinery, fund your own troops, and capture his Command Center when he's spent."
+talk Link: "Economy first. Then the hammer falls."
+</start>
+
+<turn 3>
+wait: 1
+move: 11,3
+talk Gannon: "Fresh steel from my factories!"
+add unit: 1,"Scorpion Tank",11,3
+talk Torrial: "He's spending freely. Build smart, not fast — quality over a rushed wave."
+</turn>
+
+<win>
+talk Torrial: "His supply is broken and his capital is yours. Starve the enemy and the army follows.", "You're thinking like a commander now."
+</win>
+
+<lose>
+talk Gannon: "Outspent and overrun. Did you think coin alone could save you?"
+talk Torrial: "We let his economy outpace ours. Seize the oil early next time."
+</lose>

@@ -79,9 +79,7 @@
 							<Icon icon="lucide:play" width={16} class="text-primary" />
 						</div>
 						<h2 class="mt-2 text-base font-semibold text-foreground">{level.title}</h2>
-						<p class="mt-1 text-sm text-muted-foreground">
-							{level.order === firstLevelOrder ? 'Start your campaign' : 'Ready to play'}
-						</p>
+						<p class="mt-1 text-sm text-muted-foreground">{level.blurb}</p>
 					</a>
 				{/if}
 			</li>

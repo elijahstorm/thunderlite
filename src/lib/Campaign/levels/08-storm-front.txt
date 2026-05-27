@@ -1,0 +1,26 @@
+<start>
+move: 1,8
+talk Torrial: "A storm's rolling in over these mountains. The rain churns the ground to mud — it slows troops to a crawl.", "Plan your moves shorter, Link. You won't cross as much ground as you'd like."
+move: 11,1
+talk Gannon: "The weather is on my side. Flounder in the mud while my fighters own the skies."
+move: 3,9
+talk Torrial: "He has air support. Keep your own Raptor close to answer it, and press the advance anyway. We can't wait out the storm."
+talk Link: "Then we fight through it. Forward."
+</start>
+
+<turn 2>
+wait: 1
+move: 11,3
+talk Gannon: "More armor down the pass — let the storm do half my work!"
+add unit: 1,"Scorpion Tank",11,3
+talk Torrial: "Short moves, solid ground where you can find it. Don't overextend in the mud."
+</turn>
+
+<win>
+talk Torrial: "Through the worst of it and still advancing. Weather slows an army — it doesn't have to stop one.", "Gannon's fortress is close now."
+</win>
+
+<lose>
+talk Gannon: "Bogged down and broken. The storm always favored me."
+talk Torrial: "We pushed too far into the mud. Pace the advance with the terrain next time."
+</lose>

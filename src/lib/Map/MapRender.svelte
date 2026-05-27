@@ -19,8 +19,12 @@
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
 	import { setHoverTile } from '$lib/Engine/uiState'
 	import { ANIMATION_TIME, routeAnimation, animations } from '$lib/Engine/Animator/animator'
+	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 
 	export let map: MapObject
+	/** When set, this board is a scripted campaign level; forwarded to `Game`,
+	 * which drives the K1 script (dialogue, camera, spawns) against the engine. */
+	export let campaign: CutsceneScript | undefined = undefined
 	export let mini: boolean = false
 	export let pause = false
 	export let fogOfWar: boolean = false
@@ -151,6 +155,7 @@
 			{makeImage}
 			{colorizer}
 			{select}
+			{campaign}
 			let:interfacer
 			let:renderData
 			let:select

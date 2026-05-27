@@ -9,6 +9,19 @@ export const deriveFromHash = (hash?: string, existing: MapProcesser = EMPTY_MAP
 		...mapImporter(unhash(hash)),
 	}) as MapObject
 
+/**
+ * Build a runtime {@link MapObject} from already-parsed editor `MapData` — the
+ * same JSON shape `mapExporter` emits, but loaded directly (e.g. a campaign
+ * level's `.json`) instead of round-tripped through a base62 hash. Mirrors
+ * `deriveFromHash` but skips the (un)hash step, so authored level maps can ship
+ * as readable JSON.
+ */
+export const deriveFromData = (data: MapData, existing: MapProcesser = EMPTY_MAP) =>
+	({
+		...existing,
+		...process(data),
+	}) as MapObject
+
 const filterUnsed = <T>(active: T[]) =>
 	active.filter((data) => data !== null).map((data) => (data as ObjectType).type)
 

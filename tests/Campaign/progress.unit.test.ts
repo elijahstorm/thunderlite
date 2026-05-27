@@ -150,8 +150,9 @@ describe('hydrateProgress', () => {
 		expect(getUnlockedOrder(user, storage)).toBe(3)
 
 		// A stale server read must not pull a further-ahead local value backwards.
-		campaignProgress(campaignResult(level3.id, 'win', 'player-a'), storage) // order 4
+		campaignProgress(campaignResult(level3.id, 'win', 'player-a'), storage) // unlocks level3.order + 1
+		const ahead = Math.min(level3.order + 1, lastLevelOrder)
 		hydrateProgress(user, 2, storage)
-		expect(getUnlockedOrder(user, storage)).toBe(lastLevelOrder)
+		expect(getUnlockedOrder(user, storage)).toBe(ahead)
 	})
 })
