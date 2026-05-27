@@ -148,7 +148,7 @@ function saveState(state) {
 
 function listCardFiles() {
 	return readdirSync(CARDS_DIR)
-		.filter((f) => /^\d{2}-[A-H]\d+-/.test(f))
+		.filter((f) => /^\d{2}-[A-Z]\d+-/.test(f))
 		.sort()
 }
 

@@ -25,6 +25,7 @@
 	export let pause = false
 	export let fogOfWar: boolean = false
 	export let requestRedraw = 0
+	export let backdrop = 'bg-yellow-300'
 	export let hud = {
 		advice: '/game/play/icon/move/advice.png',
 		arrow: '/game/play/icon/route/arrow.png',
@@ -143,7 +144,7 @@
 	})
 </script>
 
-<div class="w-full h-full flex justify-center items-center bg-yellow-300">
+<div class="w-full h-full flex justify-center items-center {backdrop}">
 	{#if colorizer}
 		<Game
 			{map}

@@ -9,6 +9,7 @@
 	const navLinks = [
 		{ href: '/play', label: 'Play' },
 		{ href: '/make', label: 'Browse Maps' },
+		{ href: '/editor', label: 'Editor' },
 		{ href: '/rooms', label: 'Rooms' },
 		{ href: '/about', label: 'About' },
 	]
