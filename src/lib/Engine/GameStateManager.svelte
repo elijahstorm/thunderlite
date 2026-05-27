@@ -2,6 +2,7 @@
 	import { onDestroy, onMount } from 'svelte'
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 	import { gameState, initGameStateFromMap } from './gameState'
+	import { emitMatchEnd, resetMatchEnd, buildMatchResult } from './matchEnd'
 	import { endTurn } from './turnLoop'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
@@ -30,10 +31,31 @@
 	$: if (map && map !== lastMap) {
 		lastMap = map
 		initGameStateFromMap(map)
+		// A fresh board is a fresh match — clear the emit-once guard so this match
+		// can fire its own match-end event (J1).
+		resetMatchEnd()
 		// F3 weather → env ambience: loop the matching track while sky weather is
 		// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
 		// re-renders and replayed states never restack the loop.
 		weatherAudio.setWeather(weatherForMap(map))
+	}
+
+	// J1 — match-end hook. The engine flips `phase` to `gameOver` from many call
+	// sites (applyAction, turnLoop, interactor); rather than instrument each, we
+	// observe the authoritative transition here and emit once. `emitMatchEnd` is
+	// idempotent per match, so this reactive block re-running is harmless. The
+	// winner is read straight from the engine state, never from any UI claim.
+	$: if (map && $gameState.phase === 'gameOver') {
+		emitMatchEnd(
+			buildMatchResult({
+				state: $gameState,
+				winner: typeof $gameState.winner === 'number' ? $gameState.winner : null,
+				mode: isMultiplayer ? 'online' : 'hotseat',
+				localTeam,
+				isCpuTeam: (team) => !isMultiplayer && team !== localTeam,
+				sessionId: isMultiplayer ? gameSession : undefined,
+			})
+		)
 	}
 
 	const select = (x: number, y: number) => {
