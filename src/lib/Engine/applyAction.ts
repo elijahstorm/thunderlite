@@ -14,6 +14,7 @@ import { endTurn } from './turnLoop'
 import { applyWinConditions } from './winConditions'
 import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction, type SfxAction, type SfxUnitRef } from '$lib/Audio/sfxMap'
+import { recordMatchStat, type StatEvent } from './matchStats'
 import type { SerializedAction } from './Interactor/serializedAction'
 
 /**
@@ -28,6 +29,8 @@ export interface ApplyActionOptions {
 	live?: boolean
 	/** Injectable sfx sink (testing). Defaults to the shared audio engine. */
 	playSfx?: (id: string) => void
+	/** Injectable stat sink (testing). Defaults to the shared match-stats tracker. */
+	recordStat?: (event: StatEvent) => void
 }
 
 /** Emits the resolved sfx for an action, or does nothing for replay/headless. */
@@ -44,13 +47,28 @@ const makeSfxEmit = (opts: ApplyActionOptions): SfxEmit => {
 	}
 }
 
+/**
+ * Emits a per-player stat event, or nothing for replay/headless (J2). Gated on
+ * `live` exactly like SFX so a reconnect's replayed event log never re-counts
+ * builds, kills, damage, or captures.
+ */
+type StatEmit = (event: StatEvent) => void
+
+const NO_STAT: StatEmit = () => {}
+
+const makeStatEmit = (opts: ApplyActionOptions): StatEmit => {
+	if (!opts.live) return NO_STAT
+	return opts.recordStat ?? recordMatchStat
+}
+
 const reduceHealth = (
 	map: MapObject | MapProcesser,
 	attacker: UnitObject,
 	target: UnitObject,
 	tile: number,
 	role: 'attack' | 'counter',
-	fx: SfxEmit
+	fx: SfxEmit,
+	stat: StatEmit
 ): boolean => {
 	const damage = calculateDamage(attacker, target, {
 		map: map as MapObject,
@@ -60,10 +78,13 @@ const reduceHealth = (
 	const max = unitData[target.type]?.health ?? 0
 	const current = target.health ?? max
 	const next = Math.max(0, current - damage)
+	// Credit the dealer with HP actually removed (capped, so overkill doesn't inflate).
+	stat({ kind: 'damage', team: attacker.team, amount: current - next })
 	target.health = next
 	if (next === 0) {
 		map.layers.units[tile] = null
 		fx('death', target)
+		stat({ kind: 'loss', team: target.team })
 		runModifiers(target, 'Death', {
 			kind: 'unit',
 			tile,
@@ -75,6 +96,7 @@ const reduceHealth = (
 	return false
 }
 
+// Movement is not a tracked stat; it only emits SFX.
 const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: SfxEmit): void => {
 	const unit = map.layers.units[from]
 	if (!unit) return
@@ -92,13 +114,19 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: 
 	markTileActed(to)
 }
 
-const applyAttack = (map: MapObject | MapProcesser, from: number, to: number, fx: SfxEmit): void => {
+const applyAttack = (
+	map: MapObject | MapProcesser,
+	from: number,
+	to: number,
+	fx: SfxEmit,
+	stat: StatEmit
+): void => {
 	const attacker = map.layers.units[from]
 	const target = map.layers.units[to]
 	if (!attacker || !target) return
 
 	fx('attack', attacker)
-	const targetDied = reduceHealth(map, attacker, target, to, 'attack', fx)
+	const targetDied = reduceHealth(map, attacker, target, to, 'attack', fx, stat)
 	applyLancePassthrough(map as MapObject, from, to)
 
 	let attackerDied = false
@@ -112,7 +140,7 @@ const applyAttack = (map: MapObject | MapProcesser, from: number, to: number, fx
 	) {
 		// The defender returns fire — sound its own weapon before resolving the hit.
 		fx('attack', target)
-		attackerDied = reduceHealth(map, target, attacker, from, 'counter', fx)
+		attackerDied = reduceHealth(map, target, attacker, from, 'counter', fx, stat)
 	}
 
 	markTileActed(from)
@@ -126,18 +154,20 @@ export const applyAction = (
 	opts: ApplyActionOptions = {}
 ): void => {
 	const fx = makeSfxEmit(opts)
+	const stat = makeStatEmit(opts)
 	switch (action.kind) {
 		case 'move': {
 			applyMove(map, action.from, action.to, fx)
 			return
 		}
 		case 'attack': {
-			applyAttack(map, action.from, action.to, fx)
+			applyAttack(map, action.from, action.to, fx, stat)
 			return
 		}
 		case 'capture': {
 			const unit = map.layers.units[action.tile]
 			if (!unit) return
+			stat({ kind: 'capture', team: unit.team })
 			runModifiers(unit, 'Start_Turn', {
 				kind: 'unit',
 				tile: action.tile,
@@ -167,6 +197,7 @@ export const applyAction = (
 			if (!building) return
 			spawnBuiltUnit(map, action.building, action.unitType, building.team)
 			fx('build')
+			stat({ kind: 'build', team: building.team })
 			applyWinConditions(map as MapObject)
 			return
 		}
@@ -192,6 +223,8 @@ export const applyAction = (
 			return
 		}
 		case 'end-turn': {
+			// Credit the turn to whoever is ending it, before `endTurn` advances.
+			stat({ kind: 'turn', team: get(gameState).currentTeam })
 			endTurn({ map })
 			return
 		}

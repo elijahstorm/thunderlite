@@ -3,6 +3,7 @@
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 	import { gameState, initGameStateFromMap } from './gameState'
 	import { emitMatchEnd, resetMatchEnd, buildMatchResult } from './matchEnd'
+	import { resetMatchStats, matchStatsList } from './matchStats'
 	import { endTurn } from './turnLoop'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
@@ -11,7 +12,7 @@
 	import HUDRoot from './HUD/HUDRoot.svelte'
 	import BuildMenu from './HUD/BuildMenu.svelte'
 	import ActionMenu from './HUD/ActionMenu.svelte'
-	import GameOverModal from './HUD/GameOverModal.svelte'
+	import StatsScreen from './HUD/StatsScreen.svelte'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	export let endTurnAction: (() => void) | undefined = undefined
@@ -32,8 +33,9 @@
 		lastMap = map
 		initGameStateFromMap(map)
 		// A fresh board is a fresh match — clear the emit-once guard so this match
-		// can fire its own match-end event (J1).
+		// can fire its own match-end event (J1), and zero the stat tracker (J2).
 		resetMatchEnd()
+		resetMatchStats()
 		// F3 weather → env ambience: loop the matching track while sky weather is
 		// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
 		// re-renders and replayed states never restack the loop.
@@ -54,6 +56,9 @@
 				localTeam,
 				isCpuTeam: (team) => !isMultiplayer && team !== localTeam,
 				sessionId: isMultiplayer ? gameSession : undefined,
+				// J2 — carry the live per-player stat tracker into the result so the
+				// stats screen (and J3 persistence) read it off `MatchResult.stats`.
+				stats: matchStatsList(),
 			})
 		)
 	}
@@ -74,6 +79,15 @@
 			return
 		}
 		endTurn({ map })
+	}
+
+	// Rematch (hotseat/online) — replay the same board from scratch: re-seed game
+	// state and clear the J1/J2 trackers so a new match-end can fire and re-count.
+	const handleRematch = () => {
+		if (!map) return
+		initGameStateFromMap(map)
+		resetMatchEnd()
+		resetMatchStats()
 	}
 
 	let cpuHandle: CpuAiHandle | null = null
@@ -124,4 +138,4 @@
 <HUDRoot {map} onEndTurn={handleEndTurn} />
 <BuildMenu {map} />
 <ActionMenu {map} />
-<GameOverModal />
+<StatsScreen {localTeam} onRematch={handleRematch} />
