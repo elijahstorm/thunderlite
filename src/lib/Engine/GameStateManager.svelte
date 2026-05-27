@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte'
+	import { onDestroy, onMount } from 'svelte'
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 	import { gameState, initGameStateFromMap } from './gameState'
 	import { endTurn } from './turnLoop'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
+	import { MusicDirector } from '$lib/Audio/musicDirector'
 	import HUDRoot from './HUD/HUDRoot.svelte'
 	import BuildMenu from './HUD/BuildMenu.svelte'
 	import ActionMenu from './HUD/ActionMenu.svelte'
@@ -69,6 +70,21 @@
 			}
 		}
 	}
+
+	// Music director: keyed to game phase. In single-player every opponent is a
+	// CPU, so its turns play the "thinking" theme; in multiplayer they're human.
+	let musicDirector: MusicDirector | null = null
+	onMount(() => {
+		musicDirector = new MusicDirector({
+			localTeam,
+			isCpuTeam: () => !isMultiplayer,
+		})
+		musicDirector.start()
+		return () => {
+			musicDirector?.stop()
+			musicDirector = null
+		}
+	})
 
 	onDestroy(() => {
 		if (cpuHandle) cpuHandle.cancel()

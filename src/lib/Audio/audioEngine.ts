@@ -31,6 +31,12 @@ import {
 export type SingleChannel = 'music' | 'env'
 export type ChannelKey = 'master' | AudioChannel
 
+/** Options for a single-active (music/env) playback request. */
+export interface PlaySingleOptions {
+	/** Loop the track (default `true`). One-shot stings (win/lose) pass `false`. */
+	loop?: boolean
+}
+
 /** Pure, serializable channel state machine. */
 export interface AudioState {
 	master: ChannelSettings
@@ -157,22 +163,23 @@ export class AudioEngine {
 	}
 
 	// ── Music (single-active) ────────────────────────────────────────────────
-	playMusic(name: string): void {
-		this.playSingle('music', name)
+	playMusic(name: string, opts: PlaySingleOptions = {}): void {
+		this.playSingle('music', name, opts)
 	}
 	stopMusic(): void {
 		this.stopSingle('music')
 	}
 
 	// ── Environment / weather (single-active) ─────────────────────────────────
-	playEnv(name: string): void {
-		this.playSingle('env', name)
+	playEnv(name: string, opts: PlaySingleOptions = {}): void {
+		this.playSingle('env', name, opts)
 	}
 	stopEnv(): void {
 		this.stopSingle('env')
 	}
 
-	private playSingle(channel: SingleChannel, name: string): void {
+	private playSingle(channel: SingleChannel, name: string, opts: PlaySingleOptions = {}): void {
+		const loop = opts.loop ?? true
 		const base = lookupAudio(channel, name)
 		if (base === undefined) {
 			console.warn(`[audio] unknown ${channel} track "${name}"`)
@@ -193,7 +200,7 @@ export class AudioEngine {
 		if (!this.factory) return // headless / SSR: track recorded, nothing to play
 
 		const el = this.acquireTrackElement(resolveAudioPath(base, this.format))
-		el.loop = true
+		el.loop = loop
 		el.currentTime = 0
 		el.volume = effectiveVolume(this.state, channel)
 		this.singleEls[channel] = el
