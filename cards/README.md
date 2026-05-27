@@ -14,5 +14,8 @@ The cards run sequentially through the orchestrator. The order encodes dependenc
 - **F1 → F2 → F3** — fog of war, cloak/stealth/jammer, weather (exploratory)
 - **G1 → G2 → G3 → G4** — Vulture, Lance, transports, repair
 - **H1 → H2 → H3** — second-player join, move relay, replay
+- **I1 → I2 → I3** — audio engine, music director, SFX + weather audio
+- **J1 → J2 → J3** — match-end hook, end-game stats screen, result persistence + profile stats
+- **K1 → K2 → K3 → K4 → K5** — cutscene DSL, campaign runner, progression/unlocks, single-player mode shell, 10 authored levels
 
-After D, the smallest playable end-to-end game exists. E–G add depth. H makes it online.
+After D, the smallest playable end-to-end game exists. E–G add depth. H makes it online. I adds sound from the existing asset bank. J introduces a single match-end hook that stats, persistence, campaign unlocks, and future PvP elo all subscribe to. K is the single-player campaign and depends on J1's hook for level unlocks.

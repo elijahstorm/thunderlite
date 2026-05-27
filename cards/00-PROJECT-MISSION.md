@@ -15,9 +15,16 @@ Two human players (hot-seat first, online second) load a map from the map editor
 ## What we are NOT building right now
 
 - Pretty UI, animations, polish, theming. Functional UI only. Decouple UI from game logic so a designer can replace it later.
-- Single-player AI campaign. Two-player only.
-- Sound design changes. Existing audio assets are reused.
+- New sound *assets*. Audio playback of the existing bank in `static/game/sounds/` is in scope (epic I); composing new audio is not.
 - A from-scratch art pipeline. All sprite sheets, terrain art, building art, weather art, attack animations live in `static/game/play/` already.
+
+## Recently expanded scope (epics I–K)
+
+The original "two-player only, no single-player campaign" constraint has been **superseded**. CPU AI already exists under `src/lib/Engine/cpuAi/`, and the following are now in scope:
+
+- **Audio (epic I)** — wire the existing `static/game/sounds/` bank to game events (mood-aware music, action SFX, weather loops).
+- **Match-end hooks & stats (epic J)** — one `onMatchEnd` hook emitting a `MatchResult` that the end-game stats screen, result persistence, campaign unlocks, and future PvP elo all subscribe to independently.
+- **Single-player campaign (epic K)** — a scripted-level DSL, a campaign runner, progression that unlocks the next level off the J1 hook, a Single Player entry on the title screen with continue/auto-advance, and 10 authored levels reusing the original Link / Torrial / Gannon story.
 
 ## Working norms
 
