@@ -12,14 +12,45 @@ import { landUnload, transportLoad } from './modifiers/transport'
 import { spawnBuiltUnit } from './build'
 import { endTurn } from './turnLoop'
 import { applyWinConditions } from './winConditions'
+import { audioEngine } from '$lib/Audio/audioEngine'
+import { sfxForAction, type SfxAction, type SfxUnitRef } from '$lib/Audio/sfxMap'
 import type { SerializedAction } from './Interactor/serializedAction'
+
+/**
+ * Options threaded through the apply path. `applyAction` stays deterministic and
+ * silent by default — sound is a side effect of *live* player actions only. The
+ * reconnect/replay path (H3) re-applies the whole event log; if those fired
+ * SFX a reconnecting player would hear 40 explosions at once, so SFX are gated
+ * on `live` and default to off.
+ */
+export interface ApplyActionOptions {
+	/** Fire SFX for this action. Off for replay / headless. Default `false`. */
+	live?: boolean
+	/** Injectable sfx sink (testing). Defaults to the shared audio engine. */
+	playSfx?: (id: string) => void
+}
+
+/** Emits the resolved sfx for an action, or does nothing for replay/headless. */
+type SfxEmit = (action: SfxAction, unit?: SfxUnitRef | null) => void
+
+const NO_SFX: SfxEmit = () => {}
+
+const makeSfxEmit = (opts: ApplyActionOptions): SfxEmit => {
+	if (!opts.live) return NO_SFX
+	const sink = opts.playSfx ?? ((id: string) => audioEngine.playSfx(id))
+	return (action, unit) => {
+		const id = sfxForAction(action, unit)
+		if (id) sink(id)
+	}
+}
 
 const reduceHealth = (
 	map: MapObject | MapProcesser,
 	attacker: UnitObject,
 	target: UnitObject,
 	tile: number,
-	role: 'attack' | 'counter'
+	role: 'attack' | 'counter',
+	fx: SfxEmit
 ): boolean => {
 	const damage = calculateDamage(attacker, target, {
 		map: map as MapObject,
@@ -32,6 +63,7 @@ const reduceHealth = (
 	target.health = next
 	if (next === 0) {
 		map.layers.units[tile] = null
+		fx('death', target)
 		runModifiers(target, 'Death', {
 			kind: 'unit',
 			tile,
@@ -43,12 +75,13 @@ const reduceHealth = (
 	return false
 }
 
-const applyMove = (map: MapObject | MapProcesser, from: number, to: number): void => {
+const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: SfxEmit): void => {
 	const unit = map.layers.units[from]
 	if (!unit) return
 	if (from === to) return
 	map.layers.units[from] = null
 	map.layers.units[to] = unit
+	fx('move', unit)
 	runModifiers(unit, 'Move', {
 		kind: 'unit',
 		tile: to,
@@ -59,12 +92,13 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number): voi
 	markTileActed(to)
 }
 
-const applyAttack = (map: MapObject | MapProcesser, from: number, to: number): void => {
+const applyAttack = (map: MapObject | MapProcesser, from: number, to: number, fx: SfxEmit): void => {
 	const attacker = map.layers.units[from]
 	const target = map.layers.units[to]
 	if (!attacker || !target) return
 
-	const targetDied = reduceHealth(map, attacker, target, to, 'attack')
+	fx('attack', attacker)
+	const targetDied = reduceHealth(map, attacker, target, to, 'attack', fx)
 	applyLancePassthrough(map as MapObject, from, to)
 
 	let attackerDied = false
@@ -76,7 +110,7 @@ const applyAttack = (map: MapObject | MapProcesser, from: number, to: number): v
 			defenderTile: to,
 		})
 	) {
-		attackerDied = reduceHealth(map, target, attacker, from, 'counter')
+		attackerDied = reduceHealth(map, target, attacker, from, 'counter', fx)
 	}
 
 	markTileActed(from)
@@ -84,14 +118,19 @@ const applyAttack = (map: MapObject | MapProcesser, from: number, to: number): v
 	applyWinConditions(map as MapObject)
 }
 
-export const applyAction = (map: MapObject | MapProcesser, action: SerializedAction): void => {
+export const applyAction = (
+	map: MapObject | MapProcesser,
+	action: SerializedAction,
+	opts: ApplyActionOptions = {}
+): void => {
+	const fx = makeSfxEmit(opts)
 	switch (action.kind) {
 		case 'move': {
-			applyMove(map, action.from, action.to)
+			applyMove(map, action.from, action.to, fx)
 			return
 		}
 		case 'attack': {
-			applyAttack(map, action.from, action.to)
+			applyAttack(map, action.from, action.to, fx)
 			return
 		}
 		case 'capture': {
@@ -125,6 +164,7 @@ export const applyAction = (map: MapObject | MapProcesser, action: SerializedAct
 			const building = map.layers.buildings[action.building]
 			if (!building) return
 			spawnBuiltUnit(map, action.building, action.unitType, building.team)
+			fx('build')
 			applyWinConditions(map as MapObject)
 			return
 		}

@@ -7,6 +7,8 @@
 	import { buildableUnits, spawnBuiltUnit, type BuildableUnit } from '../build'
 	import { buildAdjacent } from '../modifiers/builder'
 	import { buildMenuState, closeBuildMenu } from './buildMenuStore'
+	import { audioEngine } from '$lib/Audio/audioEngine'
+	import { sfxForAction } from '$lib/Audio/sfxMap'
 
 	export let map: MapObject | undefined = undefined
 
@@ -24,6 +26,10 @@
 				? buildAdjacent(map, menu.buildingTile, entry.type, menu.team)
 				: spawnBuiltUnit(map, menu.buildingTile, entry.type, menu.team)
 		if (result.ok) {
+			// Live human spawn — the build menu mutates directly (not via applyAction),
+			// so fire the build chime here. Replay never touches this path.
+			const sfx = sfxForAction('build')
+			if (sfx) audioEngine.playSfx(sfx)
 			closeBuildMenu()
 			return
 		}

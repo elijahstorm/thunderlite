@@ -32,7 +32,9 @@ export const interactor: Interactor = (interaction) =>
 const verifyInteraction = (obj: object) => Object.hasOwn(obj, 'tile') && Object.hasOwn(obj, 'map')
 
 const commit = (map: MapObject, action: SerializedAction): void => {
-	applyAction(map, action)
+	// `live: true` — locally-initiated action, so fire its SFX. Replayed and
+	// relayed actions go through `applyAction` directly and stay silent.
+	applyAction(map, action, { live: true })
 	emitOutgoingAction(action)
 }
 

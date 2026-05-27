@@ -27,7 +27,10 @@ export const isCpuTurn = (humanTeam: number): boolean => {
 }
 
 const commit = (map: MapObject, action: SerializedAction): void => {
-	applyAction(map, action)
+	// The CPU turn is live, animated gameplay (one action at a time), so its
+	// moves/attacks/deaths should sound just like a human's. Only the reconnect
+	// replay path stays silent.
+	applyAction(map, action, { live: true })
 	emitOutgoingAction(action)
 }
 
