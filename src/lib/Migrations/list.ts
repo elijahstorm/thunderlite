@@ -11,6 +11,8 @@ import { CreateLikes } from './create_likes.sql'
 import { CreateRelationships } from './create_relationships.sql'
 import { CreateFollows } from './create_follows.sql'
 import { CreateMessages } from './create_messages.sql'
+import { CreateMatches } from './create_matches.sql'
+import { CreateMatchPlayers } from './create_match_players.sql'
 
 export const migrationsList = async (sql: postgres.Sql) => {
 	const results = []
@@ -42,4 +44,6 @@ const migrationsInOrder = {
 	CreateRelationships,
 	CreateFollows,
 	CreateMessages,
+	CreateMatches,
+	CreateMatchPlayers,
 } as const

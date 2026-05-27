@@ -4,6 +4,7 @@
 	import { gameState, initGameStateFromMap } from './gameState'
 	import { emitMatchEnd, resetMatchEnd, buildMatchResult } from './matchEnd'
 	import { resetMatchStats, matchStatsList } from './matchStats'
+	import { registerRecordMatch } from '$lib/Database/recordMatch'
 	import { endTurn } from './turnLoop'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
@@ -115,7 +116,12 @@
 	// Music director: keyed to game phase. In single-player every opponent is a
 	// CPU, so its turns play the "thinking" theme; in multiplayer they're human.
 	let musicDirector: MusicDirector | null = null
+	// J3 — persistence is just another match-end subscriber, registered alongside
+	// the stats screen and (later) campaign unlocks. It owns no game logic; it
+	// only writes results when a match ends.
+	let offRecordMatch: (() => void) | undefined
 	onMount(() => {
+		offRecordMatch = registerRecordMatch()
 		musicDirector = new MusicDirector({
 			localTeam,
 			isCpuTeam: () => !isMultiplayer,
@@ -130,6 +136,7 @@
 	onDestroy(() => {
 		if (cpuHandle) cpuHandle.cancel()
 		weatherAudio.clear()
+		offRecordMatch?.()
 	})
 </script>
 

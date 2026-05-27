@@ -3,10 +3,12 @@
 	import HankoProfile from '$lib/Components/Auth/HankoProfile.svelte'
 	import DataInput from '$lib/Components/Widgets/Forms/DataInput.svelte'
 	import ImageUploader from '$lib/Components/Widgets/Forms/ImageUploader.svelte'
+	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
 	import { addToast } from 'as-toast'
 
 	export let data
 	$: user = data.user
+	$: stats = data.stats
 
 	export let form
 	let errors: { [key: string]: string } = {}
@@ -98,6 +100,15 @@
 			<button class="btn btn-primary" type="submit">Save changes</button>
 		</div>
 	</form>
+</section>
+
+<section>
+	<header class="mb-4">
+		<p class="section-eyebrow">Stats</p>
+		<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">Match record</h2>
+	</header>
+
+	<StatsPanel {stats} heading="Your record" />
 </section>
 
 <section>

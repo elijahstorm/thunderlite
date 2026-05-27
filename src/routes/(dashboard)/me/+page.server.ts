@@ -6,6 +6,7 @@ import {
 import { error, fail } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { validate } from '$lib/Database/validators'
+import { getUserStats } from '$lib/Database/getUserStats'
 
 export const prerender = false
 export const ssr = false
@@ -33,7 +34,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	}
 
-	return { user }
+	// J3 — profile match record. Defensive in getUserStats, so a brand-new
+	// account (no match rows) returns zeros rather than throwing.
+	const stats = await getUserStats(locals.sql, locals.user)
+
+	return { user, stats }
 }
 
 export const actions = {
