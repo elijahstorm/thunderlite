@@ -7,8 +7,6 @@
 
 <Header {logoLink} {toggleAside} />
 
-<div class="pb-16 flex justify-center">
-	<div class="container w-full break break-word">
-		<slot></slot>
-	</div>
+<div class="container w-full break break-word pt-8 pb-16">
+	<slot></slot>
 </div>

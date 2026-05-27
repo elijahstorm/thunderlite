@@ -2,6 +2,12 @@
 	export let map: MapDBData
 </script>
 
-<div class="mt-4 w-full h-64 rounded-md overflow-hidden border-2 border-gray-300 bg-gray-200">
-	<img class="w-full h-full object-cover" src={map.thumbnail} alt="{map.name} thumbnail" />
+<div class="h-full w-full bg-surface-2 overflow-hidden">
+	{#if map.thumbnail}
+		<img
+			class="h-full w-full object-cover"
+			src={map.thumbnail}
+			alt="{map.name ?? 'Map'} thumbnail"
+		/>
+	{/if}
 </div>

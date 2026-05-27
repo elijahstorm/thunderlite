@@ -56,6 +56,7 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number): voi
 		map,
 	})
 	revealCloakedAdjacentTo(map as MapObject, to, unit.team)
+	markTileActed(to)
 }
 
 const applyAttack = (map: MapObject | MapProcesser, from: number, to: number): void => {

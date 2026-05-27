@@ -11,17 +11,21 @@
 	}
 </script>
 
-<section class="m-auto flex justify-center items-center gap-4">
+<div class="flex items-center gap-2">
 	{#if $auth === null}
-		<a class="btn btn-primary flex items-center content-center h-max" href="/login">
-			<span class="pl-2 pr-4"> Login </span>
-			<Icon icon={'fe:login'} width={16} />
+		<a class="btn btn-primary btn-sm" href="/login">
+			<span>Sign in</span>
+			<Icon icon="lucide:arrow-right" width={14} />
 		</a>
 	{:else if typeof $auth === 'string'}
 		<UserIcon auth={$auth} />
-		<a href="/logout" class="btn btn-gray text-xs px-2 py-2 flex items-center h-max my-auto">
-			<span class="px-2 hidden sm:block"> Logout </span>
-			<Icon icon={'fe:logout'} width={16} />
+		<a
+			href="/logout"
+			class="btn btn-ghost btn-sm text-muted-foreground hover:text-foreground"
+			aria-label="Log out"
+		>
+			<Icon icon="lucide:log-out" width={16} />
+			<span class="hidden sm:inline">Log out</span>
 		</a>
 	{/if}
-</section>
+</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
+	import Icon from '@iconify/svelte'
 	import Loader from '../Helpers/Loader.svelte'
 
 	export let title: string
@@ -51,96 +52,92 @@
 	})
 </script>
 
-<section class="bg-white">
-	<div class="py-8 lg:py-16 px-4 mx-auto max-w-screen-md">
-		<h2 class="mb-4 text-4xl tracking-tight font-extrabold text-center text-gray-900">
-			{title}
-		</h2>
-
-		<p class="mb-8 lg:mb-16 font-light text-center text-gray-500 sm:text-xl">
-			{prompt}
-		</p>
-
-		{#if postStatus === 'error'}
-			<p
-				class="text-red-500 block p-3 mb-4 w-full text-sm bg-red-50 rounded-lg border border-red-300 shadow-sm"
-			>
-				{postResponse.message}
-			</p>
-		{:else if postStatus === 'success'}
-			<p
-				class="text-brand-500 block p-3 mb-4 w-full text-sm bg-gray-50 rounded-lg border border-brand-300 shadow-sm"
-			>
-				{postResponse.message}
-			</p>
-
-			<p>
-				<span class="opacity-50"> Ticket number: </span>
-
-				<span>{postResponse.ticket}</span>
-			</p>
-
-			<p>
-				<span class="opacity-50"> Contact message type: </span>
-
-				<span>{type}</span>
-			</p>
-
-			<p>
-				<span class="opacity-50"> Email: </span>
-
-				<span>{postResponse.email}</span>
-			</p>
-
-			<p>
-				<span class="opacity-50"> Date received: </span>
-
-				<span>{postResponse.date?.toDateString()}</span>
-			</p>
-		{:else if postStatus === 'sending'}
-			<Loader />
-		{:else}
-			<form on:submit|preventDefault={submit} method="POST" class="space-y-8">
-				<div>
-					<label for="email" class="block mb-2 text-sm font-medium text-gray-900">Your email</label>
-					<input
-						class="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5"
-						type="email"
-						placeholder="name@email.com"
-						required
-						bind:value={email}
-					/>
-				</div>
-
-				<div>
-					<label for="subject" class="block mb-2 text-sm font-medium text-gray-900">Subject</label>
-					<input
-						class="block p-3 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500"
-						type="text"
-						placeholder="Let us know how we can help you"
-						required
-						bind:value={subject}
-					/>
-				</div>
-
-				<div class="sm:col-span-2">
-					<label for="message" class="block mb-2 text-sm font-medium text-gray-900"
-						>Your message</label
-					>
-					<textarea
-						class="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg shadow-sm border border-gray-300 focus:ring-primary-500 focus:border-primary-500"
-						rows="6"
-						placeholder="Leave a comment..."
-						bind:value={message}
-					></textarea>
-				</div>
-
-				<button
-					type="submit"
-					class="btn btn-secondary py-3 px-5 text-sm font-medium text-center text-white rounded-lg bg-primary-700 sm:w-fit hover:bg-primary-800 focus:ring-4 focus:outline-none focus:ring-primary-300 :bg-primary-700"
-					>Send message</button
-				>
-			</form>
-		{/if}
+<section class="max-w-2xl mx-auto py-8">
+	<div class="text-center space-y-3 mb-10">
+		<p class="section-eyebrow">{type === 'support' ? 'Support' : 'Get in touch'}</p>
+		<h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">{title}</h1>
+		<p class="text-muted-foreground max-w-lg mx-auto leading-relaxed">{prompt}</p>
 	</div>
+
+	{#if postStatus === 'error'}
+		<div
+			class="card p-4 mb-6 flex items-start gap-3 border-destructive/40 bg-destructive/5 text-destructive"
+		>
+			<Icon icon="lucide:circle-x" width={18} class="mt-0.5 shrink-0" />
+			<p class="text-sm">{postResponse.message}</p>
+		</div>
+	{:else if postStatus === 'success'}
+		<div class="card p-6 space-y-4">
+			<div class="flex items-start gap-3 text-success">
+				<Icon icon="lucide:circle-check" width={20} class="mt-0.5 shrink-0" />
+				<p class="text-sm text-foreground">{postResponse.message}</p>
+			</div>
+			<dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm pt-2 border-t border-border">
+				<div>
+					<dt class="text-xs uppercase tracking-wide text-muted-foreground">Ticket</dt>
+					<dd class="mt-1 text-foreground font-mono">#{postResponse.ticket}</dd>
+				</div>
+				<div>
+					<dt class="text-xs uppercase tracking-wide text-muted-foreground">Type</dt>
+					<dd class="mt-1 text-foreground">{type}</dd>
+				</div>
+				<div>
+					<dt class="text-xs uppercase tracking-wide text-muted-foreground">Email</dt>
+					<dd class="mt-1 text-foreground">{postResponse.email}</dd>
+				</div>
+				<div>
+					<dt class="text-xs uppercase tracking-wide text-muted-foreground">Received</dt>
+					<dd class="mt-1 text-foreground">{postResponse.date?.toDateString()}</dd>
+				</div>
+			</dl>
+		</div>
+	{:else if postStatus === 'sending'}
+		<div class="py-16">
+			<Loader />
+		</div>
+	{:else}
+		<form on:submit|preventDefault={submit} method="POST" class="card p-6 sm:p-8 space-y-5">
+			<div>
+				<label for="email" class="field-label">Your email</label>
+				<input
+					id="email"
+					class="input"
+					type="email"
+					placeholder="name@email.com"
+					required
+					bind:value={email}
+				/>
+			</div>
+
+			<div>
+				<label for="subject" class="field-label">Subject</label>
+				<input
+					id="subject"
+					class="input"
+					type="text"
+					placeholder="Let us know how we can help"
+					required
+					bind:value={subject}
+				/>
+			</div>
+
+			<div>
+				<label for="message" class="field-label">Message</label>
+				<textarea
+					id="message"
+					class="input resize-y min-h-32"
+					rows="6"
+					placeholder="Tell us what's going on…"
+					bind:value={message}
+				></textarea>
+			</div>
+
+			<div class="flex justify-end pt-2">
+				<button type="submit" class="btn btn-primary">
+					<Icon icon="lucide:send" width={14} />
+					Send message
+				</button>
+			</div>
+		</form>
+	{/if}
 </section>

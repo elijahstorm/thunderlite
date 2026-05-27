@@ -4,10 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - '127.0.0.1:${APP_HOST_PORT:-5173}:5173'
+      - '127.0.0.1:${APP_HOST_PORT:-15173}:5173'
     env_file:
       - .env.local
     environment:
+      CI: 'true'
       NODE_ENV: development
       POSTGRES_URL: postgres://thunderlite:thunderlite@db:5432/thunderlite
       KV_REST_API_URL: http://kv:80
@@ -31,7 +32,7 @@ services:
       POSTGRES_PASSWORD: thunderlite
       POSTGRES_DB: thunderlite
     ports:
-      - '127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432'
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -46,8 +47,9 @@ services:
       dockerfile: Dockerfile.dev
     command: ['pnpm', 'chat']
     ports:
-      - '127.0.0.1:${CHAT_HOST_PORT:-8083}:8083'
+      - '127.0.0.1:${CHAT_HOST_PORT:-18083}:8083'
     environment:
+      CI: 'true'
       CHAT_PORT: 8083
     volumes:
       - .:/app
@@ -65,7 +67,7 @@ services:
       SRH_TOKEN: example_token
       SRH_CONNECTION_STRING: redis://redis:6379
     ports:
-      - '127.0.0.1:${KV_HOST_PORT:-58079}:80'
+      - '127.0.0.1:${KV_HOST_PORT:-180}:80'
     depends_on:
       - redis
 
@@ -104,12 +106,12 @@ services:
       - ./hanko/config.yaml:/etc/config/config.yaml:ro
     command: ['serve', '--config', '/etc/config/config.yaml', 'public']
     ports:
-      - '127.0.0.1:${HANKO_HOST_PORT:-8000}:8000'
+      - '127.0.0.1:${HANKO_HOST_PORT:-18000}:8000'
 
   mailpit:
     image: axllent/mailpit:latest
     ports:
-      - '127.0.0.1:${MAIL_HOST_PORT:-8025}:8025'
+      - '127.0.0.1:${MAIL_HOST_PORT:-18025}:8025'
 
 volumes:
   app_node_modules:

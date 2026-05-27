@@ -1,36 +1,82 @@
 <script lang="ts">
 	import Casing from '$lib/Components/PageContainers/Casing.svelte'
+	import Icon from '@iconify/svelte'
+
+	const pillars = [
+		{
+			icon: 'lucide:swords',
+			title: 'Tactics over twitch',
+			body: 'Every move is deliberate. Terrain, vision, and unit synergy are the puzzle — reflexes never enter the picture.',
+		},
+		{
+			icon: 'lucide:globe-2',
+			title: 'Browser-native',
+			body: 'No download, no installer, no platform lock-in. Open a tab and you are in the field.',
+		},
+		{
+			icon: 'lucide:users-round',
+			title: 'Play together, anytime',
+			body: 'Share a session code. Your friend takes their turn whenever they get the chance — async, but live when you want it.',
+		},
+		{
+			icon: 'lucide:hammer',
+			title: 'A community of cartographers',
+			body: 'The map editor is core, not a side feature. Every player can author and publish.',
+		},
+	]
 </script>
 
-<Casing logoLink={'/login'}>
-	<div class="flex flex-col gap-8 py-4">
-		<div class="text-center py-2">
-			<a
-				class="text-3xl text-brand-500 font-bold no-underline transition border-transparent border-b-4 hover:border-b-brand-500"
-				href="/login">Let's Do Together — Today!</a
-			>
+<Casing>
+	<section class="max-w-3xl mx-auto py-8 space-y-6">
+		<p class="section-eyebrow">About ThunderLite</p>
+		<h1 class="text-4xl sm:text-5xl font-semibold tracking-tight text-foreground leading-tight">
+			A love letter to <span class="text-primary">Battalion: Arena</span>.
+		</h1>
+		<p class="text-lg text-muted-foreground leading-relaxed">
+			ThunderLite is a browser-based recreation of Urban Squall's Battalion: Arena — a turn-based
+			tactics game in the Advance Wars family. It's free, open, and built for the players who never
+			stopped loving the genre.
+		</p>
+	</section>
+
+	<section class="max-w-4xl mx-auto pt-8 pb-12">
+		<div class="grid sm:grid-cols-2 gap-4">
+			{#each pillars as p (p.title)}
+				<div class="card p-6">
+					<div
+						class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground"
+					>
+						<Icon icon={p.icon} width={20} />
+					</div>
+					<h3 class="mt-4 font-semibold text-foreground">{p.title}</h3>
+					<p class="mt-2 text-sm text-muted-foreground leading-relaxed">{p.body}</p>
+				</div>
+			{/each}
 		</div>
+	</section>
 
-		<p class="indent-8 text-gray-600">
-			A cross-platform, sharable todo app powered up by the creation of teams and groups of friends
-			to work together to accomplish common goals — or just to plan a fun day at the park. Haja uses
-			simplicity to feel organic, and fun and extremely easy to use!
+	<section class="max-w-3xl mx-auto py-8 space-y-5 text-muted-foreground leading-relaxed">
+		<h2 class="text-2xl font-semibold tracking-tight text-foreground">Why ThunderLite exists</h2>
+		<p>
+			Browser flash games shaped a generation of strategy fans, and Battalion: Arena was one of the
+			best of them. When Flash sunset, that whole library went dark. ThunderLite is one small
+			attempt to bring that genre forward — same patient, thoughtful pacing, in a modern stack that
+			just runs.
 		</p>
-
-		<p class="indent-8">
-			Haja [하자] means "Let's do it together" in Korean. During my time in Korea, I was really
-			impacted by how beautiful their systems are. From the language, to architecture, to media and
-			tech design. There is so much uniquness that can be felt in the designs of South Korea. It can
-			best be described as Elegant Simplicity. I wanted to try and capture that sense of grandeur in
-			simplicity. Under the hood, making a product that feels simple and elegant might require a lot
-			of complexities and a lot of necessary abstractions.
+		<p>
+			It is built and maintained by one person, in the open. There is no monetization, no tracking
+			beyond the basics required to keep the lights on, and no plan to introduce either.
 		</p>
-
-		<p class="indent-8 text-gray-600">
-			Hop in via the phone app, or just dive in the browser. Share your personal todo list, or keep
-			it private. You can combine your efforts on a collabrative team to help you track with your
-			friends what is getting done. You can keep track of all the requirements on a school project,
-			or organize a fund raiser, or plan a picnic and figure out what still needs to be bought!
-		</p>
-	</div>
+		<div class="pt-2 flex flex-wrap items-center gap-3">
+			<a href="/login" class="btn btn-primary">
+				<Icon icon="lucide:play" width={16} />
+				Jump into a game
+			</a>
+			<a href="/editor" class="btn btn-outline">
+				<Icon icon="lucide:hammer" width={16} />
+				Build a map
+			</a>
+			<a href="/make" class="btn btn-outline">Browse community maps</a>
+		</div>
+	</section>
 </Casing>

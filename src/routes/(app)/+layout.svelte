@@ -25,12 +25,9 @@
 
 <ChatSocket let:populate let:socketMessages>
 	<section
-		class="fixed sm:block right-4 z-50 border-brand-200 border-b-0 rounded-t-lg overflow-clip transition-all"
+		class="fixed sm:block right-4 z-50 rounded-t-xl overflow-clip transition-all border border-border border-b-0 bg-surface shadow-lg"
 		class:-bottom-96={!showChatList}
-		class:bg-gray-200={!showChatList}
 		class:bottom-0={showChatList}
-		class:border={showChatList}
-		class:bg-gray-50={showChatList}
 		class:hidden={showChat}
 	>
 		<ChatList
@@ -44,14 +41,11 @@
 
 	{#if chattingWith && $auth}
 		<section
-			class="fixed sm:right-96 z-50 translate-y-1 w-full max-w-full sm:max-w-[440px] sm:w-[440px] border-brand-200 border-b-0 rounded-t-lg overflow-clip transition-all"
+			class="fixed sm:right-96 z-50 translate-y-1 w-full max-w-full sm:max-w-[440px] sm:w-[440px] rounded-t-xl overflow-clip transition-all border border-border border-b-0 bg-surface shadow-lg"
 			class:hidden={!showChat}
 			class:sm:block={!showChat}
 			class:sm:-bottom-96={!showChat}
-			class:bg-gray-200={!showChat}
 			class:bottom-0={showChat}
-			class:border={showChat}
-			class:bg-gray-50={showChat}
 			class:sm:right-4={showChat}
 			class:right-0={showChat}
 		>

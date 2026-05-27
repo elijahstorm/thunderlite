@@ -1,104 +1,112 @@
 <script lang="ts">
-	import LoginLogoutButton from '$lib/Components/Auth/LoginLogoutButton.svelte'
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 
 	export let noFooterOnMobile = false
 
-	const iconSocialLinks = [
+	const socialLinks = [
 		{
 			href: 'https://github.com/elijahstorm',
-			icon: '/images/icons/github-mark-white.svg',
-			alt: 'GitHub',
+			label: 'GitHub',
+			icon: 'lucide:github',
 		},
 	]
 
-	const footerLinks = [
+	const navGroups = [
 		{
-			href: '/download',
-			text: 'Download the App',
+			title: 'Game',
+			links: [
+				{ href: '/play', text: 'Play' },
+				{ href: '/make', text: 'Browse Maps' },
+				{ href: '/rooms', text: 'Rooms' },
+				{ href: '/download', text: 'Download' },
+			],
 		},
 		{
-			href: '/about',
-			text: 'About',
+			title: 'Company',
+			links: [
+				{ href: '/about', text: 'About' },
+				{ href: '/contact', text: 'Contact' },
+				{ href: '/support', text: 'Support' },
+			],
 		},
 		{
-			href: '/contact',
-			text: 'Contact Us',
-		},
-		{
-			href: '/support',
-			text: 'Support',
-		},
-		{
-			href: '/privacy',
-			text: 'Privacy Policy',
-		},
-		{
-			href: 'http://elijahstorm.github.io/',
-			text: 'More by Elijah',
+			title: 'Legal',
+			links: [
+				{ href: '/privacy', text: 'Privacy Policy' },
+				{ href: '/data-request', text: 'Data Request' },
+				{ href: 'http://elijahstorm.github.io/', text: 'More by Elijah' },
+			],
 		},
 	]
+
+	const year = new Date().getFullYear()
 </script>
 
-<div class="h-screen flex flex-col">
-	<div class="flex-1 bg-slate-50">
+<div class="min-h-screen flex flex-col bg-background">
+	<div class="flex-1">
 		<slot></slot>
 	</div>
 
-	<footer class:hidden={noFooterOnMobile} class:md:block={noFooterOnMobile}>
-		<div class="container">
-			<div class="text-center grid grid-cols-1 justify-items-center gap-6 md:grid-cols-12 lg:gap-0">
-				<div class="flex flex-col gap-7 pb-1 justify-between md:justify-self-start md:col-span-3">
-					<a
-						class="flex flex-col items-center justify-center gap-3 md:hidden"
-						href="/"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						<Logo width={116} height={30} url="" icon="/images/logo/white-small-tank.png" />
-						<Logo width={116} height={30} url="/images/logo/white-small.png" icon="" />
+	<footer
+		class:hidden={noFooterOnMobile}
+		class:md:block={noFooterOnMobile}
+		class="border-t border-border bg-surface-2 mt-16"
+	>
+		<div class="container py-12">
+			<div class="grid gap-10 md:grid-cols-12">
+				<div class="md:col-span-4 space-y-5">
+					<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
+						<Logo width={130} height={32} />
 					</a>
-
-					<a class="hidden md:contents" href="/" target="_blank" rel="noopener noreferrer">
-						<Logo
-							width={116}
-							height={30}
-							url="/images/logo/white-small.png"
-							icon="/images/logo/white-small-tank.png"
-						/>
-					</a>
-
-					<div class="flex justify-center md:justify-between items-center gap-4">
-						{#each iconSocialLinks as link (link.href)}
-							<a class="contents" href={link.href} target="_blank" rel="noopener noreferrer">
-								<img class="w-6 col-start-3 justify-self-end" src={link.icon} alt={link.alt} />
+					<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
+						A browser-based recreation of Battalion: Arena — turn-based tactics in the Advance Wars
+						tradition.
+					</p>
+					<div class="flex items-center gap-3 pt-1">
+						{#each socialLinks as link (link.href)}
+							<a
+								href={link.href}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-border-strong transition-colors"
+								aria-label={link.label}
+							>
+								<img class="w-4 h-4 dark:invert" src="/images/icons/github-mark-white.svg" alt="" />
 							</a>
 						{/each}
 					</div>
 				</div>
 
-				<div
-					class="items-end grid grid-cols-1 gap-2 py-1 text-white text-sm md:text-left md:grid-flow-col-dense md:justify-self-start md:grid-rows-3 md:py-0 md:w-full md:col-span-5 lg:gap-x-24 lx:col-span-3"
-				>
-					{#each footerLinks as link (link.href)}
-						<a href={link.href} target="_blank" rel="noopener noreferrer">
-							{link.text}
-						</a>
+				<div class="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
+					{#each navGroups as group (group.title)}
+						<div>
+							<h3 class="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+								{group.title}
+							</h3>
+							<ul class="mt-4 space-y-2.5">
+								{#each group.links as link (link.href)}
+									<li>
+										<a
+											href={link.href}
+											class="text-sm text-foreground/80 hover:text-foreground transition-colors"
+										>
+											{link.text}
+										</a>
+									</li>
+								{/each}
+							</ul>
+						</div>
 					{/each}
 				</div>
+			</div>
 
-				<div class="hidden md:block md:col-span-1 lx:col-span-2"></div>
-
-				<div
-					class="flex flex-col justify-between gap-4 items-center md:items-end md:justify-self-end md:col-span-3"
-				>
-					<LoginLogoutButton />
-
-					<div class="text-neutral-grayish-blue text-xs md:text-sm">
-						<p>© ThunderLite Online</p>
-						<p>All Rights Reserved</p>
-					</div>
-				</div>
+			<div
+				class="mt-12 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-6 border-t border-border"
+			>
+				<p class="text-xs text-muted-foreground">© {year} ThunderLite. All rights reserved.</p>
+				<p class="text-xs text-muted-foreground">
+					Built by <a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>.
+				</p>
 			</div>
 		</div>
 	</footer>

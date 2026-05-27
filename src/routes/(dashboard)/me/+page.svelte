@@ -33,10 +33,17 @@
 </script>
 
 <section>
-	<h1 class="py-4 opacity-90 text-lg font-semibold">My Profile</h1>
+	<header class="mb-6">
+		<p class="section-eyebrow">Account</p>
+		<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">My Profile</h1>
+		<p class="text-sm text-muted-foreground mt-1">
+			Manage how you appear to other players in the community.
+		</p>
+	</header>
 
 	<form
 		method="POST"
+		class="card p-6 sm:p-8 space-y-1"
 		use:enhance={({ formData, cancel }) => {
 			if (usernameTaken) cancel()
 			formData.set('username', formData.get('username')?.toString().replace(/.*@/, '') ?? '')
@@ -77,7 +84,7 @@
 
 		<DataInput
 			value={updated.bio}
-			placeholder="I like spicy food and..."
+			placeholder="I like spicy food and…"
 			label="About you"
 			name="bio"
 			id="bio"
@@ -86,17 +93,20 @@
 			message={errors.bio ?? ''}
 		/>
 
-		<div class="w-full flex justify-end gap-4 pt-4">
-			<button class="btn btn-gray my-auto py-3 text-xs" type="button" on:click={resetForm}>
-				cancel
-			</button>
-			<button class="btn btn-primary" type="submit"> save </button>
+		<div class="flex justify-end gap-2 pt-6">
+			<button class="btn btn-ghost" type="button" on:click={() => resetForm()}>Cancel</button>
+			<button class="btn btn-primary" type="submit">Save changes</button>
 		</div>
 	</form>
 </section>
 
 <section>
-	<h1 class="py-4 opacity-90 text-lg font-semibold">Authentication</h1>
+	<header class="mb-4">
+		<p class="section-eyebrow">Security</p>
+		<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">Authentication</h2>
+	</header>
 
-	<HankoProfile />
+	<div class="card p-6 sm:p-8">
+		<HankoProfile />
+	</div>
 </section>

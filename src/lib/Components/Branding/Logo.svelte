@@ -6,23 +6,29 @@
 	export let height = 150
 </script>
 
-<div class="flex items-center gap-3">
+<div class="logo">
 	{#if icon}
 		<div
-			class="m-auto max-w-full"
+			class="logo-icon"
 			style="background-image: url({icon}); width: {height}px; height: {height}px;"
 		></div>
 	{/if}
 	{#if url}
 		<div
-			class="m-auto max-w-full"
+			class="logo-mark"
 			style="background-image: url({url}); width: {width}px; height: {height}px;"
 		></div>
 	{/if}
 </div>
 
 <style>
-	div {
+	.logo {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.logo-icon,
+	.logo-mark {
 		background-position: center center;
 		background-size: contain;
 		background-repeat: no-repeat;

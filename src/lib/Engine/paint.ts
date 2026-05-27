@@ -1,6 +1,7 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
+import { gameState } from './gameState'
 import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
@@ -36,6 +37,11 @@ export const paint =
 		const unitAtTile = map.layers.units[tile] ?? null
 		const hideEnemyUnit =
 			!tileVisible && unitAtTile !== null && fog !== null && unitAtTile.team !== fog.team
+		const state = get(gameState)
+		const unitActed =
+			unitAtTile !== null &&
+			unitAtTile.team === state.currentTeam &&
+			state.actedTiles.has(tile)
 
 		context.save()
 		context.translate(left, top)
@@ -48,12 +54,31 @@ export const paint =
 			fog !== null &&
 			buildingAtTile !== null &&
 			buildingAtTile.team !== fog.team
-		render.conditionally(map.layers.buildings[tile], renderData.building)
+		const buildingActed =
+			buildingAtTile !== null &&
+			buildingAtTile.team === state.currentTeam &&
+			state.actedTiles.has(tile)
+		if (buildingActed) {
+			context.save()
+			context.filter = 'brightness(0.55) saturate(0.5)'
+			render.conditionally(buildingAtTile, renderData.building)
+			context.restore()
+		} else {
+			render.conditionally(buildingAtTile, renderData.building)
+		}
 		if (!hideEnemyBuildingCapture) {
-			render.captureProgress(map.layers.buildings[tile])
+			render.captureProgress(buildingAtTile)
 		}
 		if (!hideEnemyUnit) {
-			render.conditionally(unitAtTile, renderData.unit)
+			if (unitActed) {
+				context.save()
+				context.filter = 'brightness(0.55) saturate(0.5)'
+				context.globalAlpha = 0.75
+				render.conditionally(unitAtTile, renderData.unit)
+				context.restore()
+			} else {
+				render.conditionally(unitAtTile, renderData.unit)
+			}
 			render.playInfo(unitAtTile)
 		}
 		render.conditionally(map.layers.sky[tile], renderData.sky)

@@ -8,7 +8,7 @@
 	import MapOptions from './MapOptions.svelte'
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
-	import { mapStore } from './mapStore'
+	import { mapStore, playMapStore } from './mapStore'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
@@ -63,6 +63,7 @@
 			act: async () => {
 				const sha = mapHasher(map)
 				mapStore.set(map)
+				playMapStore.set(deriveFromHash(sha))
 				let ok = false
 				try {
 					const response = await fetch('/api/game', {

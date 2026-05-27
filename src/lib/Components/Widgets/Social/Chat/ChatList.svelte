@@ -165,7 +165,7 @@
 	>
 		{#await me}
 			<div class="pt-1 pb-4">
-				<Loader type={9} />
+				<Loader size={20} />
 			</div>
 		{:then me}
 			<div

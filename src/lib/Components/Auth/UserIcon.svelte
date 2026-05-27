@@ -53,7 +53,8 @@
 	<button class="contents" disabled={noClick} on:click={openProfile}>
 		<div
 			bind:this={floatingProfile}
-			class="h-8 w-8 bg-white rounded-full border border-solid border-gray-600 overflow-hidden self-center cursor-pointer"
+			class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow"
+			class:cursor-pointer={!noClick}
 			class:cursor-default={noClick}
 			{style}
 		>
@@ -67,7 +68,7 @@
 	</button>
 
 	<div
-		class="fixed inset-0 h-screen w-screen z-50 bg-[#ccc1] backdrop-blur-[2px]"
+		class="fixed inset-0 h-screen w-screen z-50 bg-foreground/10 backdrop-blur-[2px]"
 		class:hidden={!open}
 		on:keydown|stopPropagation={() => (open = false)}
 		on:click|stopPropagation={() => (open = false)}
@@ -78,12 +79,12 @@
 
 	{#if open}
 		<div
-			class="absolute left-1/2 -translate-x-1/2 pt-1 z-50 max-w-[13rem] w-52"
-			class:bottom-10={shouldFlowUp}
+			class="absolute left-1/2 -translate-x-1/2 pt-2 z-50 max-w-56 w-56"
+			class:bottom-12={shouldFlowUp}
 			class:-translate-x-6={shouldFlowRight}
 			class:-translate-x-40={shouldFlowLeft}
-			in:fly={{ y: -20, duration: 200 }}
-			out:fly={{ y: -20, duration: 200 }}
+			in:fly={{ y: -10, duration: 180 }}
+			out:fly={{ y: -10, duration: 180 }}
 		>
 			{#if user}
 				<FullProfileCard {user} />

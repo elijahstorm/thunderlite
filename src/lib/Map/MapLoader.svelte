@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { deriveFromHash } from './Editor/mapExporter'
-	import { mapStore } from './mapStore'
+	import { playMapStore } from './mapStore'
 
 	export let mapHash: string | undefined
 
-	const map: MapObject = $mapStore ?? deriveFromHash(mapHash)
+	const map: MapObject = $playMapStore ?? deriveFromHash(mapHash)
 
-	mapStore.set(map)
+	// Consume the hand-off so a refresh re-derives from `mapHash` cleanly
+	// instead of replaying a mutated in-memory map.
+	playMapStore.set(null)
 </script>
 
 <slot {map}></slot>

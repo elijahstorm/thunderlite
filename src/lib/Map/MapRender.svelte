@@ -5,7 +5,8 @@
 	import Game from '$lib/Engine/Game.svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
 	import { paint, type VisibilityProvider } from '$lib/Engine/paint'
-	import { gameState } from '$lib/Engine/gameState'
+	import { canSelectUnit, gameState } from '$lib/Engine/gameState'
+	import { buildingData } from '$lib/GameData/building'
 	import { computeTeamVisibility } from '$lib/Engine/visibility'
 	import { onDestroy, onMount } from 'svelte'
 	import { animationFrame, animationTimer } from '$lib/Sprites/animationFrameCount'
@@ -81,6 +82,23 @@
 		map.route = updateRoute(map, $interactionSource, [...map.route], tile)
 	}
 
+	const canSelectAt = (x: number, y: number): boolean => {
+		if (x < 0 || y < 0 || x >= map.cols || y >= map.rows) return false
+		const tile = y * map.cols + x
+		const state = $gameState
+		if (state.phase !== 'playing') return false
+		const unit = map.layers.units[tile]
+		if (unit) return canSelectUnit(unit, tile, state)
+		const building = map.layers.buildings[tile]
+		if (building) {
+			if (!buildingData[building.type]?.actable) return false
+			if (building.team !== state.currentTeam) return false
+			if (state.actedTiles.has(tile)) return false
+			return true
+		}
+		return false
+	}
+
 	const inc = () => {
 		if (pause) {
 			$animationTimer = null
@@ -144,6 +162,7 @@
 					{interfacer}
 					{select}
 					{validTile}
+					{canSelectAt}
 					{hover}
 					let:cellWidth
 					let:cellHeight

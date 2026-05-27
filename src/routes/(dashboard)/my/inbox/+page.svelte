@@ -7,7 +7,12 @@
 </script>
 
 <section>
-	<h1 class="py-4 opacity-90 text-lg font-semibold">Inbox</h1>
+	<header class="mb-6">
+		<p class="section-eyebrow">Messages</p>
+		<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">Inbox</h1>
+	</header>
 
-	<ChatList on:chat={({ detail }) => openChat(detail)} />
+	<div class="card overflow-hidden">
+		<ChatList on:chat={({ detail }) => openChat(detail)} />
+	</div>
 </section>

@@ -6,6 +6,7 @@
 	export let select: (x: number, y: number) => void
 	export let hover: (x: number, y: number) => void
 	export let validTile: (x: number, y: number) => boolean
+	export let canSelectAt: (x: number, y: number) => boolean = () => true
 	export let mini: boolean = false
 	export let animator: typeof Animator = Animator
 
@@ -54,7 +55,7 @@
 
 	{#if !mini}
 		<div class="col-start-1 row-start-1 pointer-events-none">
-			{#if $interactionState === 'select'}
+			{#if $interactionState === 'select' && canSelectAt(interfacer.hover.x, interfacer.hover.y)}
 				<img
 					class="absolute"
 					src="/game/play/icon/move/hover.png"
