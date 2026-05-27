@@ -1,4 +1,9 @@
-import { highlightActionsList, generateActionsList } from '$lib/Layers/tileHighlighter'
+import {
+	highlightActionsList,
+	generateActionsList,
+	generatePreviewList,
+} from '$lib/Layers/tileHighlighter'
+import { computeThreatTiles } from './Pathing/threat'
 import { get } from 'svelte/store'
 import { animateRoute, animateAttack, animateExplosion } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
@@ -51,13 +56,29 @@ const select: Interactor = ({ map, tile }) => {
 		}
 		return
 	}
-	if (!canSelectUnit(unit, tile, get(gameState))) {
+	const state = get(gameState)
+	if (!canSelectUnit(unit, tile, state)) {
+		// Not commandable (enemy unit, or one that has already acted) — show a
+		// read-only preview of its movement + attack reach rather than selecting it.
+		if (state.phase !== 'playing') return
+		highlightActionsList(map, generatePreviewList(map, tile, unit))
+		interactionSource.set(null)
+		interactionState.set('preview')
 		return
 	}
 
-	highlightActionsList(map, generateActionsList(map, tile, unit))
+	highlightActionsList(map, generateActionsList(map, tile, unit, computeThreatTiles(map, unit.team)))
 	interactionSource.set(tile)
 	interactionState.set('choice')
+}
+
+const preview: Interactor = (interaction) => {
+	// Any click dismisses the read-only preview, then re-runs selection on the
+	// clicked tile so tapping another unit previews/selects it without a dead click.
+	interactionState.set('select')
+	highlightActionsList(interaction.map, [])
+	interaction.map.route = []
+	select(interaction)
 }
 
 const choice: Interactor = ({ map, tile }) => {
@@ -100,6 +121,12 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 
 const openPostMoveMenu = (map: MapObject, tile: number, unit: UnitObject) => {
 	const items = computeAvailableActions({ map, tile, unit })
+	// `wait` is always offered last, so a single item means it's the only choice —
+	// skip the menu entirely and commit the wait so the unit just finishes in place.
+	if (items.length === 1 && items[0].id === 'wait') {
+		commit(map, { kind: 'wait', tile })
+		return
+	}
 	openActionMenu(tile, unit.team, items)
 }
 
@@ -178,6 +205,7 @@ const hud: Interactor = () => {}
 const actionsDecision = {
 	select,
 	choice,
+	preview,
 	move,
 	attack,
 	selectAttackTarget,
@@ -210,7 +238,7 @@ export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): v
 			const targets = generateAttackList(map, tile, unit)
 			highlightActionsList(
 				map,
-				targets.map((t) => ({ tile: t, type: 1, tip: 1 }) as unknown as Highlight)
+				targets.map((t): TileHighlight => ({ tile: t, type: 1, tip: 1 }))
 			)
 			return
 		}

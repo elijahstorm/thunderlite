@@ -27,15 +27,15 @@
 				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 				let:select
 			>
-				<MapRender {map} {requestRedraw} {select} fogOfWar />
+				<MapRender {map} {requestRedraw} {select} fogOfWar backdrop="game-backdrop" />
 			</GameStateManager>
 		</GameSocket>
 
 		{#if $contextLoaded}
 			<div
-				class="fixed right-0 top-0 border-l-2 border-b-2 border-black opacity-30 hover:opacity-100"
+				class="fixed right-3 top-3 overflow-hidden rounded-xl border border-border-strong opacity-40 shadow-lg ring-1 ring-black/5 backdrop-blur-sm transition-opacity duration-200 hover:opacity-100"
 			>
-				<MapRender mini pause fogOfWar {map} {contextLoaded} />
+				<MapRender mini pause fogOfWar {map} {contextLoaded} backdrop="bg-surface-2" />
 			</div>
 		{/if}
 	</MapLoader>

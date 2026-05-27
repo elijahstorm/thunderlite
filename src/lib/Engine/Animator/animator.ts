@@ -96,7 +96,9 @@ export const animateAttack = (
 		)
 		const key = generateKey()
 		const attackSprite = get(rendererStore).attacks[attacker.type]
-		map.layers.units[source] = null
+		// Keep the attacker on the map (so it still grants fog-of-war sight) but
+		// flag it so the canvas skips its idle sprite under the attack overlay.
+		attacker.animating = true
 		animations.update((animations) => [
 			...animations,
 			{
@@ -115,7 +117,7 @@ export const animateAttack = (
 			},
 		])
 		setTimeout(() => {
-			map.layers.units[source] = attacker
+			attacker.animating = false
 			removeAnimationByKey(key)
 			resolve()
 		}, ANIMATION_TIME * attackSprite.frames)

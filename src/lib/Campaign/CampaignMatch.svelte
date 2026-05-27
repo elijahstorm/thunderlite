@@ -110,6 +110,6 @@
 		endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 		let:select
 	>
-		<MapRender {map} {requestRedraw} {select} {campaign} />
+		<MapRender {map} {requestRedraw} {select} {campaign} {localTeam} />
 	</GameStateManager>
 </GameSocket>

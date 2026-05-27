@@ -9,6 +9,11 @@
 	import { endTurn } from './turnLoop'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
+	import { teamHasPendingActions } from './pendingActions'
+	import { routeAnimation, animations } from './Animator/animator'
+	import { actionMenuState } from './HUD/actionMenuStore'
+	import { buildMenuState } from './HUD/buildMenuStore'
+	import { interactionState, interactionSource } from './Interactor/interactionState'
 	import { MusicDirector } from '$lib/Audio/musicDirector'
 	import { weatherAudio, weatherForMap } from '$lib/Audio/weatherAudio'
 	import HUDRoot from './HUD/HUDRoot.svelte'
@@ -125,6 +130,39 @@
 					map,
 				})
 			}
+		}
+	}
+
+	// Auto-end the local player's turn the moment there's nothing left to do —
+	// every owned unit has acted and no factory can still produce. We only fire
+	// while the engine is fully idle (no animation, no open menu, no in-flight
+	// selection); that idle gate is what keeps it from triggering mid-action, e.g.
+	// in the gap between a move and its post-move menu, or during the
+	// move→strike→explosion of an attack (the moved unit is already marked acted
+	// at those points). `autoEndedTurnKey` guards against firing more than once for
+	// the same turn, which matters in online play where `handleEndTurn` relays over
+	// the socket and `currentTeam` doesn't flip locally until the server replies.
+	let autoEndedTurnKey = ''
+	$: {
+		const s = $gameState
+		const turnKey = `${s.currentTeam}:${s.turnNumber}`
+		const idle =
+			$routeAnimation === null &&
+			$animations.length === 0 &&
+			!$actionMenuState.open &&
+			!$buildMenuState.open &&
+			$interactionState === 'select' &&
+			$interactionSource === null
+		if (
+			map &&
+			s.phase === 'playing' &&
+			s.currentTeam === localTeam &&
+			idle &&
+			autoEndedTurnKey !== turnKey &&
+			!teamHasPendingActions(map, s)
+		) {
+			autoEndedTurnKey = turnKey
+			handleEndTurn()
 		}
 	}
 

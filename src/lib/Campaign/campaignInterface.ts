@@ -63,10 +63,8 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 		highlight: (x, y) => {
 			ensureHighlights()
 			const tile = tileFor(map, x, y)
-			// `as unknown as Highlight`: the project's global `Highlight` clashes with
-			// lib.dom's CSS-Highlight type, so the codebase casts literals (see
-			// Interactor/interactor.ts). type 0 / tip 1 = a plain "move"-style marker.
-			map.highlights[tile] = { tile, type: 0, tip: 1 } as unknown as Highlight
+			// type 0 / tip 1 = a plain "move"-style marker.
+			map.highlights[tile] = { tile, type: 0, tip: 1 }
 		},
 
 		unhighlight: (x, y) => {

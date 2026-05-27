@@ -17,6 +17,7 @@ playwright-report
 .vercel
 demo_data/
 .env*.local
+.pnpm-store
 
 # Orchestrator artifacts
 .orchestrator-state.json

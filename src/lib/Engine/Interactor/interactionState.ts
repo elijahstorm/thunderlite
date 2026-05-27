@@ -1,6 +1,12 @@
 import { writable } from 'svelte/store'
 
-type InterationState = 'select' | 'choice' | 'hud' | 'selectAttackTarget' | 'selectLandTile'
+type InterationState =
+	| 'select'
+	| 'choice'
+	| 'preview'
+	| 'hud'
+	| 'selectAttackTarget'
+	| 'selectLandTile'
 
 export const interactionState = writable<InterationState>('select')
 

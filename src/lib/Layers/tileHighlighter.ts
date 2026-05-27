@@ -1,6 +1,7 @@
 import { pathFinder } from '$lib/Engine/Interactor/Pathing/pathFinder'
 import { generateAttackList } from '$lib/Engine/Interactor/Pathing/attack'
 import { generateMovementList } from '$lib/Engine/Interactor/Pathing/movement'
+import { unitThreatTiles } from '$lib/Engine/Interactor/Pathing/threat'
 import { unitData } from '$lib/GameData/unit'
 
 export const updateRoute = (
@@ -86,38 +87,69 @@ export const updateRoute = (
 	return updated
 }
 
-export const highlightActionsList = (map: MapObject, highlights: Highlight[]) => {
+export const highlightActionsList = (map: MapObject, highlights: TileHighlight[]) => {
 	map.highlights = new Array(map.cols * map.rows)
 	highlights.map((tile) => {
 		map.highlights[tile.tile] = tile
 	})
 }
 
-export const generateActionsList = (map: MapObject, tile: number, unit: UnitObject) => {
+export const generateActionsList = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	threat?: Set<number>
+) => {
 	const tiles = generateMovementList(map, tile, unit)
 
 	if (unitData[unit.type].range[0] !== 1) {
 		return [
-			...convertToHighlightable(map, tiles, highlightTypes.move),
+			...convertToHighlightable(map, tiles, highlightTypes.move, threat),
 			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack),
 		]
 	}
 
 	return tiles.reduce(
-		(highlights, tile) => [
+		(highlights, from) => [
 			...highlights,
-			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack),
+			...convertToHighlightable(map, generateAttackList(map, from, unit), highlightTypes.attack),
 		],
-		convertToHighlightable(map, tiles, highlightTypes.move)
+		convertToHighlightable(map, tiles, highlightTypes.move, threat)
 	)
 }
 
-const convertToHighlightable = (map: MapObject, tiles: number[], type: HighlightType) =>
-	tiles.map<Highlight>((tile) => ({
-		tile,
-		type,
-		tip: highlightTypes.neutral,
-	}))
+// Read-only preview of any unit's reach: green where it can move, red across the
+// tiles it could attack (its danger zone, minus the tiles it can stand on).
+export const generatePreviewList = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject
+): TileHighlight[] => {
+	const moveTiles = generateMovementList(map, tile, unit)
+	const standable = new Set(moveTiles)
+	const attackTiles = [...unitThreatTiles(map, tile, unit)].filter((t) => !standable.has(t))
+
+	return [
+		...convertToHighlightable(map, moveTiles, highlightTypes.move),
+		...convertToHighlightable(map, attackTiles, highlightTypes.attack),
+	]
+}
+
+const convertToHighlightable = (
+	map: MapObject,
+	tiles: number[],
+	type: TileHighlightType,
+	threat?: Set<number>
+) =>
+	tiles.map<TileHighlight>((tile) => {
+		const threatened = type === highlightTypes.move && (threat?.has(tile) ?? false)
+		return {
+			tile,
+			type,
+			tip: threatened ? highlightTypes.bad : highlightTypes.neutral,
+			threatened,
+		}
+	})
 
 const highlightTypes = {
 	move: 0,

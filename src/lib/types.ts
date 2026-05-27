@@ -21,6 +21,10 @@ type UnitObject = ObjectType &
 		health?: number
 		hidden?: boolean
 		rescuedUnit?: UnitObject | null
+		// Transient render flag: true while this unit is mid attack-animation. It
+		// stays on the map (so it keeps contributing fog-of-war sight) but the
+		// canvas skips its idle sprite so the attack overlay shows alone.
+		animating?: boolean
 	}
 type BuildingObject = ObjectType &
 	AnimatedObject &
@@ -28,15 +32,18 @@ type BuildingObject = ObjectType &
 		stature?: number
 	}
 
-type HighlightType = 0 | 1
+type TileHighlightType = 0 | 1
 type HighlightMeta = {
-	type: HighlightType
+	type: TileHighlightType
 	tip: 0 | 1 | 2 | 3
+	/** True when a movement tile sits inside an enemy's attack reach. Drives the
+	 * danger overlay so only exposed move tiles show the warning icon. */
+	threatened?: boolean
 }
 type TileInfo = {
 	tile: number
 }
-type Highlight = TileInfo & HighlightMeta
+type TileHighlight = TileInfo & HighlightMeta
 type Route = {
 	state: number
 	rotate: number
@@ -68,7 +75,7 @@ type MapObject = {
 	layers: MapLayers
 	filters: MapFilters
 	route: (Route | undefined)[]
-	highlights: (Highlight | undefined)[]
+	highlights: (TileHighlight | undefined)[]
 }
 type MapProcesser = {
 	title?: string | null

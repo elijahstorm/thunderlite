@@ -28,6 +28,10 @@
 	export let mini: boolean = false
 	export let pause = false
 	export let fogOfWar: boolean = false
+	/** Team whose fog-of-war perspective is drawn. Always the local viewer — never
+	 * the active turn's team — so an opponent's/CPU's turn never reveals their
+	 * units to us. */
+	export let localTeam: number = 0
 	export let requestRedraw = 0
 	export let backdrop = 'bg-yellow-300'
 	export let hud = {
@@ -54,7 +58,11 @@
 	const visibilityProvider: VisibilityProvider = fogOfWar
 		? () => {
 				const state = $gameState
-				const team = state.currentTeam
+				// Viewer's team, not state.currentTeam: the active player switching to
+				// the CPU/opponent must not flip the fog to their vantage point. The
+				// cache still keys on turn + actedTiles so our view refreshes as their
+				// units move in and out of our sight.
+				const team = localTeam
 				if (
 					!cachedVisibility ||
 					cachedVisibility.team !== team ||
@@ -179,7 +187,9 @@
 				>
 					<div
 						class="w-full h-full"
-						style="max-width: {map.cols * cellWidth}px; max-height: {map.rows * cellHeight}px"
+						style={mini
+							? `max-width: ${map.cols * cellWidth}px; max-height: ${map.rows * cellHeight}px`
+							: ''}
 					>
 						<svelte:component
 							this={scroller}

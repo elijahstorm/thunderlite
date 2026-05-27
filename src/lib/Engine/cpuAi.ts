@@ -2,12 +2,17 @@ import { get } from 'svelte/store'
 import { gameState } from './gameState'
 import { applyAction } from './applyAction'
 import { emitOutgoingAction } from './outgoingActions'
+import { animateRoute, animateAttack, animateExplosion } from './Animator/animator'
 import { bestPlanFor } from './cpuAi/candidates'
 import { pickBuildOnce } from './cpuAi/production'
 import type { SerializedAction } from './Interactor/serializedAction'
 import type { ActionPlan } from './cpuAi/types'
 
-export const CPU_AI_TURN_DELAY_MS = 350
+// Gap inserted *between* consecutive CPU actions. Each move/attack now plays its
+// own animation (same helpers a human's actions use), so the bulk of the pacing
+// comes from the animations themselves — this just keeps distinct actions from
+// blurring together.
+export const CPU_AI_TURN_DELAY_MS = 150
 
 export type CpuAiHandle = {
 	cancel: () => void
@@ -72,7 +77,6 @@ export const runCpuTurn = ({
 
 	let cancelled = false
 	let timer: ReturnType<typeof setTimeout> | null = null
-	let followUps: SerializedAction[] = []
 
 	const stillOurTurn = (): boolean => {
 		if (cancelled) return false
@@ -93,36 +97,72 @@ export const runCpuTurn = ({
 		endTurn()
 	}
 
-	const tick = () => {
-		if (!stillOurTurn()) return
-
-		if (followUps.length > 0) {
-			const next = followUps.shift() as SerializedAction
-			commit(map, next)
-			schedule(tick)
+	// Play the same animation a human action would before committing the state
+	// change, so a CPU move slides and a CPU attack swings + explodes instead of
+	// teleporting. Animations resolve via their own timers; we await them so the
+	// turn paces itself off the animation length.
+	const dispatch = async (action: SerializedAction): Promise<void> => {
+		if (action.kind === 'move') {
+			const unit = map.layers.units[action.from]
+			if (!unit) return
+			map.layers.units[action.from] = null
+			await animateRoute(map, unit, action.from, action.to)
+			map.layers.units[action.from] = unit
+			if (cancelled) return
+			commit(map, action)
 			return
 		}
 
-		const plan = pickBestPlan(map, startTeam)
-		if (plan && plan.actions.length > 0) {
-			const [first, ...rest] = plan.actions
-			followUps = rest
-			commit(map, first)
-			schedule(tick)
+		if (action.kind === 'attack') {
+			const attacker = map.layers.units[action.from]
+			const target = map.layers.units[action.to]
+			if (!attacker || !target) return
+			await animateAttack(map, attacker, action.from, action.to)
+			if (cancelled) return
+			const targetWasAlive = (target.health ?? 0) > 0
+			commit(map, action)
+			if (targetWasAlive && map.layers.units[action.to] == null) {
+				await animateExplosion(map, action.to)
+			}
+			if (map.layers.units[action.from] == null) {
+				await animateExplosion(map, action.from)
+			}
 			return
 		}
 
-		const build = pickBuildOnce(map, startTeam)
-		if (build) {
-			commit(map, build)
-			schedule(tick)
-			return
-		}
-
-		finish()
+		if (cancelled) return
+		commit(map, action)
 	}
 
-	schedule(tick)
+	// One tick = one unit's full plan (e.g. move → attack → explosion) dispatched
+	// back-to-back with no gap, so a unit's own actions flow together like a
+	// human's. The delayMs pause only sits *between* units / build orders.
+	const tick = async () => {
+		if (!stillOurTurn()) return
+
+		const plan = pickBestPlan(map, startTeam)
+		const actions = plan?.actions ?? []
+		if (actions.length === 0) {
+			const build = pickBuildOnce(map, startTeam)
+			if (!build) {
+				finish()
+				return
+			}
+			await dispatch(build)
+			if (!stillOurTurn()) return
+			schedule(() => void tick())
+			return
+		}
+
+		for (const action of actions) {
+			if (!stillOurTurn()) return
+			await dispatch(action)
+		}
+		if (!stillOurTurn()) return
+		schedule(() => void tick())
+	}
+
+	schedule(() => void tick())
 
 	return {
 		cancel: () => {

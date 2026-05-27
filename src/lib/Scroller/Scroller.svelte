@@ -59,6 +59,25 @@
 			context.restore()
 		}
 
+	// Half of the leftover space on each axis when the content is smaller than the
+	// viewport. Larger-than-viewport content yields 0, so panning is unaffected.
+	const centerOffset = (zoom: number): [number, number] => {
+		if (!tiling) return [0, 0]
+		return [
+			Math.max((tiling.__clientWidth - tiling.__contentWidth * zoom) / 2, 0),
+			Math.max((tiling.__clientHeight - tiling.__contentHeight * zoom) / 2, 0),
+		]
+	}
+
+	// Screen→content hit-testing must account for the centring offset below, so
+	// shift the reference rect by the same amount the board was shifted.
+	const boardRect = (): DOMRect => {
+		if (!container) return new DOMRect()
+		const rect = container.getBoundingClientRect()
+		const [cx, cy] = centerOffset(scroller?.__zoomLevel ?? 1)
+		return { ...rect.toJSON(), left: rect.left + cx, top: rect.top + cy } as DOMRect
+	}
+
 	onMount(() => {
 		const _context = content.getContext('2d')
 		if (!_context) {
@@ -67,7 +86,17 @@
 
 		context = _context
 		tiling = MakeTiling()
-		scroller = MakeScroller(tiling.render(handleOffset, paint(context)), {
+
+		// Centre the board: render with half the leftover space as an offset, and
+		// signal that same offset to the overlay layers (hover/animator), so a map
+		// smaller than the viewport sits in the middle instead of the top-left
+		// corner. Maps larger than the viewport pan exactly as before.
+		const drawTiles = tiling.render(handleOffset, paint(context))
+		const renderCentered = (left: number, top: number, zoom: number) => {
+			const [cx, cy] = centerOffset(zoom)
+			drawTiles(left - cx, top - cy, zoom)
+		}
+		scroller = MakeScroller(renderCentered, {
 			bouncing: false,
 			locking: false,
 		})
@@ -109,10 +138,7 @@
 	role="grid"
 	tabindex="0"
 	bind:this={container}
-	on:click|stopPropagation|preventDefault={click(
-		container.getBoundingClientRect(),
-		scroller
-	)(handleClick)}
+	on:click|stopPropagation|preventDefault={click(boardRect(), scroller)(handleClick)}
 	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
 	on:touchstart={touchstart(scroller)}
 	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
@@ -121,10 +147,7 @@
 	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
 	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
 	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
-	on:mousemove|stopPropagation|preventDefault={mousemove(
-		container.getBoundingClientRect(),
-		scroller
-	)(handleHover)}
+	on:mousemove|stopPropagation|preventDefault={mousemove(boardRect(), scroller)(handleHover)}
 	class="h-full outline-none"
 >
 	<canvas bind:this={content}></canvas>

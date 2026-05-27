@@ -37,11 +37,19 @@ export const paint =
 		const unitAtTile = map.layers.units[tile] ?? null
 		const hideEnemyUnit =
 			!tileVisible && unitAtTile !== null && fog !== null && unitAtTile.team !== fog.team
+		// A unit mid attack-animation stays on the map for fog-of-war sight, but its
+		// idle sprite is suppressed here so only the attack overlay is drawn.
+		const hideIdleUnit = hideEnemyUnit || (unitAtTile?.animating ?? false)
 		const state = get(gameState)
 		const unitActed =
 			unitAtTile !== null &&
 			unitAtTile.team === state.currentTeam &&
 			state.actedTiles.has(tile)
+		// Only the active team's still-available units idle-animate. Units that have
+		// spent their action, and every unit belonging to a non-active team, freeze
+		// on sprite frame 0.
+		const unitAnimates =
+			unitAtTile !== null && unitAtTile.team === state.currentTeam && !unitActed
 
 		context.save()
 		context.translate(left, top)
@@ -69,15 +77,16 @@ export const paint =
 		if (!hideEnemyBuildingCapture) {
 			render.captureProgress(buildingAtTile)
 		}
-		if (!hideEnemyUnit) {
+		if (!hideIdleUnit) {
+			const drawUnit = unitAnimates ? render.conditionally : render.conditionallyStatic
 			if (unitActed) {
 				context.save()
 				context.filter = 'brightness(0.55) saturate(0.5)'
 				context.globalAlpha = 0.75
-				render.conditionally(unitAtTile, renderData.unit)
+				drawUnit(unitAtTile, renderData.unit)
 				context.restore()
 			} else {
-				render.conditionally(unitAtTile, renderData.unit)
+				drawUnit(unitAtTile, renderData.unit)
 			}
 			render.playInfo(unitAtTile)
 		}
@@ -102,6 +111,8 @@ const contextProvider = (
 ) => ({
 	always: always(width, height, frame, scale)(context),
 	conditionally: conditionally(width, height, frame, scale)(context),
+	// Frame-0 variant for units that must not idle-animate (spent or non-active team).
+	conditionallyStatic: conditionally(width, height, 0, scale)(context),
 	highlights: highlights(width, height)(context),
 	playInfo: playInfo(width, height, scale)(context),
 	captureProgress: captureProgress(width, height, scale)(context),
@@ -151,7 +162,7 @@ const conditionally =
 const highlights =
 	(width: number, height: number) =>
 	(context: CanvasRenderingContext2D) =>
-	(highlight: Highlight | undefined) => {
+	(highlight: TileHighlight | undefined) => {
 		if (!highlight) return
 
 		const style = ['green', 'red'][highlight.type]
@@ -169,8 +180,10 @@ const highlights =
 const advice =
 	(width: number, height: number) =>
 	(context: CanvasRenderingContext2D) =>
-	(highlight: Highlight | undefined, advice: HTMLImageElement) => {
-		if (!highlight) return
+	(highlight: TileHighlight | undefined, advice: HTMLImageElement) => {
+		// The warning overlay is reserved for movement tiles a player can reach
+		// but an enemy can also attack — every other highlight skips it.
+		if (!highlight || !highlight.threatened) return
 
 		context.globalAlpha = 0.5
 		context.drawImage(advice, 0, highlight.type * spriteSize, width, height, 0, 0, width, height)
