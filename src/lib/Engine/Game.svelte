@@ -8,11 +8,19 @@
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import type { createImageLoader } from '$lib/Sprites/images'
 	import { animationData, animationRenderer } from '$lib/GameData/animation'
+	import { gameState } from './gameState'
+	import { onMatchEnd } from './matchEnd'
+	import { createCampaignRunner } from '$lib/Campaign/campaignRunner'
+	import { createCampaignInterface } from '$lib/Campaign/campaignInterface'
+	import Dialogue from '$lib/Campaign/Dialogue.svelte'
+	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 
 	export let map: MapObject
 	export let colorizer: ReturnType<typeof imageColorizer>
 	export let makeImage: ReturnType<typeof createImageLoader>
 	export let select = (x: number, y: number) => {}
+	/** When set, this level is a scripted campaign level (K1 parse output). */
+	export let campaign: CutsceneScript | undefined = undefined
 
 	let validTile = (x: number, y: number) => x < map.cols && y < map.rows
 
@@ -57,6 +65,35 @@
 			animation: { ...store.animation, ...animation(animationData.map((_, index) => index)) },
 		}))
 	})
+
+	// Campaign layer (K2): when a scripted level is active, drive its script
+	// against the live engine. `start` runs on mount; each new turn number fires
+	// its `turns[n]` block once; the J1 match-end hook plays `win`/`lose`. Between
+	// scripted beats the player keeps normal control of the match.
+	onMount(() => {
+		if (!campaign) return
+
+		const runner = createCampaignRunner(campaign, createCampaignInterface({ map }))
+		void runner.start()
+
+		let lastTurn = -1
+		const offTurn = gameState.subscribe((state) => {
+			if (state.turnNumber !== lastTurn) {
+				lastTurn = state.turnNumber
+				void runner.enterTurn(state.turnNumber)
+			}
+		})
+		const offMatchEnd = onMatchEnd((result) => void runner.finish(result))
+
+		return () => {
+			offTurn()
+			offMatchEnd()
+		}
+	})
 </script>
 
 <slot {interfacer} {select} {validTile} {renderData}></slot>
+
+{#if campaign}
+	<Dialogue />
+{/if}
