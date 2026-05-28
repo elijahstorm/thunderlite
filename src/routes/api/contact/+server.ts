@@ -25,7 +25,7 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
 			fetch('/emails/contact-confirmation.html'),
 		])
 
-		const ticket = dataFetch[0].id
+		const ticket = (dataFetch[0] as unknown as { id: string }).id
 		const renderHTML = await dataFetch[1].text()
 
 		const html = mailGenerator(renderHTML, {

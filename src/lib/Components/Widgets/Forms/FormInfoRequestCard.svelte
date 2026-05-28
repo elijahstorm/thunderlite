@@ -2,7 +2,13 @@
 	import DataInput from '$lib/Components/Widgets/Forms/DataInput.svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
 
-	export let inputs = [
+	type FormInput = {
+		text: string
+		id: string
+		type: 'text' | 'textarea' | 'email' | 'password' | 'tel' | 'url' | 'number'
+		icon?: string
+	}
+	export let inputs: FormInput[] = [
 		{
 			text: 'Email',
 			id: 'email_reset',
@@ -98,8 +104,9 @@
 			<div class="relative w-full mt-6 mx-auto">
 				<form bind:this={formElement} on:submit|preventDefault={sendRequest}>
 					{#each inputs as input (input.id)}
+						<!-- `input.text` is currently unwired (DataInput has no `text` prop);
+						     map it to `label` if these inputs should show their labels. -->
 						<DataInput
-							text={input.text}
 							name={input.id}
 							id={input.id}
 							type={input.type}

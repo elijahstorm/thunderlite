@@ -15,9 +15,9 @@
 
 	export let date
 
-	const add = (amt) => date.add(1, amt)
+	const add = (amt: string) => date.add(1, amt)
 
-	const sub = (amt) => date.add(-1, amt)
+	const sub = (amt: string) => date.add(-1, amt)
 </script>
 
 <section

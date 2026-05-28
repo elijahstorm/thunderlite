@@ -2,13 +2,22 @@ import { addToast } from 'as-toast'
 
 const app = {
 	file: {
-		handle: null,
+		handle: null as FileSystemFileHandle | null,
 	},
 	modified: false,
 	map: {
 		title: 'rose gold',
 	},
 }
+
+// File System Access API isn't on the standard lib types yet — narrow access
+// through a tiny structural type so we don't sprinkle `any` around the module.
+type SaveFilePicker = (options: {
+	suggestedName?: string
+	types?: { description: string; accept: Record<string, string[]> }[]
+}) => Promise<FileSystemFileHandle>
+const showSaveFilePicker = (): SaveFilePicker | undefined =>
+	(window as unknown as { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker
 
 export const save = async (content: string) => {
 	if (!app.file.handle) {
@@ -25,15 +34,15 @@ export const open = (callback: (content: string | null) => void) => {
 
 	// Listen for the 'change' event when a file is selected
 	fileInput.addEventListener('change', function () {
-		const selectedFile = fileInput.files[0]
+		const selectedFile = fileInput.files?.[0]
 
 		if (selectedFile) {
 			const reader = new FileReader()
 
 			// Define a callback function to handle the file content
 			reader.onload = function (event) {
-				const fileContent = event.target.result
-				callback(fileContent)
+				const result = event.target?.result
+				callback(typeof result === 'string' ? result : null)
 			}
 
 			// Read the file as text
@@ -47,45 +56,51 @@ export const open = (callback: (content: string | null) => void) => {
 	fileInput.click()
 }
 
-const getNewFileHandle = async () => {
-	// For Chrome 86 and later...
-	if ('showSaveFilePicker' in window) {
-		const opts = {
-			suggestedName: app.map?.title,
-			types: [
-				{
-					description: 'Text file',
-					accept: { 'text/plain': ['.txt'] },
-				},
-			],
-		}
-		return window.showSaveFilePicker(opts)
-	}
-	// For Chrome 85 and earlier...
-	const opts = {
-		type: 'save-file',
-		accepts: [
+const getNewFileHandle = async (): Promise<FileSystemFileHandle | null> => {
+	const picker = showSaveFilePicker()
+	if (!picker) return null
+	return picker({
+		suggestedName: app.map?.title,
+		types: [
 			{
 				description: 'Text file',
-				extensions: ['txt'],
-				mimeTypes: ['text/plain'],
+				accept: { 'text/plain': ['.txt'] },
 			},
 		],
-	}
-	return window.chooseFileSystemEntries(opts)
+	})
+}
+
+// Browsers without File System Access (Firefox, Safari) fall through to a
+// regular anchor download so saving still works — no DB or handle to remember,
+// but the user gets the file. Chromium picks the real picker via `getNewFileHandle`.
+const downloadFallback = (textContent: string) => {
+	const blob = new Blob([textContent], { type: 'text/plain' })
+	const url = URL.createObjectURL(blob)
+	const a = document.createElement('a')
+	a.href = url
+	a.download = `${app.map?.title ?? 'thunderlite'}.txt`
+	document.body.appendChild(a)
+	a.click()
+	a.remove()
+	URL.revokeObjectURL(url)
 }
 
 const saveFileAs = async (textContent: string) => {
-	let fileHandle
+	let fileHandle: FileSystemFileHandle | null = null
 	try {
 		fileHandle = await getNewFileHandle()
 	} catch (ex) {
-		if (ex.name === 'AbortError') {
+		if (ex instanceof Error && ex.name === 'AbortError') {
 			return
 		}
 		const msg = 'An error occured trying to open the file.'
 		addToast(`${msg}, ${ex}`, 'warn')
 		alert(msg)
+		return
+	}
+	if (!fileHandle) {
+		// No native picker available — degrade to an anchor download.
+		downloadFallback(textContent)
 		return
 	}
 	try {
@@ -101,17 +116,6 @@ const saveFileAs = async (textContent: string) => {
 }
 
 const writeFile = async (fileHandle: FileSystemFileHandle, contents: string) => {
-	// Support for Chrome 82 and earlier.
-	if (fileHandle.createWriter) {
-		// Create a writer (request permission if necessary).
-		const writer = await fileHandle.createWriter()
-		// Write the full length of the contents
-		await writer.write(0, contents)
-		// Close the file and write the contents to disk
-		await writer.close()
-		return
-	}
-	// For Chrome 83 and later.
 	// Create a FileSystemWritableFileStream to write to.
 	const writable = await fileHandle.createWritable()
 	// Write the contents of the file to the stream.

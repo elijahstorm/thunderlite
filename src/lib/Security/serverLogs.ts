@@ -1,8 +1,8 @@
-import { NODE_ENV } from '$env/static/private'
+import { dev } from '$app/environment'
 import type postgres from 'postgres'
 
 export const logToErrorDb = (sql: postgres.Sql) => async (e: unknown, info?: string) => {
-	if (NODE_ENV === 'development') {
+	if (dev) {
 		console.error(e)
 		return
 	}

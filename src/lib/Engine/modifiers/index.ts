@@ -56,7 +56,8 @@ export const runModifiers = (
 	for (const key of modifiers) {
 		if (getPhase(key) !== phase) continue
 
-		const builtIn = modifierData[key]?.run
+		const entry = modifierData[key] as { run?: ModifierHandler } | undefined
+		const builtIn = entry?.run
 		if (builtIn) builtIn(target, ctx)
 
 		const handlers = registry.get(key)

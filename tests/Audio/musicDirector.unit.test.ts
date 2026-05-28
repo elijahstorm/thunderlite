@@ -126,7 +126,7 @@ describe('MusicDirector (subscription shell)', () => {
 		director.start()
 		expect(rec.plays.map((p) => p.track)).toEqual(['game/intro'])
 
-		introCb?.() // intro elapses
+		;(introCb as (() => void) | null)?.() // intro elapses
 		expect(rec.plays.map((p) => p.track)).toEqual(['game/intro', 'game/player'])
 
 		director.stop()

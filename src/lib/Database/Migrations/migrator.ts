@@ -1,4 +1,4 @@
-import { NODE_ENV } from '$env/static/private'
+import { dev } from '$app/environment'
 import { CreateDemoData } from '$lib/Migrations/seed_faker_data.sql'
 import { migrationsList } from '$lib/Migrations/list'
 import type postgres from 'postgres'
@@ -10,7 +10,7 @@ export const migrate = async (sql: postgres.Sql) => {
 }
 
 export const faker = async (sql: postgres.Sql, user?: string) => {
-	if (NODE_ENV === 'development' && user) {
+	if (dev && user) {
 		console.log('running demo data migration for user', user)
 		await CreateDemoData(sql, user)
 	}

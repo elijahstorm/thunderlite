@@ -4,7 +4,10 @@
 	export let value: string
 	export let id: string
 	export let name: string
-	export let type: 'textarea' | 'text' = 'text'
+	// Only `textarea` is treated specially — every other value renders as the
+	// regular text input, so this accepts the common HTML input types callers pass.
+	export let type: 'textarea' | 'text' | 'email' | 'password' | 'tel' | 'url' | 'number' =
+		'text'
 	export let placeholder: string
 	export let label: string = ''
 	export let message: string = ''

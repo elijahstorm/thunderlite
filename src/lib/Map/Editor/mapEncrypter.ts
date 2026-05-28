@@ -47,7 +47,7 @@ export const decryptData = (resolve: (message: string) => void) => (pair: KeyDat
 				additionalData: new TextEncoder().encode(AdditionalData),
 			},
 			pair.key,
-			pair.encrypted
+			pair.encrypted as BufferSource
 		)
 		.then((decrypted) => resolve(new TextDecoder().decode(decrypted)))
 		.catch((error) => addToast(`Decryption error: ${error}`, 'warn'))

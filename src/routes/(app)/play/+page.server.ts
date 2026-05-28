@@ -1,7 +1,8 @@
 import { error } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { createClient } from '@vercel/kv'
-import { KV_REST_API_TOKEN, KV_REST_API_URL, NODE_ENV } from '$env/static/private'
+import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
+import { dev } from '$app/environment'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
 import type postgres from 'postgres'
@@ -32,7 +33,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 }
 
 const getGameSession = async (sql: postgres.Sql, userSession: string) => {
-	if (NODE_ENV !== 'production') {
+	if (dev) {
 		return { gameSession: 'testSession', sha: 'hello' }
 	}
 

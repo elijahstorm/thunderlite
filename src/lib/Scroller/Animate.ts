@@ -42,7 +42,7 @@ export const Animate = {
 		const TARGET_FPS = 60
 		let requests: { [key: number]: FrameRequestCallback } = {}
 		let rafHandle = 1
-		let intervalHandle: NodeJS.Timeout | null = null
+		let intervalHandle: ReturnType<typeof setTimeout> | null = null
 		let lastActive = performance.now()
 
 		return function (callback: FrameRequestCallback) {

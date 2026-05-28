@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 		return { auth, user }
 	} catch (e) {
-		if (e.status === 302) {
+		if ((e as { status?: number })?.status === 302) {
 			throw redirect(302, '/make')
 		}
 		try {

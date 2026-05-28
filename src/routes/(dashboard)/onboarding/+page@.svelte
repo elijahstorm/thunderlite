@@ -79,7 +79,10 @@
 									addToast('Error saving your data', 'warn')
 								}
 								update()
-								if (result.data?.validated) resetForm(result.data?.validated)
+								// `data` only exists on `success` / `failure` results — narrow first.
+								if ('data' in result && result.data?.validated) {
+									resetForm(result.data.validated)
+								}
 							}
 						}}
 					>

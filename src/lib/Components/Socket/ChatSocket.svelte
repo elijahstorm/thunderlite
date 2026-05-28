@@ -18,8 +18,8 @@
 			read_at: Date | null
 		})[]
 	>([])
-	const connectionTimeout = writable<NodeJS.Timeout | null>()
-	const refreshTimeout = writable<NodeJS.Timeout | null>()
+	const connectionTimeout = writable<ReturnType<typeof setTimeout> | null>()
+	const refreshTimeout = writable<ReturnType<typeof setTimeout> | null>()
 	const TIMEOUT = 1000
 	let socket = writable<WebSocket | null>(null)
 	let error = false
