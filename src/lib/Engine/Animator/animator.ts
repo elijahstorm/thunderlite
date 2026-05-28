@@ -1,6 +1,5 @@
 import { get, writable } from 'svelte/store'
 import { pathFinder } from '../Interactor/Pathing/pathFinder'
-import { unitData } from '$lib/GameData/unit'
 import { animationData } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { rendererStore } from '$lib/Sprites/spriteStore'
@@ -75,6 +74,15 @@ export const getDirection = (map: MapObject, route: number[], index: number) => 
 	return directions.findIndex((validator) => validator(map, route[index], route[index + 1]))
 }
 
+// Turns a unit on `from` to look toward `to`. Adjacent (melee) pairings use the
+// exact orthogonal pose; distant (ranged) pairings glance left/right toward the
+// opponent's column, since the sprite sheets only pose in the 4 cardinals.
+export const facingToward = (map: MapObject, from: number, to: number): number => {
+	const orthogonal = directions.findIndex((validator) => validator(map, from, to))
+	if (orthogonal >= 0) return orthogonal
+	return from % map.cols < to % map.cols ? 0 : 2
+}
+
 export const animateAttack = (
 	map: MapObject,
 	attacker: UnitObject,
@@ -82,23 +90,27 @@ export const animateAttack = (
 	target: number
 ) =>
 	new Promise<void>((resolve) => {
-		attacker.state = getDirection(
-			map,
-			[
-				source,
-				unitData[attacker.type].range[0] > 1
-					? source % map.cols < target % map.cols
-						? source + 1
-						: source - 1
-					: target,
-			],
-			0
-		)
+		attacker.state = facingToward(map, source, target)
+		// The struck unit wheels around to face whoever hit it. It stays put while
+		// the attacker swings, so its idle sprite simply renders in the new pose.
+		const defender = map.layers.units[target]
+		if (defender) defender.state = facingToward(map, target, source)
 		const key = generateKey()
 		const attackSprite = get(rendererStore).attacks[attacker.type]
 		// Keep the attacker on the map (so it still grants fog-of-war sight) but
 		// flag it so the canvas skips its idle sprite under the attack overlay.
 		attacker.animating = true
+		// The attack sprite is only loaded for unit types present when the board
+		// mounts; a freshly-built type (or a headless/test context) may have none.
+		// Skip the overlay but still resolve on the normal beat so the attack
+		// commits and the turn keeps flowing — never throw out of an animation.
+		if (!attackSprite) {
+			setTimeout(() => {
+				attacker.animating = false
+				resolve()
+			}, ANIMATION_TIME)
+			return
+		}
 		animations.update((animations) => [
 			...animations,
 			{

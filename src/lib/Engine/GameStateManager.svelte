@@ -14,6 +14,7 @@
 	import { actionMenuState } from './HUD/actionMenuStore'
 	import { buildMenuState } from './HUD/buildMenuStore'
 	import { interactionState, interactionSource } from './Interactor/interactionState'
+	import { animateTeamDefeat } from './defeat'
 	import { MusicDirector } from '$lib/Audio/musicDirector'
 	import { weatherAudio, weatherForMap } from '$lib/Audio/weatherAudio'
 	import HUDRoot from './HUD/HUDRoot.svelte'
@@ -48,9 +49,14 @@
 	let state: 'waiting' | 'animating' | 'overlay' = 'waiting'
 	let active = false
 
+	// Teams whose defeat explosions have already been kicked off this match, so
+	// the reactive block below fires the sequence exactly once per elimination.
+	let defeatedTeams = new Set<number>()
+
 	let lastMap: MapObject | undefined
 	$: if (map && map !== lastMap) {
 		lastMap = map
+		defeatedTeams = new Set<number>()
 		initGameStateFromMap(map)
 		// A fresh board is a fresh match — clear the emit-once guard so this match
 		// can fire its own match-end event (J1), and zero the stat tracker (J2).
@@ -84,6 +90,20 @@
 		)
 	}
 
+	// When a team is eliminated — by forfeit or by losing its last unit/HQ — blow
+	// up everything it still owns with the death explosion. Runs on each client
+	// independently off the deterministic `hasLost` flip, so both sides see the
+	// same army go up. The results screen (StatsScreen) waits on `defeatAnimating`
+	// so these blasts aren't immediately hidden behind it.
+	$: if (map) {
+		for (const player of $gameState.players) {
+			if (player.hasLost && !defeatedTeams.has(player.team)) {
+				defeatedTeams.add(player.team)
+				void animateTeamDefeat(map, player.team)
+			}
+		}
+	}
+
 	const select = (x: number, y: number) => {
 		if (!interactor) return
 		if (state !== 'waiting') return
@@ -106,6 +126,7 @@
 	// state and clear the J1/J2 trackers so a new match-end can fire and re-count.
 	const handleRematch = () => {
 		if (!map) return
+		defeatedTeams = new Set<number>()
 		initGameStateFromMap(map)
 		resetMatchEnd()
 		resetMatchStats()

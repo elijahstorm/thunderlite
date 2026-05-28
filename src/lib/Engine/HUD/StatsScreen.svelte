@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte'
 	import { gameState } from '../gameState'
+	import { defeatAnimating } from '../defeat'
 	import { onMatchEnd, lastMatchResult, type MatchResult } from '../matchEnd'
 	import type { PlayerMatchStats } from '../matchStats'
 
@@ -28,7 +29,10 @@
 	})
 	onDestroy(() => off?.())
 
-	$: result = $gameState.phase === 'gameOver' ? (live ?? lastMatchResult()) : null
+	// Hold the results screen back while a defeated army is still blowing up, so
+	// those explosions are actually visible before the banner covers the board.
+	$: result =
+		$gameState.phase === 'gameOver' && $defeatAnimating === 0 ? (live ?? lastMatchResult()) : null
 
 	const STAT_COLUMNS: { key: keyof PlayerMatchStats; label: string }[] = [
 		{ key: 'unitsBuilt', label: 'Built' },

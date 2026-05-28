@@ -228,5 +228,18 @@ export const applyAction = (
 			endTurn({ map })
 			return
 		}
+		case 'surrender': {
+			// The surrendering team is eliminated; win conditions then resolve the
+			// match (the lone survivor wins). Relayed like any other action, so an
+			// online opponent sees the forfeit and the match ends on both clients.
+			gameState.update((s) => ({
+				...s,
+				players: s.players.map((p) =>
+					p.team === action.team ? { ...p, hasLost: true } : p
+				),
+			}))
+			applyWinConditions(map as MapObject)
+			return
+		}
 	}
 }

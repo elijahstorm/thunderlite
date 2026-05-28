@@ -11,6 +11,7 @@ export type SerializedAction =
 	| { kind: 'transport-unload'; transport: number; tile: number }
 	| { kind: 'wait'; tile: number }
 	| { kind: 'end-turn' }
+	| { kind: 'surrender'; team: number }
 
 export type GameEvent = {
 	id: number
@@ -49,6 +50,8 @@ export const isValidSerializedAction = (value: unknown): value is SerializedActi
 			return isTile(v.transport) && isTile(v.tile)
 		case 'end-turn':
 			return true
+		case 'surrender':
+			return isTile(v.team)
 	}
 	return false
 }

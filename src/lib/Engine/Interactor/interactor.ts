@@ -200,6 +200,13 @@ const selectLandTile: Interactor = ({ map, tile }) => {
 	commit(map, { kind: 'transport-unload', transport: source, tile })
 }
 
+// Forfeit the match for `team`. Routed through `commit` like any other action so
+// it applies locally (and fires its match-end flow) and relays to an online
+// opponent. Safe in single-player too — the local interactor just applies it.
+export const surrender = (map: MapObject, team: number): void => {
+	commit(map, { kind: 'surrender', team })
+}
+
 const hud: Interactor = () => {}
 
 const actionsDecision = {

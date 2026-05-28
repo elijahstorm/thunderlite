@@ -118,6 +118,11 @@
 				tileHeight,
 			})
 			scroller.options.locking = window.innerWidth <= 768
+			// Re-anchor the scroller's screen position too — a window resize can shift
+			// the board's left/top, and the touch math relies on these to map finger
+			// coordinates back into the content.
+			const r = container.getBoundingClientRect()
+			scroller.setPosition(r.left + container.clientLeft, r.top + container.clientTop)
 			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
 		}
 
@@ -138,7 +143,7 @@
 	role="grid"
 	tabindex="0"
 	bind:this={container}
-	on:click|stopPropagation|preventDefault={click(boardRect(), scroller)(handleClick)}
+	on:click|stopPropagation|preventDefault={click(boardRect, scroller)(handleClick)}
 	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
 	on:touchstart={touchstart(scroller)}
 	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
@@ -147,7 +152,7 @@
 	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
 	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
 	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
-	on:mousemove|stopPropagation|preventDefault={mousemove(boardRect(), scroller)(handleHover)}
+	on:mousemove|stopPropagation|preventDefault={mousemove(boardRect, scroller)(handleHover)}
 	class="h-full outline-none"
 >
 	<canvas bind:this={content}></canvas>

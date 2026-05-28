@@ -63,5 +63,5 @@
 </script>
 
 <div class="p-6 h-screen">
-	<MapRender {map} />
+	<MapRender {map} backdrop="game-backdrop" />
 </div>

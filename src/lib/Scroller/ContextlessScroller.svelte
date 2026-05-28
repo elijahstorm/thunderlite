@@ -94,7 +94,7 @@
 	tabindex="0"
 	bind:this={container}
 	on:click|stopPropagation|preventDefault={click(
-		container.getBoundingClientRect(),
+		() => container.getBoundingClientRect(),
 		scroller
 	)(handleClick)}
 	on:keypress={keypress(handleKeypress)}
@@ -106,7 +106,7 @@
 	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
 	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
 	on:mousemove|stopPropagation|preventDefault={mousemove(
-		container.getBoundingClientRect(),
+		() => container.getBoundingClientRect(),
 		scroller
 	)(handleHover)}
 	class="h-full outline-none"

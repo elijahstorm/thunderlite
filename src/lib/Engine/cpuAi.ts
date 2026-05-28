@@ -97,6 +97,18 @@ export const runCpuTurn = ({
 		endTurn()
 	}
 
+	// Animations are cosmetic. A failed one (e.g. a unit type whose attack sprite
+	// never loaded) must never reject out of `dispatch` and strand the turn — the
+	// commit that follows is what actually advances the game, so we always let it
+	// run. Swallow any animation error and keep the pacing beat.
+	const safeAnimate = async (run: () => Promise<void>): Promise<void> => {
+		try {
+			await run()
+		} catch {
+			/* visual-only; the action still commits below */
+		}
+	}
+
 	// Play the same animation a human action would before committing the state
 	// change, so a CPU move slides and a CPU attack swings + explodes instead of
 	// teleporting. Animations resolve via their own timers; we await them so the
@@ -106,7 +118,7 @@ export const runCpuTurn = ({
 			const unit = map.layers.units[action.from]
 			if (!unit) return
 			map.layers.units[action.from] = null
-			await animateRoute(map, unit, action.from, action.to)
+			await safeAnimate(() => animateRoute(map, unit, action.from, action.to))
 			map.layers.units[action.from] = unit
 			if (cancelled) return
 			commit(map, action)
@@ -117,15 +129,15 @@ export const runCpuTurn = ({
 			const attacker = map.layers.units[action.from]
 			const target = map.layers.units[action.to]
 			if (!attacker || !target) return
-			await animateAttack(map, attacker, action.from, action.to)
+			await safeAnimate(() => animateAttack(map, attacker, action.from, action.to))
 			if (cancelled) return
 			const targetWasAlive = (target.health ?? 0) > 0
 			commit(map, action)
 			if (targetWasAlive && map.layers.units[action.to] == null) {
-				await animateExplosion(map, action.to)
+				await safeAnimate(() => animateExplosion(map, action.to))
 			}
 			if (map.layers.units[action.from] == null) {
-				await animateExplosion(map, action.from)
+				await safeAnimate(() => animateExplosion(map, action.from))
 			}
 			return
 		}
@@ -140,26 +152,34 @@ export const runCpuTurn = ({
 	const tick = async () => {
 		if (!stillOurTurn()) return
 
-		const plan = pickBestPlan(map, startTeam)
-		const actions = plan?.actions ?? []
-		if (actions.length === 0) {
-			const build = pickBuildOnce(map, startTeam)
-			if (!build) {
-				finish()
+		// Any unexpected failure (planner, commit, scheduling) must end the turn
+		// rather than freeze the match on the CPU's side — `finish` hands control
+		// back to the player. Without this net a single throw leaves the turn
+		// hung, since nothing else schedules the next tick.
+		try {
+			const plan = pickBestPlan(map, startTeam)
+			const actions = plan?.actions ?? []
+			if (actions.length === 0) {
+				const build = pickBuildOnce(map, startTeam)
+				if (!build) {
+					finish()
+					return
+				}
+				await dispatch(build)
+				if (!stillOurTurn()) return
+				schedule(() => void tick())
 				return
 			}
-			await dispatch(build)
+
+			for (const action of actions) {
+				if (!stillOurTurn()) return
+				await dispatch(action)
+			}
 			if (!stillOurTurn()) return
 			schedule(() => void tick())
-			return
+		} catch {
+			finish()
 		}
-
-		for (const action of actions) {
-			if (!stillOurTurn()) return
-			await dispatch(action)
-		}
-		if (!stillOurTurn()) return
-		schedule(() => void tick())
 	}
 
 	schedule(() => void tick())

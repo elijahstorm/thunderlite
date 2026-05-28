@@ -2,14 +2,18 @@ import type { KeyboardEventHandler, MouseEventHandler, TouchEventHandler } from 
 import type { Scroller } from './Scroller'
 
 export const click =
-	(rect: DOMRect, scroller: Scroller) =>
+	(getRect: () => DOMRect, scroller: Scroller) =>
 	(click: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
-	(e) =>
-		validate(preventOnForms, minimalMouseMovement(scroller))(
+	(e) => {
+		// Resolve the rect (and its centring offset) per event so a window resize
+		// that moved or resized the board takes effect on the very next click.
+		const rect = getRect()
+		return validate(preventOnForms, minimalMouseMovement(scroller))(
 			click,
 			e.clientX - rect.left + scroller.__scrollLeft,
 			e.clientY - rect.top + scroller.__scrollTop
 		)(e)
+	}
 export const keypress =
 	(keypress: (key: string, shiftKey: boolean) => void): KeyboardEventHandler<HTMLElement> =>
 	(e) =>
@@ -54,10 +58,11 @@ export const contextmenu =
 	(e) =>
 		scroller ?? e
 export const mousemove =
-	(rect: DOMRect, scroller: Scroller) =>
+	(getRect: () => DOMRect, scroller: Scroller) =>
 	(mousemove: (x: number, y: number) => void): MouseEventHandler<HTMLElement> =>
-	(e) =>
-		otherwise(scrollerIsScrolling)(
+	(e) => {
+		const rect = getRect()
+		return otherwise(scrollerIsScrolling)(
 			scroller.doTouchMove,
 			[
 				{
@@ -71,6 +76,7 @@ export const mousemove =
 			e.clientX - rect.left + scroller.__scrollLeft,
 			e.clientY - rect.top + scroller.__scrollTop
 		)(scroller)
+	}
 
 const otherwise =
 	(validation: (scroller: Scroller) => boolean) =>

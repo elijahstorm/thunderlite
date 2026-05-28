@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import MapRender from '$lib/Map/MapRender.svelte'
+	import GameBoard from '$lib/Map/GameBoard.svelte'
 	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
 	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
 	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
@@ -110,6 +110,6 @@
 		endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 		let:select
 	>
-		<MapRender {map} {requestRedraw} {select} {campaign} {localTeam} />
+		<GameBoard {map} {requestRedraw} {select} {campaign} {localTeam} menuHref="/campaign" />
 	</GameStateManager>
 </GameSocket>
