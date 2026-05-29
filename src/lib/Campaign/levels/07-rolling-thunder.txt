@@ -8,7 +8,7 @@ talk Gannon: "Let them come through the gap. My gunners are waiting."
 talk Link: "We won't give him the charge he wants. Open up with the artillery."
 </start>
 
-<turn 2>
+<turn 0,1>
 wait: 1
 move: 10,7
 talk Gannon: "Reinforce the ridge! Hold the line!"

@@ -33,6 +33,12 @@
 
 	let reflow: VoidFunction
 	const render = () => reflow && !scroller?.__isDecelerating && !scroller?.__isTracking && reflow()
+
+	// Matches Scroller's panToTile so this stand-in is swap-compatible in tests.
+	// Headless tests don't measure layout, so a no-op satisfies the type without
+	// changing behaviour.
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	export const panToTile = (_x: number, _y: number, _animate = true): void => {}
 	export let paint =
 		(context: CanvasRenderingContext2D) =>
 		(

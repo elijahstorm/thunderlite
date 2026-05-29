@@ -8,7 +8,7 @@ talk Torrial: "He has air support. Keep your own Raptor close to answer it, and 
 talk Link: "Then we fight through it. Forward."
 </start>
 
-<turn 2>
+<turn 0,1>
 wait: 1
 move: 11,3
 talk Gannon: "More armor down the pass — let the storm do half my work!"

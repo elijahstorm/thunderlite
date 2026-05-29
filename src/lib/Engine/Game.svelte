@@ -73,20 +73,26 @@
 	})
 
 	// Campaign layer (K2): when a scripted level is active, drive its script
-	// against the live engine. `start` runs on mount; each new turn number fires
-	// its `turns[n]` block once; the J1 match-end hook plays `win`/`lose`. Between
-	// scripted beats the player keeps normal control of the match.
+	// against the live engine. `start` runs on mount; each new side-turn fires
+	// its `turns[round][team]` block once; the J1 match-end hook plays
+	// `win`/`lose`. Between scripted beats the player keeps normal control of
+	// the match. Round and team are zero-based; the engine's 1-based
+	// `turnNumber` is translated here so script authors can write `<turn 0,1>`
+	// for "CPU's first turn".
 	onMount(() => {
 		if (!campaign) return
 
 		const runner = createCampaignRunner(campaign, createCampaignInterface({ map }))
 		void runner.start()
 
-		let lastTurn = -1
+		let lastKey = ''
 		const offTurn = gameState.subscribe((state) => {
-			if (state.turnNumber !== lastTurn) {
-				lastTurn = state.turnNumber
-				void runner.enterTurn(state.turnNumber)
+			const round = state.turnNumber - 1
+			const team = state.currentTeam
+			const key = `${round}:${team}`
+			if (key !== lastKey) {
+				lastKey = key
+				void runner.enterTurn(round, team)
 			}
 		})
 		const offMatchEnd = onMatchEnd((result) => void runner.finish(result))

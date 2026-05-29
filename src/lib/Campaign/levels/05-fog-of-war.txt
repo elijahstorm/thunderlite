@@ -8,7 +8,7 @@ talk Torrial: "Don't panic. That Jammer Truck is our eyes — drive it forward a
 talk Link: "Flush them out, then hit them. Got it."
 </start>
 
-<turn 2>
+<turn 0,1>
 wait: 1
 move: 8,3
 talk Gannon: "More ghosts for you to find. Hahaha!"

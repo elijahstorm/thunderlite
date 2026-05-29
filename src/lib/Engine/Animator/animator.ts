@@ -16,6 +16,7 @@ export const routeAnimation = writable<{
 export const animations = writable<
 	{
 		key: string
+		tile: number
 		x: number
 		y: number
 		source: string
@@ -124,6 +125,7 @@ export const animateAttack = (
 			...animations,
 			{
 				key,
+				tile: source,
 				x: source % map.cols,
 				y: Math.floor(source / map.cols),
 				source: readySprite.src,
@@ -152,6 +154,7 @@ export const animateExplosion = (map: MapObject, source: number) =>
 			...animations,
 			{
 				key,
+				tile: source,
 				x: source % map.cols,
 				y: Math.floor(source / map.cols),
 				source: explosion.url,

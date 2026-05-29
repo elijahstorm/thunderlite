@@ -9,6 +9,7 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
+	import { viewerVisibility } from '$lib/Engine/fogState'
 	import { fly } from 'svelte/transition'
 	import { linear } from 'svelte/easing'
 
@@ -18,6 +19,13 @@
 
 	let index = 0
 	let hideNewInstance = false
+
+	// Fog mask: when fog is on, suppress overlays whose source tile isn't in the
+	// viewer's visibility set. The canvas already dims those tiles; without this
+	// the DOM overlays would happily flash unit/attack/explosion sprites on top
+	// of the dimmed canvas, exposing what fog is meant to hide.
+	const tileVisible = (tile: number, fog: typeof $viewerVisibility) =>
+		fog === null || fog.visible.has(tile)
 
 	const traverseRoute = (route: number[] | null) => {
 		if (route === null) {
@@ -103,7 +111,7 @@
 	}, ANIMATION_TIME)
 </script>
 
-{#if $routeAnimation}
+{#if $routeAnimation && tileVisible($routeAnimation.route[index], $viewerVisibility)}
 	{#key index}
 		<div
 			class="absolute overflow-clip"
@@ -120,8 +128,10 @@
 {/if}
 
 {#each $animations as animation (animation.key)}
-	<div
-		class="absolute overflow-clip"
-		style={render(animation, $animationFrame - animation.startingFrame)}
-	></div>
+	{#if tileVisible(animation.tile, $viewerVisibility)}
+		<div
+			class="absolute overflow-clip"
+			style={render(animation, $animationFrame - animation.startingFrame)}
+		></div>
+	{/if}
 {/each}

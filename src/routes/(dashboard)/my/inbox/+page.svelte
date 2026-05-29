@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment'
 	import { goto } from '$app/navigation'
+	import ChatSocket from '$lib/Components/Socket/ChatSocket.svelte'
 	import ChatList from '$lib/Components/Widgets/Social/Chat/ChatList.svelte'
 
 	const openChat = (auth: string) => browser && goto(`/chat/${auth}`)
@@ -13,6 +14,8 @@
 	</header>
 
 	<div class="card overflow-hidden">
-		<ChatList on:chat={({ detail }) => openChat(detail)} />
+		<ChatSocket let:socketMessages>
+			<ChatList {socketMessages} on:chat={({ detail }) => openChat(detail)} />
+		</ChatSocket>
 	</div>
 </section>

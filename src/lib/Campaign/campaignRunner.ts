@@ -10,7 +10,8 @@
  *
  * Block timing is owned by the caller (the Svelte mount), which calls:
  *   - `start()` once on level load,
- *   - `enterTurn(n)` at the start of turn n (fires `turns[n]` once),
+ *   - `enterTurn(round, team)` at the start of every side-turn (fires
+ *     `turns[round][team]` once),
  *   - `finish(result)` off the J1 match-end hook (win or lose block).
  */
 
@@ -93,8 +94,11 @@ const localPlayerWon = (outcome: CampaignOutcome): boolean =>
 export interface CampaignRunner {
 	/** Play the `start` block once. Subsequent calls are no-ops. */
 	start(): Promise<void>
-	/** Play `turns[turn]` once, the first time turn `turn` begins. */
-	enterTurn(turn: number): Promise<void>
+	/**
+	 * Play `turns[round][team]` once, the first time that side-turn begins.
+	 * Both indices are zero-based.
+	 */
+	enterTurn(round: number, team: number): Promise<void>
 	/** Play `win` or `lose` once, chosen from the match-end result. */
 	finish(outcome: CampaignOutcome): Promise<void>
 	/** True once a win/lose block has played. */
@@ -112,7 +116,7 @@ export const createCampaignRunner = (
 ): CampaignRunner => {
 	let started = false
 	let finished = false
-	const firedTurns = new Set<number>()
+	const firedTurns = new Set<string>()
 
 	return {
 		start: async () => {
@@ -120,11 +124,12 @@ export const createCampaignRunner = (
 			started = true
 			await runCutsceneEvents(script.start, iface)
 		},
-		enterTurn: async (turn) => {
+		enterTurn: async (round, team) => {
 			if (finished) return
-			if (firedTurns.has(turn)) return
-			firedTurns.add(turn)
-			const block = script.turns[turn]
+			const key = `${round}:${team}`
+			if (firedTurns.has(key)) return
+			firedTurns.add(key)
+			const block = script.turns[round]?.[team]
 			if (block) await runCutsceneEvents(block, iface)
 		},
 		finish: async (outcome) => {

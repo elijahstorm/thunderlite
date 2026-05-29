@@ -42,7 +42,7 @@ wait: 1
 unhl: 8,6
 </start>
 
-<turn 2>
+<turn 0,1>
 talk Gannon: "Too slow."
 kill unit: 8,5
 </turn>
@@ -127,12 +127,12 @@ describe('runCutsceneEvents', () => {
 })
 
 describe('createCampaignRunner', () => {
-	it('drives a full script: start, then turn 2, then win — engine ops in order', async () => {
+	it('drives a full script: start, then CPU side-turn, then win — engine ops in order', async () => {
 		const { ops, iface } = makeRecorder()
 		const runner = createCampaignRunner(parseCutsceneScript(LEVEL), iface)
 
 		await runner.start()
-		await runner.enterTurn(2)
+		await runner.enterTurn(0, 1)
 		await runner.finish(winOutcome)
 
 		expect(ops).toEqual([
@@ -144,7 +144,7 @@ describe('createCampaignRunner', () => {
 			['setTerrain', 'Mountain', 3, 4],
 			['wait', 1],
 			['unhighlight', 8, 6],
-			// turn 2 block
+			// turn 0,1 block (CPU's first side-turn)
 			['talk', 'Gannon', ['Too slow.']],
 			['kill', 8, 5],
 			// win block
@@ -171,7 +171,7 @@ describe('createCampaignRunner', () => {
 		expect(ops).toEqual([['talk', 'Torrial', ['Defeat.']]])
 	})
 
-	it('fires each block at most once (start, a given turn, and finish all dedupe)', async () => {
+	it('fires each block at most once (start, a given side-turn, and finish all dedupe)', async () => {
 		const { ops, iface } = makeRecorder()
 		const runner = createCampaignRunner(parseCutsceneScript(LEVEL), iface)
 
@@ -179,9 +179,10 @@ describe('createCampaignRunner', () => {
 		await runner.start() // no-op
 		const startCount = ops.length
 
-		await runner.enterTurn(2)
-		await runner.enterTurn(2) // no-op
-		await runner.enterTurn(3) // no such block
+		await runner.enterTurn(0, 1)
+		await runner.enterTurn(0, 1) // no-op
+		await runner.enterTurn(0, 0) // no such block (player's first turn isn't scripted)
+		await runner.enterTurn(1, 1) // no such block
 		const turnOps = ops.slice(startCount)
 		expect(turnOps).toEqual([['talk', 'Gannon', ['Too slow.']], ['kill', 8, 5]])
 
@@ -197,7 +198,7 @@ describe('createCampaignRunner', () => {
 
 		await runner.finish(winOutcome)
 		ops.length = 0
-		await runner.enterTurn(2)
+		await runner.enterTurn(0, 1)
 
 		expect(ops).toEqual([])
 	})

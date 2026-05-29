@@ -9,7 +9,7 @@ talk Torrial: "Then we take his. Push toward his refinery, fund your own troops,
 talk Link: "Economy first. Then the hammer falls."
 </start>
 
-<turn 3>
+<turn 1,1>
 wait: 1
 move: 11,3
 talk Gannon: "Fresh steel from my factories!"

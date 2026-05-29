@@ -34,6 +34,21 @@
 
 	let reflow: VoidFunction
 	const render = () => reflow && !scroller?.__isDecelerating && !scroller?.__isTracking && reflow()
+
+	/**
+	 * Scroll the view so the tile at `(x, y)` lands in the viewport centre.
+	 * Used by the campaign script's `move:` command to pan the camera onto the
+	 * action; the underlying `scrollTo` clamps to map bounds, so requests near
+	 * an edge stop with the tile as close to centre as the board allows.
+	 */
+	export const panToTile = (x: number, y: number, animate = true): void => {
+		if (!scroller || !container) return
+		const cw = container.clientWidth
+		const ch = container.clientHeight
+		const left = (x + 0.5) * tileWidth - cw / 2
+		const top = (y + 0.5) * tileHeight - ch / 2
+		scroller.scrollTo(left, top, animate)
+	}
 	export let paint =
 		(context: CanvasRenderingContext2D) =>
 		(

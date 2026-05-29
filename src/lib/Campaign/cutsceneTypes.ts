@@ -33,13 +33,15 @@ export type CutsceneEventKind = CutsceneEvent['kind']
 
 /**
  * Events grouped by the block marker that contained them. `turns` is keyed by
- * the integer in `<turn N>` (e.g. `<turn 4>` routes into `turns[4]`).
+ * `[round][team]` — both zero-based. `<turn 0,1>` routes into `turns[0][1]`
+ * (round 0, team 1 — typically the CPU's first turn). `<turn N>` is shorthand
+ * for `<turn N,0>` so the team defaults to the player.
  */
 export interface CutsceneScript {
 	start: CutsceneEvent[]
 	win: CutsceneEvent[]
 	lose: CutsceneEvent[]
-	turns: Record<number, CutsceneEvent[]>
+	turns: Record<number, Record<number, CutsceneEvent[]>>
 }
 
 /**

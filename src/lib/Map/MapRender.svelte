@@ -17,10 +17,11 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
-	import { fogOfWarEnabled } from '$lib/Engine/fogState'
+	import { fogOfWarEnabled, viewerVisibility } from '$lib/Engine/fogState'
 	import { setHoverTile } from '$lib/Engine/uiState'
 	import { ANIMATION_TIME, routeAnimation, animations } from '$lib/Engine/Animator/animator'
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
+	import { campaignCamera } from '$lib/Campaign/campaignInterface'
 
 	export let map: MapObject
 	/** When set, this board is a scripted campaign level; forwarded to `Game`,
@@ -93,6 +94,15 @@
 	// over a stale "on" value from a prior online match.
 	$: fogOfWarEnabled.set(fogOfWar)
 
+	// Mirror the viewer's visibility snapshot into a global store so the DOM
+	// Animator (walking/attack/explosion overlays) can hide animations whose
+	// source tile is in fog. Depends on $gameState so we refresh as units act
+	// and the cached set is invalidated above.
+	$: {
+		$gameState
+		viewerVisibility.set(fogOfWar ? visibilityProvider() : null)
+	}
+
 	// @ts-ignore
 	let hudImages: HUDImages = {}
 
@@ -146,6 +156,12 @@
 		}
 	}
 
+	// Bound to the live `<svelte:component>` so we can call `panToTile` on it
+	// when the campaign script asks the camera to move. Minimap MapRenders also
+	// run this binding, but they never get a `campaign` prop so the subscription
+	// below short-circuits and they don't pan with the main board.
+	let scrollerInstance: { panToTile?: (x: number, y: number, animate?: boolean) => void } | undefined
+
 	onMount(() => {
 		if (!colorizer) colorizer = imageColorizer()
 
@@ -155,6 +171,14 @@
 
 		hudImages.advice.src = hud.advice
 		hudImages.arrow.src = hud.arrow
+
+		if (!campaign) return
+		// `move: x,y` in a campaign script publishes here. Skip the initial
+		// `null` and bring `(x, y)` into view (centred, clamped to map bounds).
+		return campaignCamera.subscribe((pos) => {
+			if (!pos) return
+			scrollerInstance?.panToTile?.(pos.x, pos.y)
+		})
 	})
 
 	onDestroy(() => {
@@ -202,6 +226,7 @@
 					>
 						<svelte:component
 							this={scroller}
+							bind:this={scrollerInstance}
 							tileWidth={cellWidth}
 							tileHeight={cellHeight}
 							contentWidth={cellWidth * map.cols}

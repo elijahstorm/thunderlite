@@ -13,8 +13,13 @@
  * <start> … </start>
  * <win>   … </win>
  * <lose>  … </lose>
- * <turn 4> … </turn>
+ * <turn 4>   … </turn>   // round 4, team 0 (player) — `,T` defaults to 0
+ * <turn 0,1> … </turn>   // round 0, team 1 (typically the CPU's first turn)
  * ```
+ *
+ * Rounds and teams are zero-based; one round covers every team's side-turn,
+ * so a 2-team match has `<turn 0,0>` (player's first turn) followed by
+ * `<turn 0,1>` (CPU's first turn), then `<turn 1,0>`, `<turn 1,1>`, …
  *
  * Inside a block each line is one command:
  *
@@ -146,15 +151,18 @@ const openBlock = (script: CutsceneScript, tag: ParsedTag, lineNo: number): Cuts
 			return script[tag.name]
 		case 'turn': {
 			const attr = tag.attr.trim()
-			if (!/^\d+$/.test(attr)) {
+			const match = attr.match(/^(\d+)(?:\s*,\s*(\d+))?$/)
+			if (!match) {
 				throw new CutsceneParseError(
-					`<turn> requires a numeric turn, got "${tag.attr}"`,
+					`<turn> requires "N" or "N,T" (both non-negative integers), got "${tag.attr}"`,
 					lineNo
 				)
 			}
-			const turn = parseInt(attr, 10)
-			if (!script.turns[turn]) script.turns[turn] = []
-			return script.turns[turn]
+			const round = parseInt(match[1], 10)
+			const team = match[2] !== undefined ? parseInt(match[2], 10) : 0
+			if (!script.turns[round]) script.turns[round] = {}
+			if (!script.turns[round][team]) script.turns[round][team] = []
+			return script.turns[round][team]
 		}
 		default:
 			throw new CutsceneParseError(`unknown block tag <${tag.name}>`, lineNo)

@@ -10,7 +10,7 @@ talk Gannon: "Cowering in ditches? Pathetic. My armor will bury you in them."
 talk Link: "Let them come. We hold."
 </start>
 
-<turn 2>
+<turn 0,1>
 wait: 1
 move: 6,0
 talk Gannon: "Second wave — overrun the trench!"

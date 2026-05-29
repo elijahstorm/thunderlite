@@ -96,6 +96,7 @@ const renderConfiguredMap = (captureEvent?: (x: number, y: number) => void) => {
 			buildings: (active) => active.filter((data) => data !== null).map((data) => data?.type),
 		},
 		highlights: [],
+		route: [],
 	} as MapObject
 	const select = captureEvent ?? (() => {})
 	const makeImage = (() => {

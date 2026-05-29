@@ -8,7 +8,7 @@ talk Torrial: "Listen — those are light units. Your Heavy Commando's heavy rou
 talk Link: "Understood. Let's send Gannon a message."
 </start>
 
-<turn 2>
+<turn 0,1>
 move: 8,2
 talk Gannon: "Reinforcements! Crush him already."
 add unit: 1,"Strike Commando",8,2

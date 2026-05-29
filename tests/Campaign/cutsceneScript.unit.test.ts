@@ -4,7 +4,7 @@ import { parseCutsceneScript } from '../../src/lib/Campaign/cutsceneScript'
 import { CutsceneParseError } from '../../src/lib/Campaign/cutsceneTypes'
 
 describe('parseCutsceneScript — block routing', () => {
-	it('routes events into start / win / lose / turns[n]', () => {
+	it('routes events into start / win / lose / turns[round][team]', () => {
 		const script = parseCutsceneScript(`
 <start>
 talk Link: "Go!"
@@ -26,23 +26,33 @@ talk Torrial: "Keep it up!"
 		expect(script.start).toEqual([{ kind: 'talk', speaker: 'Link', lines: ['Go!'] }])
 		expect(script.win).toEqual([{ kind: 'talk', speaker: 'Torrial', lines: ['Victory.'] }])
 		expect(script.lose).toEqual([{ kind: 'talk', speaker: 'Torrial', lines: ['Try again.'] }])
-		expect(script.turns[4]).toEqual([
+		// `<turn 4>` is shorthand for `<turn 4,0>` — team defaults to 0.
+		expect(script.turns[4][0]).toEqual([
 			{ kind: 'talk', speaker: 'Torrial', lines: ['Keep it up!'] },
 		])
 	})
 
-	it('keys multiple turn blocks independently', () => {
+	it('keys turn blocks by round AND team, with team defaulting to 0', () => {
 		const script = parseCutsceneScript(`
 <turn 2>
 wait: 1
 </turn>
-<turn 7>
+<turn 7,0>
 wait: 2
 </turn>
+<turn 0,1>
+wait: 3
+</turn>
+<turn 0,2>
+wait: 4
+</turn>
 `)
-		expect(script.turns[2]).toEqual([{ kind: 'wait', seconds: 1 }])
-		expect(script.turns[7]).toEqual([{ kind: 'wait', seconds: 2 }])
+		expect(script.turns[2][0]).toEqual([{ kind: 'wait', seconds: 1 }])
+		expect(script.turns[7][0]).toEqual([{ kind: 'wait', seconds: 2 }])
+		expect(script.turns[0][1]).toEqual([{ kind: 'wait', seconds: 3 }])
+		expect(script.turns[0][2]).toEqual([{ kind: 'wait', seconds: 4 }])
 		expect(script.turns[3]).toBeUndefined()
+		expect(script.turns[2][1]).toBeUndefined()
 	})
 
 	it('leaves untouched blocks empty', () => {
@@ -194,7 +204,7 @@ talk Torrial: "You're doing well."
 		])
 		expect(script.win[0]).toEqual({ kind: 'talk', speaker: 'Gannon', lines: ['Arrrg!'] })
 		expect(script.lose[0]).toEqual({ kind: 'talk', speaker: 'Torrial', lines: ['Try again!'] })
-		expect(script.turns[4][0]).toEqual({
+		expect(script.turns[4][0][0]).toEqual({
 			kind: 'talk',
 			speaker: 'Torrial',
 			lines: ["You're doing well."],
@@ -260,7 +270,13 @@ describe('parseCutsceneScript — parse errors carry the line number', () => {
 	})
 
 	it('rejects a non-numeric turn', () => {
-		expectError('<turn x>\nwait: 1\n</turn>', 1, /numeric turn/)
+		expectError('<turn x>\nwait: 1\n</turn>', 1, /"N" or "N,T"/)
+	})
+
+	it('rejects a malformed turn attribute', () => {
+		expectError('<turn 1,>\nwait: 1\n</turn>', 1, /"N" or "N,T"/)
+		expectError('<turn 1,2,3>\nwait: 1\n</turn>', 1, /"N" or "N,T"/)
+		expectError('<turn -1,0>\nwait: 1\n</turn>', 1, /"N" or "N,T"/)
 	})
 
 	it('rejects an unterminated talk', () => {

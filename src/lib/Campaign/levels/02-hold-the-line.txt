@@ -8,7 +8,7 @@ talk Torrial: "Forever is a long time. Push a Commando onto his Command Center a
 talk Link: "Then we cross the bridge and end this fast."
 </start>
 
-<turn 3>
+<turn 1,1>
 move: 10,6
 talk Gannon: "Send the tank! Keep them off my capital!"
 add unit: 1,"Scorpion Tank",10,6

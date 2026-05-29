@@ -15,12 +15,8 @@ const ANNIHILATOR = unitData.findIndex((u) => u.name === 'Annihilator Tank')
 
 /** Every (x,y)-bearing event in a parsed script, flattened across all blocks. */
 const positionedEvents = (script: ReturnType<typeof parseCutsceneScript>): CutsceneEvent[] => {
-	const all: CutsceneEvent[] = [
-		...script.start,
-		...script.win,
-		...script.lose,
-		...Object.values(script.turns).flat(),
-	]
+	const turnEvents = Object.values(script.turns).flatMap((byTeam) => Object.values(byTeam).flat())
+	const all: CutsceneEvent[] = [...script.start, ...script.win, ...script.lose, ...turnEvents]
 	return all.filter((e) => 'x' in e && 'y' in e)
 }
 

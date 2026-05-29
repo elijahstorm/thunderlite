@@ -7,7 +7,7 @@ talk Torrial: "And don't charge in alone. When you attack in range, the enemy co
 talk Link: "So we don't fight it head-on. We surround it."
 </start>
 
-<turn 2>
+<turn 0,1>
 move: 10,3
 talk Gannon: "My Scorpion will flank you while the Annihilator grinds you down!"
 add unit: 1,"Scorpion Tank",10,3
