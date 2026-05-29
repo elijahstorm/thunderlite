@@ -25,7 +25,6 @@
 				<Icon icon="lucide:play" width={16} />
 				Play in browser
 			</a>
-			<a href="/contact" class="btn btn-outline">Request a platform</a>
 		</div>
 	</section>
 </Casing>

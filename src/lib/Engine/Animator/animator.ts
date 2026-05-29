@@ -1,6 +1,6 @@
 import { get, writable } from 'svelte/store'
 import { pathFinder } from '../Interactor/Pathing/pathFinder'
-import { animationData } from '$lib/GameData/animation'
+import { animationData, ANIMATION_EXPLOSION } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { rendererStore } from '$lib/Sprites/spriteStore'
 import { generateKey } from '$lib/Security/keys'
@@ -41,9 +41,18 @@ export const animateRoute = (
 		routeAnimation.set({ map, unit, route })
 		setTimeout(
 			() => {
-				resolve()
 				unit.state = getDirection(map, route, route.length - 1)
-				routeAnimation.set(null)
+				// Resolve before clearing the overlay so the caller's .then() runs
+				// applyMove (placing the unit at the destination tile) while the
+				// route overlay is still mounted. Then defer the clear to the next
+				// macrotask — after the .then() microtask has committed the move —
+				// so the canvas has the idle unit to draw at the destination
+				// before the DOM overlay's out:fly fades it away. Otherwise the
+				// synchronous reactive render on `routeAnimation = null` paints
+				// the destination tile blank between "overlay cleared" and
+				// "applyMove committed", and the unit flashes invisible.
+				resolve()
+				setTimeout(() => routeAnimation.set(null), 0)
 			},
 			(route.length - 1) * ANIMATION_TIME
 		)
@@ -97,27 +106,27 @@ export const animateAttack = (
 		if (defender) defender.state = facingToward(map, target, source)
 		const key = generateKey()
 		const attackSprite = get(rendererStore).attacks[attacker.type]
+		// The renderer is created synchronously but its `sprite` array is filled in
+		// asynchronously once the image decodes. If either the renderer is missing
+		// (headless/test context) or the sprite hasn't loaded yet, skip the overlay
+		// but resolve on the normal beat so combat keeps flowing. Crucially, don't
+		// flip `animating` here — that flag hides the idle in favor of the overlay,
+		// and without an overlay the attacker would briefly vanish.
+		const readySprite = attackSprite?.sprite?.[attacker.team ?? 0]
+		if (!readySprite) {
+			setTimeout(resolve, ANIMATION_TIME)
+			return
+		}
 		// Keep the attacker on the map (so it still grants fog-of-war sight) but
 		// flag it so the canvas skips its idle sprite under the attack overlay.
 		attacker.animating = true
-		// The attack sprite is only loaded for unit types present when the board
-		// mounts; a freshly-built type (or a headless/test context) may have none.
-		// Skip the overlay but still resolve on the normal beat so the attack
-		// commits and the turn keeps flowing — never throw out of an animation.
-		if (!attackSprite) {
-			setTimeout(() => {
-				attacker.animating = false
-				resolve()
-			}, ANIMATION_TIME)
-			return
-		}
 		animations.update((animations) => [
 			...animations,
 			{
 				key,
 				x: source % map.cols,
 				y: Math.floor(source / map.cols),
-				source: attackSprite.sprite[attacker.team ?? 0].src,
+				source: readySprite.src,
 				xOffset: attackSprite.xOffset,
 				yOffset: attackSprite.yOffset,
 				frames: attackSprite.frames,
@@ -137,7 +146,7 @@ export const animateAttack = (
 
 export const animateExplosion = (map: MapObject, source: number) =>
 	new Promise<void>((resolve) => {
-		const explosion = animationData[0]
+		const explosion = animationData[ANIMATION_EXPLOSION]
 		const key = generateKey()
 		animations.update((animations) => [
 			...animations,

@@ -41,3 +41,9 @@ export const animationData: AnimationData[] = [
 ]
 
 export const animationRenderer = imageLazyLoader('animation' as keyof MapLayers, animationData)
+
+// Named indices into `animationData` — keep colocated with the registry above so
+// renaming/reordering entries surfaces every consumer in one place.
+export const ANIMATION_EXPLOSION = 0
+export const ANIMATION_POINTER = 1
+export const ANIMATION_SELECT = 2

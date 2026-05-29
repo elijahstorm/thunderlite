@@ -2,9 +2,14 @@
 	import { gameState } from '../gameState'
 
 	export let onEndTurn: () => void = () => {}
+	export let localTeam: number = 0
+	/** True when other teams are CPU. Hotseat passes false so both human players
+	 * can end their own turn from the same client. */
+	export let cpuOpponent: boolean = false
 
 	$: state = $gameState
-	$: disabled = state.phase !== 'playing'
+	$: disabled =
+		state.phase !== 'playing' || (cpuOpponent && state.currentTeam !== localTeam)
 </script>
 
 <button

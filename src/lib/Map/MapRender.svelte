@@ -17,6 +17,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { interactionSource } from '$lib/Engine/Interactor/interactionState'
+	import { fogOfWarEnabled } from '$lib/Engine/fogState'
 	import { setHoverTile } from '$lib/Engine/uiState'
 	import { ANIMATION_TIME, routeAnimation, animations } from '$lib/Engine/Animator/animator'
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
@@ -86,13 +87,21 @@
 		cachedVisibility = null
 	}
 
+	// Engine code (attack list, AI, threat reach) consults `fogOfWarEnabled` to
+	// decide whether to apply the team-visibility filter. Sync it whenever this
+	// board's fog prop changes so a freshly-mounted campaign board doesn't carry
+	// over a stale "on" value from a prior online match.
+	$: fogOfWarEnabled.set(fogOfWar)
+
 	// @ts-ignore
 	let hudImages: HUDImages = {}
 
 	const hover = (x: number, y: number) => {
 		const tile = y * map.cols + x
 		if (!mini) setHoverTile(tile)
-		map.route = updateRoute(map, $interactionSource, [...map.route], tile)
+		const result = updateRoute(map, $interactionSource, map.pathHistory ?? [], tile)
+		map.pathHistory = result.pathHistory
+		map.route = result.route
 	}
 
 	const canSelectAt = (x: number, y: number): boolean => {
@@ -197,7 +206,13 @@
 							tileHeight={cellHeight}
 							contentWidth={cellWidth * map.cols}
 							contentHeight={cellHeight * map.rows}
-							paint={paint(renderData, hudImages, pause, visibilityProvider)(() => map)}
+							paint={paint(
+								renderData,
+								hudImages,
+								pause,
+								visibilityProvider,
+								localTeam
+							)(() => map)}
 							{requestRedraw}
 							{handleClick}
 							{handleHover}

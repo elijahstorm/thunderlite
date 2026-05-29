@@ -23,17 +23,12 @@
 		},
 		{
 			title: 'Company',
-			links: [
-				{ href: '/about', text: 'About' },
-				{ href: '/contact', text: 'Contact' },
-				{ href: '/support', text: 'Support' },
-			],
+			links: [{ href: '/about', text: 'About' }],
 		},
 		{
 			title: 'Legal',
 			links: [
 				{ href: '/privacy', text: 'Privacy Policy' },
-				{ href: '/data-request', text: 'Data Request' },
 				{ href: 'http://elijahstorm.github.io/', text: 'More by Elijah' },
 			],
 		},

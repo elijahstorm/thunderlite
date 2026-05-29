@@ -163,6 +163,10 @@
 	// at those points). `autoEndedTurnKey` guards against firing more than once for
 	// the same turn, which matters in online play where `handleEndTurn` relays over
 	// the socket and `currentTeam` doesn't flip locally until the server replies.
+	// `queueMicrotask` defers the actual end-turn out of this reactive block —
+	// mutating gameState synchronously inside Svelte's flush left the CPU reactive
+	// block (above) stuck on the pre-flip state, so the CPU's `runCpuTurn` was
+	// never scheduled after an auto-ended turn.
 	let autoEndedTurnKey = ''
 	$: {
 		const s = $gameState
@@ -183,7 +187,7 @@
 			!teamHasPendingActions(map, s)
 		) {
 			autoEndedTurnKey = turnKey
-			handleEndTurn()
+			queueMicrotask(handleEndTurn)
 		}
 	}
 
@@ -222,7 +226,7 @@
 
 <slot {select}></slot>
 
-<HUDRoot {map} onEndTurn={handleEndTurn} />
+<HUDRoot {map} onEndTurn={handleEndTurn} {localTeam} cpuOpponent={!isMultiplayer} />
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />

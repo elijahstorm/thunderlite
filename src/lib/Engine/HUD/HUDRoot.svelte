@@ -6,6 +6,8 @@
 
 	export let map: MapObject | undefined = undefined
 	export let onEndTurn: () => void = () => {}
+	export let localTeam: number = 0
+	export let cpuOpponent: boolean = false
 </script>
 
 <div
@@ -14,6 +16,6 @@
 >
 	<TurnPill />
 	<Treasury />
-	<EndTurnButton {onEndTurn} />
+	<EndTurnButton {onEndTurn} {localTeam} {cpuOpponent} />
 	<TileInfoPanel {map} />
 </div>

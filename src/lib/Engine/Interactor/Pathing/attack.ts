@@ -1,13 +1,21 @@
+import { get } from 'svelte/store'
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 import { canAttackTarget } from '$lib/Engine/modifiers/canAttack'
 import { computeTeamVisibility } from '$lib/Engine/visibility'
+import { fogOfWarEnabled } from '$lib/Engine/fogState'
 
 export const generateAttackList = (map: MapObject, tile: number, unit: UnitObject) => {
 	const [start, end] = unitData[unit.type].range
-	const visible = computeTeamVisibility(map, unit.team)
+	const targets = [...new Set(diamond(map, tile, unit, start, end))]
 
-	return [...new Set(diamond(map, tile, unit, start, end))].filter((target) => visible.has(target))
+	// In a fog-of-war match a target the team can't see shouldn't appear on the
+	// attack list — you can't intentionally target what you can't perceive. With
+	// fog off (campaign / editor / hot-seat) every drawn enemy is fair game, so
+	// the sight filter would just suppress legitimate targets.
+	if (!get(fogOfWarEnabled)) return targets
+	const visible = computeTeamVisibility(map, unit.team)
+	return targets.filter((target) => visible.has(target))
 }
 
 const diamond = (map: MapObject, tile: number, unit: UnitObject, start: number, end: number) => {

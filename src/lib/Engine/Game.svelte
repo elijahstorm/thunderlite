@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte'
 	import { terrainRenderer } from '$lib/GameData/terrain'
 	import { skyRenderer } from '$lib/GameData/sky'
-	import { attacksRenderer, unitRenderer } from '$lib/GameData/unit'
+	import { attacksRenderer, unitData, unitRenderer } from '$lib/GameData/unit'
 	import { buildingRenderer } from '$lib/GameData/building'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
@@ -41,6 +41,7 @@
 			typeof type !== 'undefined' ? ($rendererStore.units[type] ?? null) : null,
 		building: (type?: number) =>
 			typeof type !== 'undefined' ? ($rendererStore.buildings[type] ?? null) : null,
+		animation: (type: number) => $rendererStore.animation[type] ?? null,
 	}
 
 	onMount(() => {
@@ -57,7 +58,12 @@
 			ground: { ...store.ground, ...ground(map.filters.ground(map.layers.ground)) },
 			sky: { ...store.sky, ...sky(map.filters.sky(map.layers.sky)) },
 			units: { ...store.units, ...units(map.filters.units(map.layers.units)) },
-			attacks: { ...store.attacks, ...attacks(map.filters.units(map.layers.units)) },
+			// Preload every unit type's attack sprite, not just the ones standing on
+			// the initial map. Factories can build types that weren't placed at start,
+			// and even initial-map types race the player's first attack; warming the
+			// cache here avoids the brief "unit disappears" gap when the overlay
+			// fires before its image has decoded.
+			attacks: { ...store.attacks, ...attacks(unitData.map((_, index) => index)) },
 			buildings: {
 				...store.buildings,
 				...buildings(map.filters.buildings(map.layers.buildings)),

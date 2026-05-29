@@ -32,10 +32,7 @@
 		},
 		{
 			title: 'More',
-			items: [
-				{ href: '/my/pro', label: 'Upgrade to Pro', icon: 'lucide:sparkles' },
-				{ href: '/support', label: 'Help & Support', icon: 'lucide:life-buoy' },
-			],
+			items: [{ href: '/my/pro', label: 'Upgrade to Pro', icon: 'lucide:sparkles' }],
 		},
 	]
 

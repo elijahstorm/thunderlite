@@ -76,6 +76,8 @@ type MapObject = {
 	filters: MapFilters
 	route: (Route | undefined)[]
 	highlights: (TileHighlight | undefined)[]
+	pathHistory?: number[]
+	pointers?: Set<number>
 }
 type MapProcesser = {
 	title?: string | null
@@ -106,6 +108,7 @@ type ObjectRenderer = {
 	sky: (type?: number) => ObjectSpriteRenderer | null
 	unit: (type?: number) => ObjectSpriteRenderer | null
 	building: (type?: number) => ObjectSpriteRenderer | null
+	animation: (type: number) => ObjectSpriteRenderer | null
 }
 type HUDImages = {
 	advice: HTMLImageElement

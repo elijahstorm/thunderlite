@@ -1,23 +1,110 @@
 import { pathFinder } from '$lib/Engine/Interactor/Pathing/pathFinder'
 import { generateAttackList } from '$lib/Engine/Interactor/Pathing/attack'
-import { generateMovementList } from '$lib/Engine/Interactor/Pathing/movement'
+import { generateMovementList, drag } from '$lib/Engine/Interactor/Pathing/movement'
 import { unitThreatTiles } from '$lib/Engine/Interactor/Pathing/threat'
 import { unitData } from '$lib/GameData/unit'
 
+export type HoverRouteResult = {
+	pathHistory: number[]
+	route: (Route | undefined)[]
+}
+
+// Builds the visible move-arrows from the user's hover history. The history is
+// a cursor-driven sequence the player extends one tile at a time; revisiting a
+// tile truncates back to that point. We fall back to BFS only when the cursor
+// jumps non-adjacently, so users can pick an exact approach (e.g. which side
+// they attack from) rather than relying on the pathfinder's tie-break.
 export const updateRoute = (
 	map: MapObject,
 	selected: number | null,
-	route: (Route | undefined)[],
+	pathHistory: number[],
 	tile: number
-) => {
-	const unit = selected !== null && map.layers.units[selected]
-	if (!unit) return []
+): HoverRouteResult => {
+	if (selected === null) return { pathHistory: [], route: [] }
+	const unit = map.layers.units[selected]
+	if (!unit) return { pathHistory: [], route: [] }
 
 	const allActions = generateActionsList(map, selected, unit)
-	if (!allActions.find((action) => action.tile === tile)) return []
+	const action = allActions.find((a) => a.tile === tile)
+	if (!action) {
+		// Cursor is off any actionable tile. Keep history alive so the user can
+		// re-enter the action zone without losing their built-up route, but show
+		// no arrows for now.
+		const kept = pathHistory.length && pathHistory[0] === selected ? pathHistory : [selected]
+		return { pathHistory: kept, route: [] }
+	}
 
+	const newPath = nextHoverPath(map, unit, selected, pathHistory, tile, action)
+	return { pathHistory: newPath, route: routeFromPath(map, newPath) }
+}
+
+const nextHoverPath = (
+	map: MapObject,
+	unit: UnitObject,
+	source: number,
+	pathHistory: number[],
+	hovered: number,
+	action: TileHighlight
+): number[] => {
+	const path = pathHistory.length && pathHistory[0] === source ? pathHistory.slice() : [source]
+
+	if (hovered === source) return [source]
+
+	const isMelee = unitData[unit.type].range[0] === 1
+
+	if (action.type === 1) {
+		// Hovering an enemy. Do not append the enemy tile — the route ends on the
+		// last walkable tile adjacent to it. Ranged units don't move at all.
+		if (!isMelee) return [source]
+
+		const last = path[path.length - 1]
+		const lastIsClear = last === source || !map.layers.units[last]
+		if (areAdjacent(map, last, hovered) && lastIsClear) {
+			return path
+		}
+
+		const fallback = pathFinder(map, unit, source, hovered)
+		return fallback.length ? fallback : [source]
+	}
+
+	// Move target. Truncation has priority so backtracking the cursor erases the
+	// later steps the user already moved past.
+	const idx = path.indexOf(hovered)
+	if (idx >= 0) return path.slice(0, idx + 1)
+
+	const last = path[path.length - 1]
+	if (areAdjacent(map, last, hovered)) {
+		const extended = [...path, hovered]
+		if (pathWithinBudget(map, unit, extended)) return extended
+	}
+
+	const fallback = pathFinder(map, unit, source, hovered)
+	if (fallback.length) return fallback
+	return path
+}
+
+const areAdjacent = (map: MapObject, a: number, b: number): boolean => {
+	if (a === b) return false
+	const ax = a % map.cols
+	const bx = b % map.cols
+	const ay = Math.floor(a / map.cols)
+	const by = Math.floor(b / map.cols)
+	return (Math.abs(ax - bx) === 1 && ay === by) || (Math.abs(ay - by) === 1 && ax === bx)
+}
+
+const pathWithinBudget = (map: MapObject, unit: UnitObject, path: number[]): boolean => {
+	const budget = unitData[unit.type].movement
+	let total = 0
+	for (let i = 1; i < path.length; i++) {
+		total += drag(unit, map.layers.ground[path[i]], map.layers.sky[path[i]])
+		if (total > budget) return false
+	}
+	return true
+}
+
+const routeFromPath = (map: MapObject, path: number[]): (Route | undefined)[] => {
 	const updated = new Array<Route | undefined>(map.cols * map.rows)
-	const path = pathFinder(map, unit, selected, tile)
+	if (path.length < 2) return updated
 
 	path.forEach((tile, index) => {
 		let state = 0

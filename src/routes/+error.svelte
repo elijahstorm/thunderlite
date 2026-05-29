@@ -2,15 +2,7 @@
 	import { page } from '$app/stores'
 	import Casing from '$lib/Components/PageContainers/Casing.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
-	import { supportData } from './(marketing)/support/+page.svelte'
 	import Icon from '@iconify/svelte'
-
-	$: supportData.set({
-		subject: `User Error Report - ${$page.status}`,
-		message: `\n\nPage: ${$page.url}\n\nError: ${$page.status} - ${
-			$page.error?.message
-		}.\n\nTime: ${new Date().toLocaleString()}\n\n`,
-	})
 </script>
 
 <ContentWithFooter>
@@ -27,8 +19,7 @@
 					{$page.error?.message ?? 'Something went wrong'}
 				</h1>
 				<p class="text-muted-foreground">
-					We hit a snag loading this page. You can head back home, or let us know if it keeps
-					happening.
+					We hit a snag loading this page. Head back home and try again.
 				</p>
 			</div>
 			<div class="flex items-center gap-3 pt-2">
@@ -36,7 +27,6 @@
 					<Icon icon="lucide:arrow-left" width={16} />
 					Back to home
 				</a>
-				<a class="btn btn-outline" href="/support">Report the issue</a>
 			</div>
 		</section>
 	</Casing>

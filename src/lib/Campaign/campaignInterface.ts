@@ -53,23 +53,20 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 	const camera = config.camera ?? ((x: number, y: number) => campaignCamera.set({ x, y }))
 	const wait = config.wait ?? realWait
 
-	const ensureHighlights = (): void => {
-		if (!Array.isArray(map.highlights)) map.highlights = new Array(map.cols * map.rows)
+	const ensurePointers = (): Set<number> => {
+		if (!map.pointers) map.pointers = new Set<number>()
+		return map.pointers
 	}
 
 	return {
 		camera: (x, y) => camera(x, y),
 
 		highlight: (x, y) => {
-			ensureHighlights()
-			const tile = tileFor(map, x, y)
-			// type 0 / tip 1 = a plain "move"-style marker.
-			map.highlights[tile] = { tile, type: 0, tip: 1 }
+			ensurePointers().add(tileFor(map, x, y))
 		},
 
 		unhighlight: (x, y) => {
-			ensureHighlights()
-			map.highlights[tileFor(map, x, y)] = undefined
+			map.pointers?.delete(tileFor(map, x, y))
 		},
 
 		talk: (speaker, lines) => talk(speaker, lines),

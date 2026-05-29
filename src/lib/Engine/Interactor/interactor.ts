@@ -8,6 +8,7 @@ import { get } from 'svelte/store'
 import { animateRoute, animateAttack, animateExplosion } from '../Animator/animator'
 import { interactionSource, interactionState } from './interactionState'
 import { buildingData } from '$lib/GameData/building'
+import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
 import { openBuildMenu } from '../HUD/buildMenuStore'
@@ -19,6 +20,15 @@ import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import { openActionMenu, closeActionMenu, actionMenuState } from '../HUD/actionMenuStore'
 import { generateAttackList } from './Pathing/attack'
 import type { SerializedAction } from './serializedAction'
+
+const tilesAreAdjacent = (map: MapObject, a: number, b: number): boolean => {
+	if (a === b) return false
+	const ax = a % map.cols
+	const bx = b % map.cols
+	const ay = Math.floor(a / map.cols)
+	const by = Math.floor(b / map.cols)
+	return (Math.abs(ax - bx) === 1 && ay === by) || (Math.abs(ay - by) === 1 && ax === bx)
+}
 
 type Interaction = {
 	map: MapObject
@@ -64,12 +74,14 @@ const select: Interactor = ({ map, tile }) => {
 		highlightActionsList(map, generatePreviewList(map, tile, unit))
 		interactionSource.set(null)
 		interactionState.set('preview')
+		map.pathHistory = []
 		return
 	}
 
 	highlightActionsList(map, generateActionsList(map, tile, unit, computeThreatTiles(map, unit.team)))
 	interactionSource.set(tile)
 	interactionState.set('choice')
+	map.pathHistory = [tile]
 }
 
 const preview: Interactor = (interaction) => {
@@ -78,6 +90,7 @@ const preview: Interactor = (interaction) => {
 	interactionState.set('select')
 	highlightActionsList(interaction.map, [])
 	interaction.map.route = []
+	interaction.map.pathHistory = []
 	select(interaction)
 }
 
@@ -86,29 +99,59 @@ const choice: Interactor = ({ map, tile }) => {
 	interactionSource.set(null)
 	interactionState.set('select')
 	const unit = source && map.layers.units[source]
-	if (!unit) return
+	if (!unit) {
+		map.pathHistory = []
+		return
+	}
 
 	highlightActionsList(map, [])
 	map.route = []
-	if (tile === source) return
+	if (tile === source) {
+		map.pathHistory = []
+		return
+	}
 
 	const action = generateActionsList(map, source, unit).find((action) => action.tile === tile)
-	if (!action) return
+	if (!action) {
+		map.pathHistory = []
+		return
+	}
 
+	// Hand off to move/attack. They read map.pathHistory (set during hover) to
+	// drive the actual route the unit walks, then clear it once consumed.
 	actionType[action.type]({ map, tile: source, choice: action.tile })
 }
 
 const move: Interactor = ({ map, tile, choice, callback }) => {
 	const unit = map.layers.units[tile]
-	if (!unit || !choice) return
+	if (!unit || !choice) {
+		map.pathHistory = []
+		return
+	}
 
 	const destination = generateActionsList(map, tile, unit).find(
 		(action) => action.tile === choice
 	)?.tile
-	if (typeof destination !== 'number') return
+	if (typeof destination !== 'number') {
+		map.pathHistory = []
+		return
+	}
+
+	// Walk the route the user actually drew with their cursor when it matches the
+	// chosen destination. If the click somehow arrives without a matching history
+	// (e.g. touch input, or the action came from the post-move menu), pathfind it.
+	const userPath = map.pathHistory
+	const route =
+		userPath &&
+		userPath.length > 1 &&
+		userPath[0] === tile &&
+		userPath[userPath.length - 1] === destination
+			? userPath.slice()
+			: pathFinder(map, unit, tile, destination)
+	map.pathHistory = []
 
 	map.layers.units[tile] = null
-	animateRoute(map, unit, tile, destination).then(() => {
+	animateRoute(map, unit, tile, destination, route).then(() => {
 		map.layers.units[tile] = unit
 		commit(map, { kind: 'move', from: tile, to: destination })
 		if (callback) {
@@ -132,25 +175,54 @@ const openPostMoveMenu = (map: MapObject, tile: number, unit: UnitObject) => {
 
 const attack: Interactor = ({ map, tile, choice }) => {
 	const attacker = map.layers.units[tile]
-	if (!attacker || !choice) return
+	if (!attacker || !choice) {
+		map.pathHistory = []
+		return
+	}
 
 	const destination = generateActionsList(map, tile, attacker).find(
 		(action) => action.tile === choice
 	)?.tile
-	const target = destination && map.layers.units[destination]
-	if (!target) return
+	if (destination === undefined) {
+		map.pathHistory = []
+		return
+	}
+	const target = map.layers.units[destination]
+	if (!target) {
+		map.pathHistory = []
+		return
+	}
 
-	const path = pathFinder(map, attacker, tile, destination)
+	// Honor the player's hovered approach when it lands on a walkable tile that's
+	// already adjacent to the target. That lets them dictate which side of the
+	// target the attacker ends up on, instead of inheriting the BFS tie-break.
+	const isMelee = unitData[attacker.type].range[0] === 1
+	const userPath = map.pathHistory
+	const userEnd = userPath && userPath.length ? userPath[userPath.length - 1] : null
+	const userPathUsable =
+		isMelee &&
+		userPath &&
+		userPath.length >= 1 &&
+		userPath[0] === tile &&
+		userEnd !== null &&
+		tilesAreAdjacent(map, userEnd, destination) &&
+		(userEnd === tile || !map.layers.units[userEnd])
+
+	const path = userPathUsable ? userPath!.slice() : pathFinder(map, attacker, tile, destination)
 	const movementEndTile = path[path.length - 1] ?? tile
 
 	if (path.length > 1) {
+		// move() reads map.pathHistory to walk the exact route — make sure it sees
+		// the path we just committed to, not a stale (or absent) history.
+		map.pathHistory = path
 		move({
 			map,
 			tile,
-			choice: path[path.length - 1],
+			choice: movementEndTile,
 			callback: () => performAttack(map, movementEndTile, destination),
 		})
 	} else {
+		map.pathHistory = []
 		performAttack(map, movementEndTile, destination)
 	}
 }
@@ -183,6 +255,7 @@ const selectAttackTarget: Interactor = ({ map, tile }) => {
 	interactionSource.set(null)
 	interactionState.set('select')
 	highlightActionsList(map, [])
+	map.pathHistory = []
 
 	performAttack(map, source, tile)
 }
@@ -196,6 +269,7 @@ const selectLandTile: Interactor = ({ map, tile }) => {
 	interactionSource.set(null)
 	interactionState.set('select')
 	highlightActionsList(map, [])
+	map.pathHistory = []
 
 	commit(map, { kind: 'transport-unload', transport: source, tile })
 }

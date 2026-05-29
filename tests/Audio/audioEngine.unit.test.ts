@@ -10,6 +10,7 @@ import {
 	clampVolume,
 	settingsFromState,
 	type AudioElementLike,
+	type FadeScheduler,
 } from '../../src/lib/Audio/audioEngine'
 import {
 	defaultAudioSettings,
@@ -57,6 +58,48 @@ function makeEngine(settings: AudioSettings = defaultAudioSettings()) {
 		persist: (s) => persisted.push(s),
 	})
 	return { engine, created, persisted }
+}
+
+/**
+ * Deterministic fade scheduler: tests advance time manually and `tick()` flushes
+ * any scheduled callback. Lets us inspect fade midpoints without rAF or timers.
+ */
+function makeFadeScheduler() {
+	let now = 0
+	let pending: (() => void) | null = null
+	const scheduler: FadeScheduler = {
+		now: () => now,
+		requestFrame: (cb) => {
+			pending = cb
+			return () => {
+				if (pending === cb) pending = null
+			}
+		},
+	}
+	return {
+		scheduler,
+		advance(ms: number) {
+			now += ms
+		},
+		tick() {
+			const cb = pending
+			pending = null
+			cb?.()
+		},
+		hasPending: () => pending !== null,
+	}
+}
+
+function makeStemEngine(settings: AudioSettings = defaultAudioSettings()) {
+	const { factory, created } = makeFactory()
+	const clock = makeFadeScheduler()
+	const engine = new AudioEngine({
+		factory,
+		preferredFormat: 'ogg',
+		settings,
+		fadeScheduler: clock.scheduler,
+	})
+	return { engine, created, clock }
 }
 
 class MemoryStorage {
@@ -211,6 +254,112 @@ describe('cross-channel muting', () => {
 		expect(persisted).toHaveLength(2)
 		expect(persisted[1].music.muted).toBe(true)
 		expect(persisted[1].sfx.volume).toBe(0.4)
+	})
+})
+
+// ── Music stem layer (adaptive crossfade) ───────────────────────────────────────
+
+describe('music stem layer', () => {
+	const STEMS = ['game/intro', 'game/player', 'game/enemy'] as const
+
+	it('starts every stem looping, in lockstep, at gain 0', () => {
+		const { engine, created } = makeStemEngine()
+		engine.startMusicStems(STEMS)
+
+		expect(created).toHaveLength(STEMS.length)
+		for (const el of created) {
+			expect(el.loop).toBe(true)
+			expect(el.paused).toBe(false) // playing
+			expect(el.currentTime).toBe(0) // aligned start
+			expect(el.volume).toBe(0) // silent until mixed
+		}
+	})
+
+	it('snaps to the target mix when fadeMs is 0', () => {
+		const { engine, created } = makeStemEngine()
+		engine.startMusicStems(STEMS)
+		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+
+		const player = created.find((e) => e.src.includes('player'))!
+		const enemy = created.find((e) => e.src.includes('enemy'))!
+		const channelVol = effectiveVolume(engine.getState(), 'music')
+		expect(player.volume).toBeCloseTo(channelVol)
+		expect(enemy.volume).toBe(0)
+	})
+
+	it('crossfades stem gains over time without restarting any stem', () => {
+		const { engine, created, clock } = makeStemEngine()
+		engine.startMusicStems(STEMS)
+		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+
+		const player = created.find((e) => e.src.includes('player'))!
+		const enemy = created.find((e) => e.src.includes('enemy'))!
+
+		// Now flip to the enemy theme with a real fade
+		engine.setMusicMix({ 'game/enemy': 1 }, { fadeMs: 1000 })
+
+		// Halfway through, both should be roughly equally loud (linear ramp)
+		clock.advance(500)
+		clock.tick()
+		const channelVol = effectiveVolume(engine.getState(), 'music')
+		expect(player.volume).toBeCloseTo(channelVol * 0.5, 2)
+		expect(enemy.volume).toBeCloseTo(channelVol * 0.5, 2)
+		// Neither stem ever stopped or restarted — same element, still playing
+		expect(player.paused).toBe(false)
+		expect(enemy.paused).toBe(false)
+
+		// Finish the fade
+		clock.advance(500)
+		clock.tick()
+		expect(player.volume).toBe(0)
+		expect(enemy.volume).toBeCloseTo(channelVol)
+	})
+
+	it('re-targeting mid-fade continues smoothly from the current gain', () => {
+		const { engine, created, clock } = makeStemEngine()
+		engine.startMusicStems(STEMS)
+		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+
+		const player = created.find((e) => e.src.includes('player'))!
+
+		// Start fading player out toward 0
+		engine.setMusicMix({}, { fadeMs: 1000 })
+		clock.advance(400)
+		clock.tick()
+		const channelVol = effectiveVolume(engine.getState(), 'music')
+		const midGain = player.volume / channelVol
+		expect(midGain).toBeCloseTo(0.6, 2) // 40% faded
+
+		// Reverse direction — re-target player back to 1
+		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 1000 })
+		clock.advance(0)
+		clock.tick()
+		// Just after re-target, still near the current 0.6 (no jump)
+		expect(player.volume / channelVol).toBeCloseTo(midGain, 2)
+	})
+
+	it('stopMusicStems pauses every stem and clears the layer', () => {
+		const { engine, created } = makeStemEngine()
+		engine.startMusicStems(STEMS)
+		engine.stopMusicStems()
+
+		expect(created.every((e) => e.paused)).toBe(true)
+		expect(engine.getMusicStems().size).toBe(0)
+	})
+
+	it('master mute silences every stem', () => {
+		const { engine, created } = makeStemEngine()
+		engine.startMusicStems(STEMS)
+		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+
+		const player = created.find((e) => e.src.includes('player'))!
+		expect(player.volume).toBeGreaterThan(0)
+
+		engine.setMasterMute(true)
+		expect(player.volume).toBe(0)
+
+		engine.setMasterMute(false)
+		expect(player.volume).toBeGreaterThan(0)
 	})
 })
 
