@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { gameState } from '../gameState'
+	import { turnTransitionActive } from './turnTransitionStore'
 
 	export let onEndTurn: () => void = () => {}
 	export let localTeam: number = 0
@@ -9,7 +10,9 @@
 
 	$: state = $gameState
 	$: disabled =
-		state.phase !== 'playing' || (cpuOpponent && state.currentTeam !== localTeam)
+		state.phase !== 'playing' ||
+		(cpuOpponent && state.currentTeam !== localTeam) ||
+		$turnTransitionActive
 </script>
 
 <button

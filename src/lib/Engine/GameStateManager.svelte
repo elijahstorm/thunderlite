@@ -21,6 +21,8 @@
 	import BuildMenu from './HUD/BuildMenu.svelte'
 	import ActionMenu from './HUD/ActionMenu.svelte'
 	import StatsScreen from './HUD/StatsScreen.svelte'
+	import TurnTransition from './HUD/TurnTransition.svelte'
+	import { turnTransitionActive } from './HUD/turnTransitionStore'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	export let endTurnAction: (() => void) | undefined = undefined
@@ -109,6 +111,7 @@
 		if (state !== 'waiting') return
 		if (active) return
 		if (!isMultiplayer && $gameState.currentTeam !== localTeam) return
+		if ($turnTransitionActive) return
 
 		if (map) setSelectedTile(y * map.cols + x)
 		interactor(x, y)
@@ -132,19 +135,25 @@
 		resetMatchStats()
 	}
 
+	// `$turnTransitionActive` is part of the key so the CPU only starts thinking
+	// after the slide-in/slide-out overlay finishes. While the transition is up,
+	// the key collapses to '' and any in-flight handle is cancelled; when the
+	// flag flips back to false the block re-fires with the real key and a fresh
+	// `runCpuTurn` is scheduled.
 	let cpuHandle: CpuAiHandle | null = null
 	let lastCpuKey = ''
 	$: {
 		const s = $gameState
+		const transitioning = $turnTransitionActive
 		const isCpu = !isMultiplayer && s.phase === 'playing' && s.currentTeam !== localTeam
-		const key = isCpu ? `${s.currentTeam}:${s.turnNumber}` : ''
+		const key = isCpu && !transitioning ? `${s.currentTeam}:${s.turnNumber}` : ''
 		if (key !== lastCpuKey) {
 			lastCpuKey = key
 			if (cpuHandle) {
 				cpuHandle.cancel()
 				cpuHandle = null
 			}
-			if (isCpu && map) {
+			if (isCpu && !transitioning && map) {
 				cpuHandle = runCpuTurn({
 					humanTeam: localTeam,
 					endTurn: handleEndTurn,
@@ -183,6 +192,7 @@
 			s.phase === 'playing' &&
 			s.currentTeam === localTeam &&
 			idle &&
+			!$turnTransitionActive &&
 			autoEndedTurnKey !== turnKey &&
 			!teamHasPendingActions(map, s)
 		) {
@@ -230,3 +240,4 @@
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />
+<TurnTransition {localTeam} cpuOpponent={!isMultiplayer} />
