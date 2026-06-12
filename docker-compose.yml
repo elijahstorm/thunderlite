@@ -1,3 +1,7 @@
+# Local dev stack. Auth, database, and file storage are DontCode platform
+# services — there is no local stand-in for them. Set DONTCODE_API_URL and
+# DONTCODE_API_KEY in .env.local (see .env.example); only ephemeral pieces
+# (KV game-session state, chat broadcaster) run locally.
 services:
   app:
     build:
@@ -10,36 +14,14 @@ services:
     environment:
       CI: 'true'
       NODE_ENV: development
-      POSTGRES_URL: postgres://thunderlite:thunderlite@db:5432/thunderlite
       KV_REST_API_URL: http://kv:80
       KV_REST_API_TOKEN: example_token
-      HANKO_API_URL_INTERNAL: http://hanko:8000
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules
     depends_on:
-      db:
-        condition: service_healthy
       kv:
         condition: service_started
-      hanko:
-        condition: service_started
-
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: thunderlite
-      POSTGRES_PASSWORD: thunderlite
-      POSTGRES_DB: thunderlite
-    ports:
-      - '127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432'
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U thunderlite -d thunderlite']
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   chat:
     build:
@@ -71,49 +53,6 @@ services:
     depends_on:
       - redis
 
-  hanko-init:
-    image: postgres:16-alpine
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGPASSWORD: thunderlite
-    entrypoint: ['sh', '-c']
-    command:
-      - >
-        psql -h db -U thunderlite -tc "SELECT 1 FROM pg_database WHERE datname='hanko'" | grep -q 1
-        || psql -h db -U thunderlite -c "CREATE DATABASE hanko"
-    restart: 'no'
-
-  hanko-migrate:
-    image: ghcr.io/teamhanko/hanko:latest
-    depends_on:
-      hanko-init:
-        condition: service_completed_successfully
-    volumes:
-      - ./hanko/config.yaml:/etc/config/config.yaml:ro
-    command: ['--config', '/etc/config/config.yaml', 'migrate', 'up']
-    restart: 'no'
-
-  hanko:
-    image: ghcr.io/teamhanko/hanko:latest
-    depends_on:
-      hanko-migrate:
-        condition: service_completed_successfully
-      mailpit:
-        condition: service_started
-    volumes:
-      - ./hanko/config.yaml:/etc/config/config.yaml:ro
-    command: ['serve', '--config', '/etc/config/config.yaml', 'public']
-    ports:
-      - '127.0.0.1:${HANKO_HOST_PORT:-18000}:8000'
-
-  mailpit:
-    image: axllent/mailpit:latest
-    ports:
-      - '127.0.0.1:${MAIL_HOST_PORT:-18025}:8025'
-
 volumes:
   app_node_modules:
-  pgdata:
   redisdata:

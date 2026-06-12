@@ -1,7 +1,7 @@
 import { dev } from '$app/environment'
-import type postgres from 'postgres'
+import { db } from '$lib/Server/dontcode'
 
-export const logToErrorDb = (sql: postgres.Sql) => async (e: unknown, info?: string) => {
+export const logToErrorDb = async (e: unknown, info?: string) => {
 	if (dev) {
 		console.error(e)
 		return
@@ -17,9 +17,11 @@ export const logToErrorDb = (sql: postgres.Sql) => async (e: unknown, info?: str
 	}
 
 	try {
-		await sql`insert into logs (type, message, time) values ('error', ${
-			(info ? info + ': ' : '') + message
-		}, ${formatPostgresDate(new Date())})`
+		await db.insert('logs', {
+			type: 'error',
+			message: (info ? info + ': ' : '') + message,
+			time: formatPostgresDate(new Date()),
+		})
 	} catch (msg) {
 		// big system failure here... maybe send alert?
 		console.error('!!AVOIDED SYSTEM CRASH!!', 'Could not save error log')

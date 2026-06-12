@@ -1,15 +1,11 @@
 import { error, redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
 import { createClient } from '@vercel/kv'
-import { KV_REST_API_TOKEN, KV_REST_API_URL, POSTGRES_URL } from '$env/static/private'
+import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { dev } from '$app/environment'
-import { authenticatedUser } from '$lib/Components/Auth/hanko-server'
+import { auth } from '$lib/Server/dontcode'
 import { generateKey } from '$lib/Security/keys'
-import { logToErrorDb } from '$lib/Security/serverLogs'
-import postgres from 'postgres'
 
 export const handle: Handle = async ({ event, resolve }) => {
-	const dbUri = `${POSTGRES_URL}${dev ? '' : '?sslmode=require'}`
-	let sql: postgres.Sql | null = null
 	const protectedRoutes = [
 		'/onboarding',
 		'/me',
@@ -21,24 +17,38 @@ export const handle: Handle = async ({ event, resolve }) => {
 		'/api/upload',
 		'/api/migrations',
 	]
+
+	// Resolve the signed-in user once per request from the access_token cookie.
+	const accessToken = event.cookies.get('access_token')
+	if (accessToken) {
+		const user = await resolveUser(accessToken)
+		if (user) {
+			event.locals.user = user.id
+			event.locals.userEmail = user.email
+		}
+	}
+
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
-		if (!(await authenticatedUser(event))) {
+		if (!event.locals.user) {
 			throw redirect(303, '/login')
 		}
 
-		sql = postgres(dbUri, {
-			idle_timeout: 60,
-			max_lifetime: 60 * 3,
-		})
-		event.locals.session = await getUserSession(sql, event)
+		event.locals.session = await getUserSession(event)
 	}
-
-	event.locals.sql = sql ?? postgres(dbUri, { idle_timeout: 20, max_lifetime: 60 })
 
 	return await resolve(event)
 }
 
-const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
+const resolveUser = async (accessToken: string) => {
+	try {
+		return await auth.me(accessToken)
+	} catch {
+		// Platform hiccups read as "not signed in" instead of crashing the request.
+		return null
+	}
+}
+
+const getUserSession = async (event: RequestEvent) => {
 	if (dev) {
 		return generateKey()
 	}
@@ -56,7 +66,7 @@ const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
 	try {
 		session = await kv.get(`user:${userId}`)
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		console.error(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 
@@ -66,7 +76,7 @@ const getUserSession = async (sql: postgres.Sql, event: RequestEvent) => {
 		try {
 			await kv.set(`user:${userId}`, session, { ex: fullDay, nx: true })
 		} catch (msg) {
-			logToErrorDb(sql)(msg)
+			console.error(msg)
 			throw error(500, 'Cannot set to Redis storage')
 		}
 	}

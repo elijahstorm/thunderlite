@@ -1,4 +1,4 @@
-import type postgres from 'postgres'
+import { db } from '$lib/Server/dontcode'
 
-export const getMapTypes = async (sql: postgres.Sql) =>
-	(await sql`select text from map_types`).map((type) => type.text)
+export const getMapTypes = async () =>
+	(await db.find<{ text: string }>('map_types', { select: ['text'] })).map((type) => type.text)

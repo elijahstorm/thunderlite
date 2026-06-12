@@ -5,6 +5,6 @@ export const GET = async ({ params, locals }) => {
 	const userSession = locals.session
 	if (!userSession) throw error(401, 'User not logged in')
 	const { userAuth } = params
-	const user = await getUserDBDataFromAuth(locals.sql, userAuth, locals.user)
+	const user = await getUserDBDataFromAuth(userAuth, locals.user)
 	return json({ user })
 }

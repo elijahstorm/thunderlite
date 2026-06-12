@@ -5,7 +5,6 @@ import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { dev } from '$app/environment'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
-import type postgres from 'postgres'
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const userSession = locals.session
@@ -22,17 +21,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 	}
 
-	const { gameSession, sha } = await getGameSession(locals.sql, userSession)
+	const { gameSession, sha } = await getGameSession(userSession)
 	if (!gameSession || !sha) throw error(403, 'No game session found')
 
 	return {
 		userSession,
 		gameSession,
-		...(await getMapHash(locals.sql, sha)),
+		...(await getMapHash(sha)),
 	}
 }
 
-const getGameSession = async (sql: postgres.Sql, userSession: string) => {
+const getGameSession = async (userSession: string) => {
 	if (dev) {
 		return { gameSession: 'testSession', sha: 'hello' }
 	}
@@ -56,7 +55,7 @@ const getGameSession = async (sql: postgres.Sql, userSession: string) => {
 		isMember =
 			gameSession !== null && (await kv.sismember(`game:${gameSession}`, userSession)) === 1
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 

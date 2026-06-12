@@ -212,7 +212,7 @@
 					<div class="relative mx-auto h-[60px] w-[60px] rounded bg-slate-700/60">
 						{#if attacking[i] && attackSrc && unit.attackSprite}
 							<div
-								class="absolute"
+								class="pointer-events-none absolute"
 								style={renderStyle(
 									{
 										source: attackSrc,
@@ -229,7 +229,7 @@
 							></div>
 						{:else if idleSrc}
 							<div
-								class="absolute"
+								class="pointer-events-none absolute"
 								style={renderStyle(
 									{
 										source: idleSrc,
@@ -247,7 +247,7 @@
 						{/if}
 						{#if exploding[i] && explosionSrc}
 							<div
-								class="absolute"
+								class="pointer-events-none absolute"
 								style={renderStyle(
 									{
 										source: explosionSrc,
@@ -302,7 +302,7 @@
 					<div class="relative mx-auto h-[60px] w-[60px] rounded bg-slate-700/60">
 						{#if src}
 							<div
-								class="absolute"
+								class="pointer-events-none absolute"
 								style={renderStyle(
 									{
 										source: src,

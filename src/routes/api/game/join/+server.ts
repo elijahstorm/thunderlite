@@ -62,7 +62,7 @@ export const POST = async ({ request, locals }) => {
 		return json({ session, sha: creatorData.sha })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 }

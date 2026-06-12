@@ -1,10 +1,9 @@
 import { error, json } from '@sveltejs/kit'
-import { put } from '@vercel/blob'
+import { db, storage } from '$lib/Server/dontcode'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import { BLOB_READ_WRITE_TOKEN } from '$env/static/private'
 import { generateKey } from '$lib/Security/keys.js'
 
-export const POST = async ({ params, request, locals }) => {
+export const POST = async ({ params, request }) => {
 	const blob = await request.blob()
 	const { userAuth } = params
 
@@ -12,15 +11,16 @@ export const POST = async ({ params, request, locals }) => {
 		throw error(400, { message: 'No image to upload.' })
 	}
 
-	const { url } = await put(`/user-images/${generateKey()}`, blob, {
-		access: 'public',
-		token: BLOB_READ_WRITE_TOKEN,
-	})
+	const { url } = await storage.uploadPublic(
+		`user-images/${generateKey()}`,
+		blob,
+		blob.type || 'application/octet-stream'
+	)
 
 	try {
-		await locals.sql`update users set profile_image_url = ${url} where auth = ${userAuth}`
+		await db.update('profiles', { auth: userAuth }, { profile_image_url: url })
 	} catch (msg) {
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not save image url to database')
 	}
 

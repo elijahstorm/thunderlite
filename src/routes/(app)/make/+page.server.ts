@@ -3,6 +3,6 @@ import { queryMaps } from '$lib/Database/queryMaps'
 import { getMapTypes } from '$lib/Database/getMapTypes'
 
 export const load: PageServerLoad = async ({ locals }) => ({
-	...(await queryMaps(locals.sql, {}, locals.user)),
-	mapTypes: await getMapTypes(locals.sql),
+	...(await queryMaps({}, locals.user)),
+	mapTypes: await getMapTypes(),
 })

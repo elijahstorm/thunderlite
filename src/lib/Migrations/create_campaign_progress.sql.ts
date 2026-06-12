@@ -1,5 +1,3 @@
-import type postgres from 'postgres'
-
 /**
  * `campaign_progress` — one row per account recording how far the single-player
  * campaign is unlocked (K3). `highest_unlocked_order` is the largest level
@@ -11,12 +9,11 @@ import type postgres from 'postgres'
  * `user_auth` is `unique` so the write-through can upsert cleanly. It defaults
  * to `1` (the first level) so a brand-new row already has level 1 unlocked.
  */
-export const CreateCampaignProgress = (sql: postgres.Sql) =>
-	sql`
-        create table campaign_progress (
-            id serial primary key,
-            user_auth text references users(auth) unique,
-            highest_unlocked_order int not null default 1,
-            updated_at timestamp default current_timestamp
-        )
-        `
+export const CreateCampaignProgress = `
+create table if not exists campaign_progress (
+    id serial primary key,
+    user_auth text references profiles(auth) unique,
+    highest_unlocked_order int not null default 1,
+    updated_at timestamp default current_timestamp
+);
+`

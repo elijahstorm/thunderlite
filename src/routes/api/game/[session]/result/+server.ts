@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { createClient } from '@vercel/kv'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { db } from '$lib/Server/dontcode'
 
 /**
  * POST /api/game/[session]/result — persist a finished match (J3).
@@ -105,33 +106,44 @@ export const POST = async ({ request, params, locals }) => {
 
 		let matchId: number | undefined
 		if (sessionId) {
-			const inserted = (await locals.sql`
-				insert into matches ${locals.sql({ session_id: sessionId, map_sha: mapSha, mode, winner_team: winnerTeam, turns })}
-				on conflict (session_id) do nothing
-				returning id`) as unknown as { id: number }[]
-			matchId = inserted[0]?.id
+			const inserted = await db.insertIgnoreConflict('matches', {
+				session_id: sessionId,
+				map_sha: mapSha,
+				mode,
+				winner_team: winnerTeam,
+				turns,
+			})
+			matchId = inserted?.id as number | undefined
 			if (matchId === undefined) {
-				const existing = (await locals.sql`
-					select id from matches where session_id = ${sessionId}`) as unknown as { id: number }[]
-				matchId = existing[0]?.id
+				const existing = await db.findOne<{ id: number }>('matches', {
+					where: { session_id: sessionId },
+					select: ['id'],
+				})
+				matchId = existing?.id
 			}
 		} else {
-			const inserted = (await locals.sql`
-				insert into matches ${locals.sql({ map_sha: mapSha, mode, winner_team: winnerTeam, turns })}
-				returning id`) as unknown as { id: number }[]
-			matchId = inserted[0]?.id
+			const inserted = await db.insert('matches', {
+				map_sha: mapSha,
+				mode,
+				winner_team: winnerTeam,
+				turns,
+			})
+			matchId = inserted.id as number | undefined
 		}
 
 		if (matchId === undefined) throw error(500, 'Could not persist match')
 
-		await locals.sql`
-			insert into match_players ${locals.sql({ match_id: matchId, user_auth: userAuth, team, outcome })}
-			on conflict (match_id, user_auth) do nothing`
+		await db.insertIgnoreConflict('match_players', {
+			match_id: matchId,
+			user_auth: userAuth,
+			team,
+			outcome,
+		})
 
 		return json({ matchId, outcome })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not persist match result')
 	}
 }

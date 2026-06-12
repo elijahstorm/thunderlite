@@ -64,7 +64,7 @@ export const POST = async ({ request, params, locals }) => {
 		return json({ event })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 }

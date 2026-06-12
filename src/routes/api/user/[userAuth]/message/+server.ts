@@ -1,5 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { db } from '$lib/Server/dontcode'
 
 export const POST = async ({ params, request, locals }) => {
 	const message = (await request.formData()).get('chat-input')?.toString()
@@ -12,15 +13,10 @@ export const POST = async ({ params, request, locals }) => {
 	let status = 'unknown'
 
 	try {
-		await locals.sql`insert into messages ${locals.sql(
-			{ source, target, message },
-			'source',
-			'target',
-			'message'
-		)}`
+		await db.insert('messages', { source, target, message })
 		status = 'ok'
 	} catch (msg) {
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Invalid target auth or message string')
 	}
 

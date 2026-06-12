@@ -7,6 +7,7 @@ import { error, fail } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { validate } from '$lib/Database/validators'
 import { getUserStats } from '$lib/Database/getUserStats'
+import { db } from '$lib/Server/dontcode'
 
 export const prerender = false
 export const ssr = false
@@ -16,10 +17,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	let user: UserDBData | null = null
 
 	try {
-		user = await getUserDBDataFromAuth(locals.sql, locals.user)
+		user = await getUserDBDataFromAuth(locals.user)
 	} catch (e) {
 		try {
-			await makeUserDBDataFromAuth(locals.user)(locals.sql)
+			await makeUserDBDataFromAuth(locals.user)
 			user = {
 				id: -1,
 				auth: locals.user,
@@ -36,7 +37,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// J3 — profile match record. Defensive in getUserStats, so a brand-new
 	// account (no match rows) returns zeros rather than throwing.
-	const stats = await getUserStats(locals.sql, locals.user)
+	const stats = await getUserStats(locals.user)
 
 	return { user, stats }
 }
@@ -56,7 +57,10 @@ export const actions = {
 		if (Object.keys(errors).length > 0) return fail(400, { errors })
 
 		if (validated.username && typeof validated.username === 'string') {
-			const user = await locals.sql`select id from users where username = ${validated.username}`
+			const user = await db.find('profiles', {
+				where: { username: validated.username },
+				select: ['id'],
+			})
 			if (user.length) {
 				return fail(400, { errors: { username: ['Sorry! This username is already taken'] } })
 			}
@@ -66,7 +70,7 @@ export const actions = {
 			locals.user,
 			validated as UserDBData,
 			Object.keys(validated) as (keyof UserDBData)[]
-		)(locals.sql)
+		)
 
 		return {
 			validated,

@@ -17,7 +17,7 @@
 	}
 
 	if (browser) {
-		import('$lib/Components/Auth/hanko').then((hanko) => (auth = hanko.userAuth))
+		import('$lib/Components/Auth/session').then((hanko) => (auth = hanko.userAuth))
 	}
 </script>
 

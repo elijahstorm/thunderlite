@@ -1,5 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { db } from '$lib/Server/dontcode'
 
 export const POST = async ({ params, locals }) => {
 	const { userAuth } = params
@@ -10,10 +11,10 @@ export const POST = async ({ params, locals }) => {
 	let status = 'unknown'
 
 	try {
-		await locals.sql`insert into follows ${locals.sql({ source, target }, 'source', 'target')}`
+		await db.insert('follows', { source, target })
 		status = 'ok'
 	} catch (msg) {
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Invalid target auth string')
 	}
 

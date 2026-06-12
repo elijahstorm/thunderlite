@@ -4,7 +4,6 @@ import { queryMaps } from '$lib/Database/queryMaps'
 export const GET: RequestHandler = async ({ url, locals }) =>
 	json(
 		await queryMaps(
-			locals.sql,
 			{
 				search: url.searchParams.get('search') ?? '',
 				type: url.searchParams.get('type') ?? '',

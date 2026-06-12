@@ -49,7 +49,7 @@ export const GET = async ({ url, params, locals }) => {
 		return json({ events, lastEventId })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Cannot get from Redis storage')
 	}
 }

@@ -1,24 +1,39 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
-import type postgres from 'postgres'
+import { db } from '$lib/Server/dontcode'
 
-export const getUserDBDataFromAuth = async (sql: postgres.Sql, auth: string, me: string = '') => {
-	let user: UserDBData
+export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
+	let user: UserDBData | null
 
 	try {
-		user = (
-			await sql`
-				select users.*,
-					exists(select 1 from follows where source = ${me} and target = users.auth) as following,
-					exists(select 1 from follows where source = users.auth and target = ${me}) as follower,
-					(select count(*) from messages where source = ${me} and target = users.auth) as message_count,
-					relationships.status as relationship
-				from users
-					left join relationships on source = ${me} and target = users.auth
-				where auth = ${auth}`
-		)[0] as UserDBData
+		// The old single query joined follows / messages / relationships onto
+		// users; the platform API has no joins, so the profile row is fetched
+		// first and each derived flag is composed from its own lookup.
+		const profile = await db.findOne<UserDBData>('profiles', { where: { auth } })
+
+		if (profile) {
+			const [following, follower, messageCount, relationship] = await Promise.all([
+				db.count('follows', { source: me, target: auth }),
+				db.count('follows', { source: auth, target: me }),
+				db.count('messages', { source: me, target: auth }),
+				db.findOne<{ status: RelationshipStatus }>('relationships', {
+					where: { source: me, target: auth },
+					select: ['status'],
+				}),
+			])
+
+			user = {
+				...profile,
+				following: following > 0,
+				follower: follower > 0,
+				message_count: messageCount,
+				relationship: relationship?.status ?? null,
+			} as UserDBData
+		} else {
+			user = null
+		}
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not get user from database')
 	}
 
@@ -29,21 +44,25 @@ export const getUserDBDataFromAuth = async (sql: postgres.Sql, auth: string, me:
 	return user
 }
 
-export const makeUserDBDataFromAuth = (auth: string) => async (sql: postgres.Sql) => {
+export const makeUserDBDataFromAuth = async (auth: string) => {
 	try {
-		await sql`insert into users ${sql({ auth }, 'auth')}`
+		await db.insert('profiles', { auth })
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not make user')
 	}
 }
 
-export const updateUserDBData =
-	(auth: string, user: UserDBData, entries: (keyof UserDBData)[]) => async (sql: postgres.Sql) => {
-		try {
-			await sql`update users set ${sql(user, ...entries)} where auth = ${auth}`
-		} catch (msg) {
-			logToErrorDb(sql)(msg)
-			throw error(500, 'Could not make user')
-		}
+export const updateUserDBData = async (
+	auth: string,
+	user: UserDBData,
+	entries: (keyof UserDBData)[]
+) => {
+	try {
+		const data = Object.fromEntries(entries.map((entry) => [entry, user[entry]]))
+		await db.update('profiles', { auth }, data)
+	} catch (msg) {
+		logToErrorDb(msg)
+		throw error(500, 'Could not make user')
 	}
+}

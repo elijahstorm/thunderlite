@@ -1,6 +1,6 @@
 import { logToErrorDb } from '$lib/Security/serverLogs'
 import { levelForPoints, pointsForResult, type MatchOutcome } from '$lib/progression'
-import type postgres from 'postgres'
+import { db } from '$lib/Server/dontcode'
 
 /**
  * getUserStats — aggregate a player's `match_players` rows into the profile
@@ -62,16 +62,17 @@ export const computeStats = (rows: MatchPlayerRow[]): UserStats => {
  * auth or any DB hiccup (e.g. the migration not yet run) returns zeros rather
  * than throwing, so the profile page never 500s on stats alone.
  */
-export const getUserStats = async (sql: postgres.Sql, auth: string): Promise<UserStats> => {
+export const getUserStats = async (auth: string): Promise<UserStats> => {
 	if (!auth) return emptyStats()
 
 	try {
-		const rows = (await sql`
-			select outcome from match_players where user_auth = ${auth}
-		`) as unknown as MatchPlayerRow[]
+		const rows = await db.find<MatchPlayerRow>('match_players', {
+			where: { user_auth: auth },
+			select: ['outcome'],
+		})
 		return computeStats(rows)
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		logToErrorDb(msg)
 		return emptyStats()
 	}
 }

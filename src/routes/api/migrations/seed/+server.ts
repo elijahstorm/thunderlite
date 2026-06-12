@@ -9,9 +9,9 @@ export const GET = async ({ locals }) => {
 	let status
 
 	try {
-		await resetTables(locals.sql)
-		await migrate(locals.sql)
-		await makeUserDBDataFromAuth(auth)(locals.sql)
+		await resetTables()
+		await migrate()
+		await makeUserDBDataFromAuth(auth)
 		await updateUserDBData(
 			auth,
 			{
@@ -21,8 +21,8 @@ export const GET = async ({ locals }) => {
 				display_name: 'this is the day we win forever',
 			} as UserDBData,
 			['profile_image_url', 'bio', 'username', 'display_name']
-		)(locals.sql)
-		status = await faker(locals.sql, auth)
+		)
+		status = await faker(auth)
 	} catch (e) {
 		console.error(e)
 		throw error(500, 'failed to run migrations')

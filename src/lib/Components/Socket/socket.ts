@@ -7,8 +7,8 @@ import { dispatchSerializedAction, normalizeAction } from '$lib/Engine/Interacto
 
 export const socketOpened = (socket: WebSocket, callback?: VoidFunction) => () => {
 	if (browser) {
-		import('../Auth/hanko').then((hanko) => {
-			const auth = get(hanko.userAuth)
+		import('../Auth/session').then((session) => {
+			const auth = get(session.userAuth)
 			if (auth) {
 				socket.send(`auth:${auth}`)
 			}

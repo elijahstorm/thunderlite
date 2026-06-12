@@ -1,5 +1,5 @@
 <script lang="ts">
-	import HankoAuth from '$lib/Components/Auth/HankoAuth.svelte'
+	import EmailPasswordAuth from '$lib/Components/Auth/EmailPasswordAuth.svelte'
 </script>
 
-<HankoAuth />
+<EmailPasswordAuth />

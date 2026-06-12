@@ -1,29 +1,31 @@
 import { dev } from '$app/environment'
 import { CreateDemoData } from '$lib/Migrations/seed_faker_data.sql'
-import { migrationsList } from '$lib/Migrations/list'
-import type postgres from 'postgres'
+import { consolidatedSchema, dropAllTablesSql } from '$lib/Migrations/list'
+import { migrate as applyMigration } from '$lib/Server/dontcode'
 
-export const migrate = async (sql: postgres.Sql) => {
-	await migrationsList(sql)
+export const migrate = async () => {
+	console.log('starting migrations')
+	await applyMigration(consolidatedSchema)
+	console.log('finished migrations')
 
 	return { success: true }
 }
 
-export const faker = async (sql: postgres.Sql, user?: string) => {
+export const faker = async (user?: string) => {
 	if (dev && user) {
 		console.log('running demo data migration for user', user)
-		await CreateDemoData(sql, user)
+		await CreateDemoData(user)
 	}
 
 	return { success: true }
 }
 
-export const resetTables = async (sql: postgres.Sql) =>
-	await sql`
-		DO $$ 
-		BEGIN
-			EXECUTE 'DROP TABLE IF EXISTS ' || string_agg(table_name, ', ') || ' CASCADE'
-			FROM information_schema.tables
-			WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
-		END $$;
-		`
+/**
+ * Dev only: drop every app-owned table (explicit list — never the platform's
+ * `users` table) so `migrate` can rebuild from a clean slate.
+ */
+export const resetTables = async () => {
+	if (!dev) return
+
+	await applyMigration(dropAllTablesSql)
+}

@@ -1,5 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { db } from '$lib/Server/dontcode'
 
 export const GET = async ({ url, params, locals }) => {
 	const { userAuth } = params
@@ -11,17 +12,21 @@ export const GET = async ({ url, params, locals }) => {
 	const page = parseInt(url.searchParams.get('page') ?? '0')
 
 	try {
-		const messages = await locals.sql`
-			select * from messages
-			where
-                source = ${source} and target = ${target} or
-                source = ${target} and target = ${source}
-            order by created_at desc
-            limit ${limit} offset ${(page ?? 0) * limit}`
+		const messages = await db.find('messages', {
+			where: {
+				OR: [
+					{ source, target },
+					{ source: target, target: source },
+				],
+			},
+			orderBy: { created_at: 'desc' },
+			limit,
+			offset: (page ?? 0) * limit,
+		})
 
 		return json({ messages })
 	} catch (msg) {
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not access database')
 	}
 }

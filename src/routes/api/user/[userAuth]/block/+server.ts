@@ -12,13 +12,12 @@ export const POST = async ({ params, locals }) => {
 						target: params.userAuth,
 						status: 'blocked',
 					},
-					locals.sql,
 					resolve
 				)
 			)
 		)
 	} catch (msg) {
-		logToErrorDb(locals.sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not access database')
 	}
 }

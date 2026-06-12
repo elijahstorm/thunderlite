@@ -9,8 +9,8 @@ import { getUserStats } from '$lib/Database/getUserStats'
  */
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { userAuth } = params
-	const user = await getUserDBDataFromAuth(locals.sql, userAuth, locals.user ?? '')
-	const stats = await getUserStats(locals.sql, userAuth)
+	const user = await getUserDBDataFromAuth(userAuth, locals.user ?? '')
+	const stats = await getUserStats(userAuth)
 
 	return { user, stats }
 }

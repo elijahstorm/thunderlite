@@ -1,18 +1,18 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
-import type postgres from 'postgres'
+import { db } from '$lib/Server/dontcode'
 
-export const getMapHash = async (sql: postgres.Sql, sha: string) => {
-	let map: MapDBData[]
+export const getMapHash = async (sha: string) => {
+	let map: { url: string } | null
 
 	try {
-		map = await sql`select url from maps where sha = ${sha}`
+		map = await db.findOne<{ url: string }>('maps', { where: { sha }, select: ['url'] })
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not get map from database')
 	}
 
-	const url = map[0]?.url
+	const url = map?.url
 	if (!url) {
 		throw error(400, { message: 'No map with that SHA found.' })
 	}
@@ -28,14 +28,11 @@ export const getMapHash = async (sql: postgres.Sql, sha: string) => {
 	return { mapHash }
 }
 
-export const isValidMapHash = async (sql: postgres.Sql, sha: string) => {
+export const isValidMapHash = async (sha: string) => {
 	try {
-		const results = await sql<{ count: number | bigint }[]>`
-			select count(url) from maps where sha = ${sha}
-		`
-		return Number(results[0]?.count ?? 0) > 0
+		return (await db.count('maps', { sha })) > 0
 	} catch (msg) {
-		logToErrorDb(sql)(msg)
+		logToErrorDb(msg)
 		throw error(500, 'Could not perform count check on database')
 	}
 }
