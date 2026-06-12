@@ -15,7 +15,7 @@ Two human players (hot-seat first, online second) load a map from the map editor
 ## What we are NOT building right now
 
 - Pretty UI, animations, polish, theming. Functional UI only. Decouple UI from game logic so a designer can replace it later.
-- New sound *assets*. Audio playback of the existing bank in `static/game/sounds/` is in scope (epic I); composing new audio is not.
+- New sound _assets_. Audio playback of the existing bank in `static/game/sounds/` is in scope (epic I); composing new audio is not.
 - A from-scratch art pipeline. All sprite sheets, terrain art, building art, weather art, attack animations live in `static/game/play/` already.
 
 ## Recently expanded scope (epics I–K)

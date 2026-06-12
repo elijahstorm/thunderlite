@@ -101,7 +101,13 @@ const levels = [
 			'..........',
 			'..........',
 		],
-		units: [u('strike', 1, 7, 0), u('strike', 2, 7, 0), u('heavy', 1, 6, 0), u('strike', 8, 0, 1), u('strike', 7, 1, 1)],
+		units: [
+			u('strike', 1, 7, 0),
+			u('strike', 2, 7, 0),
+			u('heavy', 1, 6, 0),
+			u('strike', 8, 0, 1),
+			u('strike', 7, 1, 1),
+		],
 		buildings: [],
 	},
 	{
@@ -399,6 +405,8 @@ for (const level of levels) {
 	const file = resolve(OUT_DIR, `${level.id}.json`)
 	writeFileSync(file, JSON.stringify(data, null, '\t') + '\n')
 	const teams = new Set([...data.layers.units, ...data.layers.buildings].map((o) => o.team))
-	console.log(`${level.id}: ${data.cols}x${data.rows}, ${data.layers.units.length} units, ${data.layers.buildings.length} buildings, teams {${[...teams].join(',')}}`)
+	console.log(
+		`${level.id}: ${data.cols}x${data.rows}, ${data.layers.units.length} units, ${data.layers.buildings.length} buildings, teams {${[...teams].join(',')}}`
+	)
 }
 console.log(`\nWrote ${levels.length} maps to ${OUT_DIR}`)

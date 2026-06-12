@@ -30,16 +30,61 @@ export interface CampaignLevel {
  * logic never needs to change.
  */
 export const campaignLevels: readonly CampaignLevel[] = [
-	{ id: '01-first-contact', order: 1, title: 'First Contact', blurb: 'Move, attack, and the armor matchup' },
-	{ id: '02-hold-the-line', order: 2, title: 'Hold the Line', blurb: 'Capture — and why the capital is everything' },
-	{ id: '03-heavy-metal', order: 3, title: 'Heavy Metal', blurb: 'Heavy vs light armor, and counter-attacks' },
-	{ id: '04-trench-warfare', order: 4, title: 'Trench Warfare', blurb: 'Terrain defense — dig in and outlast' },
-	{ id: '05-fog-of-war', order: 5, title: 'Fog of War', blurb: 'Sight, cloak, and the Jammer Truck' },
-	{ id: '06-supply-lines', order: 6, title: 'Supply Lines', blurb: 'Treasury, income, and the build menu' },
-	{ id: '07-rolling-thunder', order: 7, title: 'Rolling Thunder', blurb: 'Indirect fire and range' },
+	{
+		id: '01-first-contact',
+		order: 1,
+		title: 'First Contact',
+		blurb: 'Move, attack, and the armor matchup',
+	},
+	{
+		id: '02-hold-the-line',
+		order: 2,
+		title: 'Hold the Line',
+		blurb: 'Capture — and why the capital is everything',
+	},
+	{
+		id: '03-heavy-metal',
+		order: 3,
+		title: 'Heavy Metal',
+		blurb: 'Heavy vs light armor, and counter-attacks',
+	},
+	{
+		id: '04-trench-warfare',
+		order: 4,
+		title: 'Trench Warfare',
+		blurb: 'Terrain defense — dig in and outlast',
+	},
+	{
+		id: '05-fog-of-war',
+		order: 5,
+		title: 'Fog of War',
+		blurb: 'Sight, cloak, and the Jammer Truck',
+	},
+	{
+		id: '06-supply-lines',
+		order: 6,
+		title: 'Supply Lines',
+		blurb: 'Treasury, income, and the build menu',
+	},
+	{
+		id: '07-rolling-thunder',
+		order: 7,
+		title: 'Rolling Thunder',
+		blurb: 'Indirect fire and range',
+	},
 	{ id: '08-storm-front', order: 8, title: 'Storm Front', blurb: 'Weather slows the advance' },
-	{ id: '09-the-stronghold', order: 9, title: 'The Stronghold', blurb: 'Combined arms vs the Warmachine' },
-	{ id: '10-final-standoff', order: 10, title: 'Final Standoff', blurb: 'Everything you have learned' },
+	{
+		id: '09-the-stronghold',
+		order: 9,
+		title: 'The Stronghold',
+		blurb: 'Combined arms vs the Warmachine',
+	},
+	{
+		id: '10-final-standoff',
+		order: 10,
+		title: 'Final Standoff',
+		blurb: 'Everything you have learned',
+	},
 ] as const
 
 /** Lowest campaign order — what a brand-new player starts with unlocked. */

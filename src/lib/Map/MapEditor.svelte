@@ -103,7 +103,9 @@
 
 <div class="flex h-full min-h-0 flex-col bg-background text-foreground select-none">
 	<!-- Toolbar -->
-	<header class="z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2">
+	<header
+		class="z-10 flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2"
+	>
 		<div class="flex min-w-0 flex-1 items-center gap-2">
 			<span
 				class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground sm:inline-flex"

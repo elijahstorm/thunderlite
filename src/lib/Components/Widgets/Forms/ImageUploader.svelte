@@ -83,7 +83,7 @@
 	>
 		<FallbackImage {src} {alt} {fallback} />
 
-		<ImageGradientOverlay title={title ?? `Your ${dest}`} info={''} {fileType} {fileName} {state} />
+		<ImageGradientOverlay title={title ?? `Your ${dest}`} info="" {fileType} {fileName} {state} />
 
 		<div
 			class="upload-interation-icon cursor-pointer z-10 opacity-0 transition-opacity duration-500 bg-white p-4 m-4 border border-gray-300 rounded-full"
@@ -94,7 +94,7 @@
 			{:else if state == 'uploading'}
 				<Loader />
 			{:else if state == 'failed'}
-				<Icon icon={failedIcon} {width} color={'var(--error)'} />
+				<Icon icon={failedIcon} {width} color="var(--error)" />
 				<div class="flex flex-col items-center">
 					<p
 						class="absolute mt-8 py-2 px-4 text-red-500 bg-red-100 rounded-lg border border-red-500"
@@ -103,7 +103,7 @@
 					</p>
 				</div>
 			{:else if state == 'finished'}
-				<Icon icon={finishedIcon} {width} color={'var(--primary)'} />
+				<Icon icon={finishedIcon} {width} color="var(--primary)" />
 			{/if}
 		</div>
 	</button>

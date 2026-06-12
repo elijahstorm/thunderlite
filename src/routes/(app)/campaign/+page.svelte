@@ -23,7 +23,10 @@
 
 <section class="container py-16 space-y-8">
 	<header class="space-y-2">
-		<a href="/" class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+		<a
+			href="/"
+			class="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+		>
 			<Icon icon="lucide:arrow-left" width={14} />
 			Home
 		</a>

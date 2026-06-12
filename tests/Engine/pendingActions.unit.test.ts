@@ -25,7 +25,9 @@ const building = (team: number, type = WARFACTORY): BuildingObject => ({ type, s
 // Seed the store directly so each test controls money/controls precisely.
 const seed = (currentTeam: number, money: number, ground: boolean) => {
 	gameState.set({
-		players: [{ team: currentTeam, money, hasLost: false, controls: { ground, air: false, sea: false } }],
+		players: [
+			{ team: currentTeam, money, hasLost: false, controls: { ground, air: false, sea: false } },
+		],
 		currentTeam,
 		turnNumber: 1,
 		actedTiles: new Set<number>(),

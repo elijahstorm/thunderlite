@@ -40,7 +40,12 @@
 		const health = unitData[unitType]?.health ?? 10
 		const units: (UnitObject | null)[] = []
 		units[0] = { type: unitType, state: 0, team: 0, health } as UnitObject
-		units[(rows - 1) * cols + (cols - 1)] = { type: unitType, state: 0, team: 1, health } as UnitObject
+		units[(rows - 1) * cols + (cols - 1)] = {
+			type: unitType,
+			state: 0,
+			team: 1,
+			health,
+		} as UnitObject
 
 		return {
 			...base,

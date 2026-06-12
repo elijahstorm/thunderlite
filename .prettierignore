@@ -1,8 +1,13 @@
 .DS_Store
+.claude
 node_modules
 /build
-/.svelte-kit
+**/.svelte-kit
 /package
+/test-results
+
+# Reference-only data copied from the old repo; not valid syntax
+/src/lib/GameData/old
 .env
 .env.*
 !.env.example

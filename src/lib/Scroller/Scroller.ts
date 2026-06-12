@@ -459,6 +459,7 @@ const scrollerMembers = function () {
 	 * @param deactivateCallback Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled.
 	 * @param startCallback Callback to execute to start the real async refresh action. Call {@link #finishPullToRefresh} after finish of refresh.
 	 */
+	// eslint-disable-next-line @typescript-eslint/no-unused-expressions -- vendored zynga-scroller method chain
 	;((scroller.activatePullToRefresh = function (
 		height: number,
 		activateCallback: VoidFunction | null,

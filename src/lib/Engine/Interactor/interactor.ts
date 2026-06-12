@@ -78,7 +78,10 @@ const select: Interactor = ({ map, tile }) => {
 		return
 	}
 
-	highlightActionsList(map, generateActionsList(map, tile, unit, computeThreatTiles(map, unit.team)))
+	highlightActionsList(
+		map,
+		generateActionsList(map, tile, unit, computeThreatTiles(map, unit.team))
+	)
 	interactionSource.set(tile)
 	interactionState.set('choice')
 	map.pathHistory = [tile]

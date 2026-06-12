@@ -90,11 +90,19 @@ export function settingsFromState(state: AudioState): AudioSettings {
 	}
 }
 
-export function withChannelVolume(state: AudioState, channel: ChannelKey, volume: number): AudioState {
+export function withChannelVolume(
+	state: AudioState,
+	channel: ChannelKey,
+	volume: number
+): AudioState {
 	return { ...state, [channel]: { ...state[channel], volume: clampVolume(volume) } }
 }
 
-export function withChannelMute(state: AudioState, channel: ChannelKey, muted: boolean): AudioState {
+export function withChannelMute(
+	state: AudioState,
+	channel: ChannelKey,
+	muted: boolean
+): AudioState {
 	return { ...state, [channel]: { ...state[channel], muted } }
 }
 

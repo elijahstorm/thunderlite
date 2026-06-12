@@ -60,6 +60,12 @@
 	const visibilityProvider: VisibilityProvider = fogOfWar
 		? () => {
 				const state = $gameState
+				// Lift the fog entirely once the local player is eliminated or the
+				// match is decided: sight comes only from owned units, so a dead
+				// viewer would otherwise stare at a fully black board while the
+				// remaining teams play out the match. Spectating is the better rule.
+				const localPlayer = state.players.find((p) => p.team === localTeam)
+				if (state.phase === 'gameOver' || localPlayer?.hasLost) return null
 				// Viewer's team, not state.currentTeam: the active player switching to
 				// the CPU/opponent must not flip the fog to their vantage point. The
 				// cache still keys on turn + actedTiles so our view refreshes as their
@@ -160,7 +166,9 @@
 	// when the campaign script asks the camera to move. Minimap MapRenders also
 	// run this binding, but they never get a `campaign` prop so the subscription
 	// below short-circuits and they don't pan with the main board.
-	let scrollerInstance: { panToTile?: (x: number, y: number, animate?: boolean) => void } | undefined
+	let scrollerInstance:
+		| { panToTile?: (x: number, y: number, animate?: boolean) => void }
+		| undefined
 
 	onMount(() => {
 		if (!colorizer) colorizer = imageColorizer()
@@ -231,13 +239,7 @@
 							tileHeight={cellHeight}
 							contentWidth={cellWidth * map.cols}
 							contentHeight={cellHeight * map.rows}
-							paint={paint(
-								renderData,
-								hudImages,
-								pause,
-								visibilityProvider,
-								localTeam
-							)(() => map)}
+							paint={paint(renderData, hudImages, pause, visibilityProvider, localTeam)(() => map)}
 							{requestRedraw}
 							{handleClick}
 							{handleHover}

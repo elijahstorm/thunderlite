@@ -75,10 +75,14 @@ export const POST = async ({ request, params, locals }) => {
 			}
 
 			// First writer locks the winner; everyone else reads it back.
-			await kv.set(RESULT_KEY(session), { winner: claimedWinner }, {
-				nx: true,
-				ex: RESULT_TTL_SECONDS,
-			})
+			await kv.set(
+				RESULT_KEY(session),
+				{ winner: claimedWinner },
+				{
+					nx: true,
+					ex: RESULT_TTL_SECONDS,
+				}
+			)
 			const lockedRaw = (await kv.get(RESULT_KEY(session))) as
 				| string
 				| { winner: number | null }

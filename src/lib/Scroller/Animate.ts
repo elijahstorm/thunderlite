@@ -152,11 +152,10 @@ export const Animate = {
 			// Verification is executed before next animation step
 			if (!running[id] || (verifyCallback && !verifyCallback(id))) {
 				running[id] = null
-				completedCallback &&
-					completedCallback(
-						desiredFrames - dropCounter / ((now - start) / millisecondsPerSecond),
-						id
-					)
+				completedCallback?.(
+					desiredFrames - dropCounter / ((now - start) / millisecondsPerSecond),
+					id
+				)
 				return
 			}
 
@@ -183,11 +182,10 @@ export const Animate = {
 			const value = easingMethod ? easingMethod(percent) : percent
 			if ((stepCallback(value, now, render) === false || percent === 1) && render) {
 				running[id] = null
-				completedCallback &&
-					completedCallback(
-						desiredFrames - dropCounter / ((now - start) / millisecondsPerSecond),
-						id
-					)
+				completedCallback?.(
+					desiredFrames - dropCounter / ((now - start) / millisecondsPerSecond),
+					id
+				)
 			} else if (render) {
 				lastFrame = now
 				this.requestAnimationFrame(step(true))

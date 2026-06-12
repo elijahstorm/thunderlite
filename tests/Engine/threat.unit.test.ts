@@ -2,14 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
-import {
-	computeThreatTiles,
-	unitThreatTiles,
-} from '../../src/lib/Engine/Interactor/Pathing/threat'
-import {
-	generateActionsList,
-	generatePreviewList,
-} from '../../src/lib/Layers/tileHighlighter'
+import { computeThreatTiles, unitThreatTiles } from '../../src/lib/Engine/Interactor/Pathing/threat'
+import { generateActionsList, generatePreviewList } from '../../src/lib/Layers/tileHighlighter'
 
 const unitIndex = (name: string) => {
 	const idx = unitData.findIndex((u) => u.name === name)

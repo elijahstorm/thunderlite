@@ -409,9 +409,7 @@ const collectTalk = (
  * - otherwise (neither flag): the list is unfinished (open quote or trailing
  *   comma) and needs another line appended.
  */
-const scanQuotedList = (
-	s: string
-): { complete: boolean; malformed: boolean; values: string[] } => {
+const scanQuotedList = (s: string): { complete: boolean; malformed: boolean; values: string[] } => {
 	const values: string[] = []
 	let i = 0
 	const n = s.length

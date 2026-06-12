@@ -27,7 +27,7 @@
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	export let endTurnAction: (() => void) | undefined = undefined
 	export let localTeam: number = 0
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 	export const userSession: string = ''
 	export let gameSession: string = ''
 	export let map: MapObject | undefined = undefined
@@ -56,8 +56,14 @@
 	let defeatedTeams = new Set<number>()
 
 	let lastMap: MapObject | undefined
+	// Pristine copy of the board taken before any engine mutation. The engine
+	// edits `map.layers` in place all match (units die, buildings flip teams), so
+	// a rematch must restore from this snapshot — re-deriving players from the
+	// end-of-match layers would resurrect a board with the losers already wiped.
+	let initialLayers: MapLayers | undefined
 	$: if (map && map !== lastMap) {
 		lastMap = map
+		initialLayers = structuredClone(map.layers)
 		defeatedTeams = new Set<number>()
 		initGameStateFromMap(map)
 		// A fresh board is a fresh match — clear the emit-once guard so this match
@@ -125,11 +131,17 @@
 		endTurn({ map })
 	}
 
-	// Rematch (hotseat/online) — replay the same board from scratch: re-seed game
-	// state and clear the J1/J2 trackers so a new match-end can fire and re-count.
+	// Rematch (hotseat/online) — replay the same board from scratch: restore the
+	// board to its pre-match snapshot, then re-seed game state and clear the
+	// J1/J2 trackers so a new match-end can fire and re-count.
 	const handleRematch = () => {
 		if (!map) return
+		if (initialLayers) map.layers = structuredClone(initialLayers)
+		map.route = []
+		map.highlights = new Array(map.cols * map.rows)
+		map.pathHistory = []
 		defeatedTeams = new Set<number>()
+		autoEndedTurnKey = ''
 		initGameStateFromMap(map)
 		resetMatchEnd()
 		resetMatchStats()

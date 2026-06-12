@@ -184,7 +184,10 @@ describe('createCampaignRunner', () => {
 		await runner.enterTurn(0, 0) // no such block (player's first turn isn't scripted)
 		await runner.enterTurn(1, 1) // no such block
 		const turnOps = ops.slice(startCount)
-		expect(turnOps).toEqual([['talk', 'Gannon', ['Too slow.']], ['kill', 8, 5]])
+		expect(turnOps).toEqual([
+			['talk', 'Gannon', ['Too slow.']],
+			['kill', 8, 5],
+		])
 
 		await runner.finish(winOutcome)
 		const afterFirstFinish = [...ops]

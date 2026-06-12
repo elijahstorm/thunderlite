@@ -133,7 +133,7 @@ describe('audio state machine (pure)', () => {
 	})
 
 	it('multiplies master × channel volume for effective gain', () => {
-		let state = createAudioState({
+		const state = createAudioState({
 			...defaultAudioSettings(),
 			master: { volume: 0.5, muted: false },
 			music: { volume: 0.6, muted: false },
@@ -149,7 +149,7 @@ describe('audio state machine (pure)', () => {
 	})
 
 	it('master mute silences every channel', () => {
-		let state = withChannelMute(createAudioState(), 'master', true)
+		const state = withChannelMute(createAudioState(), 'master', true)
 		expect(effectiveVolume(state, 'music')).toBe(0)
 		expect(effectiveVolume(state, 'sfx')).toBe(0)
 		expect(effectiveVolume(state, 'env')).toBe(0)
@@ -164,7 +164,7 @@ describe('audio state machine (pure)', () => {
 	})
 
 	it('settingsFromState drops runtime active-track info', () => {
-		let state = withActiveTrack(createAudioState(), 'music', 'game/player')
+		const state = withActiveTrack(createAudioState(), 'music', 'game/player')
 		expect(settingsFromState(state)).not.toHaveProperty('active')
 	})
 })

@@ -38,15 +38,15 @@ describe('musicMixForState (pure)', () => {
 	})
 
 	it('raises the thinking stem while an opponent CPU computes', () => {
-		expect(
-			activeStem(musicMixForState(base({ currentTeam: 1, cpuThinking: true }), 0))
-		).toBe('game/thinking')
+		expect(activeStem(musicMixForState(base({ currentTeam: 1, cpuThinking: true }), 0))).toBe(
+			'game/thinking'
+		)
 	})
 
 	it('returns to the enemy stem once the CPU has acted', () => {
-		expect(
-			activeStem(musicMixForState(base({ currentTeam: 1, cpuThinking: false }), 0))
-		).toBe('game/enemy')
+		expect(activeStem(musicMixForState(base({ currentTeam: 1, cpuThinking: false }), 0))).toBe(
+			'game/enemy'
+		)
 	})
 
 	it('raises the ally stem for a non-local allied team (teams > 2)', () => {

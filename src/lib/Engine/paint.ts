@@ -52,14 +52,11 @@ export const paint =
 		const hideIdleUnit = hideEnemyUnit || (unitAtTile?.animating ?? false)
 		const state = get(gameState)
 		const unitActed =
-			unitAtTile !== null &&
-			unitAtTile.team === state.currentTeam &&
-			state.actedTiles.has(tile)
+			unitAtTile !== null && unitAtTile.team === state.currentTeam && state.actedTiles.has(tile)
 		// Only the active team's still-available units idle-animate. Units that have
 		// spent their action, and every unit belonging to a non-active team, freeze
 		// on sprite frame 0.
-		const unitAnimates =
-			unitAtTile !== null && unitAtTile.team === state.currentTeam && !unitActed
+		const unitAnimates = unitAtTile !== null && unitAtTile.team === state.currentTeam && !unitActed
 
 		context.save()
 		context.translate(left, top)
@@ -68,10 +65,7 @@ export const paint =
 		render.highlights(map.highlights[tile])
 		const buildingAtTile = map.layers.buildings[tile] ?? null
 		const hideEnemyBuildingCapture =
-			!tileVisible &&
-			fog !== null &&
-			buildingAtTile !== null &&
-			buildingAtTile.team !== fog.team
+			!tileVisible && fog !== null && buildingAtTile !== null && buildingAtTile.team !== fog.team
 		const buildingActed =
 			buildingAtTile !== null &&
 			buildingAtTile.team === state.currentTeam &&
@@ -422,12 +416,7 @@ const route =
 		context.restore()
 	}
 
-const drawRouteSegment = (
-	ctx: CanvasRenderingContext2D,
-	w: number,
-	h: number,
-	state: number
-) => {
+const drawRouteSegment = (ctx: CanvasRenderingContext2D, w: number, h: number, state: number) => {
 	const cx = w / 2
 	const cy = h / 2
 	const thickness = Math.max(8, Math.round(w / 6))

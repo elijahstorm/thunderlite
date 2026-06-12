@@ -13,7 +13,7 @@
 
 	export let map: () => MapObject | undefined
 	export let gameSession: string = ''
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 	export const userSession: string = ''
 
 	const POLL_INTERVAL = 1500

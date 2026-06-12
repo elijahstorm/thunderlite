@@ -17,16 +17,22 @@ test('campaign auto-advances to the next level on a win', async ({ page }) => {
 	await page.goto('/campaign')
 
 	// First visit: level 1 is launchable; later levels are locked.
-	await expect(page.locator('[data-level-id="02-hold-the-line"][data-testid="level-locked"]')).toBeVisible()
+	await expect(
+		page.locator('[data-level-id="02-hold-the-line"][data-testid="level-locked"]')
+	).toBeVisible()
 	await page.click('[data-level-id="01-first-contact"][data-testid="level-card"]')
 	await expect(page).toHaveURL(/\/campaign\/01-first-contact/)
 
 	// Force a win without playing the match out.
 	await page.waitForFunction(
-		() => typeof (window as unknown as { __thunderliteCampaign?: { win: () => void } }).__thunderliteCampaign?.win === 'function'
+		() =>
+			typeof (window as unknown as { __thunderliteCampaign?: { win: () => void } })
+				.__thunderliteCampaign?.win === 'function'
 	)
 	await page.evaluate(() =>
-		(window as unknown as { __thunderliteCampaign: { win: () => void } }).__thunderliteCampaign.win()
+		(
+			window as unknown as { __thunderliteCampaign: { win: () => void } }
+		).__thunderliteCampaign.win()
 	)
 
 	// Clear any scripted dialogue, then Continue auto-advances to level 2's route.

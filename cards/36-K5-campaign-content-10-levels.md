@@ -15,18 +15,18 @@ K1–K4 build the machinery; this card fills it with actual playable content: ~1
 
 Author 10 levels under `src/lib/Campaign/levels/` — each a map (`.json` in the editor's map format, or an editor-built `mapSha`) plus a `.txt` script in the K1 DSL — and register them in order in `src/lib/Campaign/levels.ts`. Each level teaches/escalates one idea and carries the story. Suggested arc (transcribe into scripts, tune later):
 
-| # | Title | Map theme | Teaches | Enemy roster | Story beat |
-|---|-------|-----------|---------|--------------|------------|
-| 1 | First Contact | small plains | move, attack, attack/armor matchup | Strike Commandos | Torrial saves Link from Gannon's ambush |
-| 2 | Hold the Line | river chokepoint | capture, capital = instant loss | Commandos + 1 Scorpion Tank | capture Gannon's command center to survive |
-| 3 | Heavy Metal | open field | Heavy vs Light armor, counter-attacks | Scorpion + Annihilator Tank | the Annihilator can't be beaten head-on |
-| 4 | Trench Warfare | coast | terrain defense, set-terrain (trenches) | mixed armor wave | dig in along the coast, outlast the assault |
-| 5 | Fog of War | forest | sight, cloak, Jammer Truck reveal | Stealth Tanks | Gannon fields hidden units |
-| 6 | Supply Lines | oil fields | treasury, income buildings, build menu | growing enemy economy | seize oil + factories to fund troops |
-| 7 | Rolling Thunder | hills | indirect fire (Mortar/Rocket), range | entrenched defenders | break a bottleneck with artillery |
-| 8 | Storm Front | mountains | weather effects (rain/storm) | air + ground | weather slows the advance; press anyway |
-| 9 | The Stronghold | fortress | combined arms, transports, air | full roster, Warmachine | assault Gannon's fortress |
-| 10 | Final Standoff | entrenched coast | everything + naval potshots | full roster, naval | the climactic battle vs Gannon |
+| #   | Title           | Map theme        | Teaches                                 | Enemy roster                | Story beat                                  |
+| --- | --------------- | ---------------- | --------------------------------------- | --------------------------- | ------------------------------------------- |
+| 1   | First Contact   | small plains     | move, attack, attack/armor matchup      | Strike Commandos            | Torrial saves Link from Gannon's ambush     |
+| 2   | Hold the Line   | river chokepoint | capture, capital = instant loss         | Commandos + 1 Scorpion Tank | capture Gannon's command center to survive  |
+| 3   | Heavy Metal     | open field       | Heavy vs Light armor, counter-attacks   | Scorpion + Annihilator Tank | the Annihilator can't be beaten head-on     |
+| 4   | Trench Warfare  | coast            | terrain defense, set-terrain (trenches) | mixed armor wave            | dig in along the coast, outlast the assault |
+| 5   | Fog of War      | forest           | sight, cloak, Jammer Truck reveal       | Stealth Tanks               | Gannon fields hidden units                  |
+| 6   | Supply Lines    | oil fields       | treasury, income buildings, build menu  | growing enemy economy       | seize oil + factories to fund troops        |
+| 7   | Rolling Thunder | hills            | indirect fire (Mortar/Rocket), range    | entrenched defenders        | break a bottleneck with artillery           |
+| 8   | Storm Front     | mountains        | weather effects (rain/storm)            | air + ground                | weather slows the advance; press anyway     |
+| 9   | The Stronghold  | fortress         | combined arms, transports, air          | full roster, Warmachine     | assault Gannon's fortress                   |
+| 10  | Final Standoff  | entrenched coast | everything + naval potshots             | full roster, naval          | the climactic battle vs Gannon              |
 
 For each level write: a `<start>` block (camera tour + Torrial's setup dialogue + scripted enemy reveal), at least one `<turn N>` reinforcement/escalation beat, and `<win>` / `<lose>` dialogue. Pull tone and specific lines from the original scriptnotes where they fit (e.g. Torrial's armor-matchup explanation in level 1, the "rain slows troops" warning around level 8).
 

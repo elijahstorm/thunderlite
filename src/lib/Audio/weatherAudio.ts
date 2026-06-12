@@ -49,9 +49,7 @@ const SKY_WEATHER_AUDIO: Record<string, WeatherId> = {
  * board (it's the more significant condition), though both currently sound the
  * same.
  */
-export function weatherForMap(
-	map: Pick<MapObject, 'layers'> | null | undefined
-): WeatherId | null {
+export function weatherForMap(map: Pick<MapObject, 'layers'> | null | undefined): WeatherId | null {
 	const sky = map?.layers?.sky
 	if (!sky) return null
 	let found: WeatherId | null = null

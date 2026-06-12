@@ -33,7 +33,9 @@ test('level 1 loads, plays its opening dialogue, and is completable', async ({ p
 				.__thunderliteCampaign?.win === 'function'
 	)
 	await page.evaluate(() =>
-		(window as unknown as { __thunderliteCampaign: { win: () => void } }).__thunderliteCampaign.win()
+		(
+			window as unknown as { __thunderliteCampaign: { win: () => void } }
+		).__thunderliteCampaign.win()
 	)
 
 	// Best-effort: clear any dialogue sitting at the bottom of the screen.

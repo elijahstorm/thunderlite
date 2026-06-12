@@ -234,9 +234,7 @@ export const applyAction = (
 			// online opponent sees the forfeit and the match ends on both clients.
 			gameState.update((s) => ({
 				...s,
-				players: s.players.map((p) =>
-					p.team === action.team ? { ...p, hasLost: true } : p
-				),
+				players: s.players.map((p) => (p.team === action.team ? { ...p, hasLost: true } : p)),
 			}))
 			applyWinConditions(map as MapObject)
 			return

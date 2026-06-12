@@ -29,7 +29,9 @@ const decodeJwtSubject = (token: string): string | null => {
 }
 
 export const loggedIn = writable<boolean>(!!initialToken)
-export const userAuth = writable<string | null>(initialToken ? decodeJwtSubject(initialToken) : null)
+export const userAuth = writable<string | null>(
+	initialToken ? decodeJwtSubject(initialToken) : null
+)
 
 export const redirectAfterLogin = () => goto('/onboarding')
 export const redirectAfterLogout = () => goto('/login')
