@@ -15,15 +15,15 @@ docker compose up                 # builds and starts app + db + redis + kv shim
 
 Open [http://localhost:15173](http://localhost:15173).
 
-| Service                                                                              | URL / endpoint                                  | Purpose                                                                     |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| `app`                                                                                | [http://localhost:15173](http://localhost:15173)  | SvelteKit dev server, HMR enabled                                           |
-| `db` (Postgres 16)                                                                   | `localhost:15432` (user/pass/db `thunderlite`)    | App data + Hanko's `hanko` database                                         |
-| `kv` ([hiett/serverless-redis-http](https://github.com/hiett/serverless-redis-http)) | [http://localhost:180](http://localhost:180) (token `example_token`) | Upstash-compatible REST shim in front of Redis — what `@vercel/kv` talks to |
-| `redis`                                                                              | network-only                                      | Backing store for the kv shim                                               |
-| `hanko` ([ghcr.io/teamhanko/hanko](https://github.com/teamhanko/hanko))              | [http://localhost:18000](http://localhost:18000)  | Auth backend; config in [hanko/config.yaml](hanko/config.yaml)              |
-| `mailpit` ([axllent/mailpit](https://github.com/axllent/mailpit))                    | [http://localhost:18025](http://localhost:18025)  | Inbox for every email Hanko sends — open the UI to read passcodes           |
-| `chat`                                                                               | `ws://localhost:18083/ws`                         | In-game chat WebSocket broadcaster — script at [scripts/chat-server.mjs](scripts/chat-server.mjs) |
+| Service                                                                              | URL / endpoint                                                       | Purpose                                                                                           |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `app`                                                                                | [http://localhost:15173](http://localhost:15173)                     | SvelteKit dev server, HMR enabled                                                                 |
+| `db` (Postgres 16)                                                                   | `localhost:15432` (user/pass/db `thunderlite`)                       | App data + Hanko's `hanko` database                                                               |
+| `kv` ([hiett/serverless-redis-http](https://github.com/hiett/serverless-redis-http)) | [http://localhost:180](http://localhost:180) (token `example_token`) | Upstash-compatible REST shim in front of Redis — what `@vercel/kv` talks to                       |
+| `redis`                                                                              | network-only                                                         | Backing store for the kv shim                                                                     |
+| `hanko` ([ghcr.io/teamhanko/hanko](https://github.com/teamhanko/hanko))              | [http://localhost:18000](http://localhost:18000)                     | Auth backend; config in [hanko/config.yaml](hanko/config.yaml)                                    |
+| `mailpit` ([axllent/mailpit](https://github.com/axllent/mailpit))                    | [http://localhost:18025](http://localhost:18025)                     | Inbox for every email Hanko sends — open the UI to read passcodes                                 |
+| `chat`                                                                               | `ws://localhost:18083/ws`                                            | In-game chat WebSocket broadcaster — script at [scripts/chat-server.mjs](scripts/chat-server.mjs) |
 
 All host-side ports bind to `127.0.0.1` only. The `app` service mounts the working tree at `/app`, so file edits hot-reload in place. `node_modules` lives in a named volume inside the container so host changes don't shadow it.
 
@@ -48,19 +48,29 @@ docker compose down            # stop containers, keep data
 docker compose down -v         # nuke pgdata + redisdata + cached node_modules
 ```
 
+## Dev playground — animations & sounds
+
+[/dev](src/routes/dev/+page.svelte) is a sandbox for testing game animations and audio without starting a match. It is dev-server only (404s in production builds). Open [http://localhost:15173/dev](http://localhost:15173/dev) (Docker) or `http://localhost:5173/dev` (`pnpm dev`).
+
+- **Units** — every unit's idle animation with team-color and facing selectors, plus per-unit Attack (overlay animation + its mapped weapon sfx), Move sfx, and Die (explosion animation + sfx) buttons. Rendering uses the same sprite loader, colorizer, and frame math as the in-game `Animator`, so what you see is what the game draws.
+- **Tile FX** — the explosion / pointer / select sheet animations looping.
+- **Sounds** — channel mixer (master/music/sfx/env volumes + mutes, persisted like in-game settings), a button per sound effect, the adaptive music stem layer with per-stem solo + crossfade control, win/lose stings, and weather ambience loops.
+
+If nothing sounds, click anywhere on the page once — browsers block audio until a user gesture.
+
 ## Environment variables
 
 `docker-compose.yml` overrides the in-network ones (`POSTGRES_URL`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `NODE_ENV`) automatically — leave them blank in `.env.local`. `PUBLIC_HANKO_API_URL` defaults to the in-stack Hanko container.
 
 The remaining variables are cloud-only services with no local mock. Pull them from your Vercel project (`pnpm dlx vercel env pull .env.local`) or provision your own:
 
-| Variable                   | Where it's used                                                                            | Notes                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `EDGE_CONFIG`              | [src/routes/+layout.server.ts](src/routes/+layout.server.ts) — loads site title/desc/fonts | **Required for `/` to render.** Empty → home page returns 500.                     |
-| `BLOB_READ_WRITE_TOKEN`    | Map / asset upload routes                                                                  | Required for upload features                                                       |
+| Variable                   | Where it's used                                                                            | Notes                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `EDGE_CONFIG`              | [src/routes/+layout.server.ts](src/routes/+layout.server.ts) — loads site title/desc/fonts | **Required for `/` to render.** Empty → home page returns 500.                              |
+| `BLOB_READ_WRITE_TOKEN`    | Map / asset upload routes                                                                  | Required for upload features                                                                |
 | `PUBLIC_HANKO_API_URL`     | [src/lib/Components/Auth/](src/lib/Components/Auth/) — JWT verification & login UI         | Defaults to `http://localhost:18000` (in-stack Hanko). Set to Hanko Cloud URL to use cloud. |
-| `PUBLIC_SOCKET_CONNECTION` | [src/lib/Components/Socket/ChatSocket.svelte](src/lib/Components/Socket/ChatSocket.svelte) | WebSocket endpoint for chat/multiplayer                                            |
-| `VITE_EMAIL_NAME`          | [src/routes/api/contact/mailCarrier.ts](src/routes/api/contact/mailCarrier.ts)             | Sender address for the contact form                                                |
+| `PUBLIC_SOCKET_CONNECTION` | [src/lib/Components/Socket/ChatSocket.svelte](src/lib/Components/Socket/ChatSocket.svelte) | WebSocket endpoint for chat/multiplayer                                                     |
+| `VITE_EMAIL_NAME`          | [src/routes/api/contact/mailCarrier.ts](src/routes/api/contact/mailCarrier.ts)             | Sender address for the contact form                                                         |
 
 ### Hanko dev config
 
