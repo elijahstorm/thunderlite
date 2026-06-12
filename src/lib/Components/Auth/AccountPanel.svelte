@@ -1,11 +1,10 @@
 <!--
-	Account panel. Kept under its old name because call sites outside the auth
-	migration's ownership (e.g. /me) still import HankoProfile — Hanko itself
-	is gone; this now talks to the DontCode session endpoints.
+	Account panel: shows the signed-in user and a sign-out action, backed by
+	the DontCode session endpoints.
 -->
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import { logout, redirectAfterLogout, refreshSession } from './session'
+	import { logout, redirectAfterLogout, refreshSession } from '$lib/dontcode/client'
 
 	let email: string | null = null
 	let loaded = false

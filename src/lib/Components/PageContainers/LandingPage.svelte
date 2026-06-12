@@ -6,7 +6,7 @@
 	let loggedIn: Readable<boolean> = writable(false)
 
 	if (browser) {
-		import('$lib/Components/Auth/session').then((m) => (loggedIn = m.loggedIn))
+		import('$lib/dontcode/client').then((m) => (loggedIn = m.loggedIn))
 	}
 
 	const features = [

@@ -1,7 +1,7 @@
 import { dev } from '$app/environment'
 import { CreateDemoData } from '$lib/Migrations/seed_faker_data.sql'
 import { consolidatedSchema, dropAllTablesSql } from '$lib/Migrations/list'
-import { migrate as applyMigration } from '$lib/Server/dontcode'
+import { migrate as applyMigration } from '$lib/dontcode/server'
 
 export const migrate = async () => {
 	console.log('starting migrations')

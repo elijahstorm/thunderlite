@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
-	import HankoProfile from '$lib/Components/Auth/HankoProfile.svelte'
+	import AccountPanel from '$lib/Components/Auth/AccountPanel.svelte'
 	import DataInput from '$lib/Components/Widgets/Forms/DataInput.svelte'
 	import ImageUploader from '$lib/Components/Widgets/Forms/ImageUploader.svelte'
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
@@ -118,6 +118,6 @@
 	</header>
 
 	<div class="card p-6 sm:p-8">
-		<HankoProfile />
+		<AccountPanel />
 	</div>
 </section>

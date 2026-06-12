@@ -1,6 +1,6 @@
 import { logToErrorDb } from '$lib/Security/serverLogs'
 import { levelForPoints, pointsForResult, type MatchOutcome } from '$lib/progression'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 /**
  * getUserStats — aggregate a player's `match_players` rows into the profile

@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit'
-import { auth } from '$lib/Server/dontcode'
-import { readCredentials, setAccessTokenCookie } from '../utils'
+import { auth } from '$lib/dontcode/server'
+import { readCredentials, setAccessTokenCookie } from '$lib/dontcode/cookies'
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	const { email, password } = await readCredentials(request)

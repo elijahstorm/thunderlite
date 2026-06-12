@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const POST = async ({ params, request, locals }) => {
 	const message = (await request.formData()).get('chat-input')?.toString()

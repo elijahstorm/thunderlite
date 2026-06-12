@@ -3,8 +3,8 @@
  * local /api/auth/* routes. The access token itself lives in an httpOnly
  * cookie — the browser never sees it, only whether a user is signed in.
  *
- * Drop-in successor to the old `hanko.ts` store: exports the same
- * `loggedIn` / `userAuth` stores and redirect helpers.
+ * Part of the DontCode platform boundary (see README.md): the future
+ * `@dontcode/backend/client` entry point.
  */
 import { browser } from '$app/environment'
 import { goto } from '$app/navigation'

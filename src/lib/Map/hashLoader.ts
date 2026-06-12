@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const getMapHash = async (sha: string) => {
 	let map: { url: string } | null

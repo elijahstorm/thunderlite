@@ -2,7 +2,7 @@ import { error, redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
 import { createClient } from '@vercel/kv'
 import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { dev } from '$app/environment'
-import { auth } from '$lib/Server/dontcode'
+import { auth } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
 
 export const handle: Handle = async ({ event, resolve }) => {

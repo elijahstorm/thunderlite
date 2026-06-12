@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte'
 	import UserIcon from './UserIcon.svelte'
-	import { userAuth } from './session'
+	import { userAuth } from '$lib/dontcode/client'
 </script>
 
 <div class="flex items-center gap-2">

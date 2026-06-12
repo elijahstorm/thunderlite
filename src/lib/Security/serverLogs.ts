@@ -1,5 +1,5 @@
 import { dev } from '$app/environment'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const logToErrorDb = async (e: unknown, info?: string) => {
 	if (dev) {

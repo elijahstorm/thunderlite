@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit'
 import { getUserDBDataFromAuth } from './getUserData'
 import { logToErrorDb } from '$lib/Security/serverLogs'
-import { db, type Where } from '$lib/Server/dontcode'
+import { db, type Where } from '$lib/dontcode/server'
 
 type MapRow = MapDBData & { map_type_id: number | null }
 

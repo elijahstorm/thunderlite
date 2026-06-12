@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { redirectAfterLogin, refreshSession } from './session'
+	import { redirectAfterLogin, refreshSession } from '$lib/dontcode/client'
 
 	let mode: 'login' | 'signup' = 'login'
 	let email = ''

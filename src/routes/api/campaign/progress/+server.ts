@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 import { firstLevelOrder, lastLevelOrder } from '$lib/Campaign/levels'
 
 /**

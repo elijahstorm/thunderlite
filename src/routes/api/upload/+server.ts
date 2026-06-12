@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { hash } from '$lib/Map/Editor/mapEncrypter.js'
-import { db, storage } from '$lib/Server/dontcode'
+import { db, storage } from '$lib/dontcode/server'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 
 export const POST = async ({ request }) => {

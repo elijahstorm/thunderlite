@@ -2,7 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { createClient } from '@vercel/kv'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 /**
  * POST /api/game/[session]/result — persist a finished match (J3).

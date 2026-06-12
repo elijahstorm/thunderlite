@@ -1,5 +1,5 @@
 import { error, json } from '@sveltejs/kit'
-import { db, storage } from '$lib/Server/dontcode'
+import { db, storage } from '$lib/dontcode/server'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { generateKey } from '$lib/Security/keys.js'
 

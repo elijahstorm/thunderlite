@@ -9,7 +9,7 @@
 	let auth = writable<string | null>(null)
 
 	if (browser) {
-		import('$lib/Components/Auth/session').then((hanko) => (auth = hanko.userAuth))
+		import('$lib/dontcode/client').then((session) => (auth = session.userAuth))
 	}
 
 	const getRelationshipStatus = () =>

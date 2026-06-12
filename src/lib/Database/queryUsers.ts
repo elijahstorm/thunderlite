@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 type QueryType = 'public' | 'friends' | 'following' | 'followers'
 

@@ -1,4 +1,4 @@
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 /**
  * Dev-only demo data, ported from the old raw-SQL seed to `db.insert` calls.

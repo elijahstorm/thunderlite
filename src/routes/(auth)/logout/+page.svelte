@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import { logout, redirectAfterLogout } from '$lib/Components/Auth/session'
+	import { logout, redirectAfterLogout } from '$lib/dontcode/client'
 
 	onMount(() => {
 		logout().then(redirectAfterLogout)

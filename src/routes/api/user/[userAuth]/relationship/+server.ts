@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const GET = async ({ params, locals }) => {
 	const { userAuth } = params

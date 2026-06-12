@@ -11,7 +11,7 @@ import { error, fail, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { faker, migrate } from '$lib/Database/Migrations/migrator'
 import { validate } from '$lib/Database/validators'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const prerender = false
 export const ssr = false

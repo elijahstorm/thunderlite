@@ -1,4 +1,4 @@
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const setRelationship: (
 	params: {

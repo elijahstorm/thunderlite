@@ -7,7 +7,7 @@ import { error, fail } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { validate } from '$lib/Database/validators'
 import { getUserStats } from '$lib/Database/getUserStats'
-import { db } from '$lib/Server/dontcode'
+import { db } from '$lib/dontcode/server'
 
 export const prerender = false
 export const ssr = false

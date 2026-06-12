@@ -7,7 +7,7 @@ import { dispatchSerializedAction, normalizeAction } from '$lib/Engine/Interacto
 
 export const socketOpened = (socket: WebSocket, callback?: VoidFunction) => () => {
 	if (browser) {
-		import('../Auth/session').then((session) => {
+		import('$lib/dontcode/client').then((session) => {
 			const auth = get(session.userAuth)
 			if (auth) {
 				socket.send(`auth:${auth}`)
