@@ -8,16 +8,19 @@
 	let loading = false
 	let errorMessage = ''
 	let verificationRequired = false
+	let noticeMessage = ''
 
 	const switchMode = (next: 'login' | 'signup') => {
 		mode = next
 		errorMessage = ''
 		verificationRequired = false
+		noticeMessage = ''
 	}
 
 	const submit = async () => {
 		errorMessage = ''
 		verificationRequired = false
+		noticeMessage = ''
 
 		if (mode === 'signup' && password !== confirmPassword) {
 			errorMessage = 'Passwords do not match'
@@ -40,6 +43,16 @@
 
 			if (mode === 'signup' && data.verification_required && !data.loggedIn) {
 				verificationRequired = true
+				return
+			}
+
+			// Account created but not signed in automatically — flip to the
+			// login form and prompt the user to sign in.
+			if (mode === 'signup' && !data.loggedIn) {
+				password = ''
+				confirmPassword = ''
+				mode = 'login'
+				noticeMessage = 'Account successfully created. Please sign in.'
 				return
 			}
 
@@ -89,6 +102,12 @@
 	{#if verificationRequired}
 		<p class="text-sm p-3 rounded-lg border border-border bg-surface-2">
 			Almost there! Check your email to verify your account, then sign in.
+		</p>
+	{/if}
+
+	{#if noticeMessage}
+		<p class="text-sm p-3 rounded-lg border border-border bg-surface-2">
+			{noticeMessage}
 		</p>
 	{/if}
 
