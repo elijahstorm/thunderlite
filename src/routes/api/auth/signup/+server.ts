@@ -16,16 +16,18 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		)
 	}
 
-	// Sign the new account in right away so the user lands in the app.
+	// When email verification is on, there's no point trying to sign in — the
+	// account is locked until the user enters the code we just emailed them.
+	if (signup.verification_required) {
+		return json({ success: true, loggedIn: false, verification_required: true })
+	}
+
+	// Otherwise sign the new account in right away so the user lands in the app.
 	const login = await auth.login(email, password)
 	const loggedIn = !!(login.success && login.tokens)
 	if (login.success && login.tokens) {
 		setAccessTokenCookie(cookies, login.tokens.AccessToken, login.tokens.ExpiresIn)
 	}
 
-	return json({
-		success: true,
-		loggedIn,
-		verification_required: signup.verification_required ?? false,
-	})
+	return json({ success: true, loggedIn, verification_required: false })
 }

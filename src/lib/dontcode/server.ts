@@ -15,7 +15,9 @@ import { env } from '$env/dynamic/private'
 export class DontCodeApiError extends Error {
 	constructor(
 		public status: number,
-		message: string
+		message: string,
+		/** Machine-readable error code from the API body (e.g. "EmailNotVerified"). */
+		public code?: string
 	) {
 		super(message)
 		this.name = 'DontCodeApiError'
@@ -58,7 +60,8 @@ async function request<T>(
 			payload && typeof payload.error === 'string'
 				? payload.error
 				: `DontCode API request failed (${res.status})`
-		throw new DontCodeApiError(res.status, message)
+		const code = payload && typeof payload.code === 'string' ? payload.code : undefined
+		throw new DontCodeApiError(res.status, message, code)
 	}
 	return payload as T
 }
@@ -196,9 +199,19 @@ export interface DontCodeUser {
 interface AuthResponse {
 	success: boolean
 	error?: string
+	/** Machine-readable error code, e.g. "EmailNotVerified" / "ChallengeExpired". */
+	code?: string
 	userId?: string
+	message?: string
 	tokens?: { AccessToken: string; ExpiresIn: number }
+	verified?: boolean
 	verification_required?: boolean
+	// MFA login challenge (returned by `login` when a second factor is required).
+	mfa_offered?: boolean
+	mfa_enabled?: boolean
+	mfa_required?: boolean
+	challenge_token?: string
+	challenge_expires_in?: number
 }
 
 async function authPost(endpoint: string, body: unknown, accessToken?: string) {
@@ -210,7 +223,7 @@ async function authPost(endpoint: string, body: unknown, accessToken?: string) {
 		// Auth endpoints communicate failures in-band ({ success: false }) so
 		// callers can show the message instead of crashing the request.
 		if (err instanceof DontCodeApiError && err.status < 500) {
-			return { success: false, error: err.message } satisfies AuthResponse
+			return { success: false, error: err.message, code: err.code } satisfies AuthResponse
 		}
 		throw err
 	})
@@ -223,6 +236,26 @@ export const auth = {
 
 	login(email: string, password: string): Promise<AuthResponse> {
 		return authPost('login', { email, password })
+	},
+
+	/** Confirm a new account with the 6-digit code emailed to the user. */
+	verifyEmail(code: string, email?: string): Promise<AuthResponse> {
+		return authPost('verify-email', { code, email })
+	},
+
+	/**
+	 * Complete a login that returned `mfa_required`. Supply the challenge token
+	 * from that login plus either an authenticator `code` or a `recoveryCode`.
+	 */
+	mfaChallenge(
+		challengeToken: string,
+		{ code, recoveryCode }: { code?: string; recoveryCode?: string }
+	): Promise<AuthResponse> {
+		return authPost('mfa/challenge', {
+			challenge_token: challengeToken,
+			code,
+			recovery_code: recoveryCode,
+		})
 	},
 
 	/** Resolve the current user from an access token. Null when invalid/expired. */
