@@ -1,26 +1,26 @@
 <start>
 move: 4,4
-talk Torrial: "Gannon's dug his tanks into the hills behind that wall. Charge through the gap and they'll cut you to pieces."
+talk Vance: "Kael's dug his tanks into the hills behind that wall. Charge through the gap and they'll cut your column apart."
 move: 2,8
-talk Torrial: "This is why we brought artillery. Your Mortar and Rocket Trucks strike from range — two, three, even five tiles away.", "Soften the defenders from afar, then send the tanks in to finish."
+talk Vance: "Which is why we brought artillery. Your Mortar and Rocket Trucks hit from range: two, three, even five tiles out.", "Soften the defenders from afar, then send the tanks in to finish."
 move: 10,2
-talk Gannon: "Let them come through the gap. My gunners are waiting."
-talk Link: "We won't give him the charge he wants. Open up with the artillery."
+talk Kael: "Let them come through the gap. My gunners are ready for them."
+talk Reyes: "We won't give him the charge he's hoping for. Open up with the artillery."
 </start>
 
 <turn 0,1>
 wait: 1
 move: 10,7
-talk Gannon: "Reinforce the ridge! Hold the line!"
+talk Kael: "Reinforce the ridge. Hold the line."
 add unit: 1,"Scorpion Tank",10,7
-talk Torrial: "Keep your indirect units back and let them hammer. Don't let the trucks get caught up close."
+talk Vance: "Keep your indirect units back and let them hammer. Don't let the trucks get caught up close."
 </turn>
 
 <win>
-talk Torrial: "The bottleneck is broken. Range beats entrenchment when you use it right.", "Keep your artillery alive and you can crack any line."
+talk Vance: "The bottleneck's broken. Range beats entrenchment when you use it right.", "Keep your artillery alive and you can crack any line."
 </win>
 
 <lose>
-talk Gannon: "You threw yourselves on my guns. As I knew you would."
-talk Torrial: "We closed the distance too soon. Let the artillery do its work first."
+talk Kael: "You closed on my guns just as I expected."
+talk Vance: "We shortened the distance too soon. Let the artillery do its work first."
 </lose>

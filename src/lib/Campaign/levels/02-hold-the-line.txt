@@ -1,26 +1,26 @@
 <start>
 move: 6,4
-talk Torrial: "This river is the only way through. That bridge is the choke point — hold it.", "See the enemy Command Center across the water? That's Gannon's capital here."
+talk Vance: "This river's the only way through, and that bridge is the choke point. We hold it.", "See the enemy Command Center across the water? That's Kael's capital on this front."
 move: 10,4
-talk Gannon: "You'll never cross. My garrison will hold this bank forever."
+talk Kael: "You won't make the crossing. My garrison has this bank well in hand."
 move: 6,4
-talk Torrial: "Forever is a long time. Push a Commando onto his Command Center and capture it.", "Take a capital and the battle is over — instantly. Lose yours and it's you who falls."
-talk Link: "Then we cross the bridge and end this fast."
+talk Vance: "We'll see about that. Move a Commando onto his Command Center and capture it.", "Take a capital and the battle ends at once. But lose yours, and it's over for us instead."
+talk Reyes: "Then we cross the bridge and settle it quickly."
 </start>
 
 <turn 1,1>
 move: 10,6
-talk Gannon: "Send the tank! Keep them off my capital!"
+talk Kael: "Bring the tank up. Keep them away from my capital."
 add unit: 1,"Scorpion Tank",10,6
-talk Torrial: "He's defending the capture point. Clear a path, then take the Command Center."
+talk Vance: "He's guarding the capture point. Clear a path first, then take the Command Center."
 </turn>
 
 <win>
-talk Torrial: "The capital is ours — Gannon's line collapses. That's how you win a siege.", "Capture the heart, and the body falls."
-talk Link: "On to the next."
+talk Vance: "The capital's ours, and Kael's line falls apart with it. That's how you win a siege.", "Take the heart, and the rest gives way."
+talk Reyes: "On to the next one."
 </win>
 
 <lose>
-talk Gannon: "Hahaha! My capital still stands, and yours is dust."
-talk Torrial: "We pushed too thin. Guard your own Command Center while you reach for his."
+talk Kael: "My capital still stands. Yours does not."
+talk Vance: "We spread ourselves too thin. Guard your own Command Center while you reach for his."
 </lose>

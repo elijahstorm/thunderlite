@@ -1,27 +1,27 @@
 <start>
 move: 12,1
-talk Gannon: "So it ends here, on this miserable coast. Good.", "My Warmachine, my Annihilator, my fleet — everything I have, against everything you are."
+talk Kael: "So it comes down to this coast. Fitting enough.", "My Warmachine, my Annihilator, my fleet: everything I have against everything you've become."
 move: 13,10
-talk Gannon: "And my warships will shell you from the water while my armor grinds you flat. There is no answer to this."
+talk Kael: "My warships will shell you from the water while my armor presses you flat. I don't see your answer to that."
 move: 2,7
-talk Torrial: "There's always an answer, Link. Everything we've learned comes down to this — matchups, terrain, range, the economy, the air.", "Take his Warmachine or capture his Command Center and Gannon falls. Mind his ships, hold your line, and finish him."
-talk Link: "This is the last of it, Torrial. For everyone he's taken — we end Gannon today."
+talk Vance: "There's always an answer, Reyes. Everything we've learned comes together here: matchups, terrain, range, the economy, the air.", "Take his Warmachine or capture his Command Center and Kael falls. Mind his ships, hold your line, and see it through."
+talk Reyes: "This is the last of it, Vance. Let's bring it to an end."
 </start>
 
 <turn 1,1>
 wait: 1
 move: 10,3
-talk Gannon: "Is that all? I have steel without end!"
+talk Kael: "Is that all you have? My steel doesn't run out."
 add unit: 1,"Scorpion Tank",10,3
-talk Torrial: "Don't let the ships pin you to the shore. Press the Warmachine — break it and this is over."
+talk Vance: "Don't let the ships pin you to the shore. Press the Warmachine. Break it and this is over."
 </turn>
 
 <win>
-talk Torrial: "It's done. Gannon is finished, and the war with him.", "You walked in a green recruit and you end it a commander, Link. Well fought — all of it."
-talk Link: "We did it together, Torrial. All of us."
+talk Vance: "It's done. Kael's finished, and the war ends with him.", "You walked in a green recruit and you're leaving a commander, Reyes. Well fought, all of it."
+talk Reyes: "We did it together, Vance. All of us."
 </win>
 
 <lose>
-talk Gannon: "This is the end you chose. The coast is mine, and so is everything beyond it."
-talk Torrial: "Not yet — not while we can still stand. Up, Link. We try again. We do not let him win."
+talk Kael: "This was the end you chose. The coast is mine now, and everything past it."
+talk Vance: "Not yet. Not while we can still stand. Up, Reyes. We try again, and we don't let him have it."
 </lose>

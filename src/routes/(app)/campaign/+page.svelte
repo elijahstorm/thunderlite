@@ -32,7 +32,7 @@
 		</a>
 		<h1 class="text-3xl font-semibold tracking-tight text-foreground">Single Player Campaign</h1>
 		<p class="text-muted-foreground max-w-xl">
-			Fight through the Link / Torrial / Gannon story one level at a time. Beat a level to unlock
+			Fight through the Reyes / Vance / Kael story one level at a time. Beat a level to unlock
 			the next.
 		</p>
 	</header>

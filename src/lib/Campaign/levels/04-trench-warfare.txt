@@ -1,27 +1,27 @@
 <start>
 move: 4,7
-talk Torrial: "Gannon's column is rolling down the coast. We can't beat it in the open — so we don't fight in the open."
-talk Torrial: "Dig in. A unit in a canyon trench takes far less damage. Let the terrain be your armor."
+talk Vance: "Kael's column is rolling down the coast. We can't beat it in the open, so we won't fight in the open."
+talk Vance: "Dig in. A unit in a canyon trench takes far less damage. Let the terrain be your armor."
 terrain: "Canyon",4,8
 terrain: "Canyon",5,8
-talk Torrial: "There — trenches dug. Hold this line and make every charge cost them."
+talk Vance: "There. Trenches ready. Hold this line and make every charge cost them."
 move: 5,1
-talk Gannon: "Cowering in ditches? Pathetic. My armor will bury you in them."
-talk Link: "Let them come. We hold."
+talk Kael: "Holding a ditch won't save you. My armor will roll right over it."
+talk Reyes: "Let them come. We hold."
 </start>
 
 <turn 0,1>
 wait: 1
 move: 6,0
-talk Gannon: "Second wave — overrun the trench!"
+talk Kael: "Second wave. Push through the trench."
 add unit: 1,"Scorpion Tank",6,0
-talk Torrial: "Stay in cover and let them break on your line. Patience wins this."
+talk Vance: "Stay in cover and let them break against your line. Patience wins this one."
 </turn>
 
 <win>
-talk Torrial: "The assault is spent and we're still standing. Terrain held the line.", "You're learning to make the map fight for you."
+talk Vance: "The assault's spent and we're still standing. The terrain held the line.", "You're learning to make the map fight for you."
 </win>
 
 <lose>
-talk Torrial: "They've overrun us... we left the trenches too soon.", "Hold your cover next time, Link. Let them come to you."
+talk Vance: "They've broken through. We left the trenches too soon.", "Hold your cover next time, Reyes. Let them come to you."
 </lose>

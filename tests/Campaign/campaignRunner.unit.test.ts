@@ -35,7 +35,7 @@ const LEVEL = `
 <start>
 move: 8,8
 hl: 8,6
-talk Link: "Help me!", "Please!"
+talk Reyes: "Help me!", "Please!"
 add unit: 2,"Strike Commando",8,6
 terrain: "Mountain",3,4
 wait: 1
@@ -43,16 +43,16 @@ unhl: 8,6
 </start>
 
 <turn 0,1>
-talk Gannon: "Too slow."
+talk Kael: "Too slow."
 kill unit: 8,5
 </turn>
 
 <win>
-talk Torrial: "Victory!"
+talk Vance: "Victory!"
 </win>
 
 <lose>
-talk Torrial: "Defeat."
+talk Vance: "Defeat."
 </lose>
 `
 
@@ -80,7 +80,7 @@ describe('runCutsceneEvents', () => {
 		expect(ops).toEqual([
 			['camera', 8, 8],
 			['highlight', 8, 6],
-			['talk', 'Link', ['Help me!', 'Please!']],
+			['talk', 'Reyes', ['Help me!', 'Please!']],
 			['spawn', 2, 'Strike Commando', 8, 6],
 			['setTerrain', 'Mountain', 3, 4],
 			['wait', 1],
@@ -109,7 +109,7 @@ describe('runCutsceneEvents', () => {
 
 		const done = runCutsceneEvents(
 			[
-				{ kind: 'talk', speaker: 'Link', lines: ['hi'] },
+				{ kind: 'talk', speaker: 'Reyes', lines: ['hi'] },
 				{ kind: 'camera', x: 1, y: 1 },
 				{ kind: 'wait', seconds: 1 },
 			],
@@ -139,16 +139,16 @@ describe('createCampaignRunner', () => {
 			// start block
 			['camera', 8, 8],
 			['highlight', 8, 6],
-			['talk', 'Link', ['Help me!', 'Please!']],
+			['talk', 'Reyes', ['Help me!', 'Please!']],
 			['spawn', 2, 'Strike Commando', 8, 6],
 			['setTerrain', 'Mountain', 3, 4],
 			['wait', 1],
 			['unhighlight', 8, 6],
 			// turn 0,1 block (CPU's first side-turn)
-			['talk', 'Gannon', ['Too slow.']],
+			['talk', 'Kael', ['Too slow.']],
 			['kill', 8, 5],
 			// win block
-			['talk', 'Torrial', ['Victory!']],
+			['talk', 'Vance', ['Victory!']],
 		])
 		expect(runner.hasFinished()).toBe(true)
 	})
@@ -159,7 +159,7 @@ describe('createCampaignRunner', () => {
 
 		await runner.finish(loseOutcome)
 
-		expect(ops).toEqual([['talk', 'Torrial', ['Defeat.']]])
+		expect(ops).toEqual([['talk', 'Vance', ['Defeat.']]])
 	})
 
 	it('plays the lose block on a draw (only a win plays the win block)', async () => {
@@ -168,7 +168,7 @@ describe('createCampaignRunner', () => {
 
 		await runner.finish({ players: [{ isLocal: true, outcome: 'draw' }] })
 
-		expect(ops).toEqual([['talk', 'Torrial', ['Defeat.']]])
+		expect(ops).toEqual([['talk', 'Vance', ['Defeat.']]])
 	})
 
 	it('fires each block at most once (start, a given side-turn, and finish all dedupe)', async () => {
@@ -185,7 +185,7 @@ describe('createCampaignRunner', () => {
 		await runner.enterTurn(1, 1) // no such block
 		const turnOps = ops.slice(startCount)
 		expect(turnOps).toEqual([
-			['talk', 'Gannon', ['Too slow.']],
+			['talk', 'Kael', ['Too slow.']],
 			['kill', 8, 5],
 		])
 

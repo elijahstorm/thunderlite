@@ -1,24 +1,24 @@
 <start>
 move: 10,1
-talk Gannon: "Behold my Annihilator. Heaviest armor on the field.", "Throw yourselves at it. I'll enjoy watching."
+talk Kael: "Meet my Annihilator, the heaviest armor on this field.", "Come at it however you like. It won't matter."
 move: 1,8
-talk Torrial: "He's not bluffing — light and medium guns barely scratch heavy armor.", "But heavy weapons bite back. Your Heavy Commandos and that Rocket Truck are the answer."
-talk Torrial: "And don't charge in alone. When you attack in range, the enemy counter-attacks. Hit it from range, or gang up so it can only strike one of you."
-talk Link: "So we don't fight it head-on. We surround it."
+talk Vance: "He's right about one thing: light and medium guns barely dent heavy armor.", "But heavy weapons answer it. Your Heavy Commandos and that Rocket Truck are what we need here."
+talk Vance: "And don't go in alone. Attack within range and the enemy strikes back, so hit it from a distance, or gang up so it can only answer one of you."
+talk Reyes: "So we don't take it head-on. We surround it."
 </start>
 
 <turn 0,1>
 move: 10,3
-talk Gannon: "My Scorpion will flank you while the Annihilator grinds you down!"
+talk Kael: "My Scorpion will flank you while the Annihilator does the rest."
 add unit: 1,"Scorpion Tank",10,3
-talk Torrial: "Deal with the Annihilator with your heavy guns. Let the Scorpion come to you."
+talk Vance: "Handle the Annihilator with your heavy guns. Let the Scorpion come to you."
 </turn>
 
 <win>
-talk Torrial: "Even the heaviest armor falls to the right weapon and good positioning.", "Remember that. Gannon won't stop building bigger machines."
+talk Vance: "Even the heaviest armor gives way to the right weapon and good positioning.", "Hold onto that. Kael will only keep building bigger machines."
 </win>
 
 <lose>
-talk Gannon: "Tin soldiers against a god of war. Predictable."
-talk Torrial: "Heavy guns, Link — and never trade blows you can't win. Again."
+talk Kael: "Predictable. You spent your strength on armor you could never touch."
+talk Vance: "Heavy guns, Reyes, and never trade blows you can't win. Let's try again."
 </lose>

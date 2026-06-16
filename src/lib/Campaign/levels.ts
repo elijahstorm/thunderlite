@@ -24,7 +24,7 @@ export interface CampaignLevel {
 }
 
 /**
- * The 10 authored levels reusing the original Link / Torrial / Gannon story.
+ * The 10 authored levels telling the Reyes / Vance / Kael story.
  * Each `id` is the stem of the matching `./levels/<id>.json` map and
  * `./levels/<id>.txt` script. Tune balance and prose in those files; the unlock
  * logic never needs to change.

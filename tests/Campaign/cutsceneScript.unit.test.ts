@@ -7,28 +7,28 @@ describe('parseCutsceneScript — block routing', () => {
 	it('routes events into start / win / lose / turns[round][team]', () => {
 		const script = parseCutsceneScript(`
 <start>
-talk Link: "Go!"
+talk Reyes: "Go!"
 </start>
 
 <win>
-talk Torrial: "Victory."
+talk Vance: "Victory."
 </win>
 
 <lose>
-talk Torrial: "Try again."
+talk Vance: "Try again."
 </lose>
 
 <turn 4>
-talk Torrial: "Keep it up!"
+talk Vance: "Keep it up!"
 </turn>
 `)
 
-		expect(script.start).toEqual([{ kind: 'talk', speaker: 'Link', lines: ['Go!'] }])
-		expect(script.win).toEqual([{ kind: 'talk', speaker: 'Torrial', lines: ['Victory.'] }])
-		expect(script.lose).toEqual([{ kind: 'talk', speaker: 'Torrial', lines: ['Try again.'] }])
+		expect(script.start).toEqual([{ kind: 'talk', speaker: 'Reyes', lines: ['Go!'] }])
+		expect(script.win).toEqual([{ kind: 'talk', speaker: 'Vance', lines: ['Victory.'] }])
+		expect(script.lose).toEqual([{ kind: 'talk', speaker: 'Vance', lines: ['Try again.'] }])
 		// `<turn 4>` is shorthand for `<turn 4,0>` — team defaults to 0.
 		expect(script.turns[4][0]).toEqual([
-			{ kind: 'talk', speaker: 'Torrial', lines: ['Keep it up!'] },
+			{ kind: 'talk', speaker: 'Vance', lines: ['Keep it up!'] },
 		])
 	})
 
@@ -67,24 +67,24 @@ describe('parseCutsceneScript — commands', () => {
 	const wrap = (body: string) => parseCutsceneScript(`<start>\n${body}\n</start>`).start
 
 	it('parses talk with a single line', () => {
-		expect(wrap('talk Link: "help me!"')).toEqual([
-			{ kind: 'talk', speaker: 'Link', lines: ['help me!'] },
+		expect(wrap('talk Reyes: "help me!"')).toEqual([
+			{ kind: 'talk', speaker: 'Reyes', lines: ['help me!'] },
 		])
 	})
 
 	it('parses talk with multiple comma-separated lines on one physical line', () => {
-		expect(wrap('talk Gannon: "Hahaha!", "I hope you\'re ready to lose."')).toEqual([
+		expect(wrap('talk Kael: "Hahaha!", "I hope you\'re ready to lose."')).toEqual([
 			{
 				kind: 'talk',
-				speaker: 'Gannon',
+				speaker: 'Kael',
 				lines: ['Hahaha!', "I hope you're ready to lose."],
 			},
 		])
 	})
 
 	it('preserves a comma inside a quoted talk line', () => {
-		expect(wrap('talk Link: "First, we run."')).toEqual([
-			{ kind: 'talk', speaker: 'Link', lines: ['First, we run.'] },
+		expect(wrap('talk Reyes: "First, we run."')).toEqual([
+			{ kind: 'talk', speaker: 'Reyes', lines: ['First, we run.'] },
 		])
 	})
 
@@ -127,7 +127,7 @@ describe('parseCutsceneScript — commands', () => {
 describe('parseCutsceneScript — multi-line talk', () => {
 	it('preserves a talk whose quoted strings span several physical lines', () => {
 		const script = parseCutsceneScript(`<start>
-talk Torrial: "First line.",
+talk Vance: "First line.",
    "Second line.",
    "Third line."
 move: 0,0
@@ -135,7 +135,7 @@ move: 0,0
 
 		expect(script.start[0]).toEqual({
 			kind: 'talk',
-			speaker: 'Torrial',
+			speaker: 'Vance',
 			lines: ['First line.', 'Second line.', 'Third line.'],
 		})
 		// the command after the multi-line talk is still parsed
@@ -143,10 +143,10 @@ move: 0,0
 	})
 
 	it('keeps a single quoted string that literally spans two lines', () => {
-		const script = parseCutsceneScript('<start>\ntalk Link: "line one\nline two"\n</start>')
+		const script = parseCutsceneScript('<start>\ntalk Reyes: "line one\nline two"\n</start>')
 		expect(script.start[0]).toEqual({
 			kind: 'talk',
-			speaker: 'Link',
+			speaker: 'Reyes',
 			lines: ['line one\nline two'],
 		})
 	})
@@ -156,38 +156,38 @@ describe('parseCutsceneScript — sample script', () => {
 	it('parses a representative tutorial script into the correct ordered events', () => {
 		const script = parseCutsceneScript(`
 <start>
-talk Link: "help me!"
+talk Reyes: "help me!"
 move: 8,8
-talk Gannon: "Hahaha!", "I hope you're ready to lose."
+talk Kael: "Hahaha!", "I hope you're ready to lose."
 add unit: 2,"Annihilator Tank",8,6
 wait: 1
 kill unit: 8,5
 hl: 8,6
-talk Torrial: "That's the Annihilator Tank.",
+talk Vance: "That's the Annihilator Tank.",
    "Hit it with a Heavy Attacker."
 unhl: 8,6
 terrain: "Forest",2,3
 </start>
 
 <win>
-talk Gannon: "Arrrg!"
+talk Kael: "Arrrg!"
 </win>
 
 <lose>
-talk Torrial: "Try again!"
+talk Vance: "Try again!"
 </lose>
 
 <turn 4>
-talk Torrial: "You're doing well."
+talk Vance: "You're doing well."
 </turn>
 `)
 
 		expect(script.start).toEqual([
-			{ kind: 'talk', speaker: 'Link', lines: ['help me!'] },
+			{ kind: 'talk', speaker: 'Reyes', lines: ['help me!'] },
 			{ kind: 'camera', x: 8, y: 8 },
 			{
 				kind: 'talk',
-				speaker: 'Gannon',
+				speaker: 'Kael',
 				lines: ['Hahaha!', "I hope you're ready to lose."],
 			},
 			{ kind: 'spawn', team: 2, unit: 'Annihilator Tank', x: 8, y: 6 },
@@ -196,17 +196,17 @@ talk Torrial: "You're doing well."
 			{ kind: 'highlight', x: 8, y: 6 },
 			{
 				kind: 'talk',
-				speaker: 'Torrial',
+				speaker: 'Vance',
 				lines: ["That's the Annihilator Tank.", 'Hit it with a Heavy Attacker.'],
 			},
 			{ kind: 'unhighlight', x: 8, y: 6 },
 			{ kind: 'setTerrain', terrain: 'Forest', x: 2, y: 3 },
 		])
-		expect(script.win[0]).toEqual({ kind: 'talk', speaker: 'Gannon', lines: ['Arrrg!'] })
-		expect(script.lose[0]).toEqual({ kind: 'talk', speaker: 'Torrial', lines: ['Try again!'] })
+		expect(script.win[0]).toEqual({ kind: 'talk', speaker: 'Kael', lines: ['Arrrg!'] })
+		expect(script.lose[0]).toEqual({ kind: 'talk', speaker: 'Vance', lines: ['Try again!'] })
 		expect(script.turns[4][0][0]).toEqual({
 			kind: 'talk',
-			speaker: 'Torrial',
+			speaker: 'Vance',
 			lines: ["You're doing well."],
 		})
 	})
@@ -250,11 +250,11 @@ describe('parseCutsceneScript — parse errors carry the line number', () => {
 	})
 
 	it('rejects a command outside any block', () => {
-		expectError('talk Link: "hi"', 1, /outside of any/)
+		expectError('talk Reyes: "hi"', 1, /outside of any/)
 	})
 
 	it('rejects an unclosed block, pointing at the opening tag', () => {
-		expectError('<start>\ntalk Link: "hi"', 1, /unclosed/)
+		expectError('<start>\ntalk Reyes: "hi"', 1, /unclosed/)
 	})
 
 	it('rejects a mismatched closing tag', () => {
@@ -280,11 +280,11 @@ describe('parseCutsceneScript — parse errors carry the line number', () => {
 	})
 
 	it('rejects an unterminated talk', () => {
-		expectError('<start>\ntalk Link: "no close\n</start>', 2, /unterminated talk/)
+		expectError('<start>\ntalk Reyes: "no close\n</start>', 2, /unterminated talk/)
 	})
 
 	it('rejects malformed talk arguments (not quoted)', () => {
-		expectError('<start>\ntalk Link: hello\n</start>', 2, /malformed talk/)
+		expectError('<start>\ntalk Reyes: hello\n</start>', 2, /malformed talk/)
 	})
 
 	it('rejects talk without a speaker', () => {

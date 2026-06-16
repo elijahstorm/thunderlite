@@ -1,25 +1,25 @@
 <start>
 move: 1,7
-talk Torrial: "Link! Over here — stay low.", "Gannon's scouts ambushed your patrol. We have to fight our way clear."
+talk Vance: "Reyes, over here. Glad you made it out.", "Kael's scouts caught your patrol off guard. Let's get you clear of them."
 move: 8,0
-talk Gannon: "So the boy lives. No matter.", "My Strike Commandos will finish what the ambush started."
+talk Kael: "The patrol survivor. You should have stayed down.", "My commandos will see to the rest."
 move: 1,7
-talk Torrial: "Listen — those are light units. Your Heavy Commando's heavy rounds will tear them apart.", "Move next to one and attack. Watch the armor matchup do the work."
-talk Link: "Understood. Let's send Gannon a message."
+talk Vance: "Take a breath. Those are light units. Your Heavy Commando's rounds go right through their armor.", "Move in beside one and attack. Let the matchup do the hard part for you."
+talk Reyes: "Got it. Let's show them we're not done yet."
 </start>
 
 <turn 0,1>
 move: 8,2
-talk Gannon: "Reinforcements! Crush him already."
+talk Kael: "Send up another. Don't let one recruit hold you."
 add unit: 1,"Strike Commando",8,2
-talk Torrial: "One more scout. Focus your fire and it won't matter."
+talk Vance: "Just one more scout. Concentrate your fire and it's a non-issue."
 </turn>
 
 <win>
-talk Torrial: "Clean work, Link. That's the matchup advantage — weapon against armor.", "But this was only a scouting party. Gannon will come in force."
-talk Link: "Then we'll be ready."
+talk Vance: "Nicely done, Reyes. That's the whole idea: the right weapon against the right armor.", "This was only a scouting party, though. Kael will be back with more."
+talk Reyes: "Then we'll be ready for him."
 </win>
 
 <lose>
-talk Torrial: "Fall back! We've lost too many...", "Regroup and remember — pick your targets by their armor. Try again."
+talk Vance: "Ease off and pull back. We lost too many.", "Take a moment, then try again. Choose your targets by their armor and they'll fall faster."
 </lose>

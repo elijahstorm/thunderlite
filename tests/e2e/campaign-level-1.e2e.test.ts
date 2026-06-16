@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 // K5 — first campaign level smoke. Verifies the authored content actually loads
 // and plays: level 1 launches from the level-select, its scripted opening
-// dialogue (Torrial) appears, and a forced win advances the campaign to level 2.
+// dialogue (Vance) appears, and a forced win advances the campaign to level 2.
 test('level 1 loads, plays its opening dialogue, and is completable', async ({ page }) => {
 	// Clean progress so level 1 is the only unlocked level.
 	await page.addInitScript(() => {
@@ -22,9 +22,9 @@ test('level 1 loads, plays its opening dialogue, and is completable', async ({ p
 	await page.click('[data-level-id="01-first-contact"][data-testid="level-card"]')
 	await expect(page).toHaveURL(/\/campaign\/01-first-contact/)
 
-	// The K1 script's <start> block plays: Torrial's setup dialogue appears.
+	// The K1 script's <start> block plays: Vance's setup dialogue appears.
 	await expect(page.getByTestId('dialogue-overlay')).toBeVisible()
-	await expect(page.getByTestId('dialogue-speaker')).toHaveText('Torrial')
+	await expect(page.getByTestId('dialogue-speaker')).toHaveText('Vance')
 
 	// Force a win via the test-only hook rather than playing the match out.
 	await page.waitForFunction(

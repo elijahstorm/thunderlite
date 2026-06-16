@@ -1,26 +1,26 @@
 <start>
 move: 7,4
-talk Torrial: "Gannon's fortress. Stone walls, an Annihilator at the gate — and that, in the center, is his Warmachine.", "It builds his army. Destroy the Warmachine and Gannon loses outright. There's your target."
+talk Vance: "Kael's fortress. Stone walls, an Annihilator at the gate, and there, in the center, his Warmachine.", "It builds his army. Destroy the Warmachine and Kael's finished outright. That's your target."
 move: 4,9
-talk Torrial: "No single arm cracks a fortress. Use everything — artillery to soften the walls, your Condor Bomber to fly over them, ground troops to pour through the breach."
+talk Vance: "No single arm cracks a fortress. Use everything: artillery to soften the walls, your Condor Bomber to fly over them, ground troops to pour through the breach."
 move: 7,3
-talk Gannon: "My stronghold has never fallen. You will break upon it like all the rest."
-talk Link: "Every wall has a crack. We'll find his."
+talk Kael: "My stronghold has held against better than you. It will hold again."
+talk Reyes: "Every wall has a weak point. We'll find his."
 </start>
 
 <turn 1,1>
 wait: 1
 move: 7,7
-talk Gannon: "Sally forth! Drive them from my gate!"
+talk Kael: "Sortie out. Drive them back from the gate."
 add unit: 1,"Scorpion Tank",7,7
-talk Torrial: "He's sortieing to break our momentum. Hold formation — combined arms, like we planned. Strike the Warmachine."
+talk Vance: "He's sallying out to break our momentum. Hold formation. Combined arms, like we planned. Keep on the Warmachine."
 </turn>
 
 <win>
-talk Torrial: "The Warmachine is wreckage and the fortress is silent. You assaulted a stronghold and won, Link.", "Only Gannon himself remains now."
+talk Vance: "The Warmachine's wreckage and the fortress has gone quiet. You took a stronghold, Reyes.", "Only Kael himself is left now."
 </win>
 
 <lose>
-talk Gannon: "Shattered against my walls. The Warmachine builds on while you bleed."
-talk Torrial: "We hit it piecemeal. Bring every arm to bear at once — fly the bomber over the walls."
+talk Kael: "Broken against my walls, and the Warmachine builds on while you bleed."
+talk Vance: "We hit it piecemeal. Bring every arm to bear at once. Fly the bomber over the walls."
 </lose>

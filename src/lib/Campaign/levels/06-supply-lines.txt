@@ -1,27 +1,27 @@
 <start>
 move: 2,7
-talk Torrial: "A war runs on money, Link. See your Oil Refinery and Warfactory? The refinery pays you every turn; the factory spends it on new units."
-talk Torrial: "Hold your income, build a force, and you can outlast anyone. Lose your supply and your army starves."
+talk Vance: "A war runs on money, Reyes. See your Oil Refinery and Warfactory? The refinery pays you every turn; the factory turns that into new units."
+talk Vance: "Hold your income, build a force, and you can outlast anyone. Lose your supply and the army starves."
 move: 12,1
-talk Gannon: "My coffers are deep, boy. I'll bury you under wave after wave."
+talk Kael: "My coffers are deep. I can spend longer than you can stand."
 move: 2,7
-talk Torrial: "Then we take his. Push toward his refinery, fund your own troops, and capture his Command Center when he's spent."
-talk Link: "Economy first. Then the hammer falls."
+talk Vance: "Then we take what's his. Push toward his refinery, fund your own troops, and capture his Command Center once he's spent."
+talk Reyes: "Economy first. Then we close the door."
 </start>
 
 <turn 1,1>
 wait: 1
 move: 11,3
-talk Gannon: "Fresh steel from my factories!"
+talk Kael: "Fresh steel, straight off the line."
 add unit: 1,"Scorpion Tank",11,3
-talk Torrial: "He's spending freely. Build smart, not fast — quality over a rushed wave."
+talk Vance: "He's spending freely. Build smart, not fast. Quality beats a rushed wave."
 </turn>
 
 <win>
-talk Torrial: "His supply is broken and his capital is yours. Starve the enemy and the army follows.", "You're thinking like a commander now."
+talk Vance: "His supply's broken and his capital is yours. Starve the enemy and the army follows.", "You're thinking like a commander now."
 </win>
 
 <lose>
-talk Gannon: "Outspent and overrun. Did you think coin alone could save you?"
-talk Torrial: "We let his economy outpace ours. Seize the oil early next time."
+talk Kael: "Outspent and overrun. Coin alone was never going to carry you."
+talk Vance: "We let his economy outpace ours. Seize the oil early next time."
 </lose>

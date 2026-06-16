@@ -24,8 +24,8 @@
  * Inside a block each line is one command:
  *
  * ```
- * talk Link: "help me!"
- * talk Gannon: "Hahaha!", "I hope you're ready to lose."
+ * talk Reyes: "help me!"
+ * talk Kael: "I hope you're ready to lose."
  * move: 8,8
  * hl: 8,6
  * unhl: 8,6
