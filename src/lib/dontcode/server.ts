@@ -6,72 +6,37 @@
  * over HTTP with this project's private API key. How those services work
  * internally is not our concern — we only depend on the public contract.
  *
+ * This module is a thin adapter over the official `@dontcode2/backend` SDK
+ * (see https://backend.dontcode.co/en/docs/byoc). The SDK speaks the v1
+ * gateway directly, so we no longer hand-roll fetch calls; this file only
+ * shapes the SDK's API into the call sites the rest of the app already uses
+ * (e.g. `db.find(table, opts)` and the `insertIgnoreConflict`/`upsert`
+ * idempotency helpers, which sit on top of the SDK's primitives).
+ *
  * Env:
  *   DONTCODE_API_URL  — base URL of the DontCode backend (no trailing slash)
  *   DONTCODE_API_KEY  — this project's API key (dc_…)
  */
 import { env } from '$env/dynamic/private'
+import { dontcode, isDontCodeError, type DontCodeClient } from '@dontcode2/backend'
 
-export class DontCodeApiError extends Error {
-	constructor(
-		public status: number,
-		message: string,
-		/** Machine-readable error code from the API body (e.g. "EmailNotVerified"). */
-		public code?: string
-	) {
-		super(message)
-		this.name = 'DontCodeApiError'
-	}
+export { DontCodeError, isDontCodeError } from '@dontcode2/backend'
 
-	/** Unique/foreign-key conflicts — used for idempotent insert patterns. */
-	get isConflict(): boolean {
-		return this.status === 409
-	}
+/** Lazily-built singleton client — env is validated on first use, not import. */
+let _client: DontCodeClient | undefined
+function client(): DontCodeClient {
+	if (_client) return _client
+	const baseUrl = env.DONTCODE_API_URL
+	if (!baseUrl) throw new Error('DONTCODE_API_URL is not set')
+	const apiKey = env.DONTCODE_API_KEY
+	if (!apiKey) throw new Error('DONTCODE_API_KEY is not set')
+	_client = dontcode({ baseUrl: baseUrl.replace(/\/$/, ''), apiKey })
+	return _client
 }
 
-function baseUrl(): string {
-	const url = env.DONTCODE_API_URL
-	if (!url) throw new Error('DONTCODE_API_URL is not set')
-	return url.replace(/\/$/, '')
-}
-
-function apiKey(): string {
-	const key = env.DONTCODE_API_KEY
-	if (!key) throw new Error('DONTCODE_API_KEY is not set')
-	return key
-}
-
-async function request<T>(
-	path: string,
-	init: { method: string; body?: BodyInit; headers?: Record<string, string> }
-): Promise<T> {
-	const res = await fetch(`${baseUrl()}${path}`, {
-		method: init.method,
-		headers: {
-			Authorization: `Bearer ${apiKey()}`,
-			...init.headers,
-		},
-		body: init.body,
-	})
-
-	const payload = await res.json().catch(() => null)
-	if (!res.ok) {
-		const message =
-			payload && typeof payload.error === 'string'
-				? payload.error
-				: `DontCode API request failed (${res.status})`
-		const code = payload && typeof payload.code === 'string' ? payload.code : undefined
-		throw new DontCodeApiError(res.status, message, code)
-	}
-	return payload as T
-}
-
-function jsonRequest<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
-	return request<T>(path, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', ...headers },
-		body: JSON.stringify(body),
-	})
+/** True for a unique/foreign-key conflict — the idempotency signal. */
+function isConflict(err: unknown): boolean {
+	return isDontCodeError(err) && err.status === 409
 }
 
 // ── Database ────────────────────────────────────────────────────────────────
@@ -108,29 +73,20 @@ export interface FindOptions {
 	offset?: number
 }
 
-async function dbOperation<T>(operation: string, tableName: string, options: object): Promise<T> {
-	const result = await jsonRequest<{ data: T }>('/api/v1/db', {
-		operation,
-		tableName,
-		options,
-	})
-	return result.data
-}
-
 export const db = {
 	find<T = Record<string, unknown>>(table: string, options: FindOptions = {}): Promise<T[]> {
-		return dbOperation<T[]>('find', table, options)
+		return client().db(table).find<T>(options)
 	},
 
 	findOne<T = Record<string, unknown>>(
 		table: string,
 		options: Omit<FindOptions, 'limit' | 'offset'> = {}
 	): Promise<T | null> {
-		return dbOperation<T | null>('findOne', table, options)
+		return client().db(table).findOne<T>(options)
 	},
 
 	insert(table: string, data: Record<string, unknown>): Promise<{ id: unknown }> {
-		return dbOperation<{ id: unknown }>('insert', table, { data })
+		return client().db(table).insert(data)
 	},
 
 	/**
@@ -144,13 +100,13 @@ export const db = {
 		try {
 			return await db.insert(table, data)
 		} catch (err) {
-			if (err instanceof DontCodeApiError && err.isConflict) return null
+			if (isConflict(err)) return null
 			throw err
 		}
 	},
 
 	update(table: string, where: Where, data: Record<string, unknown>): Promise<{ count: number }> {
-		return dbOperation<{ count: number }>('update', table, { where, data })
+		return client().db(table).update({ where, data })
 	},
 
 	/** Update-then-insert. Replaces the old `ON CONFLICT DO UPDATE` patterns. */
@@ -161,7 +117,7 @@ export const db = {
 			await db.insert(table, { ...where, ...data })
 		} catch (err) {
 			// Lost a race with a concurrent insert — the row exists now, update it.
-			if (err instanceof DontCodeApiError && err.isConflict) {
+			if (isConflict(err)) {
 				await db.update(table, where, data)
 				return
 			}
@@ -170,11 +126,13 @@ export const db = {
 	},
 
 	delete(table: string, where: Where): Promise<{ count: number }> {
-		return dbOperation<{ count: number }>('delete', table, { where })
+		return client().db(table).delete({ where })
 	},
 
 	count(table: string, where?: Where): Promise<number> {
-		return dbOperation<number>('count', table, where ? { where } : {})
+		return client()
+			.db(table)
+			.count(where ? { where } : undefined)
 	},
 }
 
@@ -183,8 +141,8 @@ export type DontCodeDb = typeof db
 /** Apply a schema migration (validated server-side). */
 export async function migrate(
 	sql: string
-): Promise<{ success: boolean; executedStatements: number; warnings: string[] }> {
-	return jsonRequest('/api/v1/db/migrate', { sql })
+): Promise<{ success: boolean; executedStatements?: number; warnings?: string[]; error?: string }> {
+	return client().db.migrate({ sql })
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -196,7 +154,14 @@ export interface DontCodeUser {
 	claims?: Record<string, unknown>
 }
 
-interface AuthResponse {
+/**
+ * Superset of the SDK's auth result shapes. The SDK reports actual failures by
+ * throwing `DontCodeError`; we convert sub-500 failures back to an in-band
+ * `{ success: false, error, code }` so endpoints can render the message
+ * instead of crashing the request. "One more step" states
+ * (`verification_required`, `mfa_required`) are successes, not errors.
+ */
+export interface AuthResponse {
 	success: boolean
 	error?: string
 	/** Machine-readable error code, e.g. "EmailNotVerified" / "ChallengeExpired". */
@@ -214,33 +179,30 @@ interface AuthResponse {
 	challenge_expires_in?: number
 }
 
-async function authPost(endpoint: string, body: unknown, accessToken?: string) {
-	return jsonRequest<AuthResponse>(
-		`/api/v1/auth/${endpoint}`,
-		body,
-		accessToken ? { 'X-Access-Token': accessToken } : undefined
-	).catch((err) => {
-		// Auth endpoints communicate failures in-band ({ success: false }) so
-		// callers can show the message instead of crashing the request.
-		if (err instanceof DontCodeApiError && err.status < 500) {
-			return { success: false, error: err.message, code: err.code } satisfies AuthResponse
+/** Run an auth call, turning sub-500 gateway errors into in-band failures. */
+async function inBand(call: () => Promise<{ success: boolean }>): Promise<AuthResponse> {
+	try {
+		return (await call()) as AuthResponse
+	} catch (err) {
+		if (isDontCodeError(err) && err.status < 500) {
+			return { success: false, error: err.body.error ?? err.message, code: err.code }
 		}
 		throw err
-	})
+	}
 }
 
 export const auth = {
 	signup(email: string, password: string): Promise<AuthResponse> {
-		return authPost('signup', { email, password })
+		return inBand(() => client().auth.signup({ email, password }))
 	},
 
 	login(email: string, password: string): Promise<AuthResponse> {
-		return authPost('login', { email, password })
+		return inBand(() => client().auth.login({ email, password }))
 	},
 
 	/** Confirm a new account with the 6-digit code emailed to the user. */
 	verifyEmail(code: string, email?: string): Promise<AuthResponse> {
-		return authPost('verify-email', { code, email })
+		return inBand(() => client().auth.verifyEmail({ code, email }))
 	},
 
 	/**
@@ -251,34 +213,26 @@ export const auth = {
 		challengeToken: string,
 		{ code, recoveryCode }: { code?: string; recoveryCode?: string }
 	): Promise<AuthResponse> {
-		return authPost('mfa/challenge', {
-			challenge_token: challengeToken,
-			code,
-			recovery_code: recoveryCode,
-		})
+		return inBand(() => client().auth.mfa.challenge({ challengeToken, code, recoveryCode }))
 	},
 
 	/** Resolve the current user from an access token. Null when invalid/expired. */
 	async me(accessToken: string): Promise<DontCodeUser | null> {
 		try {
-			const result = await jsonRequest<{ user: DontCodeUser | null }>(
-				'/api/v1/auth/me',
-				{},
-				{ 'X-Access-Token': accessToken }
-			)
-			return result.user
+			const { user } = await client().auth.me({ accessToken })
+			return user
 		} catch (err) {
-			if (err instanceof DontCodeApiError && err.status === 401) return null
+			if (isDontCodeError(err) && err.status === 401) return null
 			throw err
 		}
 	},
 
 	forgotPassword(email: string): Promise<AuthResponse> {
-		return authPost('forgot-password', { email })
+		return inBand(() => client().auth.forgotPassword({ email }))
 	},
 
 	resetPassword(code: string, password: string, email?: string): Promise<AuthResponse> {
-		return authPost('reset-password', { code, password, email })
+		return inBand(() => client().auth.resetPassword({ code, password, email }))
 	},
 }
 
@@ -291,23 +245,8 @@ export const storage = {
 		data: Blob | Uint8Array,
 		contentType: string
 	): Promise<{ key: string; url: string }> {
-		const form = new FormData()
-		const blob = data instanceof Blob ? data : new Blob([data as BlobPart], { type: contentType })
-		form.append('file', blob, path.split('/').pop() ?? 'file')
-		form.append('bucket', 'public')
-		form.append('path', path)
-		form.append('contentType', contentType)
-
-		await request<{ object: { key: string } }>('/api/v1/storage', {
-			method: 'PUT',
-			body: form,
-		})
-
-		const { url } = await jsonRequest<{ url: string }>('/api/v1/storage', {
-			operation: 'getUrl',
-			bucket: 'public',
-			path,
-		})
+		await client().storage.public.upload(path, data, contentType)
+		const { url } = await client().storage.public.getUrl(path)
 		return { key: path, url }
 	},
 }
