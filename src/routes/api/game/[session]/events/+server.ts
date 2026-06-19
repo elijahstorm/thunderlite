@@ -1,11 +1,6 @@
 import { error, json } from '@sveltejs/kit'
-import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
-import { createClient } from '@vercel/kv'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import type { GameEvent } from '$lib/Engine/Interactor/serializedAction.js'
-
-const EVENTS_KEY = (session: string) => `game-events:${session}`
-const MEMBERS_KEY = (session: string) => `game:${session}`
+import { gameStore } from '$lib/Game/store.server'
 
 export const GET = async ({ url, params, locals }) => {
 	const userSession = locals.session
@@ -18,38 +13,17 @@ export const GET = async ({ url, params, locals }) => {
 	const since = sinceRaw === null ? -1 : parseInt(sinceRaw, 10)
 	if (!Number.isFinite(since)) throw error(400, 'Invalid since parameter')
 
-	const kv = createClient({
-		url: KV_REST_API_URL,
-		token: KV_REST_API_TOKEN,
-	})
-
 	try {
-		const members = ((await kv.smembers(MEMBERS_KEY(session))) as string[] | null) ?? []
+		const members = await gameStore.members(session)
 		if (members.length === 0 || !members.includes(userSession)) {
 			throw error(403, 'Not a member of this game session')
 		}
 
-		const startIndex = Math.max(0, since + 1)
-		const raw = ((await kv.lrange(EVENTS_KEY(session), startIndex, -1)) as unknown[] | null) ?? []
-		const events: GameEvent[] = []
-		for (const entry of raw) {
-			try {
-				const parsed = typeof entry === 'string' ? JSON.parse(entry) : entry
-				if (parsed && typeof parsed === 'object' && typeof (parsed as GameEvent).id === 'number') {
-					events.push(parsed as GameEvent)
-				}
-			} catch {
-				continue
-			}
-		}
-
-		const total = ((await kv.llen(EVENTS_KEY(session))) as number) ?? 0
-		const lastEventId = total > 0 ? total - 1 : -1
-
+		const { events, lastEventId } = await gameStore.events(session, since)
 		return json({ events, lastEventId })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		logToErrorDb(msg)
-		throw error(500, 'Cannot get from Redis storage')
+		throw error(500, 'Could not load game events')
 	}
 }

@@ -13,6 +13,10 @@ import { CreateMessages } from './create_messages.sql'
 import { CreateMatches } from './create_matches.sql'
 import { CreateMatchPlayers } from './create_match_players.sql'
 import { CreateCampaignProgress } from './create_campaign_progress.sql'
+import { CreateGameRoom } from './create_game_room.sql'
+import { CreateGameMember } from './create_game_member.sql'
+import { CreateGameEvent } from './create_game_event.sql'
+import { CreatePlayerGame } from './create_player_game.sql'
 
 /**
  * The full app schema as ONE consolidated SQL script for the DontCode
@@ -38,6 +42,10 @@ export const consolidatedSchema = [
 	CreateMatches,
 	CreateMatchPlayers,
 	CreateCampaignProgress,
+	CreateGameRoom,
+	CreateGameMember,
+	CreateGameEvent,
+	CreatePlayerGame,
 ]
 	.map((statement) => statement.trim())
 	.join('\n\n')
@@ -59,6 +67,10 @@ export const appTables = [
 	'matches',
 	'match_players',
 	'campaign_progress',
+	'game_room',
+	'game_member',
+	'game_event',
+	'player_game',
 ] as const
 
 /**

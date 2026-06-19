@@ -1,9 +1,6 @@
-import { error, redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
-import { createClient } from '@vercel/kv'
-import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
-import { dev } from '$app/environment'
+import { redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
+import { env } from '$env/dynamic/private'
 import { auth } from '$lib/dontcode/server'
-import { generateKey } from '$lib/Security/keys'
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const protectedRoutes = [
@@ -48,38 +45,29 @@ const resolveUser = async (accessToken: string) => {
 	}
 }
 
-const getUserSession = async (event: RequestEvent) => {
-	if (dev) {
-		return generateKey()
-	}
-
-	const userId = event.locals.user
-	if (!userId) {
-		throw error(500, 'User ID not set')
-	}
-
-	const kv = createClient({
-		url: KV_REST_API_URL,
-		token: KV_REST_API_TOKEN,
-	})
-	let session: string | null
-	try {
-		session = await kv.get(`user:${userId}`)
-	} catch (msg) {
-		console.error(msg)
-		throw error(500, 'Cannot get from Redis storage')
-	}
-
-	if (!session) {
-		session = generateKey()
-		const fullDay = 60 * 60 * 24
-		try {
-			await kv.set(`user:${userId}`, session, { ex: fullDay, nx: true })
-		} catch (msg) {
-			console.error(msg)
-			throw error(500, 'Cannot set to Redis storage')
-		}
-	}
-
-	return session
+/**
+ * The player's opaque game identity (`userSession`), used as their handle in
+ * online (H2) game rooms. It must be stable per user and server-derived (so a
+ * client can't spoof another player) — but it is not a secret, so we derive it
+ * deterministically from the signed-in user id instead of storing a random key.
+ *
+ * This used to round-trip Vercel KV on every protected route; that instance is
+ * gone, and a KV/network hiccup here would 500 the request and bounce a
+ * logged-in user to /login. Deriving it in-process removes that failure mode
+ * entirely. HMAC-SHA256 (keyed by the project API key, via the Web Crypto API
+ * the rest of the app already uses) keeps the value opaque and decoupled from
+ * the raw auth id.
+ */
+const getUserSession = async (event: RequestEvent): Promise<string> => {
+	const userId = event.locals.user ?? ''
+	const secret = env.DONTCODE_API_KEY ?? 'thunderlite-fallback-secret'
+	const key = await crypto.subtle.importKey(
+		'raw',
+		new TextEncoder().encode(secret),
+		{ name: 'HMAC', hash: 'SHA-256' },
+		false,
+		['sign']
+	)
+	const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(userId))
+	return [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }

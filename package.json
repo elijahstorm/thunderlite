@@ -20,7 +20,6 @@
 		"@dontcode2/backend": "0.1.1",
 		"@iconify/svelte": "5.1.0",
 		"@vercel/edge-config": "1.4.3",
-		"@vercel/kv": "3.0.0",
 		"as-toast": "1.1.0",
 		"base-x": "5.0.1",
 		"flowbite-svelte": "1.30.0",

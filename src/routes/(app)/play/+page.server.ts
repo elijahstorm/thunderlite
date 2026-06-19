@@ -1,10 +1,9 @@
 import { error } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { createClient } from '@vercel/kv'
-import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
 import { dev } from '$app/environment'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapHash } from '$lib/Map/hashLoader'
+import { gameStore } from '$lib/Game/store.server'
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const userSession = locals.session
@@ -36,32 +35,16 @@ const getGameSession = async (userSession: string) => {
 		return { gameSession: 'testSession', sha: 'hello' }
 	}
 
-	const kv = createClient({
-		url: KV_REST_API_URL,
-		token: KV_REST_API_TOKEN,
-	})
-	let isMember = false
-	let gameSession: string | null = null
-	let sha: string | null = null
-
 	try {
-		const gameData = (await kv.hgetall(`user-game:${userSession}`)) as unknown as {
-			session: string
-			sha: string
-		} | null
-		if (!gameData) return {}
-		gameSession = gameData.session
-		sha = gameData.sha
-		isMember =
-			gameSession !== null && (await kv.sismember(`game:${gameSession}`, userSession)) === 1
+		const current = await gameStore.currentGame(userSession)
+		if (!current) return {}
+		if (!(await gameStore.isMember(current.session, userSession))) {
+			throw error(403, 'You are not a member of this game room')
+		}
+		return { gameSession: current.session, sha: current.sha }
 	} catch (msg) {
+		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		logToErrorDb(msg)
-		throw error(500, 'Cannot get from Redis storage')
+		throw error(500, 'Could not load game session')
 	}
-
-	if (!isMember) {
-		throw error(403, 'You are not a member of this game room')
-	}
-
-	return { gameSession, sha }
 }

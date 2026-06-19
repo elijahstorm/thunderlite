@@ -1,20 +1,21 @@
 import { error, json } from '@sveltejs/kit'
-import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
-import { createClient } from '@vercel/kv'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db } from '$lib/dontcode/server'
+import { gameStore } from '$lib/Game/store.server'
 
 /**
  * POST /api/game/[session]/result — persist a finished match (J3).
  *
  * This is the server side of `recordMatch`. Two shapes flow through it:
  *
- *  - mode 'online': the caller must be a member of the H2 KV game session. The
- *    winning team is locked into KV by the first writer and every later writer
- *    reads that locked value, so all participants record one consistent winner
- *    derived from server state rather than each client's own claim. (Replaying
- *    the H2 event log to *re-derive* the winner is future hardening; the lock
- *    already prevents a divergent late claim.)
+ *  - mode 'online': the caller must be a member of the H2 game session. The
+ *    winning team is locked by the FIRST writer via the `matches.session_id`
+ *    unique constraint — that writer's row carries the authoritative
+ *    `winner_team`, and every later writer reads it back, so all participants
+ *    record one consistent winner rather than each client's own claim. (This
+ *    is the lock that used to live in KV; the unique constraint now serves the
+ *    same purpose with no separate store. Replaying the H2 event log to
+ *    *re-derive* the winner is future hardening.)
  *  - mode 'hotseat' | 'campaign': there is no shared session, so we record only
  *    the signed-in caller's own row. The `session` path segment is ignored.
  *
@@ -22,10 +23,6 @@ import { db } from '$lib/dontcode/server'
  * online POSTs to one match row, and `match_players (match_id, user_auth)`
  * collapses repeat per-player POSTs to one player row.
  */
-
-const MEMBERS_KEY = (session: string) => `game:${session}`
-const RESULT_KEY = (session: string) => `game-result:${session}`
-const RESULT_TTL_SECONDS = 60 * 60 * 24
 
 type Outcome = 'win' | 'loss' | 'draw'
 const isOutcome = (v: unknown): v is Outcome => v === 'win' || v === 'loss' || v === 'draw'
@@ -66,62 +63,41 @@ export const POST = async ({ request, params, locals }) => {
 	try {
 		let winnerTeam: number | null
 		let outcome: Outcome
-		let sessionId: string | null
+		let matchId: number | undefined
 
 		if (mode === 'online') {
-			const kv = createClient({ url: KV_REST_API_URL, token: KV_REST_API_TOKEN })
-			const members = ((await kv.smembers(MEMBERS_KEY(session))) as string[] | null) ?? []
+			const members = await gameStore.members(session)
 			if (members.length === 0 || !members.includes(userSession)) {
 				throw error(403, 'Not a member of this game session')
 			}
 
-			// First writer locks the winner; everyone else reads it back.
-			await kv.set(
-				RESULT_KEY(session),
-				{ winner: claimedWinner },
-				{
-					nx: true,
-					ex: RESULT_TTL_SECONDS,
-				}
-			)
-			const lockedRaw = (await kv.get(RESULT_KEY(session))) as
-				| string
-				| { winner: number | null }
-				| null
-			const locked =
-				typeof lockedRaw === 'string'
-					? (JSON.parse(lockedRaw) as { winner: number | null })
-					: (lockedRaw ?? { winner: claimedWinner })
-
-			winnerTeam = typeof locked.winner === 'number' ? locked.winner : null
+			// The first writer locks the winner: their row carries the
+			// authoritative `winner_team`. A later writer hits the `session_id`
+			// unique constraint, reads that row back, and records the same winner.
+			const inserted = await db.insertIgnoreConflict('matches', {
+				session_id: session,
+				map_sha: mapSha,
+				mode,
+				winner_team: claimedWinner,
+				turns,
+			})
+			if (inserted) {
+				matchId = inserted.id as number | undefined
+				winnerTeam = claimedWinner
+			} else {
+				const existing = await db.findOne<{ id: number; winner_team: number | null }>(
+					'matches',
+					{ where: { session_id: session }, select: ['id', 'winner_team'] }
+				)
+				matchId = existing?.id
+				winnerTeam = existing ? (existing.winner_team ?? null) : null
+			}
 			outcome = outcomeFor(winnerTeam, team)
-			sessionId = session
 		} else {
 			// Hot-seat / campaign: trust the local client and store its own row only.
 			if (!isOutcome(body.outcome)) throw error(400, 'Invalid outcome')
 			outcome = body.outcome
 			winnerTeam = claimedWinner
-			sessionId = null
-		}
-
-		let matchId: number | undefined
-		if (sessionId) {
-			const inserted = await db.insertIgnoreConflict('matches', {
-				session_id: sessionId,
-				map_sha: mapSha,
-				mode,
-				winner_team: winnerTeam,
-				turns,
-			})
-			matchId = inserted?.id as number | undefined
-			if (matchId === undefined) {
-				const existing = await db.findOne<{ id: number }>('matches', {
-					where: { session_id: sessionId },
-					select: ['id'],
-				})
-				matchId = existing?.id
-			}
-		} else {
 			const inserted = await db.insert('matches', {
 				map_sha: mapSha,
 				mode,

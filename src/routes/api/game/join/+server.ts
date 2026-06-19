@@ -1,10 +1,6 @@
 import { error, json } from '@sveltejs/kit'
-import { KV_REST_API_TOKEN, KV_REST_API_URL } from '$env/static/private'
-import { createClient } from '@vercel/kv'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-
-const MAX_PLAYERS = 2
-const SESSION_TTL_SECONDS = 60 * 60 * 24
+import { gameStore, MAX_PLAYERS } from '$lib/Game/store.server'
 
 export const POST = async ({ request, locals }) => {
 	const userSession = locals.session
@@ -15,54 +11,36 @@ export const POST = async ({ request, locals }) => {
 		throw error(400, 'Please provide a session code')
 	}
 
-	const kv = createClient({
-		url: KV_REST_API_URL,
-		token: KV_REST_API_TOKEN,
-	})
-
 	try {
-		const members = (await kv.smembers(`game:${session}`)) as string[] | null
-		if (!members || members.length === 0) {
+		const room = await gameStore.getRoom(session)
+		const members = await gameStore.members(session)
+		if (!room || members.length === 0) {
 			throw error(404, 'Game session does not exist')
 		}
+		if (!room.sha) throw error(500, 'Game session is missing map data')
 
+		// Already in this room — just refresh the pointer and return the map.
 		if (members.includes(userSession)) {
-			const existing = (await kv.hgetall(`user-game:${members[0]}`)) as unknown as {
-				session: string
-				sha: string
-			} | null
-			if (!existing?.sha) throw error(500, 'Game session is missing map data')
-			await kv.hset(`user-game:${userSession}`, {
-				session,
-				sha: existing.sha,
-				expires: new Date().getTime() + SESSION_TTL_SECONDS * 1000,
-			})
-			return json({ session, sha: existing.sha })
+			await gameStore.setPlayerGame(userSession, session)
+			return json({ session, sha: room.sha })
 		}
 
 		if (members.length >= MAX_PLAYERS) {
 			throw error(409, 'Game session is full')
 		}
 
-		const creatorData = (await kv.hgetall(`user-game:${members[0]}`)) as unknown as {
-			session: string
-			sha: string
-		} | null
-		if (!creatorData?.sha) {
-			throw error(500, 'Game session is missing map data')
+		await gameStore.addMember(session, userSession)
+		// Guard the seat race: if we tipped the room over capacity, roll back.
+		if ((await gameStore.memberCount(session)) > MAX_PLAYERS) {
+			await gameStore.removeMember(session, userSession)
+			throw error(409, 'Game session is full')
 		}
+		await gameStore.setPlayerGame(userSession, session)
 
-		await kv.hset(`user-game:${userSession}`, {
-			session,
-			sha: creatorData.sha,
-			expires: new Date().getTime() + SESSION_TTL_SECONDS * 1000,
-		})
-		await kv.sadd(`game:${session}`, userSession)
-
-		return json({ session, sha: creatorData.sha })
+		return json({ session, sha: room.sha })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		logToErrorDb(msg)
-		throw error(500, 'Cannot get from Redis storage')
+		throw error(500, 'Could not join game session')
 	}
 }
