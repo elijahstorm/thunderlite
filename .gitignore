@@ -27,3 +27,4 @@ demo_data/
 .orchestrator-reports/
 .caffeinate.pid
 .env*
+test-results/
