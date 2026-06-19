@@ -9,7 +9,6 @@ import {
 } from '$lib/Database/getUserData'
 import { error, fail, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { faker, migrate } from '$lib/Database/Migrations/migrator'
 import { validate } from '$lib/Database/validators'
 import { db } from '$lib/dontcode/server'
 
@@ -30,18 +29,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		if ((e as { status?: number })?.status === 302) {
 			throw redirect(302, '/make')
 		}
+		// The schema is applied out-of-band via `pnpm migrate` (scripts/migrate.ts),
+		// so first-time profile creation should just work; a failure here is a real
+		// error rather than a cue to self-migrate from the request path.
 		try {
 			await makeUserDBDataFromAuth(auth)
-		} catch (e) {
-			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-			// @ts-ignore
-			if (Object.hasOwn(e, 'status') && e.status === 500) {
-				await migrate()
-				await makeUserDBDataFromAuth(auth)
-				await faker(auth)
-			} else {
-				throw error(500, 'There was an issue making your new account')
-			}
+		} catch {
+			throw error(500, 'There was an issue making your new account')
 		}
 	}
 

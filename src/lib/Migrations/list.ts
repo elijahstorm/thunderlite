@@ -74,8 +74,9 @@ export const appTables = [
 ] as const
 
 /**
- * Explicit drops for `resetTables` (dev only) — children first, one statement
- * per app table. Never touches the platform's `users` table.
+ * Explicit drops for the `pnpm db:reset` CLI (scripts/reset.ts) — children
+ * first, one statement per app table. Never touches the platform's `users`
+ * table.
  */
 export const dropAllTablesSql = [...appTables]
 	.reverse()
