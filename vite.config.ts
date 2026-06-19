@@ -1,8 +1,9 @@
 import { sveltekit } from '@sveltejs/kit/vite'
+import { svelteTesting } from '@testing-library/svelte/vite'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [sveltekit(), svelteTesting()],
 	server: {
 		port: 5173,
 		host: true,
@@ -19,6 +20,5 @@ export default defineConfig({
 	test: {
 		include: ['tests/**/*unit.(test|spec).[jt]s'],
 		environment: 'jsdom',
-		alias: [{ find: /^svelte$/, replacement: 'svelte/internal' }],
 	},
 })

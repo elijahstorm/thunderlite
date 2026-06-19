@@ -12,7 +12,7 @@ describe('MapRender.svelte', () => {
 	it('mounts', () => {
 		const { container } = renderConfiguredMap()
 		expect(container).toBeTruthy()
-		expect(container.innerHTML).toContain('Loader')
+		expect(container.querySelector('[role="status"]')).toBeTruthy()
 	})
 
 	it('it render', async () => {
