@@ -15,10 +15,11 @@
 		{
 			title: 'Game',
 			links: [
-				{ href: '/play', text: 'Play' },
-				{ href: '/make', text: 'Browse Maps' },
-				{ href: '/rooms', text: 'Rooms' },
-				{ href: '/download', text: 'Download' },
+				{ href: '/campaign', label: 'Play' },
+				{ href: '/rooms', label: 'Rooms' },
+				{ href: '/make', label: 'Browse Maps' },
+				{ href: '/editor', label: 'Editor' },
+				{ href: '/about', label: 'About' },
 			],
 		},
 		{
@@ -54,8 +55,8 @@
 						<Logo width={130} height={32} />
 					</a>
 					<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
-						A browser-based recreation of Battalion: Arena — turn-based tactics in the Advance Wars
-						tradition.
+						A browser-based recreation of Battalion: Arena, with turn-based tactics in the Advance
+						Wars tradition.
 					</p>
 					<div class="flex items-center gap-3 pt-1">
 						{#each socialLinks as link (link.href)}

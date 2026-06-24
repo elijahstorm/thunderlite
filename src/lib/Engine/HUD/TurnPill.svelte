@@ -5,8 +5,8 @@
 	$: currentPlayer = state.players.find((p) => p.team === state.currentTeam)
 	$: turnLabel =
 		state.phase === 'gameOver'
-			? `Game Over${typeof state.winner === 'number' ? ` — Player ${state.winner + 1} wins` : ''}`
-			: `Turn ${state.turnNumber} — Player ${(state.currentTeam ?? 0) + 1}${
+			? `Game Over${typeof state.winner === 'number' ? `: Player ${state.winner + 1} wins` : ''}`
+			: `Turn ${state.turnNumber}: Player ${(state.currentTeam ?? 0) + 1}${
 					currentPlayer?.name ? ` (${currentPlayer.name})` : ''
 				}`
 </script>

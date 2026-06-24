@@ -40,7 +40,7 @@ export const campaignLevels: readonly CampaignLevel[] = [
 		id: '02-hold-the-line',
 		order: 2,
 		title: 'Hold the Line',
-		blurb: 'Capture — and why the capital is everything',
+		blurb: 'Capture, and why the capital is everything',
 	},
 	{
 		id: '03-heavy-metal',
@@ -52,7 +52,7 @@ export const campaignLevels: readonly CampaignLevel[] = [
 		id: '04-trench-warfare',
 		order: 4,
 		title: 'Trench Warfare',
-		blurb: 'Terrain defense — dig in and outlast',
+		blurb: 'Terrain defense: dig in and outlast',
 	},
 	{
 		id: '05-fog-of-war',

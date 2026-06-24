@@ -130,6 +130,10 @@
 			const clientHeight = container.clientHeight
 			content.width = clientWidth
 			content.height = clientHeight
+			// Resizing the canvas resets all context state, so re-disable smoothing
+			// here (not just on mount). Pixel-art sprites: this stops drawImage from
+			// anti-aliasing tile edges and blending the cleared background in at seams.
+			context.imageSmoothingEnabled = false
 			tiling.setup({
 				clientWidth,
 				clientHeight,

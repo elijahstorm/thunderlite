@@ -26,7 +26,7 @@ const filterUnsed = <T>(active: T[]) =>
 	active.filter((data) => data !== null).map((data) => (data as ObjectType).type)
 
 const EMPTY_MAP: MapObject = {
-	title: 'rose gold',
+	title: 'Unnamed Map',
 	cols: 10,
 	rows: 10,
 	layers: {

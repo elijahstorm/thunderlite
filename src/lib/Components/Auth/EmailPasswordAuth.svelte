@@ -70,7 +70,7 @@
 		const data = await postJson('/api/auth/login', { email, password })
 		if (data.verificationRequired) {
 			goTo('verify-email')
-			noticeMessage = 'Please verify your email — enter the code we sent you.'
+			noticeMessage = 'Please verify your email. Enter the code we sent you.'
 			return
 		}
 		if (data.success && data.mfaRequired) {
@@ -157,7 +157,7 @@
 					: 'Two-factor authentication'
 	$: subheading =
 		mode === 'login'
-			? 'Welcome back — pick up where you left off.'
+			? 'Welcome back. Pick up where you left off.'
 			: mode === 'signup'
 				? 'Join ThunderLite to play, build, and share maps.'
 				: mode === 'verify-email'

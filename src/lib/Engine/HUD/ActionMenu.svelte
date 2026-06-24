@@ -172,8 +172,8 @@
 					data-testid="action-menu-cancel"
 					aria-label={menu.moved ? 'Look around the map' : 'Cancel and deselect unit'}
 					title={menu.moved
-						? 'Look around — tap the board to bring the menu back'
-						: 'Cancel — deselect this unit without using its turn'}
+						? 'Look around: tap the board to bring the menu back'
+						: 'Cancel: deselect this unit without using its turn'}
 					on:click={handleDismiss}
 				>
 					{#if menu.moved}

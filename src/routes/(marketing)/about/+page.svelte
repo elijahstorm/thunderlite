@@ -6,7 +6,7 @@
 		{
 			icon: 'lucide:swords',
 			title: 'Tactics over twitch',
-			body: 'Every move is deliberate. Terrain, vision, and unit synergy are the puzzle — reflexes never enter the picture.',
+			body: 'Every move is deliberate. Terrain, vision, and unit synergy are the puzzle; reflexes never enter the picture.',
 		},
 		{
 			icon: 'lucide:globe-2',
@@ -16,7 +16,7 @@
 		{
 			icon: 'lucide:users-round',
 			title: 'Play together, anytime',
-			body: 'Share a session code. Your friend takes their turn whenever they get the chance — async, but live when you want it.',
+			body: 'Share a session code. Your friend takes their turn whenever they get the chance: async, but live when you want it.',
 		},
 		{
 			icon: 'lucide:hammer',
@@ -33,7 +33,7 @@
 			A love letter to <span class="text-primary">Battalion: Arena</span>.
 		</h1>
 		<p class="text-lg text-muted-foreground leading-relaxed">
-			ThunderLite is a browser-based recreation of Urban Squall's Battalion: Arena — a turn-based
+			ThunderLite is a browser-based recreation of Urban Squall's Battalion: Arena, a turn-based
 			tactics game in the Advance Wars family. It's free, open, and built for the players who never
 			stopped loving the genre.
 		</p>
@@ -60,7 +60,7 @@
 		<p>
 			Browser flash games shaped a generation of strategy fans, and Battalion: Arena was one of the
 			best of them. When Flash sunset, that whole library went dark. ThunderLite is one small
-			attempt to bring that genre forward — same patient, thoughtful pacing, in a modern stack that
+			attempt to bring that genre forward, with the same patient, thoughtful pacing, in a modern stack that
 			just runs.
 		</p>
 		<p>

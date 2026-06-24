@@ -35,7 +35,7 @@
 </script>
 
 <svelte:head>
-	<title>{level ? `Campaign — ${level.title}` : 'Campaign'}</title>
+	<title>{level ? `Campaign: ${level.title}` : 'Campaign'}</title>
 </svelte:head>
 
 {#key levelId}

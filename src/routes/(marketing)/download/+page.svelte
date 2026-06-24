@@ -16,7 +16,7 @@
 				No download required.
 			</h1>
 			<p class="text-muted-foreground leading-relaxed">
-				ThunderLite runs entirely in your browser — no app to install, no platform to wait on. If
+				ThunderLite runs entirely in your browser, with no app to install and no platform to wait on. If
 				native builds ever ship, they'll show up here first.
 			</p>
 		</div>

@@ -146,7 +146,16 @@ export const MakeTiling: () => Tiling = () => ({
 			// Render new squares
 			for (let row = startRow; row < rows + startRow; row++) {
 				for (let col = startCol; col < cols + startCol; col++) {
-					paint(row, col, currentLeft, currentTop, tileWidth, tileHeight, zoom)
+					// Snap each tile to integer pixels, deriving width/height from the
+					// *next* tile's snapped edge so neighbours share an exact boundary.
+					// Passing the raw fractional currentLeft/tileWidth leaves a sub-pixel
+					// sliver between tiles that the clear-on-repaint exposes as a flickering
+					// background line. Shared-edge rounding closes it without gaps or overlap.
+					const x = Math.round(currentLeft)
+					const y = Math.round(currentTop)
+					const w = Math.round(currentLeft + tileWidth) - x
+					const h = Math.round(currentTop + tileHeight) - y
+					paint(row, col, x, y, w, h, zoom)
 					currentLeft += tileWidth
 				}
 

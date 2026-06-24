@@ -18,7 +18,7 @@
 		{
 			icon: 'lucide:users',
 			title: 'Async multiplayer',
-			body: 'Share a session code with a friend. Take your turn whenever — your opponent picks up where you left off.',
+			body: 'Share a session code with a friend. Take your turn whenever; your opponent picks up where you left off.',
 		},
 		{
 			icon: 'lucide:hammer',
@@ -54,7 +54,7 @@
 				</h1>
 
 				<p class="text-lg text-muted-foreground max-w-xl leading-relaxed">
-					ThunderLite is a love letter to Battalion: Arena — a turn-based tactics game in the
+					ThunderLite is a love letter to Battalion: Arena, a turn-based tactics game in the
 					Advance Wars family. Play live in the browser, design your own maps, and challenge your
 					friends.
 				</p>
@@ -119,7 +119,7 @@
 						<span class="h-2 w-2 rounded-full bg-primary"></span>
 						<div class="text-sm">
 							<span class="font-medium text-foreground">Live multiplayer</span>
-							<span class="text-muted-foreground"> — share a code, take your turn</span>
+							<span class="text-muted-foreground">: share a code, take your turn</span>
 						</div>
 					</div>
 				</div>

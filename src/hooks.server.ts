@@ -1,4 +1,5 @@
 import { redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
+import { building } from '$app/environment'
 import { env } from '$env/dynamic/private'
 import { auth } from '$lib/dontcode/server'
 import { resolveCachedUser } from '$lib/dontcode/sessionCache'
@@ -28,7 +29,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
+	// Skip the auth/redirect dance while prerendering: there's no real request
+	// here, accessing `url.search` throws, and the protected pages themselves
+	// are `prerender = false` so nothing reaches the client anyway.
+	if (!building && protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!event.locals.user) {
 			// Preserve where they were headed (path + query) so /login can send
 			// them back after authenticating. API routes are fetched, not

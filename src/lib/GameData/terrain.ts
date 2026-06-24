@@ -186,7 +186,7 @@ export const terrainData: TerrainData[] = [
 		yOffset: 0,
 		connector: 0,
 		name: 'Depleted Ore Deposit',
-		description: 'Mined out — no funds left',
+		description: 'Mined out, no funds left',
 		details: 'rugged',
 		ocean: false,
 		protection: 0,

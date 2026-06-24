@@ -6,7 +6,7 @@ const app = {
 	},
 	modified: false,
 	map: {
-		title: 'rose gold',
+		title: 'Unnamed Map',
 	},
 }
 

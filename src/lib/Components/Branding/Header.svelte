@@ -7,10 +7,10 @@
 	export let toggleAside: VoidFunction | null = null
 
 	const navLinks = [
-		{ href: '/play', label: 'Play' },
+		{ href: '/campaign', label: 'Play' },
+		{ href: '/rooms', label: 'Rooms' },
 		{ href: '/make', label: 'Browse Maps' },
 		{ href: '/editor', label: 'Editor' },
-		{ href: '/rooms', label: 'Rooms' },
 		{ href: '/about', label: 'About' },
 	]
 

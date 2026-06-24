@@ -13,6 +13,7 @@
 	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
 	import { share } from './Editor/mapShare'
+	import { renderMapThumbnail } from './Editor/mapThumbnail'
 	import { skyData } from '$lib/GameData/sky'
 	import { buildingData } from '$lib/GameData/building'
 	import { parseCutsceneScript } from '$lib/Campaign/cutsceneScript'
@@ -39,6 +40,9 @@
 	let skyType = 0
 	let team = 0
 	let erasing = false
+	// True while a Share upload is in flight, so the toolbar can show a spinner
+	// and we never fire a second overlapping upload from a double-click.
+	let sharing = false
 	// The passenger a placed transport carries (a unit type), or null for empty.
 	// Persists across placements so several loaded transports drop without reselecting.
 	let cargoType: number | null = null
@@ -152,7 +156,18 @@
 		open((content: string | null) => {
 			if (content) map = deriveFromHash(content)
 		})
-	const shareMap = () => share(map?.title ?? 'ThunderLite Online', mapHasher(map))
+	const shareMap = async () => {
+		if (sharing) return
+		sharing = true
+		try {
+			// Snapshot the whole board as a thumbnail for the /make listing. Null when
+			// sprites haven't loaded yet — sharing still proceeds without one.
+			const thumbnail = renderMapThumbnail(map)
+			await share(map?.title ?? 'ThunderLite Online', mapHasher(map), thumbnail)
+		} finally {
+			sharing = false
+		}
+	}
 	const playMap = async () => {
 		if (!canPlay) return
 		const sha = mapHasher(map)
@@ -172,8 +187,8 @@
 
 	const scriptReference = [
 		'talk Speaker: "line one", "line two"',
-		'move: x,y                  — pan camera',
-		'hl: x,y   /  unhl: x,y     — (un)highlight tile',
+		'move: x,y                  - pan camera',
+		'hl: x,y   /  unhl: x,y     - (un)highlight tile',
 		'wait: seconds',
 		'add unit: team,"Name",x,y',
 		'kill unit: x,y',
@@ -184,7 +199,7 @@
 		'weather: "Name",x,y',
 		'clear weather: x,y',
 		'fog: on  /  fog: off',
-		'funds: team,amount         — amount may be negative',
+		'funds: team,amount         - amount may be negative',
 	]
 
 	$: mapStore.set(map)
@@ -221,9 +236,24 @@
 
 		<div class="flex items-center gap-1">
 			{#each tools as tool (tool.label)}
-				<button type="button" on:click={tool.act} title={tool.label} class="btn btn-ghost btn-sm">
-					<Icon icon={tool.icon} width="16" height="16" />
-					<span class="hidden lg:inline">{tool.label}</span>
+				{@const busy = tool.label === 'Share' && sharing}
+				<button
+					type="button"
+					on:click={tool.act}
+					disabled={busy}
+					aria-busy={busy}
+					title={tool.label}
+					class="btn btn-ghost btn-sm"
+					class:opacity-60={busy}
+					class:cursor-wait={busy}
+				>
+					<Icon
+						icon={busy ? 'mdi:loading' : tool.icon}
+						width="16"
+						height="16"
+						class={busy ? 'animate-spin' : ''}
+					/>
+					<span class="hidden lg:inline">{busy ? 'Sharing…' : tool.label}</span>
 				</button>
 			{/each}
 			<button
@@ -270,7 +300,7 @@
 			class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-sm text-destructive"
 		>
 			<Icon icon="mdi:eraser" width="15" height="15" />
-			Eraser active — click tiles to {editType === 'units'
+			Eraser active. Click tiles to {editType === 'units'
 				? 'remove units'
 				: editType === 'buildings'
 					? 'remove buildings'
@@ -435,7 +465,7 @@
 						<button
 							type="button"
 							on:click={changeTeam(NEUTRAL_TEAM)}
-							title="Neutral (unclaimed — capturable)"
+							title="Neutral (unclaimed, capturable)"
 							aria-pressed={team === NEUTRAL_TEAM}
 							class="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold transition-all"
 							class:border-primary={team === NEUTRAL_TEAM}
@@ -533,7 +563,7 @@
 				<EditorButton
 					action={() => (cargoType = null)}
 					selected={cargoType === null}
-					title="Empty — no passenger"
+					title="Empty (no passenger)"
 					size={48}
 				>
 					<div class="flex h-full w-full items-center justify-center text-muted-foreground">
