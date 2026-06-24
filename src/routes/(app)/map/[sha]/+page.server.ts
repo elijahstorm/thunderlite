@@ -9,6 +9,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	return {
 		map: result.map,
 		owner: result.owner,
-		signedIn: !!locals.session,
+		signedIn: !!locals.user,
 	}
 }
