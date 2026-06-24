@@ -1,18 +1,18 @@
 <start>
-move: 6,4
-talk Vance: "This river's the only way through, and that bridge is the choke point. We hold it.", "See the enemy Command Center across the water? That's Kael's capital on this front."
-move: 10,4
-talk Kael: "You won't make the crossing. My garrison has this bank well in hand."
-move: 6,4
-talk Vance: "We'll see about that. Move a Commando onto his Command Center and capture it.", "Take a capital and the battle ends at once. But lose yours, and it's over for us instead."
-talk Reyes: "Then we cross the bridge and settle it quickly."
+move: 7,5
+talk Vance: "The river splits this valley in two, and only those bridges cross it. Kael's dug in on the far bank.", "See his Command Center across the water? Take that capital and his whole line breaks."
+move: 13,5
+talk Kael: "You won't make the crossing. I hold both bridges, and my guns cover the water between them."
+move: 7,5
+talk Vance: "Then we hit both at once and split his defense. Move a Commando onto his Command Center to capture it.", "Take a capital and the battle ends at once. But lose yours, or lose your whole force, and it's over for us instead."
+talk Reyes: "Pick a bridge and push. I'll take the other."
 </start>
 
 <turn 1,1>
-move: 10,6
-talk Kael: "Bring the tank up. Keep them away from my capital."
-add unit: 1,"Scorpion Tank",10,6
-talk Vance: "He's guarding the capture point. Clear a path first, then take the Command Center."
+move: 12,6
+talk Kael: "Bring the armor up. Keep them off both bridges."
+add unit: 1,"Scorpion Tank",12,4
+talk Vance: "Reinforcements. Soften their line with the mortar before you commit the Commandos."
 </turn>
 
 <win>
@@ -22,5 +22,5 @@ talk Reyes: "On to the next one."
 
 <lose>
 talk Kael: "My capital still stands. Yours does not."
-talk Vance: "We spread ourselves too thin. Guard your own Command Center while you reach for his."
+talk Vance: "We spread ourselves too thin. Keep your Commandos covered and don't let them whittle our force to nothing."
 </lose>

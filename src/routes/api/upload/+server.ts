@@ -41,22 +41,23 @@ export const POST = async ({ request, locals }) => {
 		'text/plain'
 	)
 
-	// Optional board snapshot → public storage, keyed by the same content sha so it
-	// rides alongside the map blob. A missing/oversized/garbage thumbnail just
-	// leaves the column empty rather than failing the publish (the listing falls
-	// back to a placeholder).
-	let thumbnailUrl = ''
-	if (typeof thumbnail === 'string' && thumbnail.length <= MAX_THUMBNAIL_CHARS) {
-		const parsed = parseDataUrl(thumbnail)
-		if (parsed) {
-			const uploaded = await storage.uploadPublic(
-				`maps/${sha}.png`,
-				parsed.bytes,
-				parsed.contentType
-			)
-			thumbnailUrl = uploaded.url
-		}
+	// A published map must carry a thumbnail (the /make listing renders it), so a
+	// missing/oversized/garbage snapshot is a 400 rather than an empty column. The
+	// editor blocks the share until it can produce one, so this is the boundary guard.
+	if (typeof thumbnail !== 'string' || thumbnail.length > MAX_THUMBNAIL_CHARS) {
+		throw error(400, { message: 'A map preview is required to publish.' })
 	}
+	const parsedThumbnail = parseDataUrl(thumbnail)
+	if (!parsedThumbnail) {
+		throw error(400, { message: 'A map preview is required to publish.' })
+	}
+	// Board snapshot → public storage, keyed by the same content sha so it rides
+	// alongside the map blob.
+	const { url: thumbnailUrl } = await storage.uploadPublic(
+		`maps/${sha}.png`,
+		parsedThumbnail.bytes,
+		parsedThumbnail.contentType
+	)
 
 	try {
 		// The `maps` row carries the metadata the community browser (/make) needs;

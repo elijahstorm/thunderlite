@@ -1,6 +1,6 @@
 import { addToast } from 'as-toast'
 
-export const share = async (name: string, encoded: string, thumbnail?: string | null) => {
+export const share = async (name: string, encoded: string, thumbnail: string) => {
 	let sha: string | undefined
 	try {
 		const response = await fetch(`/api/upload`, {

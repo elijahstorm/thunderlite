@@ -96,6 +96,38 @@ describe('evaluateWinConditions (pure)', () => {
 		expect(result.gameOver).toBe(false)
 	})
 
+	it('a team with no units is a loser even while it still holds an uncaptured Command Center', () => {
+		const map = makeMap()
+		// Team 1 keeps its Command Center but has every unit destroyed.
+		map.layers.units[0] = unit(0)
+		map.layers.units[2] = unit(2)
+		map.layers.units[5] = unit(1)
+		map.layers.buildings[6] = building(1, COMMAND_CENTER_TYPE)
+		initGameStateFromMap(map)
+
+		// Wipe only team 1's units; its Command Center still stands.
+		map.layers.units[5] = null
+
+		const result = evaluateWinConditions(get(gameState), map)
+		expect(result.losers).toEqual([1])
+		expect(result.gameOver).toBe(false) // teams 0 and 2 still alive
+	})
+
+	it('two-player game ends when a side loses its last unit, even with its Command Center intact', () => {
+		const map = makeMap()
+		map.layers.units[0] = unit(0)
+		map.layers.units[5] = unit(1)
+		map.layers.buildings[6] = building(1, COMMAND_CENTER_TYPE)
+		initGameStateFromMap(map)
+
+		map.layers.units[5] = null // team 1 wiped out, CC remains
+
+		const result = evaluateWinConditions(get(gameState), map)
+		expect(result.gameOver).toBe(true)
+		expect(result.winner).toBe(0)
+		expect(result.losers).toEqual([1])
+	})
+
 	it('declares the last team standing the winner', () => {
 		const map = makeMap()
 		map.layers.units[0] = unit(0)

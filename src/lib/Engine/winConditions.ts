@@ -1,8 +1,5 @@
 import { get } from 'svelte/store'
-import { buildingData } from '$lib/GameData/building'
 import { gameState, type GameState } from './gameState'
-
-const COMMAND_CENTER_TYPE = buildingData.findIndex((b) => b.name === 'Command Center')
 
 export type WinConditionsResult = {
 	gameOver: boolean
@@ -13,15 +10,6 @@ export type WinConditionsResult = {
 const teamHasUnits = (map: MapObject | MapProcesser, team: number): boolean => {
 	for (const u of map.layers.units) {
 		if (u && u.team === team) return true
-	}
-	return false
-}
-
-const teamHasCommandCenter = (map: MapObject | MapProcesser, team: number): boolean => {
-	for (const b of map.layers.buildings) {
-		if (!b) continue
-		if (b.team !== team) continue
-		if (b.type === COMMAND_CENTER_TYPE) return true
 	}
 	return false
 }
@@ -39,9 +27,10 @@ export const evaluateWinConditions = (
 			continue
 		}
 		if (!map) continue
-		const hasUnits = teamHasUnits(map, player.team)
-		const hasCC = teamHasCommandCenter(map, player.team)
-		if (!hasUnits && !hasCC) losersSet.add(player.team)
+		// A team with no units left is defeated, even if they still hold an
+		// uncaptured Command Center — the CC can't rebuild an army (it isn't a
+		// production building), so an army-less player has no way back.
+		if (!teamHasUnits(map, player.team)) losersSet.add(player.team)
 	}
 
 	const losers = state.players.map((p) => p.team).filter((t) => losersSet.has(t))

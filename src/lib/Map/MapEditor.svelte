@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { writable } from 'svelte/store'
+	import { addToast } from 'as-toast'
 	import { goto } from '$app/navigation'
 	import { Modal } from 'flowbite-svelte'
 	import MapRender from './MapRender.svelte'
@@ -160,9 +161,14 @@
 		if (sharing) return
 		sharing = true
 		try {
-			// Snapshot the whole board as a thumbnail for the /make listing. Null when
-			// sprites haven't loaded yet — sharing still proceeds without one.
+			// A published map must carry a thumbnail for the /make listing, so block
+			// the upload until the board can actually be snapshotted (sprites loaded
+			// and the canvas exportable) rather than publishing a thumbnail-less row.
 			const thumbnail = renderMapThumbnail(map)
+			if (!thumbnail) {
+				addToast('Map preview is still loading — try sharing again in a moment.', 'warn')
+				return
+			}
 			await share(map?.title ?? 'ThunderLite Online', mapHasher(map), thumbnail)
 		} finally {
 			sharing = false
