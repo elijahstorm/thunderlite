@@ -1,6 +1,14 @@
 import { writable, get } from 'svelte/store'
 import { buildingData } from '$lib/GameData/building'
 
+/**
+ * The owner value for an unclaimed (neutral) building. Players are teams 0–3;
+ * team 4 has no player and renders with the grey palette (see `imageColorizer`).
+ * A neutral building can be captured like any other — it just belongs to nobody
+ * until a unit takes it — and never derives a player or insta-loses on capture.
+ */
+export const NEUTRAL_TEAM = 4
+
 export type PlayerControls = {
 	ground: boolean
 	air: boolean
@@ -13,6 +21,11 @@ export type Player = {
 	money: number
 	hasLost: boolean
 	controls?: PlayerControls
+	// CPU "memory" of how many stealth units it believes each other team fields,
+	// keyed by that team's number. A fuzzy running estimate updated only from what
+	// the CPU witnesses (builds, deaths, sightings) — see cpuAi/stealthMemory.ts.
+	// Absent until the AI has observed something; clamped >= 0.
+	stealthMemory?: Record<number, number>
 }
 
 const emptyControls = (): PlayerControls => ({ ground: false, air: false, sea: false })
@@ -73,7 +86,7 @@ export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] =>
 		if (u && typeof u.team === 'number') teams.add(u.team)
 	}
 	for (const b of map.layers.buildings) {
-		if (b && typeof b.team === 'number') teams.add(b.team)
+		if (b && typeof b.team === 'number' && b.team !== NEUTRAL_TEAM) teams.add(b.team)
 	}
 	return [...teams]
 		.sort((a, b) => a - b)
@@ -87,13 +100,26 @@ export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] =>
 
 export const initGameStateFromMap = (map: MapProcesser | MapObject): void => {
 	const players = derivePlayersFromMap(map)
+	const startingFunds = Math.max(0, Math.floor(map.funds ?? 0))
 	gameState.set({
-		players,
+		players: players.map((p) => ({ ...p, money: startingFunds })),
 		currentTeam: players[0]?.team ?? 0,
 		turnNumber: 1,
 		actedTiles: new Set<number>(),
 		phase: 'playing',
 	})
+}
+
+/**
+ * Recompute every player's build permissions from the buildings they currently
+ * own. Call after a scripted building add/remove/ownership change so the build
+ * menu reflects the new state without re-deriving (and resetting) the players.
+ */
+export const refreshControlsFromMap = (map: MapProcesser | MapObject): void => {
+	gameState.update((state) => ({
+		...state,
+		players: state.players.map((p) => ({ ...p, controls: controlsFromBuildings(map, p.team) })),
+	}))
 }
 
 export const resetGameState = (): void => {

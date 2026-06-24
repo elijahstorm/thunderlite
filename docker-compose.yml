@@ -1,7 +1,8 @@
 # Local dev stack. Auth, database, and file storage are DontCode platform
-# services — there is no local stand-in for them. Set DONTCODE_API_URL and
-# DONTCODE_API_KEY in .env.local (see .env.example); only ephemeral pieces
-# (KV game-session state, chat broadcaster) run locally.
+# services; for local dev run the bundled mock gateway on your host
+# (`pnpm mock`, see .env.example) and this stack reaches it automatically.
+# DONTCODE_API_KEY comes from .env.local; only ephemeral pieces (KV
+# game-session state, chat broadcaster) run as containers here.
 services:
   app:
     build:
@@ -16,6 +17,14 @@ services:
       NODE_ENV: development
       KV_REST_API_URL: http://kv:80
       KV_REST_API_TOKEN: example_token
+      # The mock gateway runs on the host (`pnpm mock`); from inside the
+      # container the host is `host.docker.internal`, not localhost. This
+      # overrides whatever DONTCODE_API_URL is set in .env.local.
+      DONTCODE_API_URL: http://host.docker.internal:${DONTCODE_MOCK_HOST_PORT:-4000}
+    extra_hosts:
+      # Make host.docker.internal resolve on Linux engines too (Docker
+      # Desktop already provides it).
+      - 'host.docker.internal:host-gateway'
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules

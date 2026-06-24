@@ -2,14 +2,19 @@ import {
 	highlightActionsList,
 	generateActionsList,
 	generatePreviewList,
+	findActionAtTile,
 } from '$lib/Layers/tileHighlighter'
 import { computeThreatTiles } from './Pathing/threat'
+import { toggleThreatUnit, viewerTeam } from '../threatOverlay'
 import { get } from 'svelte/store'
-import { animateRoute, animateAttack, animateExplosion } from '../Animator/animator'
+import { animateRoute, animateHealthBar } from '../Animator/animator'
+import { animateAttackSequence } from '../attackSequence'
 import { interactionSource, interactionState } from './interactionState'
 import { buildingData } from '$lib/GameData/building'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
+import { truncateRouteAtCollision } from './Pathing/movement'
+import { concealedEnemyTiles } from '../visibility'
 import { canSelectUnit, gameState, markTileActed } from '../gameState'
 import { openBuildMenu } from '../HUD/buildMenuStore'
 import { applyAction } from '../applyAction'
@@ -17,7 +22,12 @@ import { emitOutgoingAction } from '../outgoingActions'
 import { findFriendlyTransporters, shipOut } from '../modifiers/transport'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
-import { openActionMenu, closeActionMenu, actionMenuState } from '../HUD/actionMenuStore'
+import {
+	openActionMenu,
+	closeActionMenu,
+	peekActionMenu,
+	actionMenuState,
+} from '../HUD/actionMenuStore'
 import { generateAttackList } from './Pathing/attack'
 import type { SerializedAction } from './serializedAction'
 
@@ -68,9 +78,17 @@ const select: Interactor = ({ map, tile }) => {
 	}
 	const state = get(gameState)
 	if (!canSelectUnit(unit, tile, state)) {
-		// Not commandable (enemy unit, or one that has already acted) — show a
-		// read-only preview of its movement + attack reach rather than selecting it.
 		if (state.phase !== 'playing') return
+		// Enemy unit: toggle its attack reach in the persistent threat overlay, the
+		// planning aid for seeing where you'd be exposed. Lets the player build up a
+		// combined danger map across several enemies instead of inspecting them one
+		// at a time. (Own already-acted units fall through to the transient preview.)
+		if (unit.team !== get(viewerTeam)) {
+			toggleThreatUnit(tile)
+			return
+		}
+		// Own unit that has already acted — show a read-only preview of its
+		// movement + attack reach rather than selecting it.
 		highlightActionsList(map, generatePreviewList(map, tile, unit))
 		interactionSource.set(null)
 		interactionState.set('preview')
@@ -114,7 +132,7 @@ const choice: Interactor = ({ map, tile }) => {
 		return
 	}
 
-	const action = generateActionsList(map, source, unit).find((action) => action.tile === tile)
+	const action = findActionAtTile(generateActionsList(map, source, unit), tile)
 	if (!action) {
 		map.pathHistory = []
 		return
@@ -132,9 +150,7 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 		return
 	}
 
-	const destination = generateActionsList(map, tile, unit).find(
-		(action) => action.tile === choice
-	)?.tile
+	const destination = findActionAtTile(generateActionsList(map, tile, unit), choice)?.tile
 	if (typeof destination !== 'number') {
 		map.pathHistory = []
 		return
@@ -143,30 +159,46 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	// Walk the route the user actually drew with their cursor when it matches the
 	// chosen destination. If the click somehow arrives without a matching history
 	// (e.g. touch input, or the action came from the post-move menu), pathfind it.
+	const concealed = concealedEnemyTiles(map, unit.team)
 	const userPath = map.pathHistory
-	const route =
+	const plannedRoute =
 		userPath &&
 		userPath.length > 1 &&
 		userPath[0] === tile &&
 		userPath[userPath.length - 1] === destination
 			? userPath.slice()
-			: pathFinder(map, unit, tile, destination)
+			: pathFinder(map, unit, tile, destination, concealed)
 	map.pathHistory = []
 
+	// In fog / against stealth the planned route can run through an enemy the player
+	// couldn't see. Stop on the last clear tile: the unit walks into the ambush,
+	// halts, and its turn ends — no post-move menu, and any queued attack is aborted.
+	const { route, collided } = truncateRouteAtCollision(map, plannedRoute, unit.team)
+	const finalTile = route.length > 0 ? route[route.length - 1] : destination
+
+	// Collided before taking a single step (a concealed enemy sits adjacent): the
+	// unit forfeits its move in place.
+	if (collided && finalTile === tile) {
+		commit(map, { kind: 'wait', tile })
+		return
+	}
+
 	map.layers.units[tile] = null
-	animateRoute(map, unit, tile, destination, route).then(() => {
+	animateRoute(map, unit, tile, finalTile, route).then(() => {
 		map.layers.units[tile] = unit
-		commit(map, { kind: 'move', from: tile, to: destination })
+		commit(map, { kind: 'move', from: tile, to: finalTile })
+		// Walked into a concealed enemy mid-route: turn over, skip menu / callback.
+		if (collided) return
 		if (callback) {
 			callback()
 		} else {
-			openPostMoveMenu(map, destination, unit)
+			openPostMoveMenu(map, finalTile, unit)
 		}
 	})
 }
 
 const openPostMoveMenu = (map: MapObject, tile: number, unit: UnitObject) => {
-	const items = computeAvailableActions({ map, tile, unit })
+	const items = computeAvailableActions({ map, tile, unit, moved: true })
 	// `wait` is always offered last, so a single item means it's the only choice —
 	// skip the menu entirely and commit the wait so the unit just finishes in place.
 	if (items.length === 1 && items[0].id === 'wait') {
@@ -183,9 +215,7 @@ const attack: Interactor = ({ map, tile, choice }) => {
 		return
 	}
 
-	const destination = generateActionsList(map, tile, attacker).find(
-		(action) => action.tile === choice
-	)?.tile
+	const destination = findActionAtTile(generateActionsList(map, tile, attacker), choice)?.tile
 	if (destination === undefined) {
 		map.pathHistory = []
 		return
@@ -211,7 +241,9 @@ const attack: Interactor = ({ map, tile, choice }) => {
 		tilesAreAdjacent(map, userEnd, destination) &&
 		(userEnd === tile || !map.layers.units[userEnd])
 
-	const path = userPathUsable ? userPath!.slice() : pathFinder(map, attacker, tile, destination)
+	const path = userPathUsable
+		? userPath!.slice()
+		: pathFinder(map, attacker, tile, destination, concealedEnemyTiles(map, attacker.team))
 	const movementEndTile = path[path.length - 1] ?? tile
 
 	if (path.length > 1) {
@@ -234,16 +266,9 @@ const performAttack = (map: MapObject, attackerTile: number, targetTile: number)
 	const attacker = map.layers.units[attackerTile]
 	const target = map.layers.units[targetTile]
 	if (!attacker || !target) return
-	animateAttack(map, attacker, attackerTile, targetTile).then(() => {
-		const targetWillDie = (target.health ?? 0) > 0
-		commit(map, { kind: 'attack', from: attackerTile, to: targetTile })
-		if (targetWillDie && map.layers.units[targetTile] == null) {
-			animateExplosion(map, targetTile)
-		}
-		if (map.layers.units[attackerTile] == null) {
-			animateExplosion(map, attackerTile)
-		}
-	})
+	// The sequencer plays attack → (target bar / explosion) → counter → (attacker
+	// bar / explosion), committing the authoritative result at the end.
+	void animateAttackSequence(map, attackerTile, targetTile, (action) => commit(map, action))
 }
 
 const selectAttackTarget: Interactor = ({ map, tile }) => {
@@ -343,7 +368,14 @@ export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): v
 		}
 		case 'repair': {
 			closeActionMenu()
+			// Snapshot health before the heal so the bar can ease up to its new value
+			// (same ease-out the combat bars use) rather than snapping.
+			const before = unit.health ?? unitData[unit.type]?.health ?? 0
 			commit(map, { kind: 'repair', tile })
+			const healed = map.layers.units[tile]
+			if (healed === unit) {
+				void animateHealthBar(unit, before, unit.health ?? before)
+			}
 			return
 		}
 		case 'transport': {
@@ -373,11 +405,29 @@ export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): v
 	}
 }
 
-export const cancelMenuAsWait = (map: MapObject): void => {
+// Dismiss the post-move menu to "peek" at the board. The unit has already moved
+// (the move committed before the menu opened), but we deliberately do NOT resolve
+// it as a wait — the player is just looking around, and a tap re-summons the menu
+// (see `reopenMenuFromPeek`) so they can still attack/capture/etc. This replaces
+// the old "closing the menu silently waits the unit", which destroyed the choice.
+export const peekMenu = (): void => {
+	peekActionMenu()
+}
+
+// A tap while peeking brings the menu back for the same unit. Items are recomputed
+// from the live board (cheap, and robust if anything shifted) and the menu reopens
+// anchored to the unit again. Returns whether a peek was actually pending — the
+// caller (the board's click handler) uses that to decide between re-summoning the
+// menu and running a normal tile selection.
+export const reopenMenuFromPeek = (map: MapObject): boolean => {
 	const menu = get(actionMenuState)
-	if (!menu.open || menu.unitTile === null) {
+	if (!menu.peeking || menu.unitTile === null) return false
+	const tile = menu.unitTile
+	const unit = map.layers.units[tile]
+	if (!unit) {
 		closeActionMenu()
-		return
+		return false
 	}
-	performMenuAction(map, 'wait')
+	openActionMenu(tile, unit.team, computeAvailableActions({ map, tile, unit, moved: true }))
+	return true
 }

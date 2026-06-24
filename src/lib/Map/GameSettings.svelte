@@ -5,6 +5,7 @@
 	import { audioSettings } from '$lib/Stores/audioSettings'
 	import { gameState } from '$lib/Engine/gameState'
 	import { surrender } from '$lib/Engine/Interactor/interactor'
+	import { shownThreatUnits, toggleAllThreats } from '$lib/Engine/threatOverlay'
 
 	export let map: MapObject | undefined = undefined
 	export let localTeam = 0
@@ -15,6 +16,11 @@
 
 	$: muted = $audioSettings.master.muted
 	$: playing = $gameState.phase === 'playing'
+	$: threatShown = $shownThreatUnits.size > 0
+
+	const toggleThreatOverlay = () => {
+		if (map) toggleAllThreats(map)
+	}
 
 	const toggle = () => {
 		open = !open
@@ -67,6 +73,23 @@
 						Sound
 					</span>
 					<span class="text-xs text-white/60">{muted ? 'Muted' : 'On'}</span>
+				</button>
+
+				<button
+					type="button"
+					role="menuitem"
+					on:click={toggleThreatOverlay}
+					class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
+				>
+					<span class="flex items-center gap-2">
+						<Icon
+							icon={threatShown ? 'mdi:eye-alert' : 'mdi:eye-off-outline'}
+							width="18"
+							height="18"
+						/>
+						Enemy range
+					</span>
+					<span class="text-xs text-white/60">{threatShown ? 'On (T)' : 'Off (T)'}</span>
 				</button>
 
 				<div class="my-1 h-px bg-white/10"></div>

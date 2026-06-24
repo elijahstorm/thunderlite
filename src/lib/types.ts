@@ -13,7 +13,13 @@ type TeamObject = {
 	team: number
 }
 
-type GroundObject = ObjectType & AnimatedObject
+type GroundObject = ObjectType &
+	AnimatedObject & {
+		// Transient render hint: inner-corner sprite frames (16-19) to composite over
+		// the base tile. A water tile can need several at once, which `state` alone
+		// (one frame) can't express. Recomputed alongside `state`; see spriteConnector.
+		corners?: number[]
+	}
 type SkyObject = ObjectType & AnimatedObject
 type UnitObject = ObjectType &
 	AnimatedObject &
@@ -25,6 +31,10 @@ type UnitObject = ObjectType &
 		// stays on the map (so it keeps contributing fog-of-war sight) but the
 		// canvas skips its idle sprite so the attack overlay shows alone.
 		animating?: boolean
+		// Transient render value: the health the bar currently *shows*. After combat
+		// it's eased toward the real `health` so the bar slides instead of snapping,
+		// then cleared. Paint falls back to `health` whenever it's absent.
+		displayHealth?: number
 	}
 type BuildingObject = ObjectType &
 	AnimatedObject &
@@ -36,9 +46,13 @@ type TileHighlightType = 0 | 1
 type HighlightMeta = {
 	type: TileHighlightType
 	tip: 0 | 1 | 2 | 3
-	/** True when a movement tile sits inside an enemy's attack reach. Drives the
-	 * danger overlay so only exposed move tiles show the warning icon. */
+	/** True when a movement tile sits inside an enemy's attack reach. Raises the
+	 * move tile's advice badge to the danger ("bad") severity. */
 	threatened?: boolean
+	/** True for a tile inside an indirect unit's geometric range that terrain
+	 * height (or a Trench) puts in firing shadow — drawn with the shadow overlay
+	 * but not actually targetable. See shadowedAttackTiles / paint highlights. */
+	shadowed?: boolean
 }
 type TileInfo = {
 	tile: number
@@ -68,7 +82,16 @@ type MapFilters = {
 	units: (active: (UnitObject | null)[]) => number[]
 	buildings: (active: (BuildingObject | null)[]) => number[]
 }
-type MapObject = {
+/** Map-level rules authored in the editor and carried through save/share/play. */
+type MapSettings = {
+	/** Author's level script in the cutscene DSL (see docs/map-scripting.md). */
+	script?: string
+	/** Whether the match runs with fog of war. Defaults to on when unset. */
+	fog?: boolean
+	/** Starting funds granted to every team. Defaults to 0 when unset. */
+	funds?: number
+}
+type MapObject = MapSettings & {
 	title?: string | null
 	cols: number
 	rows: number
@@ -78,14 +101,18 @@ type MapObject = {
 	highlights: (TileHighlight | undefined)[]
 	pathHistory?: number[]
 	pointers?: Set<number>
+	/** Tiles painted by the persistent enemy-threat overlay (every reach tile of
+	 * the enemy units the player has toggled on). Recomputed in `MapRender` from
+	 * the `shownThreatUnits` store; see `threatOverlay.ts`. */
+	threatTiles?: Set<number>
 }
-type MapProcesser = {
+type MapProcesser = MapSettings & {
 	title?: string | null
 	cols: number
 	rows: number
 	layers: MapLayers
 }
-type MapData = {
+type MapData = MapSettings & {
 	title?: string | null
 	cols: number
 	rows: number

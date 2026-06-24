@@ -9,7 +9,35 @@
 
 	let updatedMap = deepClone(map)
 
+	// Fog defaults to on; mirror through a boolean the checkbox can bind to.
+	let fog = updatedMap.fog ?? true
+	$: updatedMap.fog = fog
+
+	// The dimension inputs bind to plain numbers, NOT directly to `updatedMap`.
+	// Mid-edit the field can momentarily be empty (null) or 0, and binding that
+	// straight onto the shared map object would collapse the resized layers and
+	// break the preview. Keeping them separate lets the resizer ignore invalid
+	// values while `updatedMap` stays a consistent, fully-resized map at all times.
+	let cols = updatedMap.cols
+	let rows = updatedMap.rows
+
 	let selectedDir: Direction = 'center'
+
+	// `map` is mutated in place by the editor as the user paints, but the clones
+	// below are captured once at mount. Re-clone from the live map every time the
+	// modal opens so the preview and applied changes reflect the current map.
+	let wasOpen = false
+	$: if (open && !wasOpen) {
+		wasOpen = true
+		updatedMap = deepClone(map)
+		fog = updatedMap.fog ?? true
+		cols = updatedMap.cols
+		rows = updatedMap.rows
+		selectedDir = 'center'
+		resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
+	} else if (!open) {
+		wasOpen = false
+	}
 	const directions = [
 		'topLeft',
 		'top',
@@ -33,9 +61,12 @@
 		bottomRight: 'mdi:arrow-bottom-right',
 	}
 
-	const resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
+	let resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
 
-	$: resizer(updatedMap, selectedDir)
+	// Resize only for valid positive dimensions; while the field is empty/0 the
+	// resizer is skipped and `updatedMap` retains the last good resized map, so the
+	// preview holds steady instead of collapsing until a valid number is entered.
+	$: if (cols > 0 && rows > 0) resizer({ ...updatedMap, cols, rows }, selectedDir)
 </script>
 
 <Modal title="Map options" bind:open outsideclose size="lg">
@@ -47,7 +78,7 @@
 					<span class="field-label">Columns</span>
 					<input
 						class="input"
-						bind:value={updatedMap.cols}
+						bind:value={cols}
 						type="number"
 						min="6"
 						max="100"
@@ -59,13 +90,27 @@
 					<span class="field-label">Rows</span>
 					<input
 						class="input"
-						bind:value={updatedMap.rows}
+						bind:value={rows}
 						type="number"
 						min="6"
 						max="100"
 						placeholder={`${map.rows}`}
 					/>
 					<span class="mt-1 block text-xs text-muted-foreground">Currently {map.rows}</span>
+				</label>
+			</div>
+		</div>
+
+		<div>
+			<p class="section-eyebrow mb-3">Rules</p>
+			<div class="mx-auto grid w-full max-w-sm gap-4 sm:grid-cols-2">
+				<label class="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+					<span class="field-label mb-0">Fog of war</span>
+					<input type="checkbox" class="h-5 w-5 accent-primary" bind:checked={fog} />
+				</label>
+				<label class="block">
+					<span class="field-label">Starting funds</span>
+					<input class="input" bind:value={updatedMap.funds} type="number" min="0" step="100" />
 				</label>
 			</div>
 		</div>

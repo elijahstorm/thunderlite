@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store'
+import { buildingData } from '$lib/GameData/building'
 import { animateExplosion } from './Animator/animator'
+import { NEUTRAL_TEAM } from './gameState'
 
 /**
  * Number of defeat sequences currently playing. The results screen waits for
@@ -9,34 +11,47 @@ import { animateExplosion } from './Animator/animator'
 export const defeatAnimating = writable(0)
 
 /**
- * Blow up everything a defeated `team` still owns. Their units and buildings are
- * cleared from the board first (so the sprites vanish under the blast), then a
- * death explosion plays on each former tile. Resolves once every blast finishes.
+ * Resolve a defeated `team`'s board presence. Their units are destroyed — cleared
+ * first so the sprite vanishes under the blast, then a death explosion plays on
+ * each former tile. Their buildings are NOT destroyed: ownership reverts to
+ * neutral (so a surviving enemy can recapture them) and capture progress resets.
+ *
+ * Critically, only the dead team's own units are removed. A building the dead team
+ * owned may have a *surviving* enemy unit standing on it (e.g. the unit that just
+ * captured the deciding tile); that unit must be left untouched. Resolves once
+ * every blast finishes.
  *
  * Driven from the live client (GameStateManager) when a team's `hasLost` flips,
- * so it runs for both a forfeit and a "lost your last unit/HQ" defeat. A tile
- * holding both a unit and a building gets a single explosion.
+ * so it runs for both a forfeit and a "lost your last unit/HQ" defeat.
  */
 export const animateTeamDefeat = async (map: MapObject, team: number): Promise<void> => {
-	const tiles = new Set<number>()
+	const explosionTiles = new Set<number>()
+
+	// Destroy the defeated team's units only — never a tile's occupant by virtue of
+	// a building sitting under it.
 	for (let tile = 0; tile < map.layers.units.length; tile++) {
 		const unit = map.layers.units[tile]
-		if (unit && unit.team === team) tiles.add(tile)
+		if (unit && unit.team === team) {
+			map.layers.units[tile] = null
+			explosionTiles.add(tile)
+		}
 	}
+
+	// Revert the defeated team's buildings to neutral ownership rather than removing
+	// them, resetting capture stature so they sit uncontested until recaptured.
 	for (let tile = 0; tile < map.layers.buildings.length; tile++) {
 		const building = map.layers.buildings[tile]
-		if (building && building.team === team) tiles.add(tile)
+		if (building && building.team === team) {
+			building.team = NEUTRAL_TEAM
+			building.stature = buildingData[building.type]?.stature ?? 0
+		}
 	}
-	if (tiles.size === 0) return
 
-	for (const tile of tiles) {
-		map.layers.units[tile] = null
-		map.layers.buildings[tile] = null
-	}
+	if (explosionTiles.size === 0) return
 
 	defeatAnimating.update((n) => n + 1)
 	try {
-		await Promise.all([...tiles].map((tile) => animateExplosion(map, tile)))
+		await Promise.all([...explosionTiles].map((tile) => animateExplosion(map, tile)))
 	} finally {
 		defeatAnimating.update((n) => Math.max(0, n - 1))
 	}

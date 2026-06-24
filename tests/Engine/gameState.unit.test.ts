@@ -10,6 +10,7 @@ import {
 	hasTileActed,
 	clearActedTiles,
 	canSelectUnit,
+	NEUTRAL_TEAM,
 } from '../../src/lib/Engine/gameState'
 
 const makeMap = (overrides: Partial<MapProcesser> = {}): MapProcesser => ({
@@ -75,6 +76,15 @@ describe('derivePlayersFromMap', () => {
 		map.layers.buildings[2] = building(2)
 
 		expect(derivePlayersFromMap(map).map((p) => p.team)).toEqual([1, 2, 3])
+	})
+
+	it('ignores neutral (team 4) buildings — they derive no player', () => {
+		const map = makeMap()
+		map.layers.units[0] = unit(0)
+		map.layers.buildings[1] = building(NEUTRAL_TEAM)
+		map.layers.buildings[2] = building(1)
+
+		expect(derivePlayersFromMap(map).map((p) => p.team)).toEqual([0, 1])
 	})
 })
 

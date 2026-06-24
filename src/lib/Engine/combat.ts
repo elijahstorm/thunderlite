@@ -3,13 +3,34 @@ import { terrainData } from '$lib/GameData/terrain'
 import { generateAttackList } from './Interactor/Pathing/attack'
 import { canAttackTarget, hasModifier, isRanged } from './modifiers/canAttack'
 import { computeDamageMultiplier, type AttackRole } from './modifiers/damageMultipliers'
+import { tileHeightTier } from './modifiers/height'
 
 export type { AttackRole }
 
 export type CombatContext = {
 	map: Pick<MapObject, 'layers'>
 	defenderTile: number
+	/** Tile the attacker fires from. Enables the high-ground damage bonus; when
+	 * omitted (callers that don't track it) the bonus is simply skipped. */
+	attackerTile?: number
 	role?: AttackRole
+}
+
+// High ground is an OFFENSE bonus only: firing downhill adds 8% damage per height
+// tier of advantage, capped at +16% (~2 tiers). Firing uphill or on the level adds
+// nothing — terrain `protection` already rewards the defender on raised ground, so
+// an uphill penalty here would double-count and make Mountains/Hills oppressive.
+const HIGH_GROUND_PER_TIER = 0.08
+const HIGH_GROUND_CAP = 0.16
+
+const highGroundBonus = (
+	map: Pick<MapObject, 'layers'>,
+	attackerTile: number,
+	defenderTile: number
+): number => {
+	const advantage = tileHeightTier(map, attackerTile) - tileHeightTier(map, defenderTile)
+	if (advantage <= 0) return 1
+	return 1 + Math.min(advantage * HIGH_GROUND_PER_TIER, HIGH_GROUND_CAP)
 }
 
 const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatContext): number => {
@@ -34,7 +55,12 @@ const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatCo
 		role: ctx.role ?? 'attack',
 	})
 
-	const final = Math.round(baseDamage * matchupBonus * terrainGuard * modMultiplier)
+	const highGround =
+		ctx.attackerTile != null
+			? highGroundBonus(ctx.map, ctx.attackerTile, ctx.defenderTile)
+			: 1
+
+	const final = Math.round(baseDamage * matchupBonus * terrainGuard * modMultiplier * highGround)
 	return final > 0 ? final : 0
 }
 

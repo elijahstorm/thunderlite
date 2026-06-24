@@ -58,13 +58,13 @@ describe('computeUnitSight', () => {
 		expect(computeUnitSight(map, 12, u)).toBe(unitData[STRIKE_COMMANDO].sight + 2)
 	})
 
-	it('adds +1 sight to a ranged unit standing on Hills or Mountain', () => {
+	it('grants the sight bonus by height tier regardless of unit kind (+1 Hills, +2 Mountain)', () => {
 		const map = makeMap(5, 5, PLAINS)
 		map.layers.ground[12] = ground(HILLS)
 		const u = unit(ROCKET_TRUCK)
 		expect(computeUnitSight(map, 12, u)).toBe(unitData[ROCKET_TRUCK].sight + 1)
 		map.layers.ground[12] = ground(MOUNTAIN)
-		expect(computeUnitSight(map, 12, u)).toBe(unitData[ROCKET_TRUCK].sight + 1)
+		expect(computeUnitSight(map, 12, u)).toBe(unitData[ROCKET_TRUCK].sight + 2)
 	})
 
 	it('drops the bonus when the unit moves off Extra_Sight terrain', () => {

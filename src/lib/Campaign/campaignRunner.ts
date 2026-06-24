@@ -41,6 +41,20 @@ export interface CampaignInterface {
 	kill(x: number, y: number): MaybePromise<void>
 	/** Replace the terrain at a tile. */
 	setTerrain(terrain: string, x: number, y: number): MaybePromise<void>
+	/** Set the weather/sky at a tile. */
+	setWeather(weather: string, x: number, y: number): MaybePromise<void>
+	/** Clear the weather/sky at a tile. */
+	clearWeather(x: number, y: number): MaybePromise<void>
+	/** Turn fog of war on or off for the rest of the match. */
+	fog(on: boolean): MaybePromise<void>
+	/** Add (or, when negative, subtract) funds for a team. */
+	funds(team: number, amount: number): MaybePromise<void>
+	/** Place a building for a team at a tile. */
+	addBuilding(team: number, building: string, x: number, y: number): MaybePromise<void>
+	/** Remove whatever building occupies a tile. */
+	removeBuilding(x: number, y: number): MaybePromise<void>
+	/** Change the owning team of the building at a tile. */
+	ownBuilding(team: number, x: number, y: number): MaybePromise<void>
 	/** Timed pause for `seconds`. */
 	wait(seconds: number): MaybePromise<void>
 }
@@ -82,6 +96,20 @@ const dispatchEvent = (event: CutsceneEvent, iface: CampaignInterface): MaybePro
 			return iface.kill(event.x, event.y)
 		case 'setTerrain':
 			return iface.setTerrain(event.terrain, event.x, event.y)
+		case 'setWeather':
+			return iface.setWeather(event.weather, event.x, event.y)
+		case 'clearWeather':
+			return iface.clearWeather(event.x, event.y)
+		case 'fog':
+			return iface.fog(event.on)
+		case 'funds':
+			return iface.funds(event.team, event.amount)
+		case 'addBuilding':
+			return iface.addBuilding(event.team, event.building, event.x, event.y)
+		case 'removeBuilding':
+			return iface.removeBuilding(event.x, event.y)
+		case 'ownBuilding':
+			return iface.ownBuilding(event.team, event.x, event.y)
 		case 'wait':
 			return iface.wait(event.seconds)
 	}

@@ -25,6 +25,11 @@ type UnitData = ObjectAssetMeta & {
 	cost: number
 	range: [number, number]
 	actable: boolean
+	// Stealth units (Stealth Tank, U-Boat) conceal themselves: enemies treat them
+	// as if hidden behind fog of war even when fog is off, only seeing them once a
+	// unit stands adjacent. Drives movement-path ghosting + collision (see
+	// `concealedEnemyTiles`). Absent/false for ordinary units.
+	stealth?: boolean
 	modifiers: (keyof typeof modifierData)[]
 }
 
@@ -221,6 +226,7 @@ export const unitData: UnitData[] = [
 		cost: 340,
 		range: COMMON_RANGE,
 		actable: true,
+		stealth: true,
 		modifiers: ['End_Turn.Cloak', 'Self_Action.Repairable'],
 	},
 	{
@@ -455,6 +461,7 @@ export const unitData: UnitData[] = [
 		cost: 475,
 		range: COMMON_RANGE,
 		actable: true,
+		stealth: true,
 		modifiers: ['End_Turn.Cloak', 'Self_Action.Repairable'],
 	},
 	{

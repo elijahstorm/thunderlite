@@ -6,7 +6,6 @@
  * Part of the DontCode platform boundary (see README.md): the future
  * `@dontcode/backend/client` entry point.
  */
-import { browser } from '$app/environment'
 import { goto } from '$app/navigation'
 import { writable } from 'svelte/store'
 
@@ -31,6 +30,16 @@ const clearSession = () => {
 	userAuth.set(null)
 }
 
+/**
+ * Seed the stores from session state the server already resolved (passed down
+ * through layout `data`). Synchronous and network-free, so the signed-in UI
+ * renders on first paint with no /api/auth/me round-trip or logged-out flash.
+ */
+export const initSession = (user: SessionUser | null) => {
+	if (user?.id) setSession(user)
+	else clearSession()
+}
+
 /** Re-sync the stores with the server's view of the session. */
 export const refreshSession = async (): Promise<SessionUser | null> => {
 	try {
@@ -53,8 +62,4 @@ export const logout = async () => {
 	} finally {
 		clearSession()
 	}
-}
-
-if (browser) {
-	refreshSession()
 }

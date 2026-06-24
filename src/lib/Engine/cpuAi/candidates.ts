@@ -1,9 +1,11 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
-import { hasModifier } from '../modifiers/canAttack'
+import { hasModifier, isRanged } from '../modifiers/canAttack'
 import { canMineAt } from '../modifiers/miner'
 import { generateMovementList } from '../Interactor/Pathing/movement'
 import { generateAttackList } from '../Interactor/Pathing/attack'
+import { concealedEnemyTiles } from '../visibility'
+import { lurkingStealthCount } from './stealthMemory'
 import {
 	scoreAttack,
 	scoreCapture,
@@ -45,22 +47,34 @@ export const generatePlansFor = (
 	cpuTeam: number
 ): ActionPlan[] => {
 	const plans: ActionPlan[] = []
-	const reachable = generateMovementList(map, unitTile, unit)
+	// The CPU plays blind: enemies it can't perceive (fog / stealth) are ghosts to
+	// its pathing and scoring alike. Compute the set once and thread it everywhere
+	// so reachability, threat and advance all agree on what the AI "knows".
+	const concealed = concealedEnemyTiles(map, cpuTeam)
+	// How much remembered-but-unseen enemy stealth there is, to temper how far the
+	// unit is willing to push into the unknown (folded into the position score).
+	const lurking = lurkingStealthCount(map, cpuTeam)
+	const reachable = generateMovementList(map, unitTile, unit, concealed)
+	// Ranged units may either move or attack in a turn, not both, so they can only
+	// fire from their current tile. Direct units may move-then-attack from any destination.
+	const ranged = isRanged(unit)
 
 	for (const dest of reachable) {
-		const position = scorePositionBonus(map, dest, unit, cpuTeam)
+		const position = scorePositionBonus(map, dest, unit, cpuTeam, concealed, lurking)
 
-		const targets = generateAttackList(map, dest, unit)
-		for (const targetTile of targets) {
-			const target = map.layers.units[targetTile]
-			if (!target) continue
-			const atk = scoreAttack(map, unit, dest, target, targetTile)
-			plans.push({
-				unitTile,
-				kind: 'attack',
-				score: atk.score + position * 0.5,
-				actions: [...moveActions(unitTile, dest), { kind: 'attack', from: dest, to: targetTile }],
-			})
+		if (!ranged || dest === unitTile) {
+			const targets = generateAttackList(map, dest, unit)
+			for (const targetTile of targets) {
+				const target = map.layers.units[targetTile]
+				if (!target) continue
+				const atk = scoreAttack(map, unit, dest, target, targetTile)
+				plans.push({
+					unitTile,
+					kind: 'attack',
+					score: atk.score + position * 0.5,
+					actions: [...moveActions(unitTile, dest), { kind: 'attack', from: dest, to: targetTile }],
+				})
+			}
 		}
 
 		if (canCapture(map, dest, unit)) {
@@ -93,7 +107,7 @@ export const generatePlansFor = (
 		plans.push({
 			unitTile,
 			kind: 'wait',
-			score: scoreWait(map, dest, unit, cpuTeam),
+			score: scoreWait(map, dest, unit, cpuTeam, concealed, lurking),
 			actions: [...moveActions(unitTile, dest), { kind: 'wait', tile: dest }],
 		})
 	}

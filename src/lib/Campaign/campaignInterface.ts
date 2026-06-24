@@ -15,7 +15,10 @@
 import { get, writable } from 'svelte/store'
 import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
-import { gameState } from '$lib/Engine/gameState'
+import { buildingData } from '$lib/GameData/building'
+import { skyData } from '$lib/GameData/sky'
+import { gameState, refreshControlsFromMap } from '$lib/Engine/gameState'
+import { fogOfWarEnabled } from '$lib/Engine/fogState'
 import { runModifiers } from '$lib/Engine/modifiers'
 import { applyWinConditions } from '$lib/Engine/winConditions'
 import { showDialogue } from './dialogueStore'
@@ -30,6 +33,8 @@ export const campaignCamera = writable<{ x: number; y: number } | null>(null)
 
 const unitTypeByName = (name: string): number => unitData.findIndex((u) => u.name === name)
 const terrainTypeByName = (name: string): number => terrainData.findIndex((t) => t.name === name)
+const buildingTypeByName = (name: string): number => buildingData.findIndex((b) => b.name === name)
+const skyTypeByName = (name: string): number => skyData.findIndex((s) => s.name === name)
 
 const tileFor = (map: MapObject, x: number, y: number): number => y * map.cols + x
 
@@ -98,6 +103,52 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 			const type = terrainTypeByName(terrain)
 			if (type < 0) return
 			map.layers.ground[tileFor(map, x, y)] = { type, state: 0 }
+		},
+
+		setWeather: (weather, x, y) => {
+			const type = skyTypeByName(weather)
+			if (type < 0) return
+			map.layers.sky[tileFor(map, x, y)] = { type, state: 0 }
+		},
+
+		clearWeather: (x, y) => {
+			map.layers.sky[tileFor(map, x, y)] = null
+		},
+
+		fog: (on) => {
+			fogOfWarEnabled.set(on)
+		},
+
+		funds: (team, amount) => {
+			gameState.update((s) => ({
+				...s,
+				players: s.players.map((p) =>
+					p.team === team ? { ...p, money: Math.max(0, p.money + amount) } : p
+				),
+			}))
+		},
+
+		addBuilding: (team, building, x, y) => {
+			const type = buildingTypeByName(building)
+			if (type < 0) return
+			map.layers.buildings[tileFor(map, x, y)] = { type, team, state: 0 }
+			refreshControlsFromMap(map)
+			applyWinConditions(map)
+		},
+
+		removeBuilding: (x, y) => {
+			map.layers.buildings[tileFor(map, x, y)] = null
+			refreshControlsFromMap(map)
+			applyWinConditions(map)
+		},
+
+		ownBuilding: (team, x, y) => {
+			const tile = tileFor(map, x, y)
+			const building = map.layers.buildings[tile]
+			if (!building) return
+			building.team = team
+			refreshControlsFromMap(map)
+			applyWinConditions(map)
 		},
 
 		wait: (seconds) => wait(seconds),

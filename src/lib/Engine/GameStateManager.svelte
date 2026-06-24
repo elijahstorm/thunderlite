@@ -10,10 +10,11 @@
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
 	import { teamHasPendingActions } from './pendingActions'
-	import { routeAnimation, animations } from './Animator/animator'
+	import { routeAnimation, animations, animationBusy } from './Animator/animator'
 	import { actionMenuState } from './HUD/actionMenuStore'
 	import { buildMenuState } from './HUD/buildMenuStore'
 	import { interactionState, interactionSource } from './Interactor/interactionState'
+	import { reopenMenuFromPeek } from './Interactor/interactor'
 	import { animateTeamDefeat } from './defeat'
 	import { MusicDirector } from '$lib/Audio/musicDirector'
 	import { weatherAudio, weatherForMap } from '$lib/Audio/weatherAudio'
@@ -42,6 +43,10 @@
 	export let onContinue: (() => void) | undefined = undefined
 	export let onRetry: (() => void) | undefined = undefined
 	export let campaignHref: string = '/campaign'
+
+	// Pause between the local player's last action finishing and the turn
+	// auto-ending, so the flip to the next side isn't too quick to register.
+	const AUTO_END_TURN_DELAY_MS = 500
 
 	const isMultiplayer =
 		gameSession !== '' && gameSession !== 'ephemeral' && gameSession !== 'testSession'
@@ -119,6 +124,13 @@
 		if (!isMultiplayer && $gameState.currentTeam !== localTeam) return
 		if ($turnTransitionActive) return
 
+		// A tap while a moved unit's menu is "peeking" re-summons that menu rather
+		// than running a fresh selection — the unit is still mid-decision, so the
+		// click brings its choices back instead of doing anything else.
+		if (map && $actionMenuState.peeking) {
+			if (reopenMenuFromPeek(map)) return
+		}
+
 		if (map) setSelectedTile(y * map.cols + x)
 		interactor(x, y)
 	}
@@ -184,18 +196,27 @@
 	// at those points). `autoEndedTurnKey` guards against firing more than once for
 	// the same turn, which matters in online play where `handleEndTurn` relays over
 	// the socket and `currentTeam` doesn't flip locally until the server replies.
-	// `queueMicrotask` defers the actual end-turn out of this reactive block —
-	// mutating gameState synchronously inside Svelte's flush left the CPU reactive
-	// block (above) stuck on the pre-flip state, so the CPU's `runCpuTurn` was
-	// never scheduled after an auto-ended turn.
+	// The end-turn is deferred out of this reactive block on a short timer — both
+	// because mutating gameState synchronously inside Svelte's flush left the CPU
+	// reactive block (above) stuck on the pre-flip state (so the CPU's `runCpuTurn`
+	// was never scheduled after an auto-ended turn), and to give the player a beat
+	// to register the result of their final action before the board flips and the
+	// turn-transition overlay slides in. Without that pause the flip is too quick
+	// for a human to follow.
 	let autoEndedTurnKey = ''
+	let autoEndTimer: ReturnType<typeof setTimeout> | null = null
 	$: {
 		const s = $gameState
 		const turnKey = `${s.currentTeam}:${s.turnNumber}`
 		const idle =
 			$routeAnimation === null &&
 			$animations.length === 0 &&
+			// A multi-beat attack (strike → bar ease → counter) or a standalone health
+			// ease holds this above zero through its quiet gaps, so the turn can't
+			// auto-end and slam the enemy-turn intro over a still-playing counter.
+			$animationBusy === 0 &&
 			!$actionMenuState.open &&
+			!$actionMenuState.peeking &&
 			!$buildMenuState.open &&
 			$interactionState === 'select' &&
 			$interactionSource === null
@@ -209,7 +230,11 @@
 			!teamHasPendingActions(map, s)
 		) {
 			autoEndedTurnKey = turnKey
-			queueMicrotask(handleEndTurn)
+			if (autoEndTimer) clearTimeout(autoEndTimer)
+			autoEndTimer = setTimeout(() => {
+				autoEndTimer = null
+				handleEndTurn()
+			}, AUTO_END_TURN_DELAY_MS)
 		}
 	}
 
@@ -240,6 +265,7 @@
 
 	onDestroy(() => {
 		if (cpuHandle) cpuHandle.cancel()
+		if (autoEndTimer) clearTimeout(autoEndTimer)
 		weatherAudio.clear()
 		offRecordMatch?.()
 		offCampaignProgress?.()

@@ -1,7 +1,8 @@
 import { pathFinder } from '$lib/Engine/Interactor/Pathing/pathFinder'
-import { generateAttackList } from '$lib/Engine/Interactor/Pathing/attack'
+import { generateAttackList, shadowedAttackTiles } from '$lib/Engine/Interactor/Pathing/attack'
 import { generateMovementList, drag } from '$lib/Engine/Interactor/Pathing/movement'
 import { unitThreatTiles } from '$lib/Engine/Interactor/Pathing/threat'
+import { concealedEnemyTiles } from '$lib/Engine/visibility'
 import { unitData } from '$lib/GameData/unit'
 
 export type HoverRouteResult = {
@@ -25,7 +26,7 @@ export const updateRoute = (
 	if (!unit) return { pathHistory: [], route: [] }
 
 	const allActions = generateActionsList(map, selected, unit)
-	const action = allActions.find((a) => a.tile === tile)
+	const action = findActionAtTile(allActions, tile)
 	if (!action) {
 		// Cursor is off any actionable tile. Keep history alive so the user can
 		// re-enter the action zone without losing their built-up route, but show
@@ -34,7 +35,8 @@ export const updateRoute = (
 		return { pathHistory: kept, route: [] }
 	}
 
-	const newPath = nextHoverPath(map, unit, selected, pathHistory, tile, action)
+	const concealed = concealedEnemyTiles(map, unit.team)
+	const newPath = nextHoverPath(map, unit, selected, pathHistory, tile, action, concealed)
 	return { pathHistory: newPath, route: routeFromPath(map, newPath) }
 }
 
@@ -44,7 +46,8 @@ const nextHoverPath = (
 	source: number,
 	pathHistory: number[],
 	hovered: number,
-	action: TileHighlight
+	action: TileHighlight,
+	concealed: ReadonlySet<number>
 ): number[] => {
 	const path = pathHistory.length && pathHistory[0] === source ? pathHistory.slice() : [source]
 
@@ -63,7 +66,7 @@ const nextHoverPath = (
 			return path
 		}
 
-		const fallback = pathFinder(map, unit, source, hovered)
+		const fallback = pathFinder(map, unit, source, hovered, concealed)
 		return fallback.length ? fallback : [source]
 	}
 
@@ -78,7 +81,7 @@ const nextHoverPath = (
 		if (pathWithinBudget(map, unit, extended)) return extended
 	}
 
-	const fallback = pathFinder(map, unit, source, hovered)
+	const fallback = pathFinder(map, unit, source, hovered, concealed)
 	if (fallback.length) return fallback
 	return path
 }
@@ -181,16 +184,32 @@ export const highlightActionsList = (map: MapObject, highlights: TileHighlight[]
 	})
 }
 
+// Resolve the actionable entry for a tile. Firing-shadow tiles (ranged units)
+// are visual-only — they carry the attack `type` but aren't targetable, and
+// generateActionsList intentionally lists them FIRST so the real move/attack
+// overlays paint over them (highlightActionsList is last-write-wins). A plain
+// `.find()` therefore returns the shadow entry on any tile that's *also* a move
+// tile, mislabelling a walkable tile as an attack — which silently kills the
+// hover arrow and cancels the click for indirect units. Skip shadows so
+// interaction always resolves to the real move/attack action.
+export const findActionAtTile = (
+	actions: TileHighlight[],
+	tile: number
+): TileHighlight | undefined => actions.find((a) => a.tile === tile && !a.shadowed)
+
 export const generateActionsList = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject,
 	threat?: Set<number>
 ) => {
-	const tiles = generateMovementList(map, tile, unit)
+	const tiles = generateMovementList(map, tile, unit, concealedEnemyTiles(map, unit.team))
 
 	if (unitData[unit.type].range[0] !== 1) {
+		// Shadow tiles first so the real move/attack overlays overwrite them on any
+		// shared tile (highlightActionsList is last-write-wins per tile).
 		return [
+			...convertToShadow(shadowedAttackTiles(map, tile, unit)),
 			...convertToHighlightable(map, tiles, highlightTypes.move, threat),
 			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack),
 		]
@@ -212,15 +231,28 @@ export const generatePreviewList = (
 	tile: number,
 	unit: UnitObject
 ): TileHighlight[] => {
-	const moveTiles = generateMovementList(map, tile, unit)
+	const moveTiles = generateMovementList(map, tile, unit, concealedEnemyTiles(map, unit.team))
 	const standable = new Set(moveTiles)
 	const attackTiles = [...unitThreatTiles(map, tile, unit)].filter((t) => !standable.has(t))
+	const shadowTiles = shadowedAttackTiles(map, tile, unit).filter((t) => !standable.has(t))
 
 	return [
+		...convertToShadow(shadowTiles),
 		...convertToHighlightable(map, moveTiles, highlightTypes.move),
 		...convertToHighlightable(map, attackTiles, highlightTypes.attack),
 	]
 }
+
+// Firing-shadow tiles: dead ground an indirect unit can't shell. Carried on the
+// attack channel (red family) but flagged `shadowed` so the renderer draws the
+// distinct hatched/greyed overlay instead of a live target highlight.
+const convertToShadow = (tiles: number[]): TileHighlight[] =>
+	tiles.map((tile) => ({
+		tile,
+		type: highlightTypes.attack,
+		tip: highlightTypes.neutral,
+		shadowed: true,
+	}))
 
 const convertToHighlightable = (
 	map: MapObject,
@@ -233,7 +265,14 @@ const convertToHighlightable = (
 		return {
 			tile,
 			type,
-			tip: threatened ? highlightTypes.bad : highlightTypes.neutral,
+			// Safe move tiles use the empty `good` row so the board isn't spammed
+			// with warning triangles — only tiles inside an enemy's reach get the
+			// `bad` badge. Attack tiles stay neutral until shot-quality scoring lands.
+			tip: threatened
+				? highlightTypes.bad
+				: type === highlightTypes.move
+					? highlightTypes.good
+					: highlightTypes.neutral,
 			threatened,
 		}
 	})

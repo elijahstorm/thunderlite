@@ -108,6 +108,12 @@
 		// corner. Maps larger than the viewport pan exactly as before.
 		const drawTiles = tiling.render(handleOffset, paint(context))
 		const renderCentered = (left: number, top: number, zoom: number) => {
+			// Clear before every scroll-driven repaint. Opaque tiles cover the play
+			// area on their own, but the map-edge frame draws *outward* into the
+			// off-map margin, which no tile repaints — without this clear those
+			// pixels smear into a trail while dragging/decelerating. (The redraw
+			// path via `reflow` already clears implicitly by reassigning canvas size.)
+			context.clearRect(0, 0, content.width, content.height)
 			const [cx, cy] = centerOffset(zoom)
 			drawTiles(left - cx, top - cy, zoom)
 		}

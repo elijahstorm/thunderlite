@@ -2,9 +2,46 @@
 import { terrainData } from '$lib/GameData/terrain'
 
 type ConnectionDecision = (map: MapObject, location: number) => number
+type CornerDecision = (map: MapObject, location: number) => number[]
 
 export const connectionDecision = (object: GroundObject) =>
 	flowDecision[terrainData[object.type].connector]
+
+// A single tile renders one sprite frame, so the base `state` can only ever show
+// one of the four inner corners (16=TL, 17=BL, 18=BR, 19=TR). Coastlines like
+//   G S G        G S S
+//   S S S   or   S S S
+//   G S G        G S S
+// need several inner corners on the same water tile, so we return the full list
+// here and let the renderer composite each corner's quadrant over the base tile.
+export const cornerDecision = (object: GroundObject): CornerDecision =>
+	terrainData[object.type].connector === 3 ? borderCorners : noCorners
+
+const noCorners: CornerDecision = () => []
+
+const borderCorners: CornerDecision = (map, location) => {
+	// Inner corners only apply to fully-enclosed water — a tile whose four cardinal
+	// neighbours are all the same ocean. Edge tiles already draw their land
+	// transition through the base `border` state, so the diagonal lookups below are
+	// always in-bounds and on the same row when this guard passes.
+	if (
+		!(
+			left(map, location, ocean) &&
+			up(map, location, ocean) &&
+			right(map, location, ocean) &&
+			down(map, location, ocean)
+		)
+	) {
+		return []
+	}
+
+	const corners: number[] = []
+	if (!up(map, location - 1, ocean)) corners.push(16) // top-left diagonal is land
+	if (!down(map, location - 1, ocean)) corners.push(17) // bottom-left diagonal is land
+	if (!down(map, location + 1, ocean)) corners.push(18) // bottom-right diagonal is land
+	if (!up(map, location + 1, ocean)) corners.push(19) // top-right diagonal is land
+	return corners
+}
 
 const singular: ConnectionDecision = (map, location) => 0
 
@@ -15,29 +52,10 @@ const rollInto: ConnectionDecision = (map, location) =>
 
 const random: ConnectionDecision = (map, location) => location % 5
 
-const border: ConnectionDecision = (map, location) => {
-	const border =
-		borderDecision[left(map, location, ocean) ? 'true' : 'false'][
-			up(map, location, ocean) ? 'true' : 'false'
-		][right(map, location, ocean) ? 'true' : 'false'][down(map, location, ocean) ? 'true' : 'false']
-
-	if (border === 0) {
-		if (!up(map, location + 1, ocean)) {
-			return 19
-		}
-		if (!down(map, location + 1, ocean)) {
-			return 18
-		}
-		if (!down(map, location - 1, ocean)) {
-			return 17
-		}
-		if (!up(map, location - 1, ocean)) {
-			return 16
-		}
-	}
-
-	return border
-}
+const border: ConnectionDecision = (map, location) =>
+	borderDecision[left(map, location, ocean) ? 'true' : 'false'][
+		up(map, location, ocean) ? 'true' : 'false'
+	][right(map, location, ocean) ? 'true' : 'false'][down(map, location, ocean) ? 'true' : 'false']
 
 const bridge: ConnectionDecision = (map, location) =>
 	up(map, location) || down(map, location) ? 1 : 0

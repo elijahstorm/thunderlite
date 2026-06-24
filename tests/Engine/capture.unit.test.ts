@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
-import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
+import {
+	gameState,
+	resetGameState,
+	initGameStateFromMap,
+	NEUTRAL_TEAM,
+} from '../../src/lib/Engine/gameState'
 import { endTurn } from '../../src/lib/Engine/turnLoop'
 import {
 	clearModifierRegistry,
@@ -125,6 +130,21 @@ describe('Start_Turn.Capture handler', () => {
 		initGameStateFromMap(map)
 
 		expect(() => runCaptureFor(map, 5)).not.toThrow()
+	})
+
+	it('captures a neutral (team 4) Command Center without eliminating anyone', () => {
+		const map = makeMap()
+		map.layers.units[5] = unit(0)
+		map.layers.buildings[5] = building(NEUTRAL_TEAM, COMMAND_CENTER_TYPE, 10)
+		// A real opponent exists so the roster has players to (not) eliminate.
+		map.layers.units[1] = unit(1)
+		initGameStateFromMap(map)
+
+		runCaptureFor(map, 5) // 10 − 10 = 0 → flips to the capturing team
+		expect(map.layers.buildings[5]!.team).toBe(0)
+		// previousTeam was neutral (4), which owns no player, so Capture.Insta_Lose
+		// must not flip anyone to hasLost.
+		expect(get(gameState).players.every((p) => !p.hasLost)).toBe(true)
 	})
 
 	it('Command Center capture flips team and resets stature to its max (30)', () => {

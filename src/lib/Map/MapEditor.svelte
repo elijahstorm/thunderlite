@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { writable } from 'svelte/store'
 	import { goto } from '$app/navigation'
+	import { Modal } from 'flowbite-svelte'
 	import MapRender from './MapRender.svelte'
 	import Icon from '@iconify/svelte'
 	import EditorButton from './Editor/EditorButton.svelte'
@@ -14,6 +15,9 @@
 	import { share } from './Editor/mapShare'
 	import { skyData } from '$lib/GameData/sky'
 	import { buildingData } from '$lib/GameData/building'
+	import { parseCutsceneScript } from '$lib/Campaign/cutsceneScript'
+	import { CutsceneParseError } from '$lib/Campaign/cutsceneTypes'
+	import { NEUTRAL_TEAM } from '$lib/Engine/gameState'
 
 	export let mapHash: string | undefined = undefined
 
@@ -22,13 +26,21 @@
 	const teamColors = ['rgb(233,56,46)', 'rgb(69,164,225)', 'rgb(67,193,56)', 'rgb(229,229,43)']
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
+	type Brush = 'ground' | 'units' | 'buildings' | 'sky'
+
 	let openOptionsModal = false
-	let editType: 'units' | 'ground' = 'ground'
+	let openScriptModal = false
+	let editType: Brush = 'ground'
 	let unitType = 0
 	let groundType = 0
+	let buildingType = 0
+	let skyType = 0
 	let team = 0
 	let erasing = false
 	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
+
+	/** Brushes that place a team-owned object (so the team picker is shown). */
+	const teamedBrush = (brush: Brush) => brush === 'units' || brush === 'buildings'
 
 	map.filters = {
 		ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
@@ -37,31 +49,73 @@
 		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
 	}
 
-	$: type = editType === 'units' ? unitType : groundType
+	$: type =
+		editType === 'units'
+			? unitType
+			: editType === 'buildings'
+				? buildingType
+				: editType === 'sky'
+					? skyType
+					: groundType
 	$: activeUnit = unitData[unitType]
 	$: activeTerrain = terrainData[groundType]
+	$: activeBuilding = buildingData[buildingType]
+	$: activeSky = skyData[skyType]
+
+	$: scriptError = (() => {
+		if (!map.script || map.script.trim() === '') return null
+		try {
+			parseCutsceneScript(map.script)
+			return null
+		} catch (e) {
+			if (e instanceof CutsceneParseError) return { line: e.line, message: e.message }
+			return { line: 0, message: e instanceof Error ? e.message : 'Unknown error' }
+		}
+	})()
+
+	$: playerTeams = (() => {
+		const teams = new Set<number>()
+		for (const u of map.layers.units) if (u && typeof u.team === 'number') teams.add(u.team)
+		// Neutral buildings belong to nobody, so they don't count toward playable teams.
+		for (const b of map.layers.buildings)
+			if (b && typeof b.team === 'number' && b.team !== NEUTRAL_TEAM) teams.add(b.team)
+		return teams
+	})()
+	$: canPlay = playerTeams.size >= 2
+
+	// Units always belong to a player; never leave the brush on Neutral when it
+	// would place a team-4 unit (which has no player and would render grey).
+	$: if (editType === 'units' && team === NEUTRAL_TEAM) team = 0
 
 	const select = (x: number, y: number) => {
 		const tile = y * map.cols + x
 		if (erasing) {
-			if (editType === 'units') delete map.layers.units[tile]
+			if (editType === 'units') map.layers.units[tile] = null
+			else if (editType === 'buildings') map.layers.buildings[tile] = null
+			else if (editType === 'sky') map.layers.sky[tile] = null
 			else map.layers.ground[tile] = { type: 0, state: 0 }
 			return
 		}
 		if (editType === 'units') {
 			map.layers.units[tile] = { type, team, state: 4 }
+		} else if (editType === 'buildings') {
+			map.layers.buildings[tile] = { type, team, state: 0 }
+		} else if (editType === 'sky') {
+			map.layers.sky[tile] = { type, state: 0 }
 		} else {
 			map.layers.ground[tile] = { type, state: 0 }
 		}
 	}
 
-	const setBrush = (brush: 'units' | 'ground') => () => {
+	const setBrush = (brush: Brush) => () => {
 		editType = brush
 		erasing = false
 	}
-	const changeType = (selectedType: 'units' | 'ground', index: number) => () => {
+	const changeType = (selectedType: Brush, index: number) => () => {
 		editType = selectedType
 		if (selectedType === 'units') unitType = index
+		else if (selectedType === 'buildings') buildingType = index
+		else if (selectedType === 'sky') skyType = index
 		else groundType = index
 		erasing = false
 	}
@@ -75,6 +129,7 @@
 		})
 	const shareMap = () => share(map?.title ?? 'ThunderLite Online', mapHasher(map))
 	const playMap = async () => {
+		if (!canPlay) return
 		const sha = mapHasher(map)
 		mapStore.set(map)
 		playMapStore.set(deriveFromHash(sha))
@@ -96,6 +151,23 @@
 		{ label: 'Open', icon: 'fluent:folder-32-filled', act: openMap },
 		{ label: 'Save', icon: 'fluent:save-24-filled', act: saveMap },
 		{ label: 'Share', icon: 'gg:share', act: shareMap },
+	]
+
+	const scriptReference = [
+		'talk Speaker: "line one", "line two"',
+		'move: x,y                  — pan camera',
+		'hl: x,y   /  unhl: x,y     — (un)highlight tile',
+		'wait: seconds',
+		'add unit: team,"Name",x,y',
+		'kill unit: x,y',
+		'add building: team,"Name",x,y',
+		'remove building: x,y',
+		'own building: team,x,y',
+		'terrain: "Name",x,y',
+		'weather: "Name",x,y',
+		'clear weather: x,y',
+		'fog: on  /  fog: off',
+		'funds: team,amount         — amount may be negative',
 	]
 
 	$: mapStore.set(map)
@@ -139,6 +211,19 @@
 			{/each}
 			<button
 				type="button"
+				on:click={() => (openScriptModal = true)}
+				title="Edit map script"
+				class="btn btn-ghost btn-sm"
+				class:text-destructive={scriptError}
+			>
+				<Icon icon="mdi:script-text-outline" width="16" height="16" />
+				<span class="hidden lg:inline">Script</span>
+				{#if scriptError}
+					<span class="h-1.5 w-1.5 rounded-full bg-destructive"></span>
+				{/if}
+			</button>
+			<button
+				type="button"
 				on:click={() => (openOptionsModal = true)}
 				title="Map options"
 				class="btn btn-ghost btn-sm"
@@ -147,12 +232,45 @@
 				<span class="hidden lg:inline">Options</span>
 			</button>
 			<div class="mx-1 h-5 w-px bg-border"></div>
-			<button type="button" on:click={playMap} class="btn btn-primary btn-sm">
+			<button
+				type="button"
+				on:click={playMap}
+				disabled={!canPlay}
+				title={canPlay ? 'Play' : 'Add units or buildings for at least 2 players to play'}
+				aria-disabled={!canPlay}
+				class="btn btn-primary btn-sm"
+				class:cursor-not-allowed={!canPlay}
+				class:opacity-50={!canPlay}
+			>
 				<Icon icon="solar:play-bold" width="15" height="15" />
 				Play
 			</button>
 		</div>
 	</header>
+
+	{#if erasing}
+		<div
+			class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-sm text-destructive"
+		>
+			<Icon icon="mdi:eraser" width="15" height="15" />
+			Eraser active — click tiles to {editType === 'units'
+				? 'remove units'
+				: editType === 'buildings'
+					? 'remove buildings'
+					: editType === 'sky'
+						? 'clear weather'
+						: 'reset to plains'}.
+		</div>
+	{/if}
+
+	{#if !canPlay}
+		<div
+			class="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-700"
+		>
+			<Icon icon="mdi:alert" width="15" height="15" />
+			Place units or buildings for at least 2 players before you can play.
+		</div>
+	{/if}
 
 	<!-- Body -->
 	<div class="flex min-h-0 flex-1">
@@ -167,14 +285,7 @@
 		</aside>
 
 		<div class="relative min-w-0 flex-1 overflow-hidden">
-			<MapRender pause {map} {select} {contextLoaded} backdrop="bg-surface-2 grid-pattern" />
-			{#if erasing}
-				<div class="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2">
-					<span class="chip border-destructive/40 bg-destructive/10 text-destructive">
-						<Icon icon="mdi:eraser" width="13" height="13" /> Eraser active
-					</span>
-				</div>
-			{/if}
+			<MapRender pause editor {map} {select} {contextLoaded} backdrop="bg-surface-2 grid-pattern" />
 		</div>
 	</div>
 
@@ -198,37 +309,87 @@
 	<MapRender pause mini map={updatedMap} select={() => {}} backdrop="bg-surface-2" />
 </MapOptions>
 
+<Modal title="Map script" bind:open={openScriptModal} outsideclose size="xl">
+	<section class="flex flex-col gap-3">
+		<p class="text-sm text-muted-foreground">
+			Author cutscene-style logic that runs while this map is played: dialogue, camera moves,
+			spawns, weather, funds, victory/defeat, and more. Blocks fire on level load
+			(<code>&lt;start&gt;</code>), each side-turn (<code>&lt;turn N,T&gt;</code>), and match end
+			(<code>&lt;win&gt;</code> / <code>&lt;lose&gt;</code>).
+		</p>
+
+		<textarea
+			bind:value={map.script}
+			spellcheck="false"
+			placeholder={'<start>\n  move: 4,4\n  talk Commander: "Hold the line!"\n</start>'}
+			rows="16"
+			class="input w-full resize-y font-mono text-sm leading-relaxed"
+			aria-label="Map script"
+		></textarea>
+
+		{#if scriptError}
+			<div
+				class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
+			>
+				<Icon icon="mdi:alert-circle" width="16" height="16" class="mt-0.5 shrink-0" />
+				<span>
+					{#if scriptError.line > 0}<strong>Line {scriptError.line}:</strong> {/if}{scriptError.message}
+				</span>
+			</div>
+		{:else if map.script && map.script.trim() !== ''}
+			<div class="flex items-center gap-2 text-sm text-emerald-600">
+				<Icon icon="mdi:check-circle" width="16" height="16" />
+				Script parses cleanly.
+			</div>
+		{/if}
+
+		<details class="rounded-md border border-border bg-surface-2/50 p-3 text-sm">
+			<summary class="cursor-pointer font-semibold">Command reference</summary>
+			<div class="mt-2 grid gap-1 font-mono text-xs text-muted-foreground">
+				{#each scriptReference as line (line)}
+					<div>{line}</div>
+				{/each}
+			</div>
+			<p class="mt-2 text-xs text-muted-foreground">
+				Full reference: <code>docs/map-scripting.md</code>
+			</p>
+		</details>
+	</section>
+
+	{#snippet footer()}
+		<button type="button" on:click={() => (openScriptModal = false)} class="btn btn-primary ml-auto">
+			<Icon icon="mdi:check" width="16" height="16" />
+			Done
+		</button>
+	{/snippet}
+</Modal>
+
+{#snippet brushTab(brush: Brush, icon: string, label: string)}
+	<button
+		type="button"
+		on:click={setBrush(brush)}
+		class="flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+		class:bg-surface={editType === brush}
+		class:text-foreground={editType === brush}
+		class:shadow-sm={editType === brush}
+		class:text-muted-foreground={editType !== brush}
+	>
+		<Icon {icon} width="16" height="16" />
+		{label}
+	</button>
+{/snippet}
+
 {#snippet paletteHeader()}
 	<div class="flex flex-col gap-2 border-b border-border p-3">
 		<div class="grid grid-cols-2 gap-1 rounded-lg bg-surface-2 p-1">
-			<button
-				type="button"
-				on:click={setBrush('ground')}
-				class="flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-				class:bg-surface={editType === 'ground'}
-				class:text-foreground={editType === 'ground'}
-				class:shadow-sm={editType === 'ground'}
-				class:text-muted-foreground={editType !== 'ground'}
-			>
-				<Icon icon="mdi:grass" width="16" height="16" />
-				Terrain
-			</button>
-			<button
-				type="button"
-				on:click={setBrush('units')}
-				class="flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
-				class:bg-surface={editType === 'units'}
-				class:text-foreground={editType === 'units'}
-				class:shadow-sm={editType === 'units'}
-				class:text-muted-foreground={editType !== 'units'}
-			>
-				<Icon icon="mdi:tank" width="16" height="16" />
-				Units
-			</button>
+			{@render brushTab('ground', 'mdi:grass', 'Terrain')}
+			{@render brushTab('units', 'mdi:tank', 'Units')}
+			{@render brushTab('buildings', 'mdi:office-building', 'Buildings')}
+			{@render brushTab('sky', 'mdi:weather-partly-cloudy', 'Weather')}
 		</div>
 
 		<div class="flex items-center gap-2">
-			{#if editType === 'units'}
+			{#if teamedBrush(editType)}
 				<div class="flex flex-wrap items-center gap-1" role="group" aria-label="Team">
 					{#each Array.from({ length: maxTeamAmount }) as _, i}
 						<button
@@ -251,6 +412,24 @@
 							P{i + 1}
 						</button>
 					{/each}
+					{#if editType === 'buildings'}
+						<button
+							type="button"
+							on:click={changeTeam(NEUTRAL_TEAM)}
+							title="Neutral (unclaimed — capturable)"
+							aria-pressed={team === NEUTRAL_TEAM}
+							class="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold transition-all"
+							class:border-primary={team === NEUTRAL_TEAM}
+							class:bg-accent={team === NEUTRAL_TEAM}
+							class:text-accent-foreground={team === NEUTRAL_TEAM}
+							class:border-border={team !== NEUTRAL_TEAM}
+							class:text-muted-foreground={team !== NEUTRAL_TEAM}
+							class:hover:bg-muted={team !== NEUTRAL_TEAM}
+						>
+							<span class="h-3 w-3 rounded-full bg-neutral-400 ring-1 ring-black/10"></span>
+							Neutral
+						</button>
+					{/if}
 				</div>
 			{/if}
 			<button
@@ -279,6 +458,28 @@
 				{size}
 			>
 				{@render unitImg(i, team)}
+			</EditorButton>
+		{/each}
+	{:else if editType === 'buildings'}
+		{#each buildingData as building, i (building.name + i)}
+			<EditorButton
+				action={changeType('buildings', i)}
+				selected={!erasing && editType === 'buildings' && buildingType === i}
+				title={building.name}
+				{size}
+			>
+				{@render buildingImg(i, team)}
+			</EditorButton>
+		{/each}
+	{:else if editType === 'sky'}
+		{#each skyData as sky, i (sky.name + i)}
+			<EditorButton
+				action={changeType('sky', i)}
+				selected={!erasing && editType === 'sky' && skyType === i}
+				title={sky.name}
+				{size}
+			>
+				{@render skyImg(i)}
 			</EditorButton>
 		{/each}
 	{:else}
@@ -317,6 +518,33 @@
 	/>
 {/snippet}
 
+{#snippet buildingImg(bType: number, bTeam: number)}
+	{#if $contextLoaded && $spriteStore['buildings'][bType]?.[bTeam]}
+		<img
+			class="pointer-events-none min-w-fit object-cover"
+			src={$spriteStore['buildings'][bType][bTeam].src}
+			alt={buildingData[bType].name}
+			style="margin: {-buildingData[bType].yOffset + 6}px {-buildingData[bType].xOffset}px 0 0;"
+		/>
+	{:else}
+		<img
+			class="pointer-events-none min-w-fit object-cover object-top-left"
+			src={buildingData[bType].url}
+			alt={buildingData[bType].name}
+			style="margin: {-buildingData[bType].yOffset}px {-buildingData[bType].xOffset}px 0 0;"
+		/>
+	{/if}
+{/snippet}
+
+{#snippet skyImg(sType: number)}
+	<img
+		class="pointer-events-none min-w-fit object-cover object-top-left"
+		src={skyData[sType].url}
+		alt={skyData[sType].name}
+		style="margin: {-skyData[sType].yOffset}px {-skyData[sType].xOffset}px 0 0;"
+	/>
+{/snippet}
+
 {#snippet stat(label: string, value: string | number)}
 	<span class="chip gap-1">
 		<span class="text-[10px] tracking-wide uppercase opacity-70">{label}</span>
@@ -336,7 +564,13 @@
 				<div>
 					<div class="font-semibold">Eraser</div>
 					<div class="text-xs text-muted-foreground">
-						Click tiles to {editType === 'units' ? 'remove units' : 'reset to plains'}
+						Click tiles to {editType === 'units'
+							? 'remove units'
+							: editType === 'buildings'
+								? 'remove buildings'
+								: editType === 'sky'
+									? 'clear weather'
+									: 'reset to plains'}
 					</div>
 				</div>
 			</div>
@@ -352,6 +586,23 @@
 				{@render stat('HP', activeUnit.health)}
 				{@render stat('MOV', activeUnit.movement)}
 				{@render stat('Cost', activeUnit.cost)}
+			</div>
+		{:else if editType === 'buildings'}
+			<div class="mb-1 font-semibold">{activeBuilding.name}</div>
+			<p class="mb-2 text-xs text-muted-foreground">{activeBuilding.description}</p>
+			<div class="flex flex-wrap gap-1.5">
+				{@render stat('DEF', activeBuilding.protection)}
+				{@render stat('HP', activeBuilding.stature)}
+				{#if activeBuilding.income > 0}
+					{@render stat('Income', activeBuilding.income)}
+				{/if}
+			</div>
+		{:else if editType === 'sky'}
+			<div class="mb-1 font-semibold">{activeSky.name}</div>
+			<p class="mb-2 text-xs text-muted-foreground">{activeSky.description}</p>
+			<div class="flex flex-wrap gap-1.5">
+				{@render stat('DEF', activeSky.protection)}
+				{@render stat('Drag', activeSky.drag)}
 			</div>
 		{:else}
 			<div class="mb-1 font-semibold">{activeTerrain.name}</div>

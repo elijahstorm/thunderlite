@@ -5,6 +5,8 @@
 	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
 	import GameBoard from '$lib/Map/GameBoard.svelte'
 	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
+	import { dev } from '$app/environment'
+	import PathDebugPanel from '$lib/Engine/Interactor/Pathing/PathDebugPanel.svelte'
 
 	export let data: PageData
 	$: userSession = data.userSession
@@ -23,8 +25,20 @@
 				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 				let:select
 			>
-				<GameBoard {map} {requestRedraw} {select} fogOfWar minimap menuHref="/rooms" />
+				<GameBoard
+					{map}
+					{requestRedraw}
+					{select}
+					fogOfWar={map.fog ?? true}
+					minimap
+					menuHref="/rooms"
+				/>
 			</GameStateManager>
 		</GameSocket>
 	</MapLoader>
+
+	<!-- DEV TOOL — movement/pathfinding diagnostics. dev-only (stripped from prod). -->
+	{#if dev}
+		<PathDebugPanel />
+	{/if}
 </section>

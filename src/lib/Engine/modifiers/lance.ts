@@ -44,6 +44,7 @@ export const applyLancePassthrough = (
 	const damage = calculateDamage(attacker, passthrough, {
 		map,
 		defenderTile: behind,
+		attackerTile,
 		role: 'attack',
 	})
 	const maxHealth = unitData[passthrough.type].health

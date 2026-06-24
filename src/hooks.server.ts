@@ -1,6 +1,7 @@
 import { redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
 import { env } from '$env/dynamic/private'
 import { auth } from '$lib/dontcode/server'
+import { resolveCachedUser } from '$lib/dontcode/sessionCache'
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const protectedRoutes = [
@@ -15,12 +16,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 	]
 
 	// Resolve the signed-in user once per request from the access_token cookie.
+	// Cached per token (see sessionCache) so repeat requests within the TTL skip
+	// the remote auth.me() round-trip, and so a transient backend failure keeps
+	// the user signed in on last-known state instead of bouncing them to /login.
 	const accessToken = event.cookies.get('access_token')
 	if (accessToken) {
-		const user = await resolveUser(accessToken)
+		const user = await resolveCachedUser(accessToken, resolveUser)
 		if (user) {
 			event.locals.user = user.id
-			event.locals.userEmail = user.email
+			event.locals.userEmail = user.email ?? undefined
 		}
 	}
 
@@ -35,14 +39,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	return await resolve(event)
 }
 
-const resolveUser = async (accessToken: string) => {
-	try {
-		return await auth.me(accessToken)
-	} catch {
-		// Platform hiccups read as "not signed in" instead of crashing the request.
-		return null
-	}
-}
+// `auth.me` returns null only for a real 401 (definitively signed out) and
+// throws on transient platform failures. We deliberately let those throw so the
+// cache can serve last-known state instead of misreading a hiccup as signed-out.
+const resolveUser = (accessToken: string) => auth.me(accessToken)
 
 /**
  * The player's opaque game identity (`userSession`), used as their handle in

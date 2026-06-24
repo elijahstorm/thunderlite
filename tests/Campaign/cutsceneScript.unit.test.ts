@@ -290,4 +290,50 @@ describe('parseCutsceneScript — parse errors carry the line number', () => {
 	it('rejects talk without a speaker', () => {
 		expectError('<start>\ntalk: "hi"\n</start>', 2, /speaker/)
 	})
+
+	it('rejects an unknown building name', () => {
+		expectError('<start>\nadd building: 0,"Bogus Tower",1,1\n</start>', 2, /unknown building/)
+	})
+
+	it('rejects an unknown weather name', () => {
+		expectError('<start>\nweather: "Sunshine",1,1\n</start>', 2, /unknown weather/)
+	})
+
+	it('rejects a non on/off fog argument', () => {
+		expectError('<start>\nfog: maybe\n</start>', 2, /on.*off/)
+	})
+
+	it('rejects non-integer funds amount', () => {
+		expectError('<start>\nfunds: 0,1.5\n</start>', 2, /integer/)
+	})
+})
+
+describe('parseCutsceneScript — building / weather / fog / funds commands', () => {
+	it('parses the full set of new commands into typed events', () => {
+		const script = parseCutsceneScript(`
+<start>
+add building: 1,"City",5,5
+remove building: 5,5
+own building: 0,5,5
+weather: "Storm",6,2
+clear weather: 6,2
+fog: off
+fog: on
+funds: 0,500
+funds: 1,-200
+</start>
+`)
+
+		expect(script.start).toEqual([
+			{ kind: 'addBuilding', team: 1, building: 'City', x: 5, y: 5 },
+			{ kind: 'removeBuilding', x: 5, y: 5 },
+			{ kind: 'ownBuilding', team: 0, x: 5, y: 5 },
+			{ kind: 'setWeather', weather: 'Storm', x: 6, y: 2 },
+			{ kind: 'clearWeather', x: 6, y: 2 },
+			{ kind: 'fog', on: false },
+			{ kind: 'fog', on: true },
+			{ kind: 'funds', team: 0, amount: 500 },
+			{ kind: 'funds', team: 1, amount: -200 },
+		])
+	})
 })

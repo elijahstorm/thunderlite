@@ -4,6 +4,8 @@ import { ANIMATION_POINTER, ANIMATION_SELECT } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { gameState } from './gameState'
 import { interactionSource } from './Interactor/interactionState'
+import { computeFogMask, drawFog, observeFog, observeUnitFade } from './fogRender'
+import { isUnitStealthed } from './visibility'
 import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
@@ -24,7 +26,10 @@ export const paint =
 		// The team that actually controls input on this canvas — never the active
 		// turn's team. Drives the tile-select idle marker so an AI's or remote
 		// opponent's turn doesn't tag their units as selectable to us.
-		localTeam: number = 0
+		localTeam: number = 0,
+		// Map-editor mode: there is no "selectable unit" gameplay, so the per-unit
+		// idle select marker is suppressed entirely.
+		editor: boolean = false
 	) =>
 	(getMap: () => MapObject) =>
 	(context: CanvasRenderingContext2D) =>
@@ -57,11 +62,24 @@ export const paint =
 		// spent their action, and every unit belonging to a non-active team, freeze
 		// on sprite frame 0.
 		const unitAnimates = unitAtTile !== null && unitAtTile.team === state.currentTeam && !unitActed
+		// Cloak opacity from the viewer's vantage (`localTeam`): an enemy cloaked unit
+		// fades all the way out, our own cloaked unit settles at 50% so we can still
+		// read its state, everyone else stays solid. Eased per-tile (observeUnitFade)
+		// so it animates in/out rather than popping. A spectator with no team
+		// (localTeam < 0) sees everyone at full.
+		const stealthed = unitAtTile !== null && isUnitStealthed(map, tile, unitAtTile)
+		const unitAlphaTarget =
+			stealthed && localTeam >= 0 ? (unitAtTile!.team === localTeam ? 0.5 : 0) : 1
+		const unitAlpha = unitAtTile !== null ? observeUnitFade(tile, unitAlphaTarget) : 1
 
 		context.save()
 		context.translate(left, top)
 
 		render.always(map.layers.ground[tile], renderData.ground)
+		render.corners(map.layers.ground[tile], renderData.ground)
+		// Persistent enemy-threat overlay, drawn under the active selection
+		// highlights so a unit you're currently moving still reads on top.
+		render.threat(map.threatTiles?.has(tile) ?? false)
 		render.highlights(map.highlights[tile])
 		const buildingAtTile = map.layers.buildings[tile] ?? null
 		const hideEnemyBuildingCapture =
@@ -81,26 +99,43 @@ export const paint =
 		if (!hideEnemyBuildingCapture) {
 			render.captureProgress(buildingAtTile)
 		}
-		if (!hideIdleUnit) {
+		if (!hideIdleUnit && unitAlpha > 0.01) {
 			const drawUnit = unitAnimates ? render.conditionally : render.conditionallyStatic
+			context.save()
 			if (unitActed) {
-				context.save()
 				context.filter = 'brightness(0.55) saturate(0.5)'
-				context.globalAlpha = 0.75
-				drawUnit(unitAtTile, renderData.unit)
-				context.restore()
+				context.globalAlpha = 0.75 * unitAlpha
 			} else {
-				drawUnit(unitAtTile, renderData.unit)
+				context.globalAlpha = unitAlpha
 			}
+			drawUnit(unitAtTile, renderData.unit)
+			context.restore()
+		}
+		// HP/status bar: drawn whenever the unit is on-screen, *independent* of
+		// `hideIdleUnit` — that flag suppresses only the idle sprite (so an attack
+		// overlay can show alone), but a hurt unit's bar must stay visible right
+		// through its swing/counter and not blink out. Read at full strength even on
+		// a dimmed cloaked unit; only fog-hidden / fully-faded units skip it.
+		if (unitAtTile !== null && !hideEnemyUnit && unitAlpha > 0.01) {
 			render.playInfo(unitAtTile)
 		}
 		render.conditionally(map.layers.sky[tile], renderData.sky)
 		render.advice(map.highlights[tile], hudImages.advice)
 		render.route(map.route[tile])
 
-		if (!tileVisible) {
-			context.fillStyle = 'rgba(0, 0, 0, 0.45)'
-			context.fillRect(0, 0, width, height)
+		// Fog veil. Every tile carries a fade level eased toward its target
+		// (covered → 1, visible → 0), so the veil animates in and out instead of
+		// popping. We must run this for *visible* tiles too while they finish
+		// receding — `tileVisible` flips the gameplay state instantly (enemy units
+		// hide the moment a tile is covered), but the dithered veil grows/dissolves
+		// over a few frames. The overlay crumbles organically wherever a covered
+		// tile abuts a seen one, and stays solid in the fogged interior.
+		if (fog) {
+			const fogValue = observeFog(tile, tileVisible ? 0 : 1)
+			if (fogValue > 0.002) {
+				const fogMask = computeFogMask(fog.visible, row, col, map.rows, map.cols)
+				drawFog(context, width, height, fogMask, fogValue)
+			}
 		}
 
 		// Selection idle-marker for actionable units. Only shown when the local
@@ -108,7 +143,7 @@ export const paint =
 		// the mouse, not whose turn it is — so an AI/remote opponent's turn never
 		// tags their units as selectable for us. Drawn after everything else on
 		// the tile so it sits above the unit; the PNG's alpha preserves it.
-		if (!hideIdleUnit && unitAnimates && state.currentTeam === localTeam && !hasSelection) {
+		if (!editor && !hideIdleUnit && unitAnimates && state.currentTeam === localTeam && !hasSelection) {
 			render.tileAnimation(renderData.animation(ANIMATION_SELECT))
 		}
 
@@ -117,6 +152,12 @@ export const paint =
 		if (map.pointers?.has(tile)) {
 			render.tileAnimation(renderData.animation(ANIMATION_POINTER))
 		}
+
+		// Map-boundary frame: for any tile on the outer edge, draw a border along
+		// the side(s) that face off-map. This gives both gameplay and the editor a
+		// clear "here the map ends" cue instead of terrain bleeding straight into
+		// the backdrop. Drawn last so it sits above everything as a clean frame.
+		render.mapBorder(col === 0, col === map.cols - 1, row === 0, row === map.rows - 1)
 
 		context.restore()
 	}
@@ -129,16 +170,131 @@ const contextProvider = (
 	scale: number
 ) => ({
 	always: always(width, height, frame, scale)(context),
+	corners: corners(width, height, frame)(context),
 	conditionally: conditionally(width, height, frame, scale)(context),
 	// Frame-0 variant for units that must not idle-animate (spent or non-active team).
 	conditionallyStatic: conditionally(width, height, 0, scale)(context),
 	highlights: highlights(width, height, frame)(context),
+	threat: threatHighlight(width, height, frame)(context),
 	playInfo: playInfo(width, height, scale)(context),
 	captureProgress: captureProgress(width, height, scale)(context),
 	advice: advice(width, height)(context),
 	route: route(width, height)(context),
 	tileAnimation: tileAnimation(width, height, frame)(context),
+	mapBorder: mapBorder(width, height)(context),
 })
+
+// Map-boundary frame: a riveted gunmetal armour plate running along whichever
+// sides of an edge tile face off-map — the battlefield reads as fenced in by a
+// steel bulwark rather than a flat line. The plate is drawn *outward* into the
+// off-map margin (negative / past-the-edge tile coordinates) so it never covers
+// terrain or units in the playfield; only the thin bevel lip sits on the very
+// boundary. Drawing outside the tile is safe because the Scroller now clears the
+// canvas every frame. Rivets are placed at fixed fractions of the edge so the
+// pattern in every edge tile lines up into one continuous riveted run.
+const PLATE_RIM = '#161a21'
+const PLATE_DARK = '#2b323d'
+const PLATE_MID = '#48515f'
+const PLATE_LIGHT = '#6c7888'
+const PLATE_BEVEL = 'rgba(160, 172, 190, 0.7)'
+
+const drawRivet = (context: CanvasRenderingContext2D, cx: number, cy: number, r: number) => {
+	// Lit from the top-left so a row of rivets reads as raised studs.
+	const gradient = context.createRadialGradient(
+		cx - r * 0.35,
+		cy - r * 0.35,
+		r * 0.1,
+		cx,
+		cy,
+		r
+	)
+	gradient.addColorStop(0, '#9aa6b6')
+	gradient.addColorStop(0.55, '#5c6675')
+	gradient.addColorStop(1, '#20262f')
+	context.beginPath()
+	context.arc(cx, cy, r, 0, Math.PI * 2)
+	context.fillStyle = gradient
+	context.fill()
+	context.lineWidth = Math.max(0.5, r * 0.16)
+	context.strokeStyle = 'rgba(0, 0, 0, 0.4)'
+	context.stroke()
+}
+
+const mapBorder =
+	(width: number, height: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(left: boolean, right: boolean, top: boolean, bottom: boolean) => {
+		if (!left && !right && !top && !bottom) return
+
+		const band = Math.max(5, Math.round(Math.min(width, height) * 0.18))
+		const rivetR = Math.max(1.5, band * 0.22)
+
+		// Draw one plate per off-map side, extending *outward* from the tile edge.
+		//   vertical  — band runs down a left/right edge; gradient sweeps across X.
+		//   !vertical — band caps a top/bottom edge; gradient sweeps across Y.
+		// `outer` is the rim coord (furthest into the backdrop), `inner` the lip on
+		// the map boundary. `alongStart..alongEnd` is the band's extent along the
+		// edge — top/bottom bands stretch past the corners so corner tiles fill the
+		// join. Both lie outside the tile rect (negative or > width/height).
+		const drawBand = (
+			vertical: boolean,
+			outer: number,
+			inner: number,
+			alongStart: number,
+			alongEnd: number
+		) => {
+			const gradient = vertical
+				? context.createLinearGradient(outer, 0, inner, 0)
+				: context.createLinearGradient(0, outer, 0, inner)
+			gradient.addColorStop(0, PLATE_RIM)
+			gradient.addColorStop(0.22, PLATE_DARK)
+			gradient.addColorStop(0.55, PLATE_MID)
+			gradient.addColorStop(0.85, PLATE_LIGHT)
+			gradient.addColorStop(1, PLATE_MID)
+			context.fillStyle = gradient
+			const x = vertical ? Math.min(outer, inner) : alongStart
+			const y = vertical ? alongStart : Math.min(outer, inner)
+			const w = vertical ? Math.abs(inner - outer) : alongEnd - alongStart
+			const h = vertical ? alongEnd - alongStart : Math.abs(inner - outer)
+			context.fillRect(x, y, w, h)
+
+			// Crisp bevel highlight along the lip that meets the map boundary.
+			context.strokeStyle = PLATE_BEVEL
+			context.lineWidth = Math.max(1, band * 0.08)
+			context.beginPath()
+			if (vertical) {
+				context.moveTo(inner, alongStart)
+				context.lineTo(inner, alongEnd)
+			} else {
+				context.moveTo(alongStart, inner)
+				context.lineTo(alongEnd, inner)
+			}
+			context.stroke()
+
+			// Rivet line centred across the band. Count derives from the edge length
+			// so studs stay evenly spaced and identical in every edge tile → seamless.
+			const span = alongEnd - alongStart
+			const mid = (outer + inner) / 2
+			const count = Math.max(1, Math.round(span / (band * 2.4)))
+			for (let i = 0; i < count; i++) {
+				const along = alongStart + ((i + 0.5) / count) * span
+				if (vertical) drawRivet(context, mid, along, rivetR)
+				else drawRivet(context, along, mid, rivetR)
+			}
+		}
+
+		context.save()
+		context.lineCap = 'butt'
+		// Top/bottom plates run the full width, extended past any adjoining
+		// left/right edge so the outer corner square is filled by the cap plate.
+		const xStart = left ? -band : 0
+		const xEnd = right ? width + band : width
+		if (top) drawBand(false, -band, 0, xStart, xEnd)
+		if (bottom) drawBand(false, height + band, height, xStart, xEnd)
+		if (left) drawBand(true, -band, 0, 0, height)
+		if (right) drawBand(true, width + band, width, 0, height)
+		context.restore()
+	}
 
 const renderObject =
 	(width: number, height: number, frame: number, scale: number) =>
@@ -164,6 +320,51 @@ const always =
 		renderer: (type: number) => ObjectSpriteRenderer
 	) =>
 		renderObject(width, height, frame, scale)(context)(object, renderer(object.type))
+
+// Quadrant a corner sprite frame occupies, as [x, y] halves of the tile:
+// 16=top-left, 17=bottom-left, 18=bottom-right, 19=top-right.
+const cornerQuadrant: Record<number, [0 | 1, 0 | 1]> = {
+	16: [0, 0],
+	17: [0, 1],
+	18: [1, 1],
+	19: [1, 0],
+}
+
+// Inner-corner overlays for coastline water. The base tile is already drawn; each
+// listed corner frame (16-19) is plain water except in one quadrant, so we copy
+// just that quadrant over the matching quadrant of the tile. This lets a single
+// water tile show several land corners at once — something the one-frame `state`
+// can't express on its own.
+const corners =
+	(width: number, height: number, frame: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(object: GroundObject, renderer: (type: number) => ObjectSpriteRenderer) => {
+		const list = object.corners
+		if (!list || list.length === 0) return
+		const render = renderer(object.type)
+		const sprite = render.sprite[0]
+		if (!sprite) return
+		const half = spriteSize / 2
+		const sourceY = (frame % render.frames) * (spriteSize + render.yOffset)
+		const destHalfWidth = width / 2
+		const destHalfHeight = height / 2
+		for (const corner of list) {
+			const quadrant = cornerQuadrant[corner]
+			if (!quadrant) continue
+			const [qx, qy] = quadrant
+			context.drawImage(
+				sprite,
+				corner * (spriteSize + render.xOffset) + qx * half,
+				sourceY + qy * half,
+				half,
+				half,
+				qx * destHalfWidth,
+				qy * destHalfHeight,
+				destHalfWidth,
+				destHalfHeight
+			)
+		}
+	}
 
 const conditionally =
 	(width: number, height: number, frame: number, scale: number) =>
@@ -218,12 +419,41 @@ const highlights =
 		// 0..1..0 wave, ticks slowly with the engine's animation cadence.
 		const pulse = (Math.sin(frame * 0.35) + 1) / 2
 
-		if (highlight.type === 1) {
+		if (highlight.shadowed) {
+			drawShadowHighlight(context, width, height, pulse)
+		} else if (highlight.type === 1) {
 			drawAttackHighlight(context, width, height, frame, pulse)
 		} else {
 			drawMoveHighlight(context, width, height, frame, pulse)
 		}
 	}
+
+// Firing shadow — dead ground an indirect unit can't reach. A muted grey wash with
+// static diagonal hatching reads as "blocked / unavailable" and stays visually
+// subordinate to the live red attack range it sits beside.
+const drawShadowHighlight = (
+	context: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	pulse: number
+) => {
+	context.save()
+
+	context.fillStyle = `rgba(30, 41, 59, ${0.34 + pulse * 0.06})`
+	context.fillRect(0, 0, width, height)
+
+	context.strokeStyle = 'rgba(148, 163, 184, 0.5)'
+	context.lineWidth = 1
+	context.beginPath()
+	const step = Math.max(4, Math.round(width / 5))
+	for (let x = -height; x < width; x += step) {
+		context.moveTo(x, 0)
+		context.lineTo(x + height, height)
+	}
+	context.stroke()
+
+	context.restore()
+}
 
 const drawMoveHighlight = (
 	context: CanvasRenderingContext2D,
@@ -326,17 +556,87 @@ const drawAttackHighlight = (
 	context.restore()
 }
 
+// Persistent enemy-threat overlay. Deliberately distinct from the active attack
+// highlight: a deeper crimson wash, a *counter*-diagonal hatch (the attack hatch
+// leans the other way), and a dashed perimeter instead of corner crosshairs — so
+// "where the enemy can hit me" never gets confused with "where my unit can hit".
+const threatHighlight =
+	(width: number, height: number, frame: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(active: boolean) => {
+		if (!active) return
+		const pulse = (Math.sin(frame * 0.35) + 1) / 2
+		drawThreatHighlight(context, width, height, frame, pulse)
+	}
+
+const drawThreatHighlight = (
+	context: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	frame: number,
+	pulse: number
+) => {
+	context.save()
+
+	// Deeper crimson wash, a touch stronger than the active attack red.
+	context.fillStyle = `rgba(190, 18, 60, ${0.15 + pulse * 0.07})`
+	context.fillRect(0, 0, width, height)
+
+	// Counter-diagonal hatch (bottom-left → top-right), mirroring the attack
+	// hatch's lean so the two patterns read apart at a glance.
+	context.save()
+	context.beginPath()
+	context.rect(0, 0, width, height)
+	context.clip()
+	context.strokeStyle = `rgba(244, 63, 94, ${0.4 + pulse * 0.16})`
+	context.lineWidth = 2
+	const spacing = Math.max(8, Math.round(width / 7))
+	const offset = ((frame * 1.5) % spacing) - spacing
+	for (let x = offset - height; x < width + height; x += spacing) {
+		context.beginPath()
+		context.moveTo(x, height)
+		context.lineTo(x + height, 0)
+		context.stroke()
+	}
+	context.restore()
+
+	// Dashed crimson perimeter — a steady frame around the danger area.
+	context.strokeStyle = `rgba(254, 205, 211, ${0.7 + pulse * 0.12})`
+	context.lineWidth = 1.5
+	const dash = Math.max(4, Math.round(width / 10))
+	context.setLineDash([dash, dash])
+	context.strokeRect(1.5, 1.5, width - 3, height - 3)
+	context.setLineDash([])
+
+	context.restore()
+}
+
 const advice =
 	(width: number, height: number) =>
 	(context: CanvasRenderingContext2D) =>
 	(highlight: TileHighlight | undefined, advice: HTMLImageElement) => {
-		// The warning overlay is reserved for movement tiles a player can reach
-		// but an enemy can also attack — every other highlight skips it.
-		if (!highlight || !highlight.threatened) return
+		// Drawn on every actionable tile. The base glyph (column 0) marks what the
+		// tile *is* — footsteps on a reachable move tile (row 0), the red marker on
+		// an attackable one (row 1) — and a severity badge layered on top rates it:
+		// move advice in column 1, attack advice in column 2, rows good→terrible.
+		// Firing-shadow tiles aren't real targets, so they carry no advice icon.
+		if (!highlight || highlight.shadowed) return
 
+		// Base glyph at half strength so it reads as a wash beneath the badge.
 		context.globalAlpha = 0.5
-		context.drawImage(advice, 0, highlight.type * spriteSize, width, height, 0, 0, width, height)
+		context.drawImage(
+			advice,
+			0,
+			highlight.type * spriteSize,
+			spriteSize,
+			spriteSize,
+			0,
+			0,
+			width,
+			height
+		)
 		context.globalAlpha = 1
+		// Severity badge: column 1 for move advice, column 2 for attack advice.
 		context.drawImage(
 			advice,
 			spriteSize + highlight.type * spriteSize,
@@ -356,20 +656,71 @@ const playInfo =
 	(unit: UnitObject | null) => {
 		if (!unit) return
 
-		const health = unit?.health ?? unitData[unit.type].health
-		if (health === unitData[unit.type].health) return
+		const max = unitData[unit.type].health
+		const actual = unit?.health ?? max
+		// `displayHealth` is the eased value the bar slides to after combat; fall back
+		// to the real health when no animation is in flight. Stay visible whenever
+		// *either* value is below full so a heal still shows the bar rising to the cap
+		// and damage from full still shows it draining from the cap.
+		const health = unit?.displayHealth ?? actual
+		if (health >= max && actual >= max) return
 
-		const percentage = health / unitData[unit.type].health
-		const color = percentage > 0.65 ? 'green' : percentage > 0.35 ? 'yellow' : 'red'
+		const percentage = Math.max(0, Math.min(1, health / max))
+
+		// Gradient [light → dark] per health band — softer than raw green/red.
+		const [light, dark] =
+			percentage > 0.65
+				? ['#86efac', '#22c55e']
+				: percentage > 0.35
+					? ['#fde047', '#eab308']
+					: ['#fca5a5', '#ef4444']
+
 		const offset = 5 / scale
+		const margin = offset
+		const barHeight = offset * 1.3
+		const barWidth = width - margin * 2
+		const x = margin
+		const y = height - barHeight - margin
+		const radius = barHeight / 2
 
-		context.fillStyle = 'black'
-		context.fillRect(offset, height - offset * 3, width - offset * 2, offset)
-		context.strokeStyle = color
-		context.fillStyle = color
-		context.lineWidth = 2
-		context.fillRect(offset, height - offset * 3, percentage * (width - offset * 2), offset)
-		context.strokeRect(offset, height - offset * 3, width - offset * 2, offset)
+		context.save()
+
+		// Track: dark translucent pill with a soft drop shadow so the bar stays
+		// legible over bright sprites or terrain behind it.
+		context.shadowColor = 'rgba(0,0,0,0.5)'
+		context.shadowBlur = offset * 0.6
+		context.shadowOffsetY = offset * 0.15
+		context.fillStyle = 'rgba(15,23,42,0.85)'
+		context.beginPath()
+		context.roundRect(x, y, barWidth, barHeight, radius)
+		context.fill()
+		context.shadowColor = 'transparent'
+		context.shadowBlur = 0
+		context.shadowOffsetY = 0
+
+		// Fill: vertical gradient clipped to current health, inset slightly so the
+		// dark track reads as a clean border around it.
+		const inset = barHeight * 0.18
+		const fillHeight = barHeight - inset * 2
+		const fillWidth = Math.max(0, (barWidth - inset * 2) * percentage)
+		if (fillWidth > 0) {
+			const fillRadius = fillHeight / 2
+			const gradient = context.createLinearGradient(0, y, 0, y + barHeight)
+			gradient.addColorStop(0, light)
+			gradient.addColorStop(1, dark)
+			context.fillStyle = gradient
+			context.beginPath()
+			context.roundRect(x + inset, y + inset, fillWidth, fillHeight, fillRadius)
+			context.fill()
+
+			// Glossy highlight along the top of the fill for a bit of depth.
+			context.fillStyle = 'rgba(255,255,255,0.35)'
+			context.beginPath()
+			context.roundRect(x + inset, y + inset, fillWidth, fillHeight * 0.4, fillRadius)
+			context.fill()
+		}
+
+		context.restore()
 	}
 
 const captureProgress =

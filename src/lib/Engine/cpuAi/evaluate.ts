@@ -3,6 +3,7 @@ import { buildingData } from '$lib/GameData/building'
 import { terrainData } from '$lib/GameData/terrain'
 import { previewDamage } from '../combat'
 import { generateAttackList } from '../Interactor/Pathing/attack'
+import { concealedEnemyTiles } from '../visibility'
 
 export const unitValue = (unit: UnitObject): number => {
 	const data = unitData[unit.type]
@@ -44,22 +45,29 @@ const isOwnedByLivingTeam = (building: BuildingObject): boolean => {
 	return typeof building.team === 'number' && building.team >= 0
 }
 
+// `concealed` (tiles holding enemies the CPU can't perceive) is excluded from the
+// threat sum: the AI plays blind, so a stealthed/fogged enemy contributes no fear.
+// Defaults to recomputing it; the planner passes a shared set to avoid recomputing
+// per candidate tile.
 export const threatToTile = (
 	map: MapObject,
 	tile: number,
 	defender: UnitObject,
-	cpuTeam: number
+	cpuTeam: number,
+	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam)
 ): number => {
 	let totalIncomingHP = 0
 	const units = map.layers.units
 	for (let i = 0; i < units.length; i++) {
 		const enemy = units[i]
 		if (!enemy || enemy.team === cpuTeam) continue
+		if (concealed.has(i)) continue
 		const reach = generateAttackList(map, i, enemy)
 		if (!reach.includes(tile)) continue
 		const dmg = previewDamage(enemy, defender, {
 			map,
 			defenderTile: tile,
+			attackerTile: i,
 			role: 'attack',
 		})
 		totalIncomingHP += dmg
@@ -85,7 +93,14 @@ export const teamUnits = (map: MapObject, team: number): { tile: number; unit: U
 	return out
 }
 
-export const closestEnemyDistance = (map: MapObject, tile: number, cpuTeam: number): number => {
+// Concealed enemies are skipped — the CPU steers toward foes it can actually see,
+// not ones cloaked by fog/stealth (whose positions it shouldn't know).
+export const closestEnemyDistance = (
+	map: MapObject,
+	tile: number,
+	cpuTeam: number,
+	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam)
+): number => {
 	const col = tile % map.cols
 	const row = Math.floor(tile / map.cols)
 	let best = Infinity
@@ -93,6 +108,7 @@ export const closestEnemyDistance = (map: MapObject, tile: number, cpuTeam: numb
 	for (let i = 0; i < units.length; i++) {
 		const u = units[i]
 		if (!u || u.team === cpuTeam) continue
+		if (concealed.has(i)) continue
 		const ec = i % map.cols
 		const er = Math.floor(i / map.cols)
 		const d = Math.abs(col - ec) + Math.abs(row - er)

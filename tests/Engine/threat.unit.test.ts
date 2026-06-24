@@ -4,6 +4,7 @@ import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { computeThreatTiles, unitThreatTiles } from '../../src/lib/Engine/Interactor/Pathing/threat'
 import { generateActionsList, generatePreviewList } from '../../src/lib/Layers/tileHighlighter'
+import { viewerVisibility } from '../../src/lib/Engine/fogState'
 
 const unitIndex = (name: string) => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -77,6 +78,25 @@ describe('threat computation', () => {
 
 		expect(computeThreatTiles(map, 0).size).toBe(0)
 	})
+
+	it('skips enemies the local viewer cannot see in fog of war', () => {
+		const cols = 15
+		const map = makeMap(cols, 15)
+		const enemyTile = xy(cols, 7, 7)
+		map.layers.units[enemyTile] = unit(STRIKE_COMMANDO, 1)
+
+		// Fog on, but the enemy's tile is NOT in the visible set → no threat leaks.
+		viewerVisibility.set({ visible: new Set([xy(cols, 0, 0)]), team: 0 })
+		try {
+			expect(computeThreatTiles(map, 0).size).toBe(0)
+
+			// Once the enemy tile is visible, its reach reappears.
+			viewerVisibility.set({ visible: new Set([enemyTile]), team: 0 })
+			expect(computeThreatTiles(map, 0).has(xy(cols, 8, 7))).toBe(true)
+		} finally {
+			viewerVisibility.set(null)
+		}
+	})
 })
 
 describe('generateActionsList — threat warnings on movement tiles', () => {
@@ -98,7 +118,7 @@ describe('generateActionsList — threat warnings on movement tiles', () => {
 		expect(exposed?.threatened).toBe(true)
 		expect(exposed?.tip).toBe(2) // "bad" → warning icon
 		expect(safe?.threatened).toBe(false)
-		expect(safe?.tip).toBe(1) // "neutral" → no warning
+		expect(safe?.tip).toBe(0) // "good" → empty badge, no warning icon
 
 		// Attack highlights must never carry the move-tile warning.
 		expect(actions.filter((h) => h.type === 1).every((h) => !h.threatened)).toBe(true)

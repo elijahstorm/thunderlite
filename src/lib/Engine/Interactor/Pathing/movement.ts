@@ -3,26 +3,39 @@ import { terrainData } from '$lib/GameData/terrain'
 import { unitData } from '$lib/GameData/unit'
 import { isJammedFor } from '$lib/Engine/modifiers/jamming'
 
-export const generateMovementList = (map: MapObject, tile: number, unit: UnitObject) => [
+const NO_CONCEALED: ReadonlySet<number> = new Set()
+
+// `concealed` lists tiles the moving team can't perceive (fog / stealth — see
+// `concealedEnemyTiles`). Pathing treats them as empty: a unit routes through and
+// can target them as destinations as if no enemy were there, so a blocked path
+// never betrays a hidden unit's position. Defaults to empty — callers that know
+// the full board (e.g. the CPU planner) get the old "every enemy blocks" behavior.
+export const generateMovementList = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	concealed: ReadonlySet<number> = NO_CONCEALED
+) => [
 	...new Set([
 		tile,
-		...removeOccupied(map, increment(map, tile, unit, unitData[unit.type].movement)),
+		...removeOccupied(map, increment(map, tile, unit, unitData[unit.type].movement, concealed), concealed),
 	]),
 ]
 
-const removeOccupied = (map: MapObject, tiles: number[]) =>
-	tiles.filter((tile) => !map.layers.units[tile])
+const removeOccupied = (map: MapObject, tiles: number[], concealed: ReadonlySet<number>) =>
+	tiles.filter((tile) => !map.layers.units[tile] || concealed.has(tile))
 
-const increment: (map: MapObject, tile: number, unit: UnitObject, movement: number) => number[] = (
-	map,
-	tile,
-	unit,
-	movement
-) => [
-	...move(map, tile, unit, movement, 'right'),
-	...move(map, tile, unit, movement, 'left'),
-	...move(map, tile, unit, movement, 'up'),
-	...move(map, tile, unit, movement, 'down'),
+const increment: (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	movement: number,
+	concealed: ReadonlySet<number>
+) => number[] = (map, tile, unit, movement, concealed) => [
+	...move(map, tile, unit, movement, 'right', concealed),
+	...move(map, tile, unit, movement, 'left', concealed),
+	...move(map, tile, unit, movement, 'up', concealed),
+	...move(map, tile, unit, movement, 'down', concealed),
 ]
 
 const move = (
@@ -30,24 +43,28 @@ const move = (
 	tile: number,
 	unit: UnitObject,
 	movement: number,
-	direction: keyof typeof directionDecision
-) => addWalkableTiles(map, updateTileDecision[direction](map, tile), unit, movement, direction)
+	direction: keyof typeof directionDecision,
+	concealed: ReadonlySet<number>
+) =>
+	addWalkableTiles(map, updateTileDecision[direction](map, tile), unit, movement, direction, concealed)
 
 const addWalkableTiles = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject,
 	movement: number,
-	direction: keyof typeof directionDecision
+	direction: keyof typeof directionDecision,
+	concealed: ReadonlySet<number>
 ) =>
-	isWalkable(map, tile, unit, movement, direction)
+	isWalkable(map, tile, unit, movement, direction, concealed)
 		? [
 				tile,
 				...increment(
 					map,
 					tile,
 					unit,
-					movement - drag(unit, map.layers.ground[tile], map.layers.sky[tile])
+					movement - drag(unit, map.layers.ground[tile], map.layers.sky[tile]),
+					concealed
 				),
 			]
 		: []
@@ -57,11 +74,12 @@ const isWalkable = (
 	tile: number,
 	unit: UnitObject,
 	movement: number,
-	direction: keyof typeof directionDecision
+	direction: keyof typeof directionDecision,
+	concealed: ReadonlySet<number>
 ) =>
 	directionDecision[direction](map, tile) &&
 	movement >= drag(unit, map.layers.ground[tile], map.layers.sky[tile]) &&
-	notBlocked(map, tile, unit) &&
+	notBlocked(map, tile, unit, concealed) &&
 	notJammed(map, tile, unit) &&
 	validTerrain(map.layers.ground[tile], unit)
 
@@ -93,8 +111,35 @@ export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | 
 						? 2
 						: 1) * terrainData[terrain.type].drag
 
-const notBlocked = (map: MapObject, tile: number, unit: UnitObject) =>
-	!map.layers.units[tile] || map.layers.units[tile]?.team === unit.team
+const notBlocked = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	concealed: ReadonlySet<number>
+) =>
+	!map.layers.units[tile] ||
+	map.layers.units[tile]?.team === unit.team ||
+	concealed.has(tile)
+
+// Stops `route` at the first tile occupied by an enemy of `team`, returning the
+// route up to (but not including) that tile and flagging the collision. Pathing
+// only ever routes a unit through enemies it couldn't see (concealed by fog or
+// stealth), so any enemy met mid-route is one the player walked into blind: the
+// unit halts on the last clear tile and its turn ends. A clean route comes back
+// unchanged with `collided: false`.
+export const truncateRouteAtCollision = (
+	map: MapObject,
+	route: number[],
+	team: number
+): { route: number[]; collided: boolean } => {
+	for (let i = 1; i < route.length; i++) {
+		const occupant = map.layers.units[route[i]]
+		if (occupant && occupant.team !== team) {
+			return { route: route.slice(0, i), collided: true }
+		}
+	}
+	return { route, collided: false }
+}
 
 export const validTerrain = (terrain: GroundObject, unit: UnitObject) => {
 	const u = unitData[unit.type]
@@ -103,6 +148,9 @@ export const validTerrain = (terrain: GroundObject, unit: UnitObject) => {
 	if (t.details === 'impassable') return false
 	if (u.type === 'air') return true
 	if (t.name === 'Shore') return true
+	// A High Bridge spans deep water: ground units cross the deck while ships pass
+	// beneath it, so both are allowed (a plain Bridge sits low and blocks ships).
+	if (t.name === 'High Bridge') return u.type === 'ground' || u.type === 'sea'
 	if (t.ocean) return u.type === 'sea'
 	return u.type === 'ground'
 }

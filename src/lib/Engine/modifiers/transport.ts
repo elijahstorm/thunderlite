@@ -1,7 +1,7 @@
 import { unitData } from '$lib/GameData/unit'
-import { terrainData } from '$lib/GameData/terrain'
 import { validTerrain, drag } from '$lib/Engine/Interactor/Pathing/movement'
 import { hasModifier } from './canAttack'
+import { tileHasModifier } from './terrainModifier'
 
 const findUnitType = (name: string): number => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -88,13 +88,16 @@ export const transportLoad = (
 	return { ok: true, transportTile }
 }
 
+// A ground unit can embark — transforming itself into a Leviathan sea transport
+// that carries it across the ocean (and can't attack) — only from a tile with the
+// `Port` terrain attribute. Shore is the stock Port tile, but any terrain authored
+// with the `Port` modifier now works the same way.
 export const canShipOut = (map: MapObject | MapProcesser, unitTile: number): boolean => {
 	const unit = map.layers.units[unitTile]
 	if (!unit) return false
 	if (unitData[unit.type].type !== 'ground') return false
-	const ground = map.layers.ground[unitTile]
-	if (!ground) return false
-	return terrainData[ground.type]?.name === 'Shore'
+	if (!map.layers.ground[unitTile]) return false
+	return tileHasModifier(map, unitTile, 'Port')
 }
 
 export type ShipOutResult =

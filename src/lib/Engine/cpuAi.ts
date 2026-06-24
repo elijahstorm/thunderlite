@@ -2,7 +2,12 @@ import { get } from 'svelte/store'
 import { gameState } from './gameState'
 import { applyAction } from './applyAction'
 import { emitOutgoingAction } from './outgoingActions'
-import { animateRoute, animateAttack, animateExplosion } from './Animator/animator'
+import { animateRoute } from './Animator/animator'
+import { animateAttackSequence } from './attackSequence'
+import { pathFinder } from './Interactor/Pathing/pathFinder'
+import { truncateRouteAtCollision } from './Interactor/Pathing/movement'
+import { concealedEnemyTiles } from './visibility'
+import { observeStealthSightings } from './cpuAi/stealthMemory'
 import { bestPlanFor } from './cpuAi/candidates'
 import { pickBuildOnce } from './cpuAi/production'
 import type { SerializedAction } from './Interactor/serializedAction'
@@ -75,6 +80,11 @@ export const runCpuTurn = ({
 	const startTurn = get(gameState).turnNumber
 	const startTeam = get(gameState).currentTeam
 
+	// Reconcile this CPU's fuzzy stealth memory against what it can plainly see as
+	// the turn opens — it can't believe an enemy has fewer cloak units than are
+	// currently revealed. Build/death sightings during play adjust it from there.
+	observeStealthSightings(map, startTeam)
+
 	let cancelled = false
 	let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -113,37 +123,55 @@ export const runCpuTurn = ({
 	// change, so a CPU move slides and a CPU attack swings + explodes instead of
 	// teleporting. Animations resolve via their own timers; we await them so the
 	// turn paces itself off the animation length.
-	const dispatch = async (action: SerializedAction): Promise<void> => {
+	// Returns whether the rest of the unit's plan should still run. A move that walks
+	// into a concealed enemy returns false: the unit halts and forfeits any queued
+	// follow-up (attack/capture), exactly like the human path.
+	const dispatch = async (action: SerializedAction): Promise<boolean> => {
 		if (action.kind === 'move') {
 			const unit = map.layers.units[action.from]
-			if (!unit) return
+			if (!unit) return false
+			// The CPU plays blind, so its planned route can run through an enemy it
+			// couldn't perceive. Re-pathfind with the same concealment the planner used,
+			// then stop on the last clear tile if it collides — and commit the truncated
+			// destination so an online opponent stays in sync.
+			const concealed = concealedEnemyTiles(map, unit.team)
+			const planned = pathFinder(map, unit, action.from, action.to, concealed)
+			const { route: walked, collided } = truncateRouteAtCollision(map, planned, unit.team)
+			const finalTile =
+				walked.length > 1 ? walked[walked.length - 1] : collided ? action.from : action.to
+			if (collided && finalTile === action.from) {
+				// Ambushed before taking a step: forfeit the move in place.
+				commit(map, { kind: 'wait', tile: action.from })
+				return false
+			}
 			map.layers.units[action.from] = null
-			await safeAnimate(() => animateRoute(map, unit, action.from, action.to))
+			await safeAnimate(() => animateRoute(map, unit, action.from, finalTile, walked))
 			map.layers.units[action.from] = unit
-			if (cancelled) return
-			commit(map, action)
-			return
+			if (cancelled) return false
+			commit(map, { kind: 'move', from: action.from, to: finalTile })
+			return !collided
 		}
 
 		if (action.kind === 'attack') {
 			const attacker = map.layers.units[action.from]
 			const target = map.layers.units[action.to]
-			if (!attacker || !target) return
-			await safeAnimate(() => animateAttack(map, attacker, action.from, action.to))
-			if (cancelled) return
-			const targetWasAlive = (target.health ?? 0) > 0
-			commit(map, action)
-			if (targetWasAlive && map.layers.units[action.to] == null) {
-				await safeAnimate(() => animateExplosion(map, action.to))
-			}
-			if (map.layers.units[action.from] == null) {
-				await safeAnimate(() => animateExplosion(map, action.from))
-			}
-			return
+			if (!attacker || !target) return true
+			// Same choreography a human attack plays — swing, target bar/explosion,
+			// counter, attacker bar/explosion — committing the result at the end.
+			// `safeAnimate` still guards the visuals, but the commit lives inside the
+			// sequencer; pass it through so a cancelled turn skips the commit too.
+			if (cancelled) return false
+			await safeAnimate(() =>
+				animateAttackSequence(map, action.from, action.to, (a) => {
+					if (!cancelled) commit(map, a)
+				})
+			)
+			return true
 		}
 
-		if (cancelled) return
+		if (cancelled) return false
 		commit(map, action)
+		return true
 	}
 
 	// One tick = one unit's full plan (e.g. move → attack → explosion) dispatched
@@ -173,7 +201,9 @@ export const runCpuTurn = ({
 
 			for (const action of actions) {
 				if (!stillOurTurn()) return
-				await dispatch(action)
+				const proceed = await dispatch(action)
+				// A blind move that collided ends this unit's plan; other units still act.
+				if (!proceed) break
 			}
 			if (!stillOurTurn()) return
 			schedule(() => void tick())

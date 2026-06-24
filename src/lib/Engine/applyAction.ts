@@ -15,6 +15,8 @@ import { applyWinConditions } from './winConditions'
 import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction, type SfxAction, type SfxUnitRef } from '$lib/Audio/sfxMap'
 import { recordMatchStat, type StatEvent } from './matchStats'
+import { isStealthUnit } from './visibility'
+import { recordStealthBuild, recordStealthDeath } from './cpuAi/stealthMemory'
 import type { SerializedAction } from './Interactor/serializedAction'
 
 /**
@@ -66,6 +68,7 @@ const reduceHealth = (
 	attacker: UnitObject,
 	target: UnitObject,
 	tile: number,
+	attackerTile: number,
 	role: 'attack' | 'counter',
 	fx: SfxEmit,
 	stat: StatEmit
@@ -73,6 +76,7 @@ const reduceHealth = (
 	const damage = calculateDamage(attacker, target, {
 		map: map as MapObject,
 		defenderTile: tile,
+		attackerTile,
 		role,
 	})
 	const max = unitData[target.type]?.health ?? 0
@@ -83,6 +87,8 @@ const reduceHealth = (
 	target.health = next
 	if (next === 0) {
 		map.layers.units[tile] = null
+		// A witnessed stealth-unit death trims the CPU's remembered tally for that team.
+		if (isStealthUnit(target)) recordStealthDeath(map, tile, target.team)
 		fx('death', target)
 		stat({ kind: 'loss', team: target.team })
 		runModifiers(target, 'Death', {
@@ -126,7 +132,7 @@ const applyAttack = (
 	if (!attacker || !target) return
 
 	fx('attack', attacker)
-	const targetDied = reduceHealth(map, attacker, target, to, 'attack', fx, stat)
+	const targetDied = reduceHealth(map, attacker, target, to, from, 'attack', fx, stat)
 	applyLancePassthrough(map as MapObject, from, to)
 
 	let attackerDied = false
@@ -140,7 +146,7 @@ const applyAttack = (
 	) {
 		// The defender returns fire — sound its own weapon before resolving the hit.
 		fx('attack', target)
-		attackerDied = reduceHealth(map, target, attacker, from, 'counter', fx, stat)
+		attackerDied = reduceHealth(map, target, attacker, from, to, 'counter', fx, stat)
 	}
 
 	markTileActed(from)
@@ -195,7 +201,13 @@ export const applyAction = (
 		case 'build': {
 			const building = map.layers.buildings[action.building]
 			if (!building) return
-			spawnBuiltUnit(map, action.building, action.unitType, building.team)
+			const built = spawnBuiltUnit(map, action.building, action.unitType, building.team)
+			// A stealth unit rolling off the line is logged by every team that can see
+			// the factory, feeding their fuzzy memory of enemy cloak strength.
+			if (built.ok && typeof built.tile === 'number') {
+				const spawned = map.layers.units[built.tile]
+				if (spawned && isStealthUnit(spawned)) recordStealthBuild(map, built.tile, building.team)
+			}
 			fx('build')
 			stat({ kind: 'build', team: building.team })
 			applyWinConditions(map as MapObject)

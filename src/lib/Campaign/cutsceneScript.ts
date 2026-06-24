@@ -33,17 +33,32 @@
  * add unit: 2,"Annihilator Tank",8,6
  * kill unit: 8,5
  * terrain: "Mountain",3,4
+ * weather: "Storm",3,4
+ * clear weather: 3,4
+ * fog: off
+ * funds: 0,500
+ * add building: 1,"City",5,5
+ * remove building: 5,5
+ * own building: 0,5,5
  * ```
+ *
+ * See `docs/map-scripting.md` for the full command reference.
  *
  * A `talk` argument list may span multiple physical lines (its quoted strings
  * are accumulated until the list is complete).
  */
 
 import { unitData } from '$lib/GameData/unit'
+import { buildingData } from '$lib/GameData/building'
+import { skyData } from '$lib/GameData/sky'
 import { CutsceneParseError, type CutsceneEvent, type CutsceneScript } from './cutsceneTypes'
 
 /** Valid `spawn` unit names — anything else is an authoring mistake. */
 const VALID_UNIT_NAMES: ReadonlySet<string> = new Set(unitData.map((u) => u.name))
+/** Valid `add building` names. */
+const VALID_BUILDING_NAMES: ReadonlySet<string> = new Set(buildingData.map((b) => b.name))
+/** Valid `weather` names. */
+const VALID_WEATHER_NAMES: ReadonlySet<string> = new Set(skyData.map((s) => s.name))
 
 interface ParsedTag {
 	closing: boolean
@@ -230,31 +245,55 @@ const parseCommandInto = (
 			return i
 		}
 		case 'add': {
-			if (qualifier !== 'unit') {
-				throw new CutsceneParseError(`unknown command "add ${qualifier}"`, lineNo)
+			if (qualifier === 'unit') {
+				const fields = splitArgFields(argStr, lineNo)
+				if (fields.length !== 4) {
+					throw new CutsceneParseError(
+						`add unit expects "team,\\"Name\\",x,y" (4 args), got ${fields.length}`,
+						lineNo
+					)
+				}
+				if (!fields[1].quoted) {
+					throw new CutsceneParseError('add unit name must be quoted', lineNo)
+				}
+				const unit = fields[1].value
+				if (!VALID_UNIT_NAMES.has(unit)) {
+					throw new CutsceneParseError(`unknown unit "${unit}"`, lineNo)
+				}
+				events.push({
+					kind: 'spawn',
+					team: intArg(fields[0].value, lineNo, 'team'),
+					unit,
+					x: intArg(fields[2].value, lineNo, 'x'),
+					y: intArg(fields[3].value, lineNo, 'y'),
+				})
+				return i
 			}
-			const fields = splitArgFields(argStr, lineNo)
-			if (fields.length !== 4) {
-				throw new CutsceneParseError(
-					`add unit expects "team,\\"Name\\",x,y" (4 args), got ${fields.length}`,
-					lineNo
-				)
+			if (qualifier === 'building') {
+				const fields = splitArgFields(argStr, lineNo)
+				if (fields.length !== 4) {
+					throw new CutsceneParseError(
+						`add building expects "team,\\"Name\\",x,y" (4 args), got ${fields.length}`,
+						lineNo
+					)
+				}
+				if (!fields[1].quoted) {
+					throw new CutsceneParseError('add building name must be quoted', lineNo)
+				}
+				const building = fields[1].value
+				if (!VALID_BUILDING_NAMES.has(building)) {
+					throw new CutsceneParseError(`unknown building "${building}"`, lineNo)
+				}
+				events.push({
+					kind: 'addBuilding',
+					team: intArg(fields[0].value, lineNo, 'team'),
+					building,
+					x: intArg(fields[2].value, lineNo, 'x'),
+					y: intArg(fields[3].value, lineNo, 'y'),
+				})
+				return i
 			}
-			if (!fields[1].quoted) {
-				throw new CutsceneParseError('add unit name must be quoted', lineNo)
-			}
-			const unit = fields[1].value
-			if (!VALID_UNIT_NAMES.has(unit)) {
-				throw new CutsceneParseError(`unknown unit "${unit}"`, lineNo)
-			}
-			events.push({
-				kind: 'spawn',
-				team: intArg(fields[0].value, lineNo, 'team'),
-				unit,
-				x: intArg(fields[2].value, lineNo, 'x'),
-				y: intArg(fields[3].value, lineNo, 'y'),
-			})
-			return i
+			throw new CutsceneParseError(`unknown command "add ${qualifier}"`, lineNo)
 		}
 		case 'kill': {
 			if (qualifier !== 'unit') {
@@ -262,6 +301,33 @@ const parseCommandInto = (
 			}
 			const [x, y] = coordPair(argStr, lineNo)
 			events.push({ kind: 'kill', x, y })
+			return i
+		}
+		case 'remove': {
+			if (qualifier !== 'building') {
+				throw new CutsceneParseError(`unknown command "remove ${qualifier}"`, lineNo)
+			}
+			const [x, y] = coordPair(argStr, lineNo)
+			events.push({ kind: 'removeBuilding', x, y })
+			return i
+		}
+		case 'own': {
+			if (qualifier !== 'building') {
+				throw new CutsceneParseError(`unknown command "own ${qualifier}"`, lineNo)
+			}
+			const fields = splitArgFields(argStr, lineNo)
+			if (fields.length !== 3) {
+				throw new CutsceneParseError(
+					`own building expects "team,x,y" (3 args), got ${fields.length}`,
+					lineNo
+				)
+			}
+			events.push({
+				kind: 'ownBuilding',
+				team: intArg(fields[0].value, lineNo, 'team'),
+				x: intArg(fields[1].value, lineNo, 'x'),
+				y: intArg(fields[2].value, lineNo, 'y'),
+			})
 			return i
 		}
 		case 'terrain': {
@@ -281,6 +347,56 @@ const parseCommandInto = (
 				terrain: fields[0].value,
 				x: intArg(fields[1].value, lineNo, 'x'),
 				y: intArg(fields[2].value, lineNo, 'y'),
+			})
+			return i
+		}
+		case 'weather': {
+			requireNoQualifier(keyword, qualifier, lineNo)
+			const fields = splitArgFields(argStr, lineNo)
+			if (fields.length !== 3) {
+				throw new CutsceneParseError(
+					`weather expects "\\"Type\\",x,y" (3 args), got ${fields.length}`,
+					lineNo
+				)
+			}
+			if (!fields[0].quoted) {
+				throw new CutsceneParseError('weather type must be quoted', lineNo)
+			}
+			const weather = fields[0].value
+			if (!VALID_WEATHER_NAMES.has(weather)) {
+				throw new CutsceneParseError(`unknown weather "${weather}"`, lineNo)
+			}
+			events.push({
+				kind: 'setWeather',
+				weather,
+				x: intArg(fields[1].value, lineNo, 'x'),
+				y: intArg(fields[2].value, lineNo, 'y'),
+			})
+			return i
+		}
+		case 'clear': {
+			if (qualifier !== 'weather') {
+				throw new CutsceneParseError(`unknown command "clear ${qualifier}"`, lineNo)
+			}
+			const [x, y] = coordPair(argStr, lineNo)
+			events.push({ kind: 'clearWeather', x, y })
+			return i
+		}
+		case 'fog': {
+			requireNoQualifier(keyword, qualifier, lineNo)
+			events.push({ kind: 'fog', on: onOffArg(argStr, lineNo) })
+			return i
+		}
+		case 'funds': {
+			requireNoQualifier(keyword, qualifier, lineNo)
+			const fields = splitArgFields(argStr, lineNo)
+			if (fields.length !== 2) {
+				throw new CutsceneParseError(`funds expects "team,amount" (2 args), got ${fields.length}`, lineNo)
+			}
+			events.push({
+				kind: 'funds',
+				team: intArg(fields[0].value, lineNo, 'team'),
+				amount: signedIntArg(fields[1].value, lineNo, 'amount'),
 			})
 			return i
 		}
@@ -318,6 +434,27 @@ const numberArg = (value: string, lineNo: number, label: string): number => {
 		throw new CutsceneParseError(`${label} must be a non-negative number, got "${value}"`, lineNo)
 	}
 	return Number(trimmed)
+}
+
+/** Like {@link intArg} but accepts a leading `-` (e.g. `funds: 0,-500`). */
+const signedIntArg = (value: string, lineNo: number, label: string): number => {
+	const trimmed = value.trim()
+	if (!/^-?\d+$/.test(trimmed)) {
+		throw new CutsceneParseError(`${label} must be an integer, got "${value}"`, lineNo)
+	}
+	return parseInt(trimmed, 10)
+}
+
+/** Parse an `on`/`off` toggle argument (case-insensitive). */
+const onOffArg = (argStr: string, lineNo: number): boolean => {
+	const fields = splitArgFields(argStr, lineNo)
+	if (fields.length !== 1) {
+		throw new CutsceneParseError(`expected "on" or "off" (1 arg), got ${fields.length}`, lineNo)
+	}
+	const value = fields[0].value.trim().toLowerCase()
+	if (value === 'on') return true
+	if (value === 'off') return false
+	throw new CutsceneParseError(`expected "on" or "off", got "${fields[0].value}"`, lineNo)
 }
 
 /**

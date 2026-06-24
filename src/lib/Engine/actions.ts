@@ -1,7 +1,7 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { generateAttackList } from './Interactor/Pathing/attack'
-import { hasModifier } from './modifiers/canAttack'
+import { hasModifier, isRanged } from './modifiers/canAttack'
 import { canMineAt } from './modifiers/miner'
 import { passableAdjacentTiles } from './modifiers/builder'
 import {
@@ -32,6 +32,11 @@ export type AvailableActionsContext = {
 	map: MapObject
 	tile: number
 	unit: UnitObject
+	// True when the unit reached `tile` by moving this turn (the post-move menu).
+	// Indirect units (range ≥ 2) can't move and fire in the same turn, so their
+	// attack option is withheld here — stationary fire goes through the up-front
+	// attack list instead, which is anchored to the unit's starting tile.
+	moved?: boolean
 }
 
 const hasAttackableEnemy = (map: MapObject, tile: number, unit: UnitObject): boolean =>
@@ -79,10 +84,11 @@ const canLand = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 }
 
 export const computeAvailableActions = (ctx: AvailableActionsContext): ActionMenuItem[] => {
-	const { map, tile, unit } = ctx
+	const { map, tile, unit, moved } = ctx
 	const items: ActionMenuItem[] = []
 
-	if (hasAttackableEnemy(map, tile, unit)) {
+	// Indirect units forfeit their shot once they've moved this turn.
+	if (!(moved && isRanged(unit)) && hasAttackableEnemy(map, tile, unit)) {
 		items.push({ id: 'attack', enabled: true })
 	}
 

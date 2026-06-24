@@ -1,5 +1,7 @@
 import { unitData } from '$lib/GameData/unit'
 import { previewDamage, canCounterAttack } from '../combat'
+import { isStealthUnit } from '../visibility'
+import { hasAdjacentEnemy } from '../modifiers/cloak'
 import {
 	unitValue,
 	terrainProtection,
@@ -28,6 +30,7 @@ export const scoreAttack = (
 	const damage = previewDamage(attacker, defender, {
 		map,
 		defenderTile,
+		attackerTile,
 		role: 'attack',
 	})
 
@@ -51,6 +54,7 @@ export const scoreAttack = (
 			returnDamage = previewDamage(simulated, attacker, {
 				map,
 				defenderTile: attackerTile,
+				attackerTile: defenderTile,
 				role: 'counter',
 			})
 		}
@@ -85,25 +89,57 @@ export const scoreRepair = (unit: UnitObject): number => {
 	return (1 - ratio) * cost * 0.15
 }
 
+// Stealth units earn their keep cloaked, as invisible area-denial: an enemy can't
+// path through a tile it doesn't know is occupied, so a hidden Stealth Tank / sub
+// silently walls a lane. Reward an owned stealth unit for holding a forward tile
+// while staying hidden, and dock it for ending adjacent to an enemy (which flushes
+// it out — an attack that wants that trade is scored separately via scoreAttack).
+// `enemyDist` is the already-computed blind closest-enemy distance.
+const scoreStealthPositioning = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	enemyDist: number
+): number => {
+	if (!isStealthUnit(unit)) return 0
+	if (hasAdjacentEnemy(map, tile, cpuTeam)) return -unitValue(unit) * 0.05
+	const forward = enemyDist > 0 ? Math.max(0, 8 - enemyDist) : 0
+	return forward * 1.2
+}
+
+// `concealed` (enemies the CPU can't perceive) is threaded into the threat and
+// closest-enemy terms so the AI scores positions blind to fogged/stealthed foes.
+// `lurking` is the count of enemy stealth units the CPU *remembers but can't see*
+// (see stealthMemory.ts) — it makes the AI hesitate to expose itself near the front
+// where a remembered ambush could spring. Both default to no-op so the inspector and
+// tests get the plain greedy score.
 export const scorePositionBonus = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject,
-	cpuTeam: number
+	cpuTeam: number,
+	concealed?: ReadonlySet<number>,
+	lurking: number = 0
 ): number => {
 	const cover = terrainProtection(map, tile) * unitValue(unit) * 0.05
-	const threat = threatToTile(map, tile, unit, cpuTeam) * VALUE_PER_HP * unitValue(unit) * 0.5
+	const threat =
+		threatToTile(map, tile, unit, cpuTeam, concealed) * VALUE_PER_HP * unitValue(unit) * 0.5
 	const objectiveDist = closestObjectiveDistance(map, tile, cpuTeam)
-	const enemyDist = closestEnemyDistance(map, tile, cpuTeam)
+	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
 	const advance = objectiveDist > 0 ? -objectiveDist * 1.5 : -enemyDist * 0.5
-	return cover - threat + advance
+	const stealth = scoreStealthPositioning(map, tile, unit, cpuTeam, enemyDist)
+	const caution = lurking * Math.max(0, 6 - enemyDist) * 0.4
+	return cover - threat + advance + stealth - caution
 }
 
 export const scoreWait = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject,
-	cpuTeam: number
+	cpuTeam: number,
+	concealed?: ReadonlySet<number>,
+	lurking: number = 0
 ): number => {
-	return scorePositionBonus(map, tile, unit, cpuTeam) - 5
+	return scorePositionBonus(map, tile, unit, cpuTeam, concealed, lurking) - 5
 }

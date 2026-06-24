@@ -63,6 +63,7 @@ const filter = (map: MapProcesser) =>
 	({
 		cols: map.cols,
 		rows: map.rows,
+		...settings(map),
 		layers: {
 			ground: map.layers.ground.map(removeState),
 			sky: map.layers.sky.map(addLocation).filter(exists),
@@ -75,6 +76,7 @@ const process = (map: MapData) =>
 	({
 		cols: map.cols,
 		rows: map.rows,
+		...settings(map),
 		layers: {
 			ground: map.layers.ground.map((object) => ({ ...object, state: 0 })),
 			sky: processObjects(map, map.layers.sky)(processObjectState),
@@ -109,6 +111,19 @@ const processObjectState =
 			type: object.type,
 			state: 0,
 		} as T & AnimatedObject)
+
+/**
+ * Carry the optional map-level settings (script / fog / funds) through the
+ * (de)serialization round-trip, omitting any that are unset so they never bloat
+ * the exported hash with `undefined` keys.
+ */
+const settings = (map: MapSettings) => {
+	const out: MapSettings = {}
+	if (map.script != null && map.script !== '') out.script = map.script
+	if (map.fog != null) out.fog = map.fog
+	if (map.funds != null) out.funds = map.funds
+	return out
+}
 
 const removeState = <T extends ObjectType>(object: T) => ({ type: object.type })
 

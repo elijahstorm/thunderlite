@@ -1,12 +1,19 @@
 <script lang="ts">
 	import type { LayoutData } from './$types'
 	import { Toasts } from 'as-toast'
+	import { browser } from '$app/environment'
+	import { initSession } from '$lib/dontcode/client'
 	import '../app.css'
 
 	export let data: LayoutData
 
 	const { title, desc, googleFonts } = data.config
 	const IMG_URL = `/images/embedded-card.png`
+
+	// Seed the client session stores from the server-resolved user. Kept to the
+	// browser so the module-level stores are never mutated during SSR (which
+	// would leak one request's user into another's render).
+	$: if (browser) initSession(data.user)
 </script>
 
 <svelte:head>

@@ -26,6 +26,14 @@ const makeRecorder = (): { ops: Op[]; iface: CampaignInterface } => {
 		spawn: (team, unit, x, y) => void ops.push(['spawn', team, unit, x, y]),
 		kill: (x, y) => void ops.push(['kill', x, y]),
 		setTerrain: (terrain, x, y) => void ops.push(['setTerrain', terrain, x, y]),
+		setWeather: (weather, x, y) => void ops.push(['setWeather', weather, x, y]),
+		clearWeather: (x, y) => void ops.push(['clearWeather', x, y]),
+		fog: (on) => void ops.push(['fog', on]),
+		funds: (team, amount) => void ops.push(['funds', team, amount]),
+		addBuilding: (team, building, x, y) =>
+			void ops.push(['addBuilding', team, building, x, y]),
+		removeBuilding: (x, y) => void ops.push(['removeBuilding', x, y]),
+		ownBuilding: (team, x, y) => void ops.push(['ownBuilding', team, x, y]),
 		wait: (seconds) => void ops.push(['wait', seconds]),
 	}
 	return { ops, iface }
@@ -88,6 +96,37 @@ describe('runCutsceneEvents', () => {
 		])
 	})
 
+	it('dispatches the building / weather / fog / funds commands to their methods', async () => {
+		const { ops, iface } = makeRecorder()
+		const script = parseCutsceneScript(`
+<start>
+add building: 1,"City",5,5
+own building: 0,5,5
+remove building: 5,5
+weather: "Storm",6,2
+clear weather: 6,2
+fog: off
+fog: on
+funds: 0,500
+funds: 1,-200
+</start>
+`)
+
+		await runCutsceneEvents(script.start, iface)
+
+		expect(ops).toEqual([
+			['addBuilding', 1, 'City', 5, 5],
+			['ownBuilding', 0, 5, 5],
+			['removeBuilding', 5, 5],
+			['setWeather', 'Storm', 6, 2],
+			['clearWeather', 6, 2],
+			['fog', false],
+			['fog', true],
+			['funds', 0, 500],
+			['funds', 1, -200],
+		])
+	})
+
 	it('awaits each event before starting the next (a pending talk blocks the rest)', async () => {
 		const ops: string[] = []
 		let resolveTalk!: () => void
@@ -104,6 +143,13 @@ describe('runCutsceneEvents', () => {
 			spawn: () => {},
 			kill: () => {},
 			setTerrain: () => {},
+			setWeather: () => {},
+			clearWeather: () => {},
+			fog: () => {},
+			funds: () => {},
+			addBuilding: () => {},
+			removeBuilding: () => {},
+			ownBuilding: () => {},
 			wait: () => void ops.push('wait'),
 		}
 

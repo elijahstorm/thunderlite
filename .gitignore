@@ -28,3 +28,6 @@ demo_data/
 .caffeinate.pid
 .env*
 test-results/
+
+# DontCode local mock gateway state (`pnpm mock`)
+.dontcode-mock/

@@ -25,8 +25,7 @@
 	{#if tile == null}
 		<div class="opacity-60">Hover or click a tile</div>
 	{:else}
-		<div class="flex items-center justify-between mb-1">
-			<span class="opacity-60">Tile {tile}</span>
+		<div class="flex items-center justify-end mb-1">
 			<span class="opacity-60">{pinned ? 'pinned' : 'hover'}</span>
 		</div>
 
@@ -36,6 +35,19 @@
 				<div class="opacity-80">
 					Protection: {Math.round(terrain.protection * 100)}%
 				</div>
+				<div class="opacity-80">Height: {terrain.height}</div>
+				{#if terrain.modifiers.length > 0}
+					<div class="mt-1 flex flex-wrap gap-1">
+						{#each terrain.modifiers as mod (mod)}
+							<span
+								class="px-1 py-px rounded bg-white/10 text-[10px]"
+								data-testid="tile-info-terrain-modifier"
+							>
+								{mod}
+							</span>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -46,6 +58,18 @@
 				<div class="opacity-80">
 					Stature: {building.stature ?? buildingInfo.stature}/{buildingInfo.stature}
 				</div>
+				{#if buildingInfo.modifiers.length > 0}
+					<div class="mt-1 flex flex-wrap gap-1">
+						{#each buildingInfo.modifiers as mod (mod)}
+							<span
+								class="px-1 py-px rounded bg-white/10 text-[10px]"
+								data-testid="tile-info-building-modifier"
+							>
+								{mod}
+							</span>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/if}
 

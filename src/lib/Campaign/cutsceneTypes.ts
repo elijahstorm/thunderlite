@@ -28,6 +28,20 @@ export type CutsceneEvent =
 	| { kind: 'kill'; x: number; y: number }
 	/** Replace the terrain at a tile. */
 	| { kind: 'setTerrain'; terrain: string; x: number; y: number }
+	/** Set the weather/sky at a tile. `weather` matches a `skyData` name. */
+	| { kind: 'setWeather'; weather: string; x: number; y: number }
+	/** Clear the weather/sky at a tile. */
+	| { kind: 'clearWeather'; x: number; y: number }
+	/** Turn fog of war on or off for the rest of the match. */
+	| { kind: 'fog'; on: boolean }
+	/** Add (or, when negative, subtract) funds for `team`. */
+	| { kind: 'funds'; team: number; amount: number }
+	/** Place a building for `team` at a tile. `building` matches a `buildingData` name. */
+	| { kind: 'addBuilding'; team: number; building: string; x: number; y: number }
+	/** Remove whatever building occupies a tile. */
+	| { kind: 'removeBuilding'; x: number; y: number }
+	/** Change the owning team of the building at a tile. */
+	| { kind: 'ownBuilding'; team: number; x: number; y: number }
 
 export type CutsceneEventKind = CutsceneEvent['kind']
 
