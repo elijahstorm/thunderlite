@@ -6,6 +6,7 @@ import { animateExplosion } from './Animator/animator'
 import { gameState, type GameState, type Player } from './gameState'
 import { runModifiers, type ModifierContext, type ModifierPhase } from './modifiers'
 import { applySkyHiding } from './visibility'
+import { resetCaptureProgress } from './modifiers/capture'
 import { applyWinConditions } from './winConditions'
 
 export const STORM_DAMAGE = 10
@@ -92,6 +93,7 @@ export const applyTerrainEndOfTurnDamage = (
 		const died = next <= 0
 		if (died) {
 			map.layers.units[tile] = null
+			resetCaptureProgress(map.layers.buildings[tile], unit.team)
 			runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
 		}
 		events.push({ tile, unit, damage, died })
@@ -119,6 +121,7 @@ export const applySkyEndOfTurnDamage = (
 		const died = next <= 0
 		if (died) {
 			map.layers.units[tile] = null
+			resetCaptureProgress(map.layers.buildings[tile], unit.team)
 			runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
 		}
 		events.push({ tile, unit, damage: STORM_DAMAGE, died })

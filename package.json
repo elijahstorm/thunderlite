@@ -21,7 +21,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@dontcode2/backend": "0.1.1",
+		"@dontcode2/backend": "0.2.0",
 		"@iconify/svelte": "5.1.0",
 		"@vercel/edge-config": "1.4.3",
 		"as-toast": "1.1.0",

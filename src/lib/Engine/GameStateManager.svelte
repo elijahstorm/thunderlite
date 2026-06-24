@@ -14,7 +14,7 @@
 	import { actionMenuState } from './HUD/actionMenuStore'
 	import { buildMenuState } from './HUD/buildMenuStore'
 	import { interactionState, interactionSource } from './Interactor/interactionState'
-	import { reopenMenuFromPeek } from './Interactor/interactor'
+	import { reopenMenuFromPeek, openInPlaceMenu, resetInteraction } from './Interactor/interactor'
 	import { animateTeamDefeat } from './defeat'
 	import { MusicDirector } from '$lib/Audio/musicDirector'
 	import { weatherAudio, weatherForMap } from '$lib/Audio/weatherAudio'
@@ -32,6 +32,9 @@
 	export const userSession: string = ''
 	export let gameSession: string = ''
 	export let map: MapObject | undefined = undefined
+	/** Surface the corner overview map in the HUD stack (currently the play route). */
+	export let minimap: boolean = false
+	export let fogOfWar: boolean = false
 
 	// K4 — campaign integration. When `mode` is supplied it overrides the
 	// hotseat/online derivation (campaign is single-player, never a socket match);
@@ -117,6 +120,13 @@
 		}
 	}
 
+	// Double-click detection: a second click on the same tile inside this window
+	// opens the unit's action menu in place (act without moving) instead of just
+	// re-selecting it.
+	const DOUBLE_CLICK_MS = 350
+	let lastClickTile = -1
+	let lastClickAt = 0
+
 	const select = (x: number, y: number) => {
 		if (!interactor) return
 		if (state !== 'waiting') return
@@ -131,8 +141,44 @@
 			if (reopenMenuFromPeek(map)) return
 		}
 
-		if (map) setSelectedTile(y * map.cols + x)
+		const tile = map ? y * map.cols + x : -1
+		const now =
+			typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()
+		const isDoubleClick = tile >= 0 && tile === lastClickTile && now - lastClickAt < DOUBLE_CLICK_MS
+		lastClickTile = tile
+		lastClickAt = now
+
+		// Double-click a selectable own unit → open its action menu anchored where it
+		// stands, so it can attack/capture/etc. without committing a move first.
+		// Whether or not a menu opens, we always swallow this second click: the first
+		// click already did the meaningful thing (selected the unit / moved onto the
+		// tile / opened the build menu), so re-routing the second click would only undo
+		// it — re-entering `choice` deselects the unit, and on an empty Warfactory tile
+		// it pops the build menu. That re-routing is exactly what made units feel
+		// un-movable on and around a factory when the player double-tapped.
+		if (isDoubleClick && map) {
+			lastClickTile = -1
+			openInPlaceMenu(map, tile)
+			return
+		}
+
+		if (map) setSelectedTile(tile)
 		interactor(x, y)
+	}
+
+	// Clear any leftover selection / open menu / stale highlight whenever the active
+	// side changes. Ending a turn mid-selection (e.g. picking a unit then hitting
+	// End Turn, or building from a factory) used to leave `interactionState` stuck
+	// on `choice`/`preview` with a stale source, so the next turn's first clicks were
+	// misrouted and the board showed move tiles that couldn't be commanded. Keyed on
+	// team+turn so it fires once per handoff, never mid-turn.
+	let lastInteractionTurnKey = ''
+	$: if (map) {
+		const key = `${$gameState.currentTeam}:${$gameState.turnNumber}`
+		if (key !== lastInteractionTurnKey) {
+			lastInteractionTurnKey = key
+			resetInteraction(map)
+		}
 	}
 
 	const handleEndTurn = () => {
@@ -274,7 +320,7 @@
 
 <slot {select}></slot>
 
-<HUDRoot {map} onEndTurn={handleEndTurn} {localTeam} cpuOpponent={!isMultiplayer} />
+<HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} cpuOpponent={!isMultiplayer} />
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />

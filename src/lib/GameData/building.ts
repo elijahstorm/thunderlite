@@ -9,6 +9,8 @@ type BuildingData = ObjectAssetMeta & {
 	income: number
 	resources: number
 	actable: boolean
+	/** Whether this building belongs on ocean terrain (must match the tile's terrain.ocean). */
+	ocean: boolean
 	modifiers: (keyof typeof modifierData)[]
 }
 
@@ -26,6 +28,7 @@ export const buildingData: BuildingData[] = [
 		income: 0,
 		resources: 0,
 		actable: false,
+		ocean: false,
 		modifiers: ['Capture.Insta_Lose', 'Start_Turn.Heal_Team'],
 	},
 	{
@@ -40,6 +43,7 @@ export const buildingData: BuildingData[] = [
 		income: 0,
 		resources: 0,
 		actable: false,
+		ocean: false,
 		modifiers: ['Capture.Allow_Ground'],
 	},
 	{
@@ -54,6 +58,7 @@ export const buildingData: BuildingData[] = [
 		income: 0,
 		resources: 0,
 		actable: false,
+		ocean: false,
 		modifiers: ['Capture.Allow_Air'],
 	},
 	{
@@ -68,6 +73,7 @@ export const buildingData: BuildingData[] = [
 		income: 0,
 		resources: 0,
 		actable: false,
+		ocean: true,
 		modifiers: ['Capture.Allow_Sea'],
 	},
 	{
@@ -82,6 +88,7 @@ export const buildingData: BuildingData[] = [
 		income: 0,
 		resources: 0,
 		actable: true,
+		ocean: false,
 		modifiers: [],
 	},
 	{
@@ -96,6 +103,7 @@ export const buildingData: BuildingData[] = [
 		income: 120,
 		resources: 1000,
 		actable: false,
+		ocean: false,
 		modifiers: ['Each_Turn.Supply_Income'],
 	},
 	{
@@ -110,6 +118,7 @@ export const buildingData: BuildingData[] = [
 		income: 60,
 		resources: 1000,
 		actable: false,
+		ocean: false,
 		modifiers: ['Each_Turn.Supply_Income'],
 	},
 	{
@@ -124,6 +133,7 @@ export const buildingData: BuildingData[] = [
 		income: 120,
 		resources: 1000,
 		actable: false,
+		ocean: true,
 		modifiers: ['Each_Turn.Supply_Income'],
 	},
 ]

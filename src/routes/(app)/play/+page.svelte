@@ -21,18 +21,13 @@
 				{userSession}
 				{gameSession}
 				{map}
+				minimap
+				fogOfWar={map.fog ?? true}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 				let:select
 			>
-				<GameBoard
-					{map}
-					{requestRedraw}
-					{select}
-					fogOfWar={map.fog ?? true}
-					minimap
-					menuHref="/rooms"
-				/>
+				<GameBoard {map} {requestRedraw} {select} fogOfWar={map.fog ?? true} menuHref="/rooms" />
 			</GameStateManager>
 		</GameSocket>
 	</MapLoader>

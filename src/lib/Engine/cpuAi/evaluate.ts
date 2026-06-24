@@ -4,6 +4,7 @@ import { terrainData } from '$lib/GameData/terrain'
 import { previewDamage } from '../combat'
 import { generateAttackList } from '../Interactor/Pathing/attack'
 import { concealedEnemyTiles } from '../visibility'
+import { isMineableTerrainType } from '../modifiers/miner'
 
 export const unitValue = (unit: UnitObject): number => {
 	const data = unitData[unit.type]
@@ -112,6 +113,25 @@ export const closestEnemyDistance = (
 		const ec = i % map.cols
 		const er = Math.floor(i / map.cols)
 		const d = Math.abs(col - ec) + Math.abs(row - er)
+		if (d < best) best = d
+	}
+	return best === Infinity ? 0 : best
+}
+
+// Manhattan distance to the nearest mineable ore tile (any tier), or 0 if the map
+// has none left. Steers a low-on-funds Warmachine toward ore it can harvest to
+// refill its wallet.
+export const closestOreDistance = (map: MapObject, tile: number): number => {
+	const col = tile % map.cols
+	const row = Math.floor(tile / map.cols)
+	let best = Infinity
+	const ground = map.layers.ground
+	for (let i = 0; i < ground.length; i++) {
+		const g = ground[i]
+		if (!g || !isMineableTerrainType(g.type)) continue
+		const gc = i % map.cols
+		const gr = Math.floor(i / map.cols)
+		const d = Math.abs(col - gc) + Math.abs(row - gr)
 		if (d < best) best = d
 	}
 	return best === Infinity ? 0 : best

@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store'
 import { buildingData } from '$lib/GameData/building'
 import { animateExplosion } from './Animator/animator'
+import { resetCaptureProgress } from './modifiers/capture'
 import { NEUTRAL_TEAM } from './gameState'
 
 /**
@@ -32,6 +33,8 @@ export const animateTeamDefeat = async (map: MapObject, team: number): Promise<v
 	for (let tile = 0; tile < map.layers.units.length; tile++) {
 		const unit = map.layers.units[tile]
 		if (unit && unit.team === team) {
+			// A defeated unit mid-capture abandons whatever enemy building it held.
+			resetCaptureProgress(map.layers.buildings[tile], unit.team)
 			map.layers.units[tile] = null
 			explosionTiles.add(tile)
 		}

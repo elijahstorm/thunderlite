@@ -220,6 +220,18 @@ export class AudioEngine {
 		return settingsFromState(this.state)
 	}
 
+	/**
+	 * When sound is off (master muted) we never call `el.play()`. A muted element
+	 * is still *playing* as far as the OS is concerned, which on iOS/macOS grabs
+	 * the audio session and can interrupt the user's own music or yank a Bluetooth
+	 * device into a call profile. So if a player mutes and then loads a fresh
+	 * match, nothing autostarts — we keep elements primed (src/volume set) and
+	 * resume them only once they un-mute (see `resumeSuppressedPlayback`).
+	 */
+	private get playbackSuppressed(): boolean {
+		return this.state.master.muted
+	}
+
 	// ── Music (single-active one-shot path; used for non-looping stings) ─────
 	playMusic(name: string, opts: PlaySingleOptions = {}): void {
 		this.playSingle('music', name, opts)
@@ -260,7 +272,9 @@ export class AudioEngine {
 				targetGain: 0,
 				fadeFromGain: 0,
 			})
-			void el.play()
+			// Stay primed but silent when sound is off; un-muting resumes the stems
+			// in lockstep (they never advanced past currentTime 0).
+			if (!this.playbackSuppressed) void el.play()
 		}
 	}
 
@@ -378,7 +392,7 @@ export class AudioEngine {
 		el.currentTime = 0
 		el.volume = effectiveVolume(this.state, channel)
 		this.singleEls[channel] = el
-		void el.play()
+		if (!this.playbackSuppressed) void el.play()
 	}
 
 	private stopSingle(channel: SingleChannel): void {
@@ -409,6 +423,9 @@ export class AudioEngine {
 			return
 		}
 		if (!this.factory) return
+		// Fire-and-forget: when sound is off there is nothing to resume later, so
+		// just drop it rather than grabbing the audio session for a silent voice.
+		if (this.playbackSuppressed) return
 
 		const el = this.acquireSfxVoice(name, resolveAudioPath(base, this.format))
 		el.currentTime = 0
@@ -479,6 +496,23 @@ export class AudioEngine {
 		const sfxVol = effectiveVolume(this.state, 'sfx')
 		for (const pool of this.sfxPool.values()) {
 			for (const el of pool) if (!el.paused) el.volume = sfxVol
+		}
+		// Sound was off and is now back on: start the looping elements we kept
+		// primed but never played (one per single channel + every music stem).
+		if (!this.playbackSuppressed) this.resumeSuppressedPlayback()
+	}
+
+	/**
+	 * Resume looping playback for elements that were primed while muted. SFX are
+	 * transient and intentionally not resumed — a missed effect just stays missed.
+	 */
+	private resumeSuppressedPlayback(): void {
+		for (const channel of SINGLE_CHANNELS) {
+			const el = this.singleEls[channel]
+			if (el && el.paused) void el.play()
+		}
+		for (const stem of this.musicStems.values()) {
+			if (stem.el.paused) void stem.el.play()
 		}
 	}
 }

@@ -9,6 +9,11 @@ export type ActionMenuState = {
 	// This is distinct from `open`: while peeking the panel is hidden but the
 	// pending unit (unitTile/team/items) is remembered so it can pop back up.
 	peeking: boolean
+	// Whether the unit already moved before this menu opened. The post-move menu
+	// (moved: true) can't be undone, so dismissing it only peeks. The in-place
+	// double-click menu (moved: false) committed nothing, so it offers a real
+	// cancel that fully deselects the unit without idling it.
+	moved: boolean
 	unitTile: number | null
 	team: number | null
 	items: ActionMenuItem[]
@@ -17,6 +22,7 @@ export type ActionMenuState = {
 const closed = (): ActionMenuState => ({
 	open: false,
 	peeking: false,
+	moved: false,
 	unitTile: null,
 	team: null,
 	items: [],
@@ -24,8 +30,13 @@ const closed = (): ActionMenuState => ({
 
 export const actionMenuState = writable<ActionMenuState>(closed())
 
-export const openActionMenu = (unitTile: number, team: number, items: ActionMenuItem[]): void => {
-	actionMenuState.set({ open: true, peeking: false, unitTile, team, items })
+export const openActionMenu = (
+	unitTile: number,
+	team: number,
+	items: ActionMenuItem[],
+	moved = true
+): void => {
+	actionMenuState.set({ open: true, peeking: false, moved, unitTile, team, items })
 }
 
 // Hide the panel but keep the pending unit — the player is peeking at the board.

@@ -131,4 +131,45 @@ describe('applyAction stat gating', () => {
 		const list = matchStatsList()
 		expect(list.find((s) => s.team === 0)?.tilesCaptured).toBe(1)
 	})
+
+	// Auto-capture resolves inside endTurn (the next team's Start_Turn phase); the
+	// end-turn action credits the capture stat by diffing building ownership.
+	const makeAutoCaptureMap = (cityStature: number): MapObject => {
+		const cols = 3
+		const rows = 3
+		const map = {
+			cols,
+			rows,
+			layers: {
+				ground: new Array(cols * rows).fill(0).map(() => ({ type: PLAINS, state: 0 })),
+				sky: new Array(cols * rows).fill(null),
+				units: new Array(cols * rows).fill(null),
+				buildings: new Array(cols * rows).fill(null),
+			},
+			highlights: [],
+			route: [],
+			filters: {} as never,
+		} as MapObject
+		// Team 1's commando sits on team 0's city, one tick from flipping.
+		map.layers.units[4] = { type: COMMANDO, state: 0, team: 1, health: unitData[COMMANDO].health }
+		map.layers.buildings[4] = { type: CITY, state: 0, team: 0, stature: cityStature }
+		// Team 0 also has a unit so the roster has two players and the turn can advance.
+		map.layers.units[0] = { type: COMMANDO, state: 0, team: 0, health: unitData[COMMANDO].health }
+		initGameStateFromMap(map)
+		return map
+	}
+
+	it('credits a capture stat when a building flips during the end-turn auto-capture', () => {
+		const sink = vi.fn()
+		// Stature 10 → one full-HP commando tick (−10) flips it as team 1 starts.
+		applyAction(makeAutoCaptureMap(10), { kind: 'end-turn' }, { live: true, recordStat: sink })
+		expect(sink).toHaveBeenCalledWith({ kind: 'capture', team: 1 })
+	})
+
+	it('does NOT credit a capture when the building only partially captures', () => {
+		const sink = vi.fn()
+		// Stature 20 → one tick (−10) leaves it at 10, no flip, no stat.
+		applyAction(makeAutoCaptureMap(20), { kind: 'end-turn' }, { live: true, recordStat: sink })
+		expect(sink).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'capture' }))
+	})
 })

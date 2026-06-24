@@ -30,7 +30,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	if (protectedRoutes.some((url) => event.url.pathname.startsWith(url))) {
 		if (!event.locals.user) {
-			throw redirect(303, '/login')
+			// Preserve where they were headed (path + query) so /login can send
+			// them back after authenticating. API routes are fetched, not
+			// navigated, so bouncing back to one is meaningless — skip those.
+			const { pathname, search } = event.url
+			const returnTo = pathname.startsWith('/api/') ? '' : pathname + search
+			const query = returnTo ? `?redirectTo=${encodeURIComponent(returnTo)}` : ''
+			throw redirect(303, `/login${query}`)
 		}
 
 		event.locals.session = await getUserSession(event)

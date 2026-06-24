@@ -11,23 +11,28 @@ import { error, fail, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { validate } from '$lib/Database/validators'
 import { db } from '$lib/dontcode/server'
+import { safeRedirect } from '$lib/safeRedirect'
 
 export const prerender = false
 export const ssr = false
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const auth = locals.user
 	if (!auth) throw error(403, 'You are not logged in')
+
+	// Where to land once the profile is set up. Defaults to /make when login
+	// wasn't triggered by a redirect from somewhere specific.
+	const redirectTo = safeRedirect(url.searchParams.get('redirectTo')) ?? '/make'
 
 	try {
 		const user = await getUserDBDataFromAuth(auth)
 		if (user.username && user.profile_image_url) {
-			throw redirect(302, '/make')
+			throw redirect(302, redirectTo)
 		}
-		return { auth, user }
+		return { auth, user, redirectTo }
 	} catch (e) {
 		if ((e as { status?: number })?.status === 302) {
-			throw redirect(302, '/make')
+			throw redirect(302, redirectTo)
 		}
 		// The schema is applied out-of-band via `pnpm migrate` (scripts/migrate.ts),
 		// so first-time profile creation should just work; a failure here is a real
@@ -39,7 +44,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	}
 
-	return { auth }
+	return { auth, redirectTo }
 }
 
 export const actions = {

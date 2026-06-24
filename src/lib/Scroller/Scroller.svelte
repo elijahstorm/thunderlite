@@ -158,7 +158,16 @@
 	}
 </script>
 
-<svelte:window on:resize={reflow} />
+<!--
+	Call `reflow` through a wrapper, not `on:resize={reflow}` directly: `reflow`
+	is assigned inside `onMount`, so it is still `undefined` when the window
+	listener is wired up. Binding the bare reference captures that `undefined`
+	and the board never recomputes its canvas size, scroll bounds, or screen
+	anchor on resize — shrinking the window then leaves the map cut off with no
+	way to scroll it back into view. The closure reads the current `reflow` at
+	event time instead.
+-->
+<svelte:window on:resize={() => reflow?.()} />
 
 <section
 	role="grid"

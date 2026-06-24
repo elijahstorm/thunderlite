@@ -4,7 +4,7 @@ export type ActionPlan = {
 	unitTile: number
 	actions: SerializedAction[]
 	score: number
-	kind: 'attack' | 'capture' | 'mine' | 'repair' | 'wait'
+	kind: 'attack' | 'capture' | 'mine' | 'repair' | 'wait' | 'build'
 }
 
 export type AiCtx = {

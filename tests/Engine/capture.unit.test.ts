@@ -113,6 +113,26 @@ describe('Start_Turn.Capture handler', () => {
 		expect(map.layers.buildings[5]!.team).toBe(1)
 	})
 
+	it('a unit that attacked last turn skips this turn’s capture, then resumes next turn', () => {
+		const map = makeMap()
+		const u = unit(0)
+		u.attacked = true
+		map.layers.units[5] = u
+		map.layers.buildings[5] = building(1, CITY_TYPE)
+		initGameStateFromMap(map)
+
+		const max = buildingData[CITY_TYPE].stature
+
+		// `attacked` is consumed without reducing stature.
+		runCaptureFor(map, 5)
+		expect(map.layers.buildings[5]!.stature ?? max).toBe(max)
+		expect(map.layers.units[5]!.attacked).toBeUndefined()
+
+		// Next start of turn it captures normally.
+		runCaptureFor(map, 5)
+		expect(map.layers.buildings[5]!.stature).toBe(max - 10)
+	})
+
 	it('does not reduce stature when standing on a friendly building', () => {
 		const map = makeMap()
 		map.layers.units[5] = unit(0)

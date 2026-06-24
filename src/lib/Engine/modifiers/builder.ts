@@ -1,8 +1,8 @@
-import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { terrainData } from '$lib/GameData/terrain'
-import { gameState, markTileActed } from '$lib/Engine/gameState'
-import { playerCanBuildType } from '$lib/Engine/build'
+import { markTileActed } from '$lib/Engine/gameState'
+import { walletOf } from '$lib/Engine/wallet'
+import { validTerrain } from '$lib/Engine/Interactor/Pathing/movement'
 
 const adjacencyOffsets = (cols: number) => [-cols, -1, 1, cols]
 
@@ -32,6 +32,23 @@ export const passableAdjacentTiles = (map: MapObject | MapProcesser, tile: numbe
 		return true
 	})
 
+// Adjacent tiles a *specific* unit type could legally be deployed onto: open (no
+// occupant) and terrain the unit can actually exist on (e.g. a ground unit can't
+// be built onto open water, a ship can't be built onto land). This is the gate
+// the directional build picker paints — every highlighted tile is a tile the
+// chosen unit can stand on.
+export const buildableAdjacentTiles = (
+	map: MapObject | MapProcesser,
+	tile: number,
+	unitType: number
+): number[] =>
+	adjacentTiles(map, tile).filter((t) => {
+		if (map.layers.units[t] != null) return false
+		const ground = map.layers.ground[t]
+		if (!ground) return false
+		return validTerrain(ground, { type: unitType } as UnitObject)
+	})
+
 export type BuildAdjacentResult =
 	| { ok: true; tile: number }
 	| { ok: false; reason: 'no-space' | 'not-affordable' | 'not-buildable' | 'invalid' }
@@ -47,13 +64,15 @@ export const buildAdjacent = (
 	if (!data) return { ok: false, reason: 'invalid' }
 	if (data.cost <= 0) return { ok: false, reason: 'not-buildable' }
 
-	const state = get(gameState)
-	const player = state.players.find((p) => p.team === team)
-	if (!player) return { ok: false, reason: 'invalid' }
-	if (!playerCanBuildType(player, data.type)) return { ok: false, reason: 'not-buildable' }
-	if (player.money < data.cost) return { ok: false, reason: 'not-affordable' }
+	// A Warmachine is a self-contained mobile factory: it can build any unit type
+	// regardless of which factories the player owns, paying out of its own wallet
+	// (refilled by mining) rather than the shared player money pool.
+	const builder = map.layers.units[builderTile]
+	if (!builder) return { ok: false, reason: 'invalid' }
+	const funds = walletOf(builder)
+	if (funds < data.cost) return { ok: false, reason: 'not-affordable' }
 
-	const adjacencies = passableAdjacentTiles(map, builderTile)
+	const adjacencies = buildableAdjacentTiles(map, builderTile, unitType)
 	const spawnTile =
 		typeof destination === 'number' && adjacencies.includes(destination)
 			? destination
@@ -67,10 +86,7 @@ export const buildAdjacent = (
 		health: data.health,
 	}
 
-	gameState.update((s) => ({
-		...s,
-		players: s.players.map((p) => (p.team === team ? { ...p, money: p.money - data.cost } : p)),
-	}))
+	builder.wallet = funds - data.cost
 
 	markTileActed(spawnTile)
 	markTileActed(builderTile)

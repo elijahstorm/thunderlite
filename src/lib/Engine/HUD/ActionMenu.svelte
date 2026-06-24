@@ -4,7 +4,7 @@
 	import { cubicOut } from 'svelte/easing'
 	import { actionMenuState } from './actionMenuStore'
 	import { boardGeometry } from './boardGeometry'
-	import { performMenuAction, peekMenu } from '../Interactor/interactor'
+	import { performMenuAction, peekMenu, cancelMenu } from '../Interactor/interactor'
 	import type { ActionMenuItemId } from '../actions'
 
 	export let map: MapObject | undefined = undefined
@@ -20,6 +20,7 @@
 		repair: 'Repair',
 		transport: 'Transport',
 		ship_out: 'Ship Out',
+		air_lift: 'Air Lift',
 		land: 'Land',
 		wait: 'Wait',
 	}
@@ -93,11 +94,23 @@
 		peekMenu()
 	}
 
+	// A unit that hasn't moved yet committed nothing, so its menu offers a true
+	// cancel: close the panel and deselect the unit outright. It is NOT idled — it
+	// stays free to act this turn. The post-move menu has no such escape (the move
+	// already happened), so there we fall back to peeking.
+	const handleDismiss = () => {
+		if (menu.moved) {
+			handlePeek()
+		} else {
+			cancelMenu()
+		}
+	}
+
 	const onKey = (evt: KeyboardEvent) => {
 		if (!menu.open) return
 		if (evt.key === 'Escape') {
 			evt.preventDefault()
-			handlePeek()
+			handleDismiss()
 		}
 	}
 
@@ -131,9 +144,9 @@
 	<button
 		type="button"
 		class="fixed inset-0 z-54 cursor-default bg-black/25"
-		aria-label="Dismiss menu and look around"
+		aria-label={menu.moved ? 'Dismiss menu and look around' : 'Cancel and deselect unit'}
 		data-testid="action-menu-backdrop"
-		on:click={handlePeek}
+		on:click={handleDismiss}
 		transition:fade={{ duration: 180 }}
 	></button>
 
@@ -157,23 +170,41 @@
 					type="button"
 					class="flex h-5 w-5 items-center justify-center rounded text-white/50 hover:bg-white/10 hover:text-white"
 					data-testid="action-menu-cancel"
-					aria-label="Look around the map"
-					title="Look around — tap the board to bring the menu back"
-					on:click={handlePeek}
+					aria-label={menu.moved ? 'Look around the map' : 'Cancel and deselect unit'}
+					title={menu.moved
+						? 'Look around — tap the board to bring the menu back'
+						: 'Cancel — deselect this unit without using its turn'}
+					on:click={handleDismiss}
 				>
-					<svg
-						class="h-3.5 w-3.5"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-						<circle cx="12" cy="12" r="3" />
-					</svg>
+					{#if menu.moved}
+						<svg
+							class="h-3.5 w-3.5"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+							<circle cx="12" cy="12" r="3" />
+						</svg>
+					{:else}
+						<svg
+							class="h-3.5 w-3.5"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							aria-hidden="true"
+						>
+							<path d="M18 6 6 18" />
+							<path d="m6 6 12 12" />
+						</svg>
+					{/if}
 				</button>
 			</div>
 

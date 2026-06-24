@@ -9,6 +9,7 @@ import {
 	threatToTile,
 	closestEnemyDistance,
 	closestObjectiveDistance,
+	closestOreDistance,
 } from './evaluate'
 
 const VALUE_PER_HP = 1 / 40
@@ -131,6 +132,73 @@ export const scorePositionBonus = (
 	const stealth = scoreStealthPositioning(map, tile, unit, cpuTeam, enemyDist)
 	const caution = lurking * Math.max(0, 6 - enemyDist) * 0.4
 	return cover - threat + advance + stealth - caution
+}
+
+// The Warmachine is the player's life (Death.Insta_Lose) *and* their economy. The
+// CPU never throws it at the front line — it scores the unit's positioning to keep
+// it alive and productive: hug cover, flee any tile an enemy can hit, hold a buffer
+// from the front, and when funds run low drift toward the nearest ore to refill.
+// `wallet` is the unit's current holdings; `LOW_WALLET` is the threshold below
+// which refuelling becomes a priority.
+export const LOW_WALLET = 1000
+
+export const scoreBuilderPosition = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	wallet: number,
+	concealed?: ReadonlySet<number>
+): number => {
+	const cover = terrainProtection(map, tile) * unitValue(unit) * 0.05
+	// Losing this unit loses the game, so weight incoming damage far above a normal
+	// unit's threat term (×5) — a threatened tile is all but disqualifying.
+	const danger = threatToTile(map, tile, unit, cpuTeam, concealed) * VALUE_PER_HP * unitValue(unit) * 5
+	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
+	// Inverse of a combat unit's "advance": reward keeping distance from the enemy.
+	const safety = enemyDist > 0 ? Math.min(enemyDist, 8) * 2 : 0
+	// Low on funds: pull toward the closest ore so it can mine and keep building.
+	const ore = closestOreDistance(map, tile)
+	const refuel = wallet < LOW_WALLET && ore > 0 ? -ore * 2 : 0
+	return cover - danger + safety + refuel
+}
+
+// Mining always helps a builder, but it's urgent when the wallet is nearly empty —
+// scale the reward from a baseline up as holdings fall below LOW_WALLET so a broke
+// Warmachine prefers refilling over building the cheapest thing it can afford.
+export const scoreBuilderMine = (wallet: number): number => {
+	const urgency = wallet < LOW_WALLET ? (LOW_WALLET - wallet) / LOW_WALLET : 0
+	return 60 + urgency * 140
+}
+
+// Value of a Warmachine spending its wallet to build a unit, from a given tile.
+// `buildScore` is the chosen unit's production score (see bestBuildableType);
+// `position` folds in how safe the tile it builds from is.
+export const scoreBuilderBuild = (buildScore: number, position: number): number =>
+	buildScore * 0.6 + position
+
+// Below this many enemies on the board the Warmachine is willing to pick a fight —
+// few foes means a lost trade can't snowball, and it hits hard enough to likely
+// one-shot its target.
+export const FEW_ENEMIES = 3
+
+// A Warmachine attacking is the exception, not the rule: its life is the game, so
+// escaping and building come first. But it's a heavy hitter, so when there are few
+// enemies left and the shot is a clean, safe kill, taking it is a genuinely strong
+// play — score that at full tactical value (plus the firing tile's safety). Any
+// other attack (no kill, crowded board, or meaningful return fire) is a last
+// resort: damped hard so build/mine/escape plans win unless nothing else remains.
+export const scoreBuilderAttack = (
+	attack: AttackScore,
+	enemies: number,
+	position: number
+): number => {
+	const cleanKill = attack.killsTarget && attack.returnDamage <= 0
+	const favorable = cleanKill && enemies <= FEW_ENEMIES
+	if (favorable) return attack.score + position * 0.5
+	// Last resort: a fraction of the tactical value, anchored to how exposed the
+	// firing tile is, so it only surfaces when build/escape are worse.
+	return attack.score * 0.15 + position
 }
 
 export const scoreWait = (

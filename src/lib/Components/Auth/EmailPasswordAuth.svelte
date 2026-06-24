@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state'
 	import { redirectAfterLogin, refreshSession } from '$lib/dontcode/client'
 
 	type Mode = 'login' | 'signup' | 'verify-email' | 'mfa'
@@ -39,7 +40,7 @@
 
 	const finishLogin = async () => {
 		await refreshSession()
-		redirectAfterLogin()
+		redirectAfterLogin(page.url.searchParams.get('redirectTo'))
 	}
 
 	const submitSignup = async () => {

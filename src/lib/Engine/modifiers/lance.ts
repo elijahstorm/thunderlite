@@ -3,6 +3,7 @@ import { unitData } from '$lib/GameData/unit'
 import { calculateDamage } from '../combat'
 import { gameState } from '../gameState'
 import { hasModifier } from './canAttack'
+import { resetCaptureProgress } from './capture'
 import { runModifiers } from './index'
 
 export type LancePassthroughResult = {
@@ -53,6 +54,7 @@ export const applyLancePassthrough = (
 	const killed = passthrough.health === 0
 	if (killed) {
 		map.layers.units[behind] = null
+		resetCaptureProgress(map.layers.buildings[behind], passthrough.team)
 		runModifiers(passthrough, 'Death', {
 			kind: 'unit',
 			tile: behind,

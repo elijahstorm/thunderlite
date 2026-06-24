@@ -46,23 +46,15 @@ describe('computeAvailableActions', () => {
 		expect(ids(items)).toContain('wait')
 	})
 
-	it('Strike Commando standing on enemy City shows Capture + Wait', () => {
+	it('Strike Commando on enemy City shows only Wait — capture is automatic, not a menu action', () => {
 		const map = makeMap()
 		const u = unit(STRIKE_COMMANDO, 0)
 		map.layers.units[12] = u
 		map.layers.buildings[12] = { type: CITY, state: 0, team: 1 }
 		const items = computeAvailableActions({ map, tile: 12, unit: u })
-		expect(ids(items)).toEqual(expect.arrayContaining(['capture', 'wait']))
-		expect(ids(items)).not.toContain('attack')
-	})
-
-	it('Strike Commando standing on own City does NOT show Capture', () => {
-		const map = makeMap()
-		const u = unit(STRIKE_COMMANDO, 0)
-		map.layers.units[12] = u
-		map.layers.buildings[12] = { type: CITY, state: 0, team: 0 }
-		const items = computeAvailableActions({ map, tile: 12, unit: u })
+		expect(ids(items)).toContain('wait')
 		expect(ids(items)).not.toContain('capture')
+		expect(ids(items)).not.toContain('attack')
 	})
 
 	it('Scorpion Tank adjacent to an enemy shows Attack + Wait', () => {
@@ -136,7 +128,7 @@ describe('computeAvailableActions', () => {
 		expect(ids(items)).not.toContain('ship_out')
 	})
 
-	it('Strike Commando on enemy City with adjacent enemy shows Capture + Attack + Wait', () => {
+	it('Strike Commando on enemy City with adjacent enemy shows Attack + Wait (capture is automatic)', () => {
 		const map = makeMap()
 		const u = unit(STRIKE_COMMANDO, 0)
 		const enemy = unit(STRIKE_COMMANDO, 1)
@@ -144,6 +136,7 @@ describe('computeAvailableActions', () => {
 		map.layers.units[13] = enemy
 		map.layers.buildings[12] = { type: CITY, state: 0, team: 1 }
 		const items = computeAvailableActions({ map, tile: 12, unit: u })
-		expect(ids(items)).toEqual(expect.arrayContaining(['attack', 'capture', 'wait']))
+		expect(ids(items)).toEqual(expect.arrayContaining(['attack', 'wait']))
+		expect(ids(items)).not.toContain('capture')
 	})
 })

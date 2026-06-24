@@ -3,6 +3,7 @@
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
 	import { buildingData } from '$lib/GameData/building'
+	import { isWalletUnit, walletOf } from '../wallet'
 
 	export let map: MapObject | undefined = undefined
 
@@ -78,6 +79,9 @@
 				<div class="font-bold">{unitInfo.name}</div>
 				<div class="opacity-80">Team: Player {unit.team + 1}</div>
 				<div class="opacity-80">HP: {unitHp}/{unitHpMax}</div>
+				{#if isWalletUnit(unit)}
+					<div class="opacity-80" data-testid="tile-info-wallet">Holdings: ${walletOf(unit)}</div>
+				{/if}
 				<div class="opacity-80">Power: {unitInfo.power}</div>
 				<div class="opacity-80">
 					Range: {unitInfo.range[0]}–{unitInfo.range[1]}

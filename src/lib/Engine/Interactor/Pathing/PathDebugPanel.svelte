@@ -5,6 +5,7 @@
 	import { pathDebug, pathDebugEnabled } from './pathDebug'
 	import { get } from 'svelte/store'
 	import { onDestroy, onMount } from 'svelte'
+	import { browser } from '$app/environment'
 
 	const toggle = () => pathDebugEnabled.update((v) => !v)
 
@@ -56,7 +57,8 @@
 
 	onMount(() => window.addEventListener('keydown', onKey))
 	onDestroy(() => {
-		window.removeEventListener('keydown', onKey)
+		// onDestroy also fires during SSR in Svelte 5, where `window` is undefined.
+		if (browser) window.removeEventListener('keydown', onKey)
 		clearTimeout(copyTimer)
 	})
 

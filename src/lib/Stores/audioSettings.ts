@@ -24,6 +24,9 @@ export interface AudioSettings {
 
 export const AUDIO_STORAGE_KEY = 'thunderlite.audio.settings.v1'
 
+/** One year — settings should outlive a browsing session, like any preference. */
+const AUDIO_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
 export function defaultAudioSettings(): AudioSettings {
 	return {
 		master: { volume: 1, muted: false },
@@ -63,10 +66,37 @@ export function normalizeAudioSettings(raw: unknown): AudioSettings {
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
 
+/**
+ * Cookie-backed storage so the chosen preferences (notably "sound off") travel
+ * with the document rather than living only in `localStorage`. A non-httpOnly
+ * cookie is intentional here — these are pure client UX preferences the page
+ * reads on load to decide whether audio may start, so it must be reachable from
+ * JS. Auth tokens stay httpOnly elsewhere; nothing sensitive lives here.
+ */
+function cookieStorage(): StorageLike | null {
+	if (!browser || typeof document === 'undefined') return null
+	return {
+		getItem(key: string): string | null {
+			const prefix = `${encodeURIComponent(key)}=`
+			for (const part of document.cookie ? document.cookie.split('; ') : []) {
+				if (part.startsWith(prefix)) return decodeURIComponent(part.slice(prefix.length))
+			}
+			return null
+		},
+		setItem(key: string, value: string): void {
+			const secure =
+				typeof location !== 'undefined' && location.protocol === 'https:' ? '; Secure' : ''
+			document.cookie =
+				`${encodeURIComponent(key)}=${encodeURIComponent(value)}` +
+				`; Path=/; Max-Age=${AUDIO_COOKIE_MAX_AGE}; SameSite=Lax${secure}`
+		},
+	}
+}
+
 function defaultStorage(): StorageLike | null {
 	if (!browser) return null
 	try {
-		return window.localStorage
+		return cookieStorage()
 	} catch {
 		return null
 	}

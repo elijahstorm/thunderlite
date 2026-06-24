@@ -178,4 +178,41 @@ describe('applyAction determinism', () => {
 		const second = run()
 		expect(second).toEqual(first)
 	})
+
+	it('attacking flags a capture-capable unit so it skips next turn’s capture', () => {
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, STRIKE_COMMANDO, 0)
+		placeUnit(map, 13, STRIKE_COMMANDO, 1)
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'attack', from: 12, to: 13 })
+		expect(map.layers.units[12]?.attacked).toBe(true)
+	})
+
+	it('a capturing unit killed in combat resets the building it stood on to full', () => {
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, SCORPION_TANK, 0)
+		placeUnit(map, 13, STRIKE_COMMANDO, 1, 1) // 1 HP — one shot kills it
+		placeBuilding(map, 13, CITY, 0) // enemy (team 0) building under the team-1 commando
+		const max = buildingData[CITY].stature
+		map.layers.buildings[13]!.stature = max - 10 // mid-capture by the commando
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'attack', from: 12, to: 13 })
+		expect(map.layers.units[13]).toBeNull() // defender died
+		expect(map.layers.buildings[13]?.stature).toBe(max)
+	})
+
+	it('moving off a partially-captured enemy building resets its stature to full', () => {
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, STRIKE_COMMANDO, 0)
+		placeBuilding(map, 12, CITY, 1)
+		const max = buildingData[CITY].stature
+		map.layers.buildings[12]!.stature = max - 10 // mid-capture
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'move', from: 12, to: 13 })
+		expect(map.layers.units[13]?.type).toBe(STRIKE_COMMANDO)
+		expect(map.layers.buildings[12]?.stature).toBe(max)
+	})
 })

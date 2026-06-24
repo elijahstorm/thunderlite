@@ -7,8 +7,11 @@ import { revealCloakedAdjacentTo } from './modifiers/cloak'
 import { applyLancePassthrough } from './modifiers/lance'
 import { applyVultureKill } from './modifiers/vulture'
 import { mine } from './modifiers/miner'
+import { hasModifier } from './modifiers/canAttack'
+import { resetCaptureProgress } from './modifiers/capture'
 import { repair } from './modifiers/repair'
 import { landUnload, transportLoad } from './modifiers/transport'
+import { buildAdjacent } from './modifiers/builder'
 import { spawnBuiltUnit } from './build'
 import { endTurn } from './turnLoop'
 import { applyWinConditions } from './winConditions'
@@ -87,6 +90,8 @@ const reduceHealth = (
 	target.health = next
 	if (next === 0) {
 		map.layers.units[tile] = null
+		// A capturing unit dying mid-capture abandons the building, same as walking off.
+		resetCaptureProgress(map.layers.buildings[tile], target.team)
 		// A witnessed stealth-unit death trims the CPU's remembered tally for that team.
 		if (isStealthUnit(target)) recordStealthDeath(map, tile, target.team)
 		fx('death', target)
@@ -107,6 +112,8 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: 
 	const unit = map.layers.units[from]
 	if (!unit) return
 	if (from === to) return
+	// Abandoning a capture: stepping off the tile heals the building back to full.
+	resetCaptureProgress(map.layers.buildings[from], unit.team)
 	map.layers.units[from] = null
 	map.layers.units[to] = unit
 	fx('move', unit)
@@ -132,6 +139,10 @@ const applyAttack = (
 	if (!attacker || !target) return
 
 	fx('attack', attacker)
+	// A capture-capable unit that attacks forfeits next turn's auto-capture tick;
+	// the flag is consumed by the Start_Turn capture handler. Tagged only on
+	// capturers so the field never spreads to units that can't capture anyway.
+	if (hasModifier(attacker, 'Start_Turn.Capture')) attacker.attacked = true
 	const targetDied = reduceHealth(map, attacker, target, to, from, 'attack', fx, stat)
 	applyLancePassthrough(map as MapObject, from, to)
 
@@ -213,6 +224,25 @@ export const applyAction = (
 			applyWinConditions(map as MapObject)
 			return
 		}
+		case 'build-adjacent': {
+			const builder = map.layers.units[action.builder]
+			if (!builder) return
+			const built = buildAdjacent(
+				map,
+				action.builder,
+				action.unitType,
+				builder.team,
+				action.destination
+			)
+			if (built.ok && typeof built.tile === 'number') {
+				const spawned = map.layers.units[built.tile]
+				if (spawned && isStealthUnit(spawned)) recordStealthBuild(map, built.tile, builder.team)
+				fx('build')
+				stat({ kind: 'build', team: builder.team })
+			}
+			applyWinConditions(map as MapObject)
+			return
+		}
 		case 'transport-load': {
 			const result = transportLoad(map, action.passenger, action.transport)
 			if (result.ok) {
@@ -222,9 +252,13 @@ export const applyAction = (
 			return
 		}
 		case 'transport-unload': {
+			// The carried unit disembarks onto the transport's own tile, so it inherits
+			// that tile's acted state: already spent if the transport moved here this
+			// turn (post-move land), still free to move if it landed without moving.
+			// Nothing to mark — landUnload removes the transport and drops the unit in
+			// the same cell, keeping whatever acted flag the cell already had.
 			const result = landUnload(map, action.transport, action.tile)
 			if (result.ok) {
-				markTileActed(action.tile)
 				applyWinConditions(map as MapObject)
 			}
 			return
@@ -237,7 +271,21 @@ export const applyAction = (
 		case 'end-turn': {
 			// Credit the turn to whoever is ending it, before `endTurn` advances.
 			stat({ kind: 'turn', team: get(gameState).currentTeam })
+			// Capture now resolves inside `endTurn` (the next team's Start_Turn phase)
+			// rather than via a menu action, so the capture stat is credited here by
+			// diffing building ownership across the turn flip. Goes through the same
+			// live-gated `stat` sink, so replay/reconnect stays silent.
+			const ownersBefore = map.layers.buildings.map((b) => b?.team ?? null)
 			endTurn({ map })
+			// Only buildings that flipped *to the team that just started its turn* are
+			// auto-captures. This excludes ownership changes from a player defeat
+			// (those neutralize to NEUTRAL_TEAM, not the active team).
+			const activeTeam = get(gameState).currentTeam
+			map.layers.buildings.forEach((b, tile) => {
+				if (b && b.team === activeTeam && ownersBefore[tile] !== activeTeam) {
+					stat({ kind: 'capture', team: activeTeam })
+				}
+			})
 			return
 		}
 		case 'surrender': {

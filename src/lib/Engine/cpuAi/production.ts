@@ -2,7 +2,7 @@ import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { gameState } from '../gameState'
-import { buildableUnits } from '../build'
+import { buildableUnits, type BuildableUnitsOptions } from '../build'
 import type { SerializedAction } from '../Interactor/serializedAction'
 
 type ArmyMix = {
@@ -70,14 +70,22 @@ const scoreBuildChoice = (
 	return score - cost * 0.1
 }
 
-export const pickBuildOnce = (map: MapObject, cpuTeam: number): SerializedAction | null => {
-	const producers = findProducerBuildings(map, cpuTeam)
-	if (producers.length === 0) return null
-
+/**
+ * Rank every unit the CPU can afford from a funding source, best first. Shared by
+ * factory production (player money, gated by owned factories) and the Warmachine
+ * builder (its own wallet, any unit type). `opts` is threaded straight into
+ * {@link buildableUnits} to set the budget and lift the control gate. The
+ * Warmachine planner walks the ranked list to skip choices it can't physically
+ * deploy on the terrain around it (e.g. a sea unit on a landlocked tile).
+ */
+export const rankBuildableTypes = (
+	map: MapObject,
+	cpuTeam: number,
+	opts: BuildableUnitsOptions = {}
+): { type: number; score: number }[] => {
 	const state = get(gameState)
 	const player = state.players.find((p) => p.team === cpuTeam)
-	if (!player) return null
-	if (player.money <= 0) return null
+	if (!player) return []
 
 	const mix = sampleArmyMix(map, cpuTeam)
 	const enemyAirThreat = mix.air > 0 && mix.air * 3 >= mix.totalEnemies
@@ -87,19 +95,33 @@ export const pickBuildOnce = (map: MapObject, cpuTeam: number): SerializedAction
 		if (u && u.team === cpuTeam && isCaptureCapable(u.type)) ownCaptureCount++
 	}
 
-	const candidates = buildableUnits(player).filter((c) => c.buildable)
-	if (candidates.length === 0) return null
+	return buildableUnits(player, opts)
+		.filter((c) => c.buildable)
+		.map((c) => ({ type: c.type, score: scoreBuildChoice(c.type, mix, ownCaptureCount, enemyAirThreat) }))
+		.sort((a, b) => b.score - a.score)
+}
 
-	let bestType: number | null = null
-	let bestScore = -Infinity
-	for (const c of candidates) {
-		const s = scoreBuildChoice(c.type, mix, ownCaptureCount, enemyAirThreat)
-		if (s > bestScore) {
-			bestScore = s
-			bestType = c.type
-		}
-	}
-	if (bestType === null) return null
+/**
+ * The single highest-value unit the CPU should build, or null if it can afford
+ * none. Thin wrapper over {@link rankBuildableTypes} for the factory path.
+ */
+export const bestBuildableType = (
+	map: MapObject,
+	cpuTeam: number,
+	opts: BuildableUnitsOptions = {}
+): { type: number; score: number } | null => rankBuildableTypes(map, cpuTeam, opts)[0] ?? null
 
-	return { kind: 'build', building: producers[0], unitType: bestType }
+export const pickBuildOnce = (map: MapObject, cpuTeam: number): SerializedAction | null => {
+	const producers = findProducerBuildings(map, cpuTeam)
+	if (producers.length === 0) return null
+
+	const state = get(gameState)
+	const player = state.players.find((p) => p.team === cpuTeam)
+	if (!player) return null
+	if (player.money <= 0) return null
+
+	const best = bestBuildableType(map, cpuTeam)
+	if (!best) return null
+
+	return { kind: 'build', building: producers[0], unitType: best.type }
 }

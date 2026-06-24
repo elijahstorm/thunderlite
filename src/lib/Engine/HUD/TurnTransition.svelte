@@ -16,23 +16,12 @@
 	import { fly } from 'svelte/transition'
 	import { cubicOut } from 'svelte/easing'
 	import { gameState } from '../gameState'
+	import { TEAM_COLORS } from '../teamColors'
 	import { turnTransitionActive, TURN_TRANSITION_MS } from './turnTransitionStore'
 
 	export let localTeam: number = 0
 	/** True when other teams are CPU; flips the label between "Enemy" and "Player N". */
 	export let cpuOpponent: boolean = false
-
-	// Mirrors the team palette from `imageColorizer.ts` (the second band of each
-	// team's gradient — the saturated mid-tone). Keeping a separate copy here is
-	// fine: the colorizer's data lives in pixel triples for sprite recolouring,
-	// not as CSS-ready strings.
-	const TEAM_COLORS = [
-		'rgb(233,56,46)', // 0 — red
-		'rgb(69,164,225)', // 1 — blue
-		'rgb(67,193,56)', // 2 — green
-		'rgb(229,229,43)', // 3 — yellow
-		'rgb(138,134,139)', // 4 — grey
-	]
 
 	let lastKey = ''
 	let showing = false

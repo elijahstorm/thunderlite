@@ -3,6 +3,10 @@ import type { modifierData } from './modifier'
 
 type TerrainData = ObjectAssetMeta & {
 	connector: 0 | 1 | 2 | 3 | 4
+	// Sprite column to show in the map-editor palette. Autotiled terrains (border
+	// connector) render their state-0 frame as open water, so Shore would look
+	// identical to Sea in the palette. Point it at a coastline frame instead.
+	editorState?: number
 	name: string
 	description: string
 	details: 'clean' | 'dirty' | 'rough' | 'slippery' | 'rugged' | 'impassable'
@@ -182,7 +186,7 @@ export const terrainData: TerrainData[] = [
 		yOffset: 0,
 		connector: 0,
 		name: 'Depleted Ore Deposit',
-		description: 'Can be mined for money',
+		description: 'Mined out — no funds left',
 		details: 'rugged',
 		ocean: false,
 		protection: 0,
@@ -261,6 +265,7 @@ export const terrainData: TerrainData[] = [
 		xOffset: 0,
 		yOffset: 0,
 		connector: 3,
+		editorState: 11,
 		name: 'Shore',
 		description: 'An easy access to the sea',
 		details: 'rough',

@@ -171,3 +171,47 @@ describe('supplyIncome handler direct dispatch', () => {
 		expect(moneyOf(0)).toBe(120)
 	})
 })
+
+describe('income reservoir depletion', () => {
+	beforeEach(() => {
+		resetGameState()
+		clearModifierRegistry()
+	})
+
+	it('draws full income from the reservoir until it runs dry, then only a trickle', () => {
+		const map = makeMap()
+		map.layers.units[0] = unit(0)
+		const city = building(0, CITY_TYPE)
+		// A nearly-empty reservoir so the last full payout is capped and the next is a trickle.
+		city.resources = 100
+		map.layers.buildings[0] = city
+		initGameStateFromMap(map)
+
+		// Round 1: only $100 remains, so the City pays $100 and the reservoir hits 0.
+		endTurn({ map })
+		expect(moneyOf(0)).toBe(100)
+		expect(city.resources).toBe(0)
+
+		// Round 2: drained — pays the reduced trickle (25% of 120 = 30).
+		endTurn({ map })
+		expect(moneyOf(0)).toBe(130)
+		expect(city.resources).toBe(0)
+
+		// Round 3: still trickling.
+		endTurn({ map })
+		expect(moneyOf(0)).toBe(160)
+	})
+
+	it('defaults an untouched building to its full reservoir before depleting', () => {
+		const map = makeMap()
+		map.layers.units[0] = unit(0)
+		const city = building(0, CITY_TYPE) // resources field absent → defaults to data (1000)
+		map.layers.buildings[0] = city
+		initGameStateFromMap(map)
+
+		endTurn({ map })
+
+		expect(moneyOf(0)).toBe(120)
+		expect(city.resources).toBe(880) // 1000 - 120
+	})
+})

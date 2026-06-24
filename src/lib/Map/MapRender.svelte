@@ -11,9 +11,8 @@
 	import { onDestroy, onMount, tick } from 'svelte'
 	import {
 		animationFrame,
-		animationTimer,
-		overlayFrame,
-		overlayTimer,
+		startAnimationClock,
+		stopAnimationClock,
 	} from '$lib/Sprites/animationFrameCount'
 	import { connectionDecision, cornerDecision } from '$lib/Sprites/spriteConnector'
 	import { imageColorizer } from '$lib/Sprites/imageColorizer'
@@ -189,7 +188,9 @@
 		// long-range unit picking a target), the unit isn't moving, so suppress the
 		// route preview rather than drawing a stale path over the move tiles.
 		if ($interactionState !== 'choice') {
-			map.route = []
+			// The directional build picker owns map.route while it's up (the outward
+			// arrows aren't hover-driven), so leave it intact in that state only.
+			if ($interactionState !== 'selectBuildTile') map.route = []
 			// DEV TOOL — live path/move diagnostics (PathDebugPanel). dev-only.
 			if (dev && !mini && get(pathDebugEnabled)) analyzePathDebug(map, get(interactionSource), tile)
 			return
@@ -219,28 +220,16 @@
 		return false
 	}
 
-	const inc = () => {
-		if (pause) {
-			$animationTimer = null
-			return
-		}
-		animationFrame.update((frame) => (frame + 1) % 100000)
-		$animationTimer = setTimeout(inc, ANIMATION_TIME)
+	// Repaint this board on every global animation tick (idle unit cycling,
+	// selectable-unit pulse, movement steps). The tick itself is a process-wide
+	// singleton owned by the animation clock (see animationFrameCount); here we
+	// only react to the counter it advances. Paused boards (the minimap) hold a
+	// static frame, so they skip the per-frame repaint. The combat-overlay clock
+	// (`overlayFrame`) drives the DOM Animator reactively and needs no canvas
+	// repaint, so it isn't mirrored here.
+	$: if (!pause) {
+		$animationFrame
 		render()
-	}
-
-	// Faster clock for combat overlays (attack/explosion sprite sheets). Runs on
-	// its own beat so swings/blasts play at a natural ~18fps without speeding up
-	// movement steps or idle cycling, which stay on `inc`/ANIMATION_TIME. Overlays
-	// are DOM (Animator.svelte) and re-render reactively off `overlayFrame`, so no
-	// canvas render() call is needed here.
-	const incOverlay = () => {
-		if (pause) {
-			$overlayTimer = null
-			return
-		}
-		overlayFrame.update((frame) => (frame + 1) % 100000)
-		$overlayTimer = setTimeout(incOverlay, OVERLAY_ANIMATION_TIME)
 	}
 
 	// Resizing the map (editor "Map options") feeds the canvas through two
@@ -272,12 +261,19 @@
 		render()
 	}
 
+	// Hold a reference on the global animation clock while this board is unpaused.
+	// `clockHeld` tracks our own one-and-only reference so the ref count stays
+	// balanced even if `pause` toggles at runtime: we acquire on the false edge,
+	// release on the true edge, and release once on destroy. The clock itself is
+	// a singleton, so this never starts a second tick chain.
+	let clockHeld = false
 	$: {
-		if (!pause && !$animationTimer) {
-			$animationTimer = setTimeout(inc, ANIMATION_TIME)
-		}
-		if (!pause && !$overlayTimer) {
-			$overlayTimer = setTimeout(incOverlay, OVERLAY_ANIMATION_TIME)
+		if (!pause && !clockHeld) {
+			startAnimationClock(ANIMATION_TIME, OVERLAY_ANIMATION_TIME)
+			clockHeld = true
+		} else if (pause && clockHeld) {
+			stopAnimationClock()
+			clockHeld = false
 		}
 	}
 
@@ -292,13 +288,6 @@
 	onMount(() => {
 		if (!colorizer) colorizer = imageColorizer()
 
-		if (!pause && !$animationTimer) {
-			$animationTimer = setTimeout(inc, ANIMATION_TIME)
-		}
-		if (!pause && !$overlayTimer) {
-			$overlayTimer = setTimeout(incOverlay, OVERLAY_ANIMATION_TIME)
-		}
-
 		hudImages.advice.src = hud.advice
 		hudImages.arrow.src = hud.arrow
 
@@ -312,14 +301,10 @@
 	})
 
 	onDestroy(() => {
-		if ($animationTimer) {
-			clearTimeout($animationTimer)
+		if (clockHeld) {
+			stopAnimationClock()
+			clockHeld = false
 		}
-		$animationTimer = null
-		if ($overlayTimer) {
-			clearTimeout($overlayTimer)
-		}
-		$overlayTimer = null
 		if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(fogRaf)
 	})
 </script>

@@ -155,6 +155,32 @@ export const validTerrain = (terrain: GroundObject, unit: UnitObject) => {
 	return u.type === 'ground'
 }
 
+// Whether `unit` could legally occupy `terrain` — used by the map editor to reject
+// nonsensical placements (a ground unit on the sea, a ship on grass, anything on a
+// volcano, a tank on a mountain). It mirrors the in-match passability rules
+// (`validTerrain`'s terrain gate plus the impassable `drag` check that `landTiles`
+// relies on) but, unlike `validTerrain`, permits immobile units (Turrets, Blockades)
+// which can never "move" yet still belong on the board.
+export const canPlaceUnit = (terrain: GroundObject, unit: UnitObject, sky?: SkyObject | null) => {
+	const u = unitData[unit.type]
+	const t = terrainData[terrain.type]
+	if (t.details === 'impassable') return false
+	if (u.type === 'air') return true
+	const terrainAllows =
+		t.name === 'Shore'
+			? true
+			: t.name === 'High Bridge'
+				? u.type === 'ground' || u.type === 'sea'
+				: t.ocean
+					? u.type === 'sea'
+					: u.type === 'ground'
+	if (!terrainAllows) return false
+	// Even on type-compatible terrain, a unit's movement type may be unable to
+	// traverse it (a tank on a mountain, a warship on a shore): an impassable move
+	// cost means it could never stand there, so it can't be placed there either.
+	return drag(unit, terrain, sky ?? undefined) < 100
+}
+
 const updateTileDecision = {
 	right: (map: MapObject, tile: number) => tile + 1,
 	left: (map: MapObject, tile: number) => tile - 1,

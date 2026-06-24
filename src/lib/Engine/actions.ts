@@ -1,10 +1,10 @@
 import { unitData } from '$lib/GameData/unit'
-import { buildingData } from '$lib/GameData/building'
 import { generateAttackList } from './Interactor/Pathing/attack'
 import { hasModifier, isRanged } from './modifiers/canAttack'
 import { canMineAt } from './modifiers/miner'
 import { passableAdjacentTiles } from './modifiers/builder'
 import {
+	canAirLift,
 	canShipOut,
 	findFriendlyTransporters,
 	hasRescuedUnit,
@@ -19,6 +19,7 @@ export type ActionMenuItemId =
 	| 'repair'
 	| 'transport'
 	| 'ship_out'
+	| 'air_lift'
 	| 'land'
 	| 'wait'
 
@@ -41,14 +42,6 @@ export type AvailableActionsContext = {
 
 const hasAttackableEnemy = (map: MapObject, tile: number, unit: UnitObject): boolean =>
 	generateAttackList(map, tile, unit).length > 0
-
-const isCapturable = (map: MapObject, tile: number, unit: UnitObject): boolean => {
-	if (!hasModifier(unit, 'Start_Turn.Capture')) return false
-	const building = map.layers.buildings[tile]
-	if (!building) return false
-	if (building.team === unit.team) return false
-	return (buildingData[building.type]?.stature ?? 0) > 0
-}
 
 const isMineable = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 	if (!hasModifier(unit, 'Self_Action.Miner')) return false
@@ -77,6 +70,10 @@ const canShipOutHere = (map: MapObject, tile: number, _unit: UnitObject): boolea
 	return canShipOut(map, tile)
 }
 
+const canAirLiftHere = (map: MapObject, tile: number, _unit: UnitObject): boolean => {
+	return canAirLift(map, tile)
+}
+
 const canLand = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 	if (!hasModifier(unit, 'Self_Action.Land')) return false
 	if (!hasRescuedUnit(unit)) return false
@@ -92,15 +89,18 @@ export const computeAvailableActions = (ctx: AvailableActionsContext): ActionMen
 		items.push({ id: 'attack', enabled: true })
 	}
 
-	if (isCapturable(map, tile, unit)) {
-		items.push({ id: 'capture', enabled: true })
-	}
+	// Capture is no longer a menu action — it resolves automatically at the start of
+	// the owning team's turn (see modifiers/capture + turnLoop). The unit just needs
+	// to be standing on the enemy building when its turn begins.
 
 	if (isMineable(map, tile, unit)) {
 		items.push({ id: 'mine', enabled: true })
 	}
 
-	if (isBuilder(map, tile, unit)) {
+	// A builder (Warmachine) deploys in place: it can't both move and build in the
+	// same turn, so the build option is withheld once it has moved this turn — the
+	// player must build before moving (from the stationary action menu).
+	if (!moved && isBuilder(map, tile, unit)) {
 		items.push({ id: 'build', enabled: true })
 	}
 
@@ -110,6 +110,10 @@ export const computeAvailableActions = (ctx: AvailableActionsContext): ActionMen
 
 	if (canShipOutHere(map, tile, unit)) {
 		items.push({ id: 'ship_out', enabled: true })
+	}
+
+	if (canAirLiftHere(map, tile, unit)) {
+		items.push({ id: 'air_lift', enabled: true })
 	}
 
 	if (canLand(map, tile, unit)) {

@@ -11,6 +11,7 @@
 	export let data: PageData
 	$: user = data.user
 	$: auth = data.auth ?? ''
+	$: redirectTo = data.redirectTo ?? '/make'
 
 	export let form
 	let errors: { [key: string]: string } = {}
@@ -63,7 +64,7 @@
 						alt="user profile"
 						src={updated.profile_image_url}
 						{auth}
-						on:complete={() => goto('/make')}
+						on:complete={() => goto(redirectTo)}
 					/>
 				{:else}
 					<form

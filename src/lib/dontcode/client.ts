@@ -8,6 +8,7 @@
  */
 import { goto } from '$app/navigation'
 import { writable } from 'svelte/store'
+import { safeRedirect } from '$lib/safeRedirect'
 
 export interface SessionUser {
 	id: string
@@ -17,7 +18,17 @@ export interface SessionUser {
 export const loggedIn = writable<boolean>(false)
 export const userAuth = writable<string | null>(null)
 
-export const redirectAfterLogin = () => goto('/onboarding')
+/**
+ * Always route through /onboarding after authenticating — it's the gatekeeper
+ * that decides whether the profile still needs setup. The validated return URL
+ * rides along so onboarding can forward there (skipping straight through if the
+ * profile is already complete).
+ */
+export const redirectAfterLogin = (redirectTo?: string | null) => {
+	const target = safeRedirect(redirectTo)
+	const query = target ? `?redirectTo=${encodeURIComponent(target)}` : ''
+	return goto(`/onboarding${query}`)
+}
 export const redirectAfterLogout = () => goto('/login')
 
 const setSession = (user: SessionUser) => {

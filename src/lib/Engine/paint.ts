@@ -6,6 +6,7 @@ import { gameState } from './gameState'
 import { interactionSource } from './Interactor/interactionState'
 import { computeFogMask, drawFog, observeFog, observeUnitFade } from './fogRender'
 import { isUnitStealthed } from './visibility'
+import { isWalletUnit, walletOf } from './wallet'
 import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
@@ -80,7 +81,6 @@ export const paint =
 		// Persistent enemy-threat overlay, drawn under the active selection
 		// highlights so a unit you're currently moving still reads on top.
 		render.threat(map.threatTiles?.has(tile) ?? false)
-		render.highlights(map.highlights[tile])
 		const buildingAtTile = map.layers.buildings[tile] ?? null
 		const hideEnemyBuildingCapture =
 			!tileVisible && fog !== null && buildingAtTile !== null && buildingAtTile.team !== fog.team
@@ -96,27 +96,62 @@ export const paint =
 		} else {
 			render.conditionally(buildingAtTile, renderData.building)
 		}
-		if (!hideEnemyBuildingCapture) {
-			render.captureProgress(buildingAtTile)
-		}
+		// Selection highlights (move-green, attack-red, amber "selected" origin) are
+		// drawn AFTER the building so they stay visible on a building tile. Buildings
+		// are tall, opaque sprites; painting the highlight underneath them (as before)
+		// meant a Warfactory swallowed the green "you can move here" wash AND the amber
+		// "this unit is selected" marker — so moving a unit onto, or selecting a unit
+		// standing on, an actable building gave no visible feedback and felt broken.
+		// Still drawn before the unit below, so a unit on the tile reads on top.
+		render.highlights(map.highlights[tile])
 		if (!hideIdleUnit && unitAlpha > 0.01) {
 			const drawUnit = unitAnimates ? render.conditionally : render.conditionallyStatic
 			context.save()
+			// Spent units stay fully opaque — they only desaturate/dim via the
+			// filter. Fading them out made them read as "slightly invisible" and
+			// let the tile (especially busy building art) bleed through, which
+			// looked wrong; the brightness/saturation knock-down alone is enough to
+			// signal "acted".
+			context.globalAlpha = unitAlpha
 			if (unitActed) {
 				context.filter = 'brightness(0.55) saturate(0.5)'
-				context.globalAlpha = 0.75 * unitAlpha
-			} else {
-				context.globalAlpha = unitAlpha
 			}
 			drawUnit(unitAtTile, renderData.unit)
 			context.restore()
 		}
-		// HP/status bar: drawn whenever the unit is on-screen, *independent* of
-		// `hideIdleUnit` — that flag suppresses only the idle sprite (so an attack
-		// overlay can show alone), but a hurt unit's bar must stay visible right
-		// through its swing/counter and not blink out. Read at full strength even on
-		// a dimmed cloaked unit; only fog-hidden / fully-faded units skip it.
-		if (unitAtTile !== null && !hideEnemyUnit && unitAlpha > 0.01) {
+		// Carried-passenger badge: a transport (Leviathan / paraglider Transporter)
+		// shows the unit riding inside it as a small icon, drawn over the carrier but
+		// under the HP bar so the bar stays readable.
+		if (!hideIdleUnit && unitAlpha > 0.01 && unitAtTile?.rescuedUnit) {
+			context.save()
+			context.globalAlpha = unitAlpha
+			render.carryBadge(unitAtTile.rescuedUnit, renderData.unit)
+			context.restore()
+		}
+		// Money/status overlays, drawn FIRST so the HP bar below can paint over them.
+		const unitVisible = unitAtTile !== null && !hideEnemyUnit && unitAlpha > 0.01
+		if (unitVisible) {
+			// Warmachine holdings tag, drawn with the unit so it tracks through its
+			// animations and is hidden by the same fog/enemy rules. Sits top-right.
+			render.walletLabel(unitAtTile)
+		}
+		// Building status overlays (capture countdown + income reserve), drawn AFTER
+		// the unit so a unit standing on the building never hides them — the capture
+		// number especially was getting buried under the capturing unit's sprite.
+		if (!hideEnemyBuildingCapture) {
+			// Money pill first, capture bar last, so the capture indicator always
+			// layers on top of the building's income readout rather than under it.
+			render.incomeReserve(buildingAtTile)
+			render.captureProgress(buildingAtTile)
+		}
+		// HP/status bar: drawn LAST of all the per-tile overlays so a unit's health
+		// always sits on top — a Warmachine's wallet pill (or a building's money tag
+		// on the same tile) can never bury it. Drawn *independent* of `hideIdleUnit`:
+		// that flag suppresses only the idle sprite (so an attack overlay can show
+		// alone), but a hurt unit's bar must stay visible right through its
+		// swing/counter and not blink out. Read at full strength even on a dimmed
+		// cloaked unit; only fog-hidden / fully-faded units skip it.
+		if (unitVisible) {
 			render.playInfo(unitAtTile)
 		}
 		render.conditionally(map.layers.sky[tile], renderData.sky)
@@ -138,12 +173,26 @@ export const paint =
 			}
 		}
 
-		// Selection idle-marker for actionable units. Only shown when the local
-		// viewer is also the team currently in control — i.e. it tracks who has
-		// the mouse, not whose turn it is — so an AI/remote opponent's turn never
-		// tags their units as selectable for us. Drawn after everything else on
-		// the tile so it sits above the unit; the PNG's alpha preserves it.
-		if (!editor && !hideIdleUnit && unitAnimates && state.currentTeam === localTeam && !hasSelection) {
+		// Selection idle-marker for actionable units AND actable buildings (e.g. a
+		// Warfactory that can still produce). Only shown when the local viewer is
+		// also the team currently in control — i.e. it tracks who has the mouse, not
+		// whose turn it is — so an AI/remote opponent's turn never tags their pieces
+		// as selectable for us. A building only gets the marker while no unit stands
+		// on it (the unit takes selection priority, and would carry its own marker).
+		// Drawn after everything else on the tile so it sits on top; the PNG's alpha
+		// preserves it.
+		const buildingSelectable =
+			buildingAtTile !== null &&
+			buildingData[buildingAtTile.type]?.actable === true &&
+			buildingAtTile.team === state.currentTeam &&
+			!state.actedTiles.has(tile) &&
+			unitAtTile === null
+		if (
+			!editor &&
+			state.currentTeam === localTeam &&
+			!hasSelection &&
+			((!hideIdleUnit && unitAnimates) || buildingSelectable)
+		) {
 			render.tileAnimation(renderData.animation(ANIMATION_SELECT))
 		}
 
@@ -174,10 +223,13 @@ const contextProvider = (
 	conditionally: conditionally(width, height, frame, scale)(context),
 	// Frame-0 variant for units that must not idle-animate (spent or non-active team).
 	conditionallyStatic: conditionally(width, height, 0, scale)(context),
+	carryBadge: carryBadge(width, height)(context),
 	highlights: highlights(width, height, frame)(context),
 	threat: threatHighlight(width, height, frame)(context),
 	playInfo: playInfo(width, height, scale)(context),
+	walletLabel: walletLabel(width, height, scale)(context),
 	captureProgress: captureProgress(width, height, scale)(context),
+	incomeReserve: incomeReserve(width, height, scale)(context),
 	advice: advice(width, height)(context),
 	route: route(width, height)(context),
 	tileAnimation: tileAnimation(width, height, frame)(context),
@@ -299,9 +351,14 @@ const mapBorder =
 const renderObject =
 	(width: number, height: number, frame: number, scale: number) =>
 	(context: CanvasRenderingContext2D) =>
-	<T extends ActiveObject>(object: T, render: ObjectSpriteRenderer) =>
+	<T extends ActiveObject>(object: T, render: ObjectSpriteRenderer) => {
+		// `sprite` is populated asynchronously once the image finishes loading
+		// (see imageLazyLoader). On the first paint after a reload it can still be
+		// undefined — skip this object so we don't throw; it paints next frame.
+		const sprite = render?.sprite?.[object.team ?? 0]
+		if (!sprite) return
 		context.drawImage(
-			render.sprite[object.team ?? 0],
+			sprite,
 			object.state * (spriteSize + render.xOffset),
 			(frame % render.frames) * (spriteSize + render.yOffset),
 			spriteSize + render.xOffset,
@@ -311,6 +368,7 @@ const renderObject =
 			width + render.xOffset / scale,
 			height + render.yOffset / scale
 		)
+	}
 
 const always =
 	(width: number, height: number, frame: number, scale: number) =>
@@ -380,6 +438,48 @@ const conditionally =
 				)
 			: null
 
+// Small inset badge showing the unit a transport is carrying: the passenger's
+// default sprite (state 0, frame 0) drawn at ~30% of the tile in the bottom-right
+// corner, over a soft dark plate so it stays legible against any carrier. Uses
+// the passenger's own team palette since a transport only ever carries its owner's
+// units. Frame 0 keeps it static even while the carrier idle-animates.
+const CARRY_BADGE_SCALE = 0.3
+
+const carryBadge =
+	(width: number, height: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(passenger: { type: number; team?: number }, renderer: (type: number) => ObjectSpriteRenderer | null) => {
+		const render = renderer(passenger.type)
+		if (!render) return
+		const sprite = render.sprite[passenger.team ?? 0]
+		if (!sprite) return
+
+		const badgeW = width * CARRY_BADGE_SCALE
+		const badgeH = height * CARRY_BADGE_SCALE
+		const pad = Math.min(width, height) * 0.04
+		const dx = width - badgeW - pad
+		const dy = height - badgeH - pad
+
+		context.save()
+		context.fillStyle = 'rgba(15,23,42,0.7)'
+		context.beginPath()
+		context.roundRect(dx, dy, badgeW, badgeH, Math.min(badgeW, badgeH) * 0.25)
+		context.fill()
+
+		context.drawImage(
+			sprite,
+			0,
+			0,
+			spriteSize + render.xOffset,
+			spriteSize + render.yOffset,
+			dx,
+			dy,
+			badgeW,
+			badgeH
+		)
+		context.restore()
+	}
+
 // Vertical sprite-strip overlay for a single tile (tile-select, tile-pointer).
 // Always uses the team-0 (uncolored) sprite, source x=0, since these effects
 // have no team variant and only one column. Frame y advances with the shared
@@ -421,12 +521,53 @@ const highlights =
 
 		if (highlight.shadowed) {
 			drawShadowHighlight(context, width, height, pulse)
+		} else if (highlight.origin) {
+			drawOriginHighlight(context, width, height, pulse)
 		} else if (highlight.type === 1) {
 			drawAttackHighlight(context, width, height, frame, pulse)
 		} else {
 			drawMoveHighlight(context, width, height, frame, pulse)
 		}
 	}
+
+// The selected unit's own tile. Deliberately *not* green like the move targets
+// around it — a muted amber wash with steady corner brackets reads as "this unit
+// is selected; click again for its action menu" rather than "move here".
+const drawOriginHighlight = (
+	context: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	pulse: number
+) => {
+	context.save()
+
+	// Soft amber wash, gentler than the move green so it sits quietly under the unit.
+	context.fillStyle = `rgba(234, 179, 8, ${0.12 + pulse * 0.06})`
+	context.fillRect(0, 0, width, height)
+
+	// Steady amber corner brackets (no marching ants) — a calm frame that marks
+	// the origin without inviting a "walk here" read.
+	const len = Math.max(5, Math.round(width / 8))
+	const inset = 3
+	context.strokeStyle = `rgba(253, 224, 71, ${0.8 + pulse * 0.1})`
+	context.lineWidth = 1.5
+	context.beginPath()
+	context.moveTo(inset, inset + len)
+	context.lineTo(inset, inset)
+	context.lineTo(inset + len, inset)
+	context.moveTo(width - inset - len, inset)
+	context.lineTo(width - inset, inset)
+	context.lineTo(width - inset, inset + len)
+	context.moveTo(width - inset, height - inset - len)
+	context.lineTo(width - inset, height - inset)
+	context.lineTo(width - inset - len, height - inset)
+	context.moveTo(inset + len, height - inset)
+	context.lineTo(inset, height - inset)
+	context.lineTo(inset, height - inset - len)
+	context.stroke()
+
+	context.restore()
+}
 
 // Firing shadow — dead ground an indirect unit can't reach. A muted grey wash with
 // static diagonal hatching reads as "blocked / unavailable" and stays visually
@@ -619,8 +760,9 @@ const advice =
 		// tile *is* — footsteps on a reachable move tile (row 0), the red marker on
 		// an attackable one (row 1) — and a severity badge layered on top rates it:
 		// move advice in column 1, attack advice in column 2, rows good→terrible.
-		// Firing-shadow tiles aren't real targets, so they carry no advice icon.
-		if (!highlight || highlight.shadowed) return
+		// Firing-shadow tiles aren't real targets, and the selected unit's own
+		// (origin) tile isn't a move destination, so neither carries an advice icon.
+		if (!highlight || highlight.shadowed || highlight.origin) return
 
 		// Base glyph at half strength so it reads as a wash beneath the badge.
 		context.globalAlpha = 0.5
@@ -733,18 +875,125 @@ const captureProgress =
 		const current = typeof building.stature === 'number' ? building.stature : max
 		if (current >= max) return
 
+		// Capture reads as a vertical "health bar" pinned to the tile's TOP-left
+		// corner — the unit HP bar's look rotated 90°. Kept to 60% of the tile
+		// height and anchored at the top so it clears the unit's HP bar (which sits
+		// along the bottom edge). Fills bottom-up as the building is taken over
+		// (stature draining max → 0, so a full bar == captured), in a distinct
+		// sky-blue so it never reads as a unit's health.
+		const percentage = Math.max(0, Math.min(1, 1 - current / max))
+
 		const offset = 5 / scale
-		const fontSize = Math.max(8, Math.round(height / 4))
-		const text = String(current)
+		const margin = offset
+		const barWidth = offset * 1.3
+		const barHeight = (height - margin * 2) * 0.6
+		const x = margin
+		const y = margin
+		const radius = barWidth / 2
+
 		context.save()
-		context.font = `bold ${fontSize}px sans-serif`
-		context.textBaseline = 'top'
-		context.textAlign = 'left'
-		context.fillStyle = 'rgba(0,0,0,0.65)'
-		context.fillRect(offset, offset, fontSize * (text.length + 1), fontSize + offset)
-		context.fillStyle = '#fff'
-		context.fillText(text, offset * 1.5, offset * 1.5)
+
+		// Track: dark translucent pill with a soft drop shadow so it stays legible
+		// over bright sprites or terrain behind it.
+		context.shadowColor = 'rgba(0,0,0,0.5)'
+		context.shadowBlur = offset * 0.6
+		context.shadowOffsetX = offset * 0.15
+		context.fillStyle = 'rgba(15,23,42,0.85)'
+		context.beginPath()
+		context.roundRect(x, y, barWidth, barHeight, radius)
+		context.fill()
+		context.shadowColor = 'transparent'
+		context.shadowBlur = 0
+		context.shadowOffsetX = 0
+
+		// Fill: clipped to capture progress, grown from the bottom and inset slightly
+		// so the dark track reads as a clean border around it.
+		const inset = barWidth * 0.18
+		const fillWidth = barWidth - inset * 2
+		const fillHeight = Math.max(0, (barHeight - inset * 2) * percentage)
+		if (fillHeight > 0) {
+			const fillRadius = fillWidth / 2
+			const fillX = x + inset
+			const fillY = y + barHeight - inset - fillHeight
+			const gradient = context.createLinearGradient(0, y + barHeight, 0, y)
+			gradient.addColorStop(0, '#7dd3fc')
+			gradient.addColorStop(1, '#0ea5e9')
+			context.fillStyle = gradient
+			context.beginPath()
+			context.roundRect(fillX, fillY, fillWidth, fillHeight, fillRadius)
+			context.fill()
+
+			// Glossy highlight down the left of the fill for a bit of depth.
+			context.fillStyle = 'rgba(255,255,255,0.35)'
+			context.beginPath()
+			context.roundRect(fillX, fillY, fillWidth * 0.4, fillHeight, fillRadius)
+			context.fill()
+		}
+
 		context.restore()
+	}
+
+// Shared "$N" funds pill — the common look *and* placement for every on-board
+// money readout (a building's income reservoir, a Warmachine's wallet): a
+// right-aligned gold pill pinned to the tile's bottom-right over a translucent
+// black plate, dimming to a muted bronze once the figure hits zero so "tapped
+// out" reads at a glance. Sits low so it clears the capture countdown (top-left).
+// The HP bar is drawn AFTER this (see the per-tile draw order) so unit health
+// always paints on top of the pill rather than the other way round.
+const drawFundsPill = (
+	context: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	scale: number,
+	value: number
+) => {
+	const offset = 5 / scale
+	const fontSize = Math.max(8, Math.round(height / 4))
+	const text = `$${value}`
+	context.save()
+	context.font = `bold ${fontSize}px sans-serif`
+	context.textBaseline = 'top'
+	context.textAlign = 'right'
+	const padding = offset
+	const boxWidth = context.measureText(text).width + padding * 2
+	const boxHeight = fontSize + offset
+	const right = width - offset
+	const top = height - boxHeight - offset
+	context.fillStyle = 'rgba(0,0,0,0.65)'
+	context.fillRect(right - boxWidth, top, boxWidth, boxHeight)
+	context.fillStyle = value > 0 ? '#ffd84d' : '#b9883a'
+	context.fillText(text, right - padding, top + offset * 0.5)
+	context.restore()
+}
+
+// Income reserve tag for a funds building (City / Oil Refinery / Oil Rig): how
+// much is left in its reservoir. It pays full income each turn until this drains,
+// then only a trickle (see modifiers/supplyIncome). Pinned bottom-right so it
+// clears the capture countdown (top-left) and the building art's centre, and only
+// shown for buildings with a reservoir.
+const incomeReserve =
+	(width: number, height: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(building: BuildingObject | null) => {
+		if (!building) return
+		if (typeof building.team !== 'number') return
+		const data = buildingData[building.type]
+		const reservoir = data?.resources ?? 0
+		if (reservoir <= 0 || (data?.income ?? 0) <= 0) return
+		const remaining = typeof building.resources === 'number' ? building.resources : reservoir
+		drawFundsPill(context, width, height, scale, remaining)
+	}
+
+// Holdings tag for a Warmachine (wallet unit): the same funds pill — same look and
+// same bottom-right placement — the income buildings use. It surfaces the unit's
+// private wallet, the funds it spends building units and refills by mining ore.
+// Drawn before the HP bar so a damaged Warmachine's health paints on top of it.
+const walletLabel =
+	(width: number, height: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(unit: UnitObject | null) => {
+		if (!unit || !isWalletUnit(unit)) return
+		drawFundsPill(context, width, height, scale, walletOf(unit))
 	}
 
 // Route arrow drawn programmatically to match the new highlight aesthetic:

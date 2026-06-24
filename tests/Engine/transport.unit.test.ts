@@ -9,10 +9,17 @@ import {
 	transportLoad,
 	canShipOut,
 	shipOut,
+	canAirLift,
+	airLift,
+	teamHasAirControl,
 	landTiles,
 	landUnload,
 	hasRescuedUnit,
 } from '../../src/lib/Engine/modifiers/transport'
+import { buildingData } from '../../src/lib/GameData/building'
+
+const AIR_CONTROL = buildingData.findIndex((b) => b.name === 'Air Control')
+const CITY = buildingData.findIndex((b) => b.name === 'City')
 
 const STRIKE_COMMANDO = unitData.findIndex((u) => u.name === 'Strike Commando')
 const HEAVY_COMMANDO = unitData.findIndex((u) => u.name === 'Heavy Commando')
@@ -166,39 +173,32 @@ describe('transport — load and unload', () => {
 		expect(hasRescuedUnit(lev)).toBe(true)
 	})
 
-	it('landTiles: returns adjacent passable tiles for rescued unit movement type', () => {
+	it('landTiles: returns the transport own tile when it is passable for the rescued unit', () => {
 		const map = makeMap(5, 5)
 		const transTile = tileXY(5, 2, 2)
 		const transport = unit(TRANSPORTER_TYPE, 0)
 		transport.rescuedUnit = unit(STRIKE_COMMANDO, 0)
 		map.layers.units[transTile] = transport
 
-		// volcano (impassable) to the east; foot can go everywhere else
-		map.layers.ground[tileXY(5, 3, 2)] = { type: VOLCANO, state: 0 }
-
-		const tiles = landTiles(map, transTile)
-		expect(tiles).toContain(tileXY(5, 1, 2))
-		expect(tiles).toContain(tileXY(5, 2, 1))
-		expect(tiles).toContain(tileXY(5, 2, 3))
-		expect(tiles).not.toContain(tileXY(5, 3, 2))
+		// plains under the transport — a foot unit can stand here, so it lands in place
+		expect(landTiles(map, transTile)).toEqual([transTile])
 	})
 
-	it('landTiles: excludes occupied tiles', () => {
+	it('landTiles: returns [] when the transport own tile is impassable for the rescued unit', () => {
 		const map = makeMap(5, 5)
 		const transTile = tileXY(5, 2, 2)
 		const transport = unit(TRANSPORTER_TYPE, 0)
 		transport.rescuedUnit = unit(STRIKE_COMMANDO, 0)
 		map.layers.units[transTile] = transport
-		map.layers.units[tileXY(5, 3, 2)] = unit(SCORPION_TANK, 0)
 
-		const tiles = landTiles(map, transTile)
-		expect(tiles).not.toContain(tileXY(5, 3, 2))
+		// volcano underneath — impassable for foot, so there's nowhere to land
+		map.layers.ground[transTile] = { type: VOLCANO, state: 0 }
+		expect(landTiles(map, transTile)).toEqual([])
 	})
 
-	it('Land: rescued unit restored on adjacent valid tile; transport removed', () => {
+	it('Land: rescued unit restored on the transport own tile; transport replaced', () => {
 		const map = makeMap(5, 5)
 		const transTile = tileXY(5, 2, 2)
-		const dest = tileXY(5, 2, 1)
 		const rescuedMax = unitData[STRIKE_COMMANDO].health
 		const transportMax = unitData[TRANSPORTER_TYPE].health
 
@@ -207,10 +207,9 @@ describe('transport — load and unload', () => {
 		transport.rescuedUnit = rescued
 		map.layers.units[transTile] = transport
 
-		const result = landUnload(map, transTile, dest)
+		const result = landUnload(map, transTile, transTile)
 		expect(result.ok).toBe(true)
-		expect(map.layers.units[transTile]).toBeNull()
-		const landed = map.layers.units[dest]
+		const landed = map.layers.units[transTile]
 		expect(landed).toBe(rescued)
 		expect(landed?.team).toBe(0)
 		// transport at ~50% HP → rescued unit reduced proportionally
@@ -221,22 +220,35 @@ describe('transport — load and unload', () => {
 		expect(landed?.health).toBe(expectedHP)
 	})
 
-	it('Land: refuses an invalid destination (not adjacent / impassable)', () => {
+	it('Land: refuses any destination other than the transport own tile', () => {
 		const map = makeMap(5, 5)
 		const transTile = tileXY(5, 2, 2)
 		const transport = unit(TRANSPORTER_TYPE, 0)
 		transport.rescuedUnit = unit(STRIKE_COMMANDO, 0)
 		map.layers.units[transTile] = transport
 
-		// volcano destination (impassable for foot)
-		map.layers.ground[tileXY(5, 3, 2)] = { type: VOLCANO, state: 0 }
-		const result = landUnload(map, transTile, tileXY(5, 3, 2))
-		expect(result.ok).toBe(false)
-		if (!result.ok) expect(result.reason).toBe('invalid-destination')
+		// an adjacent tile is no longer a legal drop — landing only happens in place
+		const adjacent = landUnload(map, transTile, tileXY(5, 2, 1))
+		expect(adjacent.ok).toBe(false)
+		if (!adjacent.ok) expect(adjacent.reason).toBe('invalid-destination')
 
 		// far away tile
 		const far = landUnload(map, transTile, tileXY(5, 4, 4))
 		expect(far.ok).toBe(false)
+	})
+
+	it('Land: refuses when the transport own tile is impassable for the rescued unit', () => {
+		const map = makeMap(5, 5)
+		const transTile = tileXY(5, 2, 2)
+		const transport = unit(TRANSPORTER_TYPE, 0)
+		transport.rescuedUnit = unit(STRIKE_COMMANDO, 0)
+		map.layers.units[transTile] = transport
+
+		// volcano underneath — impassable for foot
+		map.layers.ground[transTile] = { type: VOLCANO, state: 0 }
+		const result = landUnload(map, transTile, transTile)
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.reason).toBe('invalid-destination')
 	})
 
 	it('Land: rejects when transport has no rescuedUnit', () => {
@@ -244,44 +256,28 @@ describe('transport — load and unload', () => {
 		const transTile = tileXY(5, 2, 2)
 		map.layers.units[transTile] = unit(TRANSPORTER_TYPE, 0)
 
-		const result = landUnload(map, transTile, tileXY(5, 2, 1))
+		const result = landUnload(map, transTile, transTile)
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.reason).toBe('no-rescued')
 	})
 
 	it('Air transport delivers across forest and mountain (the whole point)', () => {
-		// Build a row of forest and mountain tiles; foot units treat them as walkable
-		// terrain via the air transport since the transporter is air (low-air).
+		// A paraglider flies over forest/mountain and sets its foot passenger down on
+		// the mountain tile it ends on — terrain a foot unit can stand on (just crosses
+		// slowly), which is exactly what the air transport is for.
 		const map = makeMap(7, 3)
-		// Row of mixed terrain in the middle row
 		const row = 1
-		map.layers.ground[tileXY(7, 1, row)] = { type: FOREST, state: 0 }
-		map.layers.ground[tileXY(7, 2, row)] = { type: MOUNTAIN, state: 0 }
-		map.layers.ground[tileXY(7, 3, row)] = { type: FOREST, state: 0 }
-		map.layers.ground[tileXY(7, 4, row)] = { type: MOUNTAIN, state: 0 }
-
-		const commandoStart = tileXY(7, 0, row)
-		const transTile = tileXY(7, 0, row)
-		const transportDelivery = tileXY(7, 4, row) // after flying across forest/mountain
+		const mountainTile = tileXY(7, 4, row)
+		map.layers.ground[mountainTile] = { type: MOUNTAIN, state: 0 }
 
 		const commando = unit(STRIKE_COMMANDO, 0)
-		map.layers.units[commandoStart] = commando
-
-		// load the commando into a transporter that lands next to it
-		map.layers.units[tileXY(7, 1, row)] = null
-		map.layers.units[commandoStart] = null
-		// place transporter at commando's old position with commando rescued
 		const transport = unit(TRANSPORTER_TYPE, 0)
 		transport.rescuedUnit = commando
-		map.layers.units[transportDelivery] = transport
+		map.layers.units[mountainTile] = transport
 
-		// land on mountain tile (valid for foot)
-		const landTarget = tileXY(7, 4, row)
-		// pick an adjacent tile that's forest or mountain for the foot unit
-		const adjacentMountain = tileXY(7, 3, row)
-		const result = landUnload(map, landTarget, adjacentMountain)
+		const result = landUnload(map, mountainTile, mountainTile)
 		expect(result.ok).toBe(true)
-		expect(map.layers.units[adjacentMountain]?.type).toBe(STRIKE_COMMANDO)
+		expect(map.layers.units[mountainTile]?.type).toBe(STRIKE_COMMANDO)
 	})
 
 	it('Land: refuses landing on Sea for a foot rescuedUnit', () => {
@@ -290,17 +286,96 @@ describe('transport — load and unload', () => {
 		const transport = unit(TRANSPORTER_TYPE, 0)
 		transport.rescuedUnit = unit(STRIKE_COMMANDO, 0)
 		map.layers.units[transTile] = transport
-		map.layers.ground[tileXY(5, 3, 2)] = { type: SEA, state: 0 }
+		// the transport sits over open sea — a foot unit can't disembark here
+		map.layers.ground[transTile] = { type: SEA, state: 0 }
 
-		const result = landUnload(map, transTile, tileXY(5, 3, 2))
+		const result = landUnload(map, transTile, transTile)
 		expect(result.ok).toBe(false)
+	})
+
+	const building = (type: number, team = 0) => ({ type, state: 0, team })
+
+	it('teamHasAirControl: true only when the team owns an Air Control', () => {
+		const map = makeMap(5, 5)
+		expect(teamHasAirControl(map, 0)).toBe(false)
+		map.layers.buildings[tileXY(5, 0, 0)] = building(AIR_CONTROL, 0)
+		expect(teamHasAirControl(map, 0)).toBe(true)
+		// owned by the enemy → still false for team 0
+		expect(teamHasAirControl(map, 1)).toBe(false)
+	})
+
+	it('teamHasAirControl: a City (no Allow_Air) does not count', () => {
+		const map = makeMap(5, 5)
+		map.layers.buildings[tileXY(5, 0, 0)] = building(CITY, 0)
+		expect(teamHasAirControl(map, 0)).toBe(false)
+	})
+
+	it('canAirLift: commando with an Air Control may air-lift anywhere (no shore needed)', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		map.layers.units[tile] = unit(STRIKE_COMMANDO, 0)
+		// no Air Control yet
+		expect(canAirLift(map, tile)).toBe(false)
+		map.layers.buildings[tileXY(5, 0, 0)] = building(AIR_CONTROL, 0)
+		expect(canAirLift(map, tile)).toBe(true)
+	})
+
+	it('canAirLift: refuses a non-commando even with an Air Control', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		map.layers.units[tile] = unit(SCORPION_TANK, 0)
+		map.layers.buildings[tileXY(5, 0, 0)] = building(AIR_CONTROL, 0)
+		expect(canAirLift(map, tile)).toBe(false)
+	})
+
+	it('Air Lift: commando → Transporter carrying itself in the same tile', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		const commandoMax = unitData[STRIKE_COMMANDO].health
+		const transportMax = unitData[TRANSPORTER_TYPE].health
+		const commando = unit(HEAVY_COMMANDO, 0, commandoMax)
+		map.layers.units[tile] = commando
+		map.layers.buildings[tileXY(5, 0, 0)] = building(AIR_CONTROL, 0)
+
+		const result = airLift(map, tile)
+		expect(result.ok).toBe(true)
+		const transport = map.layers.units[tile]
+		expect(transport?.type).toBe(TRANSPORTER_TYPE)
+		expect(transport?.rescuedUnit).toBe(commando)
+		expect(transport?.team).toBe(0)
+		expect(transport?.health).toBe(transportMax) // full commando → full carrier
+	})
+
+	it('Air Lift: refused without an Air Control', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		map.layers.units[tile] = unit(STRIKE_COMMANDO, 0)
+		const result = airLift(map, tile)
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.reason).toBe('cannot-air-lift')
+	})
+
+	it('Air Lift then Land: paraglider drops the commando back in place onto land, not sea', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		map.layers.units[tile] = unit(STRIKE_COMMANDO, 0)
+		map.layers.buildings[tileXY(5, 0, 0)] = building(AIR_CONTROL, 0)
+		expect(airLift(map, tile).ok).toBe(true)
+
+		// over open sea the commando can't come down...
+		map.layers.ground[tile] = { type: SEA, state: 0 }
+		expect(landUnload(map, tile, tile).ok).toBe(false)
+
+		// ...but over passable ground it lands in place
+		map.layers.ground[tile] = { type: PLAINS, state: 0 }
+		expect(landUnload(map, tile, tile).ok).toBe(true)
+		expect(map.layers.units[tile]?.type).toBe(STRIKE_COMMANDO)
 	})
 
 	it('round-trip: Transport then Land restores commando with HP proportional', () => {
 		const map = makeMap(5, 5)
 		const commandoTile = tileXY(5, 2, 2)
 		const transTile = tileXY(5, 3, 2)
-		const landTile = tileXY(5, 3, 3)
 
 		const commandoMax = unitData[STRIKE_COMMANDO].health
 		const commando = unit(STRIKE_COMMANDO, 0, commandoMax)
@@ -311,11 +386,11 @@ describe('transport — load and unload', () => {
 		expect(load.ok).toBe(true)
 		expect(map.layers.units[commandoTile]).toBeNull()
 
-		const land = landUnload(map, transTile, landTile)
+		// the transporter disembarks the commando onto its own tile
+		const land = landUnload(map, transTile, transTile)
 		expect(land.ok).toBe(true)
-		const landed = map.layers.units[landTile]
+		const landed = map.layers.units[transTile]
 		expect(landed).toBe(commando)
 		expect(landed?.health).toBe(commandoMax) // full HP round-trip
-		expect(map.layers.units[transTile]).toBeNull()
 	})
 })

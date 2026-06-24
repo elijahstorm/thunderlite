@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
 import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import { mine, canMineAt, MINE_REWARD } from '../../src/lib/Engine/modifiers/miner'
+import { WARMACHINE_WALLET, walletOf } from '../../src/lib/Engine/wallet'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
 
@@ -32,9 +33,13 @@ const warmachine = (team: number): UnitObject => ({
 })
 
 const moneyOf = (team: number) => get(gameState).players.find((p) => p.team === team)?.money ?? 0
+const walletAt = (map: MapProcesser, tile: number) => {
+	const unit = map.layers.units[tile]
+	return unit ? walletOf(unit) : 0
+}
 
 describe('miner.canMineAt', () => {
-	it('returns true on the three ore deposit tiers', () => {
+	it('is mineable on Enriched and Ore tiers; a Depleted deposit is spent', () => {
 		const map = makeMap()
 		map.layers.ground[0].type = ENRICHED_ORE
 		map.layers.ground[1].type = ORE_DEPOSIT
@@ -42,7 +47,7 @@ describe('miner.canMineAt', () => {
 		map.layers.ground[3].type = PLAINS
 		expect(canMineAt(map, 0)).toBe(true)
 		expect(canMineAt(map, 1)).toBe(true)
-		expect(canMineAt(map, 2)).toBe(true)
+		expect(canMineAt(map, 2)).toBe(false) // Depleted is terminal — no funds left
 		expect(canMineAt(map, 3)).toBe(false)
 	})
 })
@@ -52,7 +57,7 @@ describe('miner.mine', () => {
 		resetGameState()
 	})
 
-	it('Enriched Ore Deposit → Ore Deposit, +500 money, tile acted', () => {
+	it('Enriched Ore Deposit → Ore Deposit, +500 to the unit wallet (not player money), tile acted', () => {
 		const map = makeMap()
 		map.layers.ground[5].type = ENRICHED_ORE
 		map.layers.units[5] = warmachine(0)
@@ -60,7 +65,9 @@ describe('miner.mine', () => {
 
 		const result = mine(map, 5, 0)
 		expect(result.ok).toBe(true)
-		expect(moneyOf(0)).toBe(MINE_REWARD)
+		// The reward refills the Warmachine's own wallet; the player pool is untouched.
+		expect(walletAt(map, 5)).toBe(WARMACHINE_WALLET + MINE_REWARD)
+		expect(moneyOf(0)).toBe(0)
 		expect(map.layers.ground[5].type).toBe(ORE_DEPOSIT)
 		expect(get(gameState).actedTiles.has(5)).toBe(true)
 	})
@@ -74,19 +81,22 @@ describe('miner.mine', () => {
 		const result = mine(map, 5, 0)
 		expect(result.ok).toBe(true)
 		expect(map.layers.ground[5].type).toBe(DEPLETED_ORE)
-		expect(moneyOf(0)).toBe(MINE_REWARD)
+		expect(walletAt(map, 5)).toBe(WARMACHINE_WALLET + MINE_REWARD)
+		expect(moneyOf(0)).toBe(0)
 	})
 
-	it('Depleted Ore Deposit → Plains, yields the final +500', () => {
+	it('refuses to mine a Depleted Ore Deposit — it is spent, no reward, tile unchanged', () => {
 		const map = makeMap()
 		map.layers.ground[5].type = DEPLETED_ORE
 		map.layers.units[5] = warmachine(0)
 		initGameStateFromMap(map)
 
 		const result = mine(map, 5, 0)
-		expect(result.ok).toBe(true)
-		expect(map.layers.ground[5].type).toBe(PLAINS)
-		expect(moneyOf(0)).toBe(MINE_REWARD)
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.reason).toBe('not-mineable')
+		expect(map.layers.ground[5].type).toBe(DEPLETED_ORE)
+		expect(walletAt(map, 5)).toBe(WARMACHINE_WALLET)
+		expect(get(gameState).actedTiles.has(5)).toBe(false)
 	})
 
 	it('refuses to mine on non-ore terrain', () => {

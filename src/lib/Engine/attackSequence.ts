@@ -21,10 +21,12 @@ import type { SerializedAction } from './Interactor/serializedAction'
  *
  * The authoritative state change is committed *after* the whole sequence, so the
  * units stay on the board (with their bars frozen via `displayHealth`) throughout —
- * a unit that dies isn't yanked off mid-counter. Because nothing mutates the real
- * `health` until the commit, the predicted outcomes below read the exact pre-combat
- * state `applyAttack` will, so they match what actually resolves. Shared by the
- * human interactor and the CPU so both play the identical beat.
+ * a unit that dies isn't yanked off mid-counter. Nothing mutates the real `health`
+ * until the commit, so the predicted outcomes below read the same pre-combat state
+ * `applyAttack` starts from — with one wrinkle the prediction reproduces by hand:
+ * `applyAttack` lands the first hit before the counter, so the counter scales off
+ * the target's *reduced* health (see `counterDamage`). Shared by the human
+ * interactor and the CPU so both play the identical beat.
  */
 export const animateAttackSequence = async (
 	map: MapObject,
@@ -61,8 +63,13 @@ export const animateAttackSequence = async (
 		!targetWillDie &&
 		canCounterAttack(attacker, target, { map, attackerTile, defenderTile: targetTile })
 
+	// `applyAttack` lands the first hit *before* resolving the counter, so the
+	// counter's damage scales off the target's already-reduced HP (combat damage is
+	// proportional to the firer's current health). Predict against that same
+	// post-hit health — using the pre-combat value here overestimates the counter,
+	// sliding the attacker's bar past its real value and snapping it back on commit.
 	const counterDamage = willCounter
-		? calculateDamage(target, attacker, {
+		? calculateDamage({ ...target, health: targetHealthAfter }, attacker, {
 				map,
 				defenderTile: attackerTile,
 				attackerTile: targetTile,

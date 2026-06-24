@@ -39,16 +39,28 @@ export const playerCanBuildType = (
 	return Boolean(controls[unitType])
 }
 
+/**
+ * `budget` overrides the funds affordability is measured against — used for the
+ * Warmachine builder menu, which spends the unit's private wallet instead of the
+ * player pool. `ignoreControls` lifts the factory-ownership gate, since a
+ * Warmachine is a self-contained factory that can build any unit type.
+ */
+export type BuildableUnitsOptions = {
+	budget?: number
+	ignoreControls?: boolean
+}
+
 export const buildableUnits = (
 	player: Pick<Player, 'money' | 'controls'>,
-	_building?: BuildingObject | null
+	opts: BuildableUnitsOptions = {}
 ): BuildableUnit[] => {
+	const funds = opts.budget ?? player.money
 	const out: BuildableUnit[] = []
 	for (let type = 0; type < unitData.length; type++) {
 		const data = unitData[type]
 		if (data.cost <= 0) continue
-		const controlled = playerCanBuildType(player, data.type)
-		const affordable = player.money >= data.cost
+		const controlled = opts.ignoreControls ? true : playerCanBuildType(player, data.type)
+		const affordable = funds >= data.cost
 		out.push({
 			type,
 			data,

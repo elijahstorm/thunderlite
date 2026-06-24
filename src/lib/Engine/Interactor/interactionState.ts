@@ -6,7 +6,7 @@ type InterationState =
 	| 'preview'
 	| 'hud'
 	| 'selectAttackTarget'
-	| 'selectLandTile'
+	| 'selectBuildTile'
 
 export const interactionState = writable<InterationState>('select')
 

@@ -9,8 +9,6 @@
 	export let size: number = 2
 	export let noClick = false
 
-	const fallback = 'https://cdn4.iconfinder.com/data/icons/small-n-flat/24/user-alt-512.png'
-
 	let floatingProfile: HTMLDivElement
 	let shouldFlowLeft = false
 	let shouldFlowUp = false
@@ -58,12 +56,7 @@
 			class:cursor-default={noClick}
 			{style}
 		>
-			<FallbackImage
-				src={user?.profile_image_url}
-				alt="{user?.display_name ?? 'user'} profile"
-				{fallback}
-				cover
-			/>
+			<FallbackImage src={user?.profile_image_url} alt="{user?.display_name ?? 'user'} profile" cover />
 		</div>
 	</button>
 

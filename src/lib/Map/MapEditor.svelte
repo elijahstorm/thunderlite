@@ -18,6 +18,8 @@
 	import { parseCutsceneScript } from '$lib/Campaign/cutsceneScript'
 	import { CutsceneParseError } from '$lib/Campaign/cutsceneTypes'
 	import { NEUTRAL_TEAM } from '$lib/Engine/gameState'
+	import { canPlaceUnit } from '$lib/Engine/Interactor/Pathing/movement'
+	import { carriableUnitTypes, isTransportType } from '$lib/Engine/modifiers/transport'
 
 	export let mapHash: string | undefined = undefined
 
@@ -37,6 +39,9 @@
 	let skyType = 0
 	let team = 0
 	let erasing = false
+	// The passenger a placed transport carries (a unit type), or null for empty.
+	// Persists across placements so several loaded transports drop without reselecting.
+	let cargoType: number | null = null
 	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
 
 	/** Brushes that place a team-owned object (so the team picker is shown). */
@@ -87,6 +92,12 @@
 	// would place a team-4 unit (which has no player and would render grey).
 	$: if (editType === 'units' && team === NEUTRAL_TEAM) team = 0
 
+	// Passenger options for the currently-selected unit — only transports can carry,
+	// and only the types each transport legally accepts. Drop a stale cargo choice
+	// when switching to a unit that can't carry it (or can't carry at all).
+	$: carriable = editType === 'units' && isTransportType(unitType) ? carriableUnitTypes(unitType) : []
+	$: if (cargoType !== null && !carriable.includes(cargoType)) cargoType = null
+
 	const select = (x: number, y: number) => {
 		const tile = y * map.cols + x
 		if (erasing) {
@@ -97,8 +108,22 @@
 			return
 		}
 		if (editType === 'units') {
-			map.layers.units[tile] = { type, team, state: 4 }
+			// A unit can only be placed where it could legally stand: ground units off
+			// the sea, ships off the land, nothing on a volcano, tanks off mountains, etc.
+			const ground = map.layers.ground[tile]
+			if (!ground) return
+			if (!canPlaceUnit(ground, { type, team, state: 4 }, map.layers.sky[tile])) return
+			// A transport carries its chosen passenger (same team), authored inline so it
+			// plays loaded; an empty transport (or any other unit) places as before.
+			const rescuedUnit =
+				isTransportType(type) && cargoType !== null
+					? { type: cargoType, team, state: 4 }
+					: undefined
+			map.layers.units[tile] = { type, team, state: 4, rescuedUnit }
 		} else if (editType === 'buildings') {
+			// Sea buildings only belong on ocean terrain, ground buildings only on land.
+			const terrain = terrainData[map.layers.ground[tile]?.type ?? 0]
+			if (buildingData[type].ocean !== terrain.ocean) return
 			map.layers.buildings[tile] = { type, team, state: 0 }
 		} else if (editType === 'sky') {
 			map.layers.sky[tile] = { type, state: 0 }
@@ -133,18 +158,10 @@
 		const sha = mapHasher(map)
 		mapStore.set(map)
 		playMapStore.set(deriveFromHash(sha))
-		let ok = false
-		try {
-			const response = await fetch('/api/game', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sha }),
-			})
-			ok = response.ok
-		} catch {
-			ok = false
-		}
-		await goto(ok ? '/play' : `/play?ephemeral=1&sha=${encodeURIComponent(sha)}`)
+		// Editor "Play" is always a local test of the in-progress map, which may
+		// not be saved to the backend yet. Go straight to ephemeral play instead
+		// of creating a backend room (which 400s for unregistered map hashes).
+		await goto(`/play?ephemeral=1&sha=${encodeURIComponent(sha)}`)
 	}
 
 	const tools = [
@@ -281,6 +298,7 @@
 					{@render tiles()}
 				</div>
 			</div>
+			{@render cargoPicker()}
 			{@render brushInfo()}
 		</aside>
 
@@ -297,6 +315,7 @@
 				{@render tiles()}
 			</div>
 		</div>
+		{@render cargoPicker()}
 	</div>
 </div>
 
@@ -496,6 +515,46 @@
 	{/if}
 {/snippet}
 
+<!-- Cargo picker: surfaces only when the selected unit is a transport, letting the
+     author choose what it carries (or leave it empty). The choice sticks across map
+     clicks so a loadout can be stamped down repeatedly without reselecting. -->
+{#snippet cargoPicker()}
+	{#if !erasing && carriable.length > 0}
+		<div class="flex flex-col gap-2 border-t border-border bg-surface-2/50 p-3">
+			<div class="flex items-baseline justify-between gap-2">
+				<span class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+					Carrying
+				</span>
+				<span class="truncate text-xs text-muted-foreground">
+					{cargoType === null ? 'Empty' : unitData[cargoType].name}
+				</span>
+			</div>
+			<div class="flex flex-wrap gap-2">
+				<EditorButton
+					action={() => (cargoType = null)}
+					selected={cargoType === null}
+					title="Empty — no passenger"
+					size={48}
+				>
+					<div class="flex h-full w-full items-center justify-center text-muted-foreground">
+						<Icon icon="mdi:close" width="18" height="18" />
+					</div>
+				</EditorButton>
+				{#each carriable as c (c)}
+					<EditorButton
+						action={() => (cargoType = c)}
+						selected={cargoType === c}
+						title={unitData[c].name}
+						size={48}
+					>
+						{@render unitImg(c, team)}
+					</EditorButton>
+				{/each}
+			</div>
+		</div>
+	{/if}
+{/snippet}
+
 {#snippet unitImg(uType: number, uTeam: number)}
 	{#if $contextLoaded}
 		<img
@@ -514,7 +573,8 @@
 		class="pointer-events-none min-w-fit object-cover object-top-left"
 		src={terrainData[tType].url}
 		alt={terrainData[tType].name}
-		style="margin: {-terrainData[tType].yOffset}px {-terrainData[tType].xOffset}px 0 0;"
+		style="margin: {-terrainData[tType].yOffset}px {-terrainData[tType].xOffset}px 0 {-(terrainData[tType]
+			.editorState ?? 0) * 60}px;"
 	/>
 {/snippet}
 

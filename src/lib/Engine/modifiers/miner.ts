@@ -1,6 +1,7 @@
 import { get } from 'svelte/store'
 import { terrainData } from '$lib/GameData/terrain'
 import { gameState, markTileActed } from '$lib/Engine/gameState'
+import { walletOf } from '$lib/Engine/wallet'
 
 const terrainTypeByName = (name: string): number => {
 	const idx = terrainData.findIndex((t) => t.name === name)
@@ -11,14 +12,16 @@ const terrainTypeByName = (name: string): number => {
 const ENRICHED_ORE = terrainTypeByName('Enriched Ore Deposit')
 const ORE_DEPOSIT = terrainTypeByName('Ore Deposit')
 const DEPLETED_ORE = terrainTypeByName('Depleted Ore Deposit')
-const PLAINS = terrainTypeByName('Plains')
 
 export const MINE_REWARD = 500
 
+// A deposit yields $500 per harvest down two tiers — Enriched → Ore → Depleted —
+// for $1000 total. A Depleted Ore Deposit is spent: it has no transition here, so
+// `isMineableTerrainType` reports it un-mineable and it stays on the map as a
+// visibly-exhausted tile rather than reverting to plains.
 const mineTransitions: Record<number, number> = {
 	[ENRICHED_ORE]: ORE_DEPOSIT,
 	[ORE_DEPOSIT]: DEPLETED_ORE,
-	[DEPLETED_ORE]: PLAINS,
 }
 
 export const isMineableTerrainType = (terrainType: number): boolean =>
@@ -53,10 +56,9 @@ export const mine = (map: MapObject | MapProcesser, tile: number, team: number):
 	ground.type = nextTerrain
 	ground.state = 0
 
-	gameState.update((s) => ({
-		...s,
-		players: s.players.map((p) => (p.team === team ? { ...p, money: p.money + MINE_REWARD } : p)),
-	}))
+	// The reward refills the mining unit's own wallet, not the player pool — a
+	// Warmachine harvests ore to fund the units it builds (see Engine/wallet.ts).
+	unit.wallet = walletOf(unit) + MINE_REWARD
 
 	markTileActed(tile)
 

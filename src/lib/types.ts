@@ -26,6 +26,12 @@ type UnitObject = ObjectType &
 	TeamObject & {
 		health?: number
 		hidden?: boolean
+		// Builder units (Warmachine) carry their own funds, separate from the player's
+		// money pool: they pay for the units they build out of this wallet and refill
+		// it by mining ore. Absent until first read/mutation — reads default to the
+		// type's starting wallet (see Engine/wallet.ts), exactly like `health` defaults
+		// to the unit's max, so map-placed and freshly-built Warmachines both start full.
+		wallet?: number
 		rescuedUnit?: UnitObject | null
 		// Transient render flag: true while this unit is mid attack-animation. It
 		// stays on the map (so it keeps contributing fog-of-war sight) but the
@@ -35,11 +41,20 @@ type UnitObject = ObjectType &
 		// it's eased toward the real `health` so the bar slides instead of snapping,
 		// then cleared. Paint falls back to `health` whenever it's absent.
 		displayHealth?: number
+		// Set when the unit attacks; consumed at the start of its next turn by the
+		// auto-capture handler so a unit that attacked can't also capture that turn.
+		// Only carried by capture-capable units (set behind that check in applyAttack).
+		attacked?: boolean
 	}
 type BuildingObject = ObjectType &
 	AnimatedObject &
 	TeamObject & {
 		stature?: number
+		// Remaining funds reservoir for income buildings (City/Oil). Pays the type's
+		// full `income` each turn until drained, then only a small trickle. Absent
+		// until first paid out — reads default to the type's starting `resources`,
+		// the same lazy-default pattern as `stature`/`health`. See modifiers/supplyIncome.
+		resources?: number
 	}
 
 type TileHighlightType = 0 | 1
@@ -53,6 +68,11 @@ type HighlightMeta = {
 	 * height (or a Trench) puts in firing shadow — drawn with the shadow overlay
 	 * but not actually targetable. See shadowedAttackTiles / paint highlights. */
 	shadowed?: boolean
+	/** True for the selected unit's *own* tile. It's a member of the movement list
+	 * (a unit can always "stay put") but shouldn't read as a green move target —
+	 * the renderer paints it a muted amber to signal that clicking it opens the
+	 * unit's action menu rather than moving it. */
+	origin?: boolean
 }
 type TileInfo = {
 	tile: number
@@ -73,7 +93,9 @@ type MapLayers = {
 type MapLayersData = {
 	ground: ObjectType[]
 	sky: LocationObject[]
-	units: (LocationObject & TeamObject)[]
+	// `cargo` is the unit type a transport is carrying (its rescuedUnit). The
+	// passenger always belongs to the carrier's team, so only the type is stored.
+	units: (LocationObject & TeamObject & { cargo?: number })[]
 	buildings: (LocationObject & TeamObject)[]
 }
 type MapFilters = {

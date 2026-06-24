@@ -210,7 +210,7 @@ export const generateActionsList = (
 		// shared tile (highlightActionsList is last-write-wins per tile).
 		return [
 			...convertToShadow(shadowedAttackTiles(map, tile, unit)),
-			...convertToHighlightable(map, tiles, highlightTypes.move, threat),
+			...convertToHighlightable(map, tiles, highlightTypes.move, threat, tile),
 			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack),
 		]
 	}
@@ -220,7 +220,7 @@ export const generateActionsList = (
 			...highlights,
 			...convertToHighlightable(map, generateAttackList(map, from, unit), highlightTypes.attack),
 		],
-		convertToHighlightable(map, tiles, highlightTypes.move, threat)
+		convertToHighlightable(map, tiles, highlightTypes.move, threat, tile)
 	)
 }
 
@@ -238,7 +238,7 @@ export const generatePreviewList = (
 
 	return [
 		...convertToShadow(shadowTiles),
-		...convertToHighlightable(map, moveTiles, highlightTypes.move),
+		...convertToHighlightable(map, moveTiles, highlightTypes.move, undefined, tile),
 		...convertToHighlightable(map, attackTiles, highlightTypes.attack),
 	]
 }
@@ -258,10 +258,14 @@ const convertToHighlightable = (
 	map: MapObject,
 	tiles: number[],
 	type: TileHighlightType,
-	threat?: Set<number>
+	threat?: Set<number>,
+	// The selected unit's own tile — flagged `origin` so it renders as the muted
+	// "stay put / open menu" marker instead of a green move target.
+	origin?: number
 ) =>
 	tiles.map<TileHighlight>((tile) => {
 		const threatened = type === highlightTypes.move && (threat?.has(tile) ?? false)
+		const isOrigin = type === highlightTypes.move && tile === origin
 		return {
 			tile,
 			type,
@@ -274,6 +278,7 @@ const convertToHighlightable = (
 					? highlightTypes.good
 					: highlightTypes.neutral,
 			threatened,
+			...(isOrigin ? { origin: true } : {}),
 		}
 	})
 

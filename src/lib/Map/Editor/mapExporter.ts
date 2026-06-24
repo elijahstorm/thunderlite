@@ -68,7 +68,7 @@ const filter = (map: MapProcesser) =>
 			ground: map.layers.ground.map(removeState),
 			sky: map.layers.sky.map(addLocation).filter(exists),
 			units: map.layers.units.map(addUnitLocation).filter(exists),
-			buildings: map.layers.buildings.map(addUnitLocation).filter(exists),
+			buildings: map.layers.buildings.map(addBuildingLocation).filter(exists),
 		},
 	}) as MapData
 
@@ -80,14 +80,21 @@ const process = (map: MapData) =>
 		layers: {
 			ground: map.layers.ground.map((object) => ({ ...object, state: 0 })),
 			sky: processObjects(map, map.layers.sky)(processObjectState),
-			units: processObjects(map, map.layers.units)(processTeamObjectState),
+			units: processObjects(map, map.layers.units)(processUnitState),
 			buildings: processObjects(map, map.layers.buildings)(processTeamObjectState),
 		},
 	}) as MapProcesser
 
 const processObjects =
 	(map: MapData, objects: LocationObject[]) =>
-	<T extends typeof processTeamObjectState | typeof processObjectState>(processer: T) => {
+	<
+		T extends
+			| typeof processTeamObjectState
+			| typeof processObjectState
+			| typeof processUnitState,
+	>(
+		processer: T
+	) => {
 		const result = new Array(map.cols * map.rows)
 		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 		// @ts-ignore
@@ -103,6 +110,21 @@ const processTeamObjectState =
 			team: object.team,
 			state: 0,
 		} as T & AnimatedObject)
+
+// Units round-trip their carried passenger: a serialized `cargo` (unit type)
+// becomes a fresh `rescuedUnit` owned by the carrier's team. Mirrors the in-game
+// transport, so an editor-placed loaded transport plays exactly as authored.
+const processUnitState =
+	(source: (UnitObject | null)[]) =>
+	(object: LocationObject & TeamObject & { cargo?: number }) =>
+		(source[object.l] = {
+			type: object.type,
+			team: object.team,
+			state: 0,
+			...(object.cargo != null
+				? { rescuedUnit: { type: object.cargo, team: object.team, state: 0 } }
+				: {}),
+		} as UnitObject)
 
 const processObjectState =
 	<T extends LocationObject>(source: T[]) =>
@@ -137,7 +159,7 @@ const addLocation = <T extends ObjectType>(object: T | null, index: number) =>
 				l: index,
 			} as LocationObject)
 
-const addUnitLocation = <T extends ObjectType & TeamObject>(object: T | null, index: number) =>
+const addBuildingLocation = <T extends ObjectType & TeamObject>(object: T | null, index: number) =>
 	!object
 		? object
 		: ({
@@ -145,3 +167,15 @@ const addUnitLocation = <T extends ObjectType & TeamObject>(object: T | null, in
 				team: object.team,
 				l: index,
 			} as LocationObject)
+
+// Units serialize like buildings but also persist any carried passenger as a
+// compact `cargo` type (the rescuedUnit). Empty transports omit the field.
+const addUnitLocation = (object: UnitObject | null, index: number) =>
+	!object
+		? object
+		: ({
+				type: object.type,
+				team: object.team,
+				l: index,
+				...(object.rescuedUnit ? { cargo: object.rescuedUnit.type } : {}),
+			} as LocationObject & TeamObject & { cargo?: number })

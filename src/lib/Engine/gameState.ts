@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store'
 import { buildingData } from '$lib/GameData/building'
+import { unitData } from '$lib/GameData/unit'
 
 /**
  * The owner value for an unclaimed (neutral) building. Players are teams 0–3;
@@ -148,5 +149,10 @@ export const canSelectUnit = (
 	if (state.phase !== 'playing') return false
 	if (unit.team !== state.currentTeam) return false
 	if (state.actedTiles.has(tile)) return false
+	// Units that can neither move nor act (e.g. the Blockade) have no possible
+	// action — never let them be selected, since doing so just opens an empty
+	// flow that does nothing.
+	const data = unitData[unit.type]
+	if (data && data.movement === 0 && !data.actable) return false
 	return true
 }

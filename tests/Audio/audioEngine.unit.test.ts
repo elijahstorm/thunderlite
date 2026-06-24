@@ -257,6 +257,60 @@ describe('cross-channel muting', () => {
 	})
 })
 
+// ── Sound-off autostart suppression (Bluetooth / audio-session safety) ──────────
+
+function mutedSettings(): AudioSettings {
+	const s = defaultAudioSettings()
+	return { ...s, master: { ...s.master, muted: true } }
+}
+
+describe('master-muted playback suppression', () => {
+	it('does not autostart music or sfx when starting muted', () => {
+		const { engine, created } = makeEngine(mutedSettings())
+		engine.playMusic('game/player')
+		engine.playSfx('explosion')
+
+		// The looping track is primed (element exists, src/active recorded) but
+		// never played, so no audio session is grabbed.
+		expect(engine.getActiveTrack('music')).toBe('game/player')
+		expect(created.every((e) => e.paused)).toBe(true)
+	})
+
+	it('keeps music stems primed but silent and unplayed when muted', () => {
+		const { engine, created } = makeStemEngine(mutedSettings())
+		engine.startMusicStems(['game/intro', 'game/player'])
+
+		expect(created).toHaveLength(2)
+		for (const el of created) {
+			expect(el.paused).toBe(true) // never grabbed the audio session
+			expect(el.volume).toBe(0)
+		}
+	})
+
+	it('resumes the primed track and stems once sound is turned back on', () => {
+		const { engine, created } = makeEngine(mutedSettings())
+		engine.startMusicStems(['game/player'])
+		engine.playEnv('weather/rain')
+		expect(created.every((e) => e.paused)).toBe(true)
+
+		engine.setMasterMute(false)
+
+		expect(created.every((e) => !e.paused)).toBe(true)
+		const env = created.find((e) => e.src.includes('rain'))!
+		expect(env.volume).toBeGreaterThan(0)
+	})
+
+	it('drops sfx fired while muted rather than replaying them on unmute', () => {
+		const { engine, created } = makeEngine(mutedSettings())
+		engine.playSfx('explosion')
+		// Nothing was even created for a dropped fire-and-forget effect.
+		expect(created).toHaveLength(0)
+
+		engine.setMasterMute(false)
+		expect(created).toHaveLength(0)
+	})
+})
+
 // ── Music stem layer (adaptive crossfade) ───────────────────────────────────────
 
 describe('music stem layer', () => {
