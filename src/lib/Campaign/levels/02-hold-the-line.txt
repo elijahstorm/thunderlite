@@ -1,18 +1,26 @@
 <start>
-move: 7,5
-talk Vance: "The river splits this valley in two, and only those bridges cross it. Kael's dug in on the far bank.", "See his Command Center across the water? Take that capital and his whole line breaks."
-move: 13,5
-talk Kael: "You won't make the crossing. I hold both bridges, and my guns cover the water between them."
-move: 7,5
-talk Vance: "Then we hit both at once and split his defense. Move a Commando onto his Command Center to capture it.", "Take a capital and the battle ends at once. But lose yours, or lose your whole force, and it's over for us instead."
-talk Reyes: "Pick a bridge and push. I'll take the other."
+move: 6,3
+talk Vance: "Kael's capital sits on the high ground to the northeast. The river bends between us, and he's massed his garrison on the bridge road.", "Hit that line head-on and he'll grind us down. But look south, past the trees..."
+move: 7,8
+talk Reyes: "There's a second crossing down here, and the woods run all the way up to his capital. Quiet cover the whole way."
+move: 12,2
+talk Kael: "Let them come. The bridge is mine, and my reserves are already moving up."
+move: 2,7
+talk Vance: "Then we make noise at the bridge and slip a Commando through the trees. Get one onto his Command Center to capture it.", "Take his capital and it ends. But lose ours, or lose our whole force, and it ends for us instead."
 </start>
 
+<turn 0,1>
+move: 9,3
+talk Kael: "Bring the armor to the bridge. Nothing crosses here."
+add unit: 1,"Scorpion Tank",9,3
+talk Vance: "His reserves are on the line. Keep his eyes here while the runner moves."
+</turn>
+
 <turn 1,1>
-move: 12,6
-talk Kael: "Bring the armor up. Keep them off both bridges."
-add unit: 1,"Scorpion Tank",12,4
-talk Vance: "Reinforcements. Soften their line with the mortar before you commit the Commandos."
+move: 10,8
+talk Kael: "Movement in the southern woods. A runner, slipping the line.", "Peel a man off and flush him out. You won't reach my capital that easily."
+add unit: 1,"Strike Commando",10,8
+talk Reyes: "We're spotted in the trees. Push the bridge harder and draw him back."
 </turn>
 
 <win>

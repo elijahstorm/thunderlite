@@ -5,6 +5,68 @@ import { db, type Where } from '$lib/dontcode/server'
 
 type MapRow = MapDBData & { map_type_id: number | null }
 
+// Single public map by its content sha, enriched the same way the /make listing
+// rows are (type text, info chips, like/share/play counts, owner relationship).
+// Backs the shareable /map/[sha] landing page, so a private map returns null
+// rather than leaking through a direct link.
+export const getMapBySha: (
+	sha: string,
+	me?: string
+) => Promise<{ map: MapDBData; owner: UserDBData } | null> = async (sha, me = '') => {
+	try {
+		const row = await db.findOne<MapRow & { status: string }>('maps', { where: { sha } })
+		if (!row || row.status === 'private') return null
+
+		const [mapType, infoMorphs, likes, shares] = await Promise.all([
+			row.map_type_id !== null
+				? db.findOne<{ text: string }>('map_types', {
+						where: { id: row.map_type_id },
+						select: ['text'],
+					})
+				: Promise.resolve(null),
+			db.find<{ info_id: number | null }>('info_morph_map', {
+				where: { entity_id: row.id, entity_type: 'maps' },
+				select: ['info_id'],
+			}),
+			db.find<{ user_auth: string | null }>('likes', {
+				where: { map_id: row.id },
+				select: ['user_auth'],
+			}),
+			db.count('share_morph_map', { entity_id: row.id, entity_type: 'map' }),
+		])
+
+		const infoIds = [...new Set(infoMorphs.map((morph) => morph.info_id).filter((id) => id !== null))]
+		const infos = infoIds.length
+			? await db.find<{ id: number; info: string; color: string }>('info', {
+					where: { id: { in: infoIds } },
+				})
+			: []
+		const infosById = new Map(infos.map((info) => [info.id, info]))
+		const oneMonthAgo = new Date()
+		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
+
+		const map = {
+			...row,
+			type: mapType?.text ?? null,
+			info: infoMorphs.map((morph) => {
+				const info = morph.info_id !== null ? infosById.get(morph.info_id) : undefined
+				return { info: info?.info ?? null, color: info?.color ?? null }
+			}),
+			likes: likes.length,
+			shares,
+			trending: new Date(row.created_at).getTime() >= oneMonthAgo.getTime(),
+			liked_by_me: likes.some((like) => like.user_auth === me),
+		} as unknown as MapDBData
+
+		const owner = await getUserDBDataFromAuth(row.owner_auth, me)
+
+		return { map, owner }
+	} catch (msg) {
+		logToErrorDb(msg)
+		throw error(500, 'Could not get map from database')
+	}
+}
+
 export const queryMaps: (
 	props: {
 		search?: string

@@ -6,8 +6,12 @@
 
 	export let map: MapDBData
 
-	const formatDate = (date: Date) =>
-		date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+	const formatDate = (date: Date | string) =>
+		new Date(date).toLocaleDateString(undefined, {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+		})
 
 	const shortenNumber = (value: number) => {
 		if (value >= 1e9) return (value / 1e9).toFixed(1) + 'b'

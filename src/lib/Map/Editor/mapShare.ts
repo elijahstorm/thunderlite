@@ -31,8 +31,9 @@ export const share = async (name: string, encoded: string, thumbnail: string) =>
 	}
 
 	// Absolute URL so the shared/copied link works when pasted anywhere, not just
-	// when already on the site.
-	const url = new URL(`/editor/${sha}`, window.location.origin).href
+	// when already on the site. Recipients land on the map's view/play page rather
+	// than the authoring editor.
+	const url = new URL(`/map/${sha}`, window.location.origin).href
 
 	if (navigator.share) {
 		try {

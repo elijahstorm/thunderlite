@@ -89,27 +89,28 @@ const notJammed = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 }
 
 const IMPASSABLE = 9999
-export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | null) =>
-	unitData[unit.type].type === 'air'
-		? sky && skyData[sky.type]?.modifiers.includes('treacherous')
-			? skyData[sky.type].drag
-			: 1
-		: ((terrainData[terrain.type].name === 'Shore' &&
-				unitData[unit.type].movementType === 'warship') ||
-			(terrainData[terrain.type].details === 'rugged' &&
-				(unitData[unit.type].movementType === 'wheel' ||
-					unitData[unit.type].movementType === 'tank'))
-				? IMPASSABLE
-				: terrainData[terrain.type].details === 'rough' &&
-					  (unitData[unit.type].movementType === 'wheel' ||
-							unitData[unit.type].movementType === 'boat')
-					? 3
-					: (terrainData[terrain.type].details === 'slippery' &&
-								unitData[unit.type].movementType === 'foot') ||
-						  (terrainData[terrain.type].details === 'dirty' &&
-								unitData[unit.type].movementType === 'wheel')
-						? 2
-						: 1) * terrainData[terrain.type].drag
+export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | null) => {
+	const u = unitData[unit.type]
+	const t = terrainData[terrain.type]
+	if (u.type === 'air')
+		return sky && skyData[sky.type]?.modifiers.includes('treacherous') ? skyData[sky.type].drag : 1
+	// Tires cross rough terrain (hills, forest) poorly, but the 3x penalty already IS
+	// the final cost — it must NOT also be scaled by the terrain's own `drag`, or a
+	// wheel unit would spend its entire move climbing a single hill (3 * drag 2 = 6).
+	// Every other movement type still scales by terrain drag below.
+	if (t.details === 'rough' && u.movementType === 'wheel') return 3
+	return (
+		(t.name === 'Shore' && u.movementType === 'warship') ||
+		(t.details === 'rugged' && (u.movementType === 'wheel' || u.movementType === 'tank'))
+			? IMPASSABLE
+			: t.details === 'rough' && u.movementType === 'boat'
+				? 3
+				: (t.details === 'slippery' && u.movementType === 'foot') ||
+					  (t.details === 'dirty' && u.movementType === 'wheel')
+					? 2
+					: 1
+	) * t.drag
+}
 
 const notBlocked = (
 	map: MapObject,
