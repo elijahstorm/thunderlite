@@ -27,7 +27,7 @@
 				'Content-Type': 'application/json',
 				'x-sveltekit-action': 'true',
 			},
-			body: JSON.stringify({ sha: map.sha }),
+			body: JSON.stringify({ mapId: map.public_id }),
 		})
 			.then((response) => response.json())
 			.then((session) => {
@@ -71,7 +71,7 @@
 				<Loader label="Creating session" />
 			{:else}
 				<div class="flex flex-wrap justify-end gap-2 pt-2">
-					<a href="/editor/{map.sha}" class="btn btn-ghost">
+					<a href="/editor/{map.public_id}" class="btn btn-ghost">
 						<Icon icon="fluent:edit-24-filled" width={14} />
 						Open in editor
 					</a>

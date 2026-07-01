@@ -35,6 +35,7 @@ const STEALTH_TANK = unitIndex('Stealth Tank')
 const U_BOAT = unitIndex('U-Boat')
 const ROCKET_TRUCK = unitIndex('Rocket Truck') // indirect, range [3,5]
 const SCORPION_TANK = unitIndex('Scorpion Tank') // direct ground bruiser
+const JAMMER_TRUCK = unitIndex('Jammer Truck') // radar ring 2..3, uncloaks enemies
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
 const unit = (type: number, team = 0): UnitObject => ({ type, state: 0, team })
@@ -88,6 +89,54 @@ describe('isUnitStealthed', () => {
 		const map = makeMap(5, 1)
 		const u = unit(STRIKE_COMMANDO, 1)
 		u.hidden = true
+		map.layers.units[2] = u
+		expect(isUnitStealthed(map, 2, u)).toBe(true)
+	})
+
+	it('is exposed while standing in an enemy Jammer Truck radar ring', () => {
+		// Jammer Truck radar is the ring 2..3 tiles out. Place a friendly jammer at 0
+		// and a hidden enemy stealth tank at 2 (distance 2 → inside the ring).
+		const map = makeMap(6, 1)
+		map.layers.units[0] = unit(JAMMER_TRUCK, 0)
+		const enemy = unit(STEALTH_TANK, 1)
+		enemy.hidden = true
+		map.layers.units[2] = enemy
+		expect(isUnitStealthed(map, 2, enemy)).toBe(false)
+	})
+
+	it('stays concealed just inside the radar ring minimum (point-blank gap)', () => {
+		// Distance 1 is below the ring's inner edge, so the jammer does not expose it.
+		const map = makeMap(6, 1)
+		map.layers.units[0] = unit(JAMMER_TRUCK, 0)
+		const enemy = unit(STEALTH_TANK, 1)
+		enemy.hidden = true
+		map.layers.units[1] = enemy
+		expect(isUnitStealthed(map, 1, enemy)).toBe(true)
+	})
+
+	it('a friendly jammer does not expose its own stealth units', () => {
+		const map = makeMap(6, 1)
+		map.layers.units[0] = unit(JAMMER_TRUCK, 1)
+		const ally = unit(STEALTH_TANK, 1)
+		ally.hidden = true
+		map.layers.units[2] = ally
+		expect(isUnitStealthed(map, 2, ally)).toBe(true)
+	})
+
+	it('an explicitly-flushed unit stays revealed even after stepping away (trackable)', () => {
+		// hidden===false is a known flush; it must NOT re-cloak via the "no enemy
+		// adjacent" fallback, so a watcher can follow it to where it moves this turn.
+		const map = makeMap(5, 1)
+		const u = unit(STEALTH_TANK, 1)
+		u.hidden = false
+		map.layers.units[2] = u
+		expect(isUnitStealthed(map, 2, u)).toBe(false)
+	})
+
+	it('an undetermined (never-flushed) stealth unit still defaults to cloaked', () => {
+		// hidden===undefined keeps the fuzzy "assume stealthed" default.
+		const map = makeMap(5, 1)
+		const u = unit(STEALTH_TANK, 1) // no hidden flag set
 		map.layers.units[2] = u
 		expect(isUnitStealthed(map, 2, u)).toBe(true)
 	})

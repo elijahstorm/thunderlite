@@ -1,7 +1,13 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { parseCutsceneScript } from '../../src/lib/Campaign/cutsceneScript'
+import {
+	parseCutsceneScript,
+	scriptReferencedTypeIndices,
+} from '../../src/lib/Campaign/cutsceneScript'
 import { CutsceneParseError } from '../../src/lib/Campaign/cutsceneTypes'
+import { terrainData } from '../../src/lib/GameData/terrain'
+import { buildingData } from '../../src/lib/GameData/building'
+import { skyData } from '../../src/lib/GameData/sky'
 
 describe('parseCutsceneScript — block routing', () => {
 	it('routes events into start / win / lose / turns[round][team]', () => {
@@ -110,6 +116,52 @@ describe('parseCutsceneScript — commands', () => {
 
 	it('parses kill unit', () => {
 		expect(wrap('kill unit: 8,5')).toEqual([{ kind: 'kill', x: 8, y: 5 }])
+	})
+
+	it('parses hurt unit', () => {
+		expect(wrap('hurt unit: 13,2,20')).toEqual([{ kind: 'hurt', x: 13, y: 2, health: 20 }])
+	})
+
+	it('parses a color command (hex and colour name)', () => {
+		expect(wrap('color Kael: #ef4444')).toEqual([
+			{ kind: 'speakerColor', speaker: 'Kael', color: '#ef4444' },
+		])
+		expect(wrap('color Reyes: teal')).toEqual([
+			{ kind: 'speakerColor', speaker: 'Reyes', color: 'teal' },
+		])
+	})
+
+	it('rejects a color value that is not a hex code or colour name', () => {
+		expect(() => wrap('color Kael: rgb(1,2,3)')).toThrow(CutsceneParseError)
+	})
+
+	it('parses the defeat command', () => {
+		expect(wrap('defeat')).toEqual([{ kind: 'defeat' }])
+	})
+
+	it('collects terrain/building/weather types a script introduces (for sprite warming)', () => {
+		const script = parseCutsceneScript(`
+<start>
+terrain: "Bridge",7,5
+add building: 1,"City",5,5
+weather: "Storm",3,4
+</start>
+<when team 1 units <= 2>
+terrain: "Road",8,5
+</when>
+`)
+		const refs = scriptReferencedTypeIndices(script)
+		const BRIDGE = terrainData.findIndex((t) => t.name === 'Bridge')
+		const ROAD = terrainData.findIndex((t) => t.name === 'Road')
+		const CITY = buildingData.findIndex((b) => b.name === 'City')
+		const STORM = skyData.findIndex((s) => s.name === 'Storm')
+		expect(refs.ground.sort()).toEqual([BRIDGE, ROAD].sort())
+		expect(refs.buildings).toEqual([CITY])
+		expect(refs.sky).toEqual([STORM])
+	})
+
+	it('rejects hurt unit with the wrong argument count', () => {
+		expect(() => wrap('hurt unit: 13,2')).toThrow(CutsceneParseError)
 	})
 
 	it('parses terrain', () => {

@@ -5,6 +5,7 @@ import { extraRangeBonus } from '$lib/Engine/modifiers/extraSight'
 import { indirectFireShadowed } from '$lib/Engine/lineOfSight'
 import { indirectShadowsEnabled } from '$lib/Engine/occlusionState'
 import { viewerVisibility } from '$lib/Engine/fogState'
+import { previewDamage } from '$lib/Engine/combat'
 import { generateMovementList } from './movement'
 
 // Adds every in-bounds tile whose Manhattan distance from `center` falls within
@@ -77,6 +78,35 @@ export const computeThreatTiles = (map: MapObject, team: number): Set<number> =>
 		if (!enemy || enemy.team === team) continue
 		if (fog && !fog.visible.has(i)) continue
 		for (const t of unitThreatTiles(map, i, enemy)) out.add(t)
+	}
+	return out
+}
+
+// Like computeThreatTiles, but quantifies the danger: instead of bare membership
+// it returns the total incoming HP `unit` would suffer on each tile it could be
+// struck on. Damage is summed across every enemy that can reach a tile — focus
+// fire is what actually kills you — with each shot forecast from that enemy's
+// current tile (a cheap, slightly optimistic stand-in for wherever it would move
+// to fire). This feeds the move-advice badge so it scales from a light chip to a
+// lethal trap instead of flagging every reachable-by-anything tile identically.
+export const computeThreatSeverity = (map: MapObject, unit: UnitObject): Map<number, number> => {
+	const out = new Map<number, number>()
+	const fog = get(viewerVisibility)
+	const units = map.layers.units
+	for (let i = 0; i < units.length; i++) {
+		const enemy = units[i]
+		if (!enemy || enemy.team === unit.team) continue
+		if (fog && !fog.visible.has(i)) continue
+		for (const t of unitThreatTiles(map, i, enemy)) {
+			const dmg = previewDamage(enemy, unit, {
+				map,
+				defenderTile: t,
+				attackerTile: i,
+				role: 'attack',
+			})
+			if (dmg <= 0) continue
+			out.set(t, (out.get(t) ?? 0) + dmg)
+		}
 	}
 	return out
 }

@@ -4,6 +4,7 @@ import { generateMovementList, drag } from '$lib/Engine/Interactor/Pathing/movem
 import { unitThreatTiles } from '$lib/Engine/Interactor/Pathing/threat'
 import { concealedEnemyTiles } from '$lib/Engine/visibility'
 import { unitData } from '$lib/GameData/unit'
+import { attackAdviceTip, moveAdviceTip } from './adviceSeverity'
 
 export type HoverRouteResult = {
 	pathHistory: number[]
@@ -201,26 +202,35 @@ export const generateActionsList = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject,
-	threat?: Set<number>
+	threat?: ReadonlyMap<number, number>
 ) => {
 	const tiles = generateMovementList(map, tile, unit, concealedEnemyTiles(map, unit.team))
 
 	if (unitData[unit.type].range[0] !== 1) {
+		// Indirect units can't move-and-fire, so every shot is launched from `tile`.
 		// Shadow tiles first so the real move/attack overlays overwrite them on any
 		// shared tile (highlightActionsList is last-write-wins per tile).
 		return [
 			...convertToShadow(shadowedAttackTiles(map, tile, unit)),
-			...convertToHighlightable(map, tiles, highlightTypes.move, threat, tile),
-			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack),
+			...convertToHighlightable(map, tiles, highlightTypes.move, { threat, origin: tile, unit }),
+			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack, {
+				unit,
+				attackerTile: tile,
+			}),
 		]
 	}
 
+	// Direct units close to point-blank, so each reachable tile is also a firing
+	// position — score each shot from the tile it would actually be launched from.
 	return tiles.reduce(
 		(highlights, from) => [
 			...highlights,
-			...convertToHighlightable(map, generateAttackList(map, from, unit), highlightTypes.attack),
+			...convertToHighlightable(map, generateAttackList(map, from, unit), highlightTypes.attack, {
+				unit,
+				attackerTile: from,
+			}),
 		],
-		convertToHighlightable(map, tiles, highlightTypes.move, threat, tile)
+		convertToHighlightable(map, tiles, highlightTypes.move, { threat, origin: tile, unit })
 	)
 }
 
@@ -238,7 +248,7 @@ export const generatePreviewList = (
 
 	return [
 		...convertToShadow(shadowTiles),
-		...convertToHighlightable(map, moveTiles, highlightTypes.move, undefined, tile),
+		...convertToHighlightable(map, moveTiles, highlightTypes.move, { origin: tile, unit }),
 		...convertToHighlightable(map, attackTiles, highlightTypes.attack),
 	]
 }
@@ -254,29 +264,50 @@ const convertToShadow = (tiles: number[]): TileHighlight[] =>
 		shadowed: true,
 	}))
 
+type ConvertOptions = {
+	// Per-tile incoming damage to `unit` (computeThreatSeverity) — drives the move
+	// advice badge from a light chip up to a lethal trap.
+	threat?: ReadonlyMap<number, number>
+	// The selected unit's own tile — flagged `origin` so it renders as the muted
+	// "stay put / open menu" marker instead of a green move target.
+	origin?: number
+	// The acting unit, needed to rate moves (how much it would take) and attacks
+	// (the shot it would land vs the counter it would eat).
+	unit?: UnitObject
+	// Firing position for attack tiles — direct units fire from wherever they moved
+	// to, so the same target can grade differently from different approaches.
+	attackerTile?: number
+}
+
 const convertToHighlightable = (
 	map: MapObject,
 	tiles: number[],
 	type: TileHighlightType,
-	threat?: Set<number>,
-	// The selected unit's own tile — flagged `origin` so it renders as the muted
-	// "stay put / open menu" marker instead of a green move target.
-	origin?: number
+	{ threat, origin, unit, attackerTile }: ConvertOptions = {}
 ) =>
 	tiles.map<TileHighlight>((tile) => {
-		const threatened = type === highlightTypes.move && (threat?.has(tile) ?? false)
-		const isOrigin = type === highlightTypes.move && tile === origin
+		if (type === highlightTypes.attack) {
+			// Attack advice rates the trade against the enemy on the tile. Preview
+			// danger-zone tiles carry no real target (and pass no unit), so they fall
+			// back to the neutral marker that just shows reach.
+			const defender = map.layers.units[tile]
+			const tip =
+				unit && defender
+					? attackAdviceTip(map, unit, attackerTile ?? tile, defender, tile)
+					: highlightTypes.neutral
+			return { tile, type, tip }
+		}
+
+		// Move advice. Safe tiles use the empty `good` row so the board isn't spammed
+		// with warning triangles; tiles inside an enemy's reach scale by how much of
+		// the unit's health the incoming fire threatens.
+		const incoming = threat?.get(tile) ?? 0
+		const threatened = incoming > 0
+		const isOrigin = tile === origin
 		return {
 			tile,
 			type,
-			// Safe move tiles use the empty `good` row so the board isn't spammed
-			// with warning triangles — only tiles inside an enemy's reach get the
-			// `bad` badge. Attack tiles stay neutral until shot-quality scoring lands.
-			tip: threatened
-				? highlightTypes.bad
-				: type === highlightTypes.move
-					? highlightTypes.good
-					: highlightTypes.neutral,
+			tip: threatened && unit ? moveAdviceTip(unit, incoming) : highlightTypes.good,
 			threatened,
 			...(isOrigin ? { origin: true } : {}),
 		}

@@ -20,26 +20,23 @@ export const cornerDecision = (object: GroundObject): CornerDecision =>
 const noCorners: CornerDecision = () => []
 
 const borderCorners: CornerDecision = (map, location) => {
-	// Inner corners only apply to fully-enclosed water — a tile whose four cardinal
-	// neighbours are all the same ocean. Edge tiles already draw their land
-	// transition through the base `border` state, so the diagonal lookups below are
-	// always in-bounds and on the same row when this guard passes.
-	if (
-		!(
-			left(map, location, ocean) &&
-			up(map, location, ocean) &&
-			right(map, location, ocean) &&
-			down(map, location, ocean)
-		)
-	) {
-		return []
-	}
+	// An inner corner is needed wherever land pokes diagonally into the water: the
+	// two cardinal neighbours flanking that corner are both ocean, but the diagonal
+	// between them is land. Each corner is judged on its own so this works for any
+	// shape — a fully-enclosed tile (all four corners), a concave lake corner (one),
+	// and crucially a moat ring's corner tiles, which face the protected interior on
+	// their inner diagonal yet are NOT fully enclosed, so the base `border` state
+	// (which assumes open water diagonally) would otherwise cut the square's corners.
+	const l = left(map, location, ocean)
+	const u = up(map, location, ocean)
+	const r = right(map, location, ocean)
+	const d = down(map, location, ocean)
 
 	const corners: number[] = []
-	if (!up(map, location - 1, ocean)) corners.push(16) // top-left diagonal is land
-	if (!down(map, location - 1, ocean)) corners.push(17) // bottom-left diagonal is land
-	if (!down(map, location + 1, ocean)) corners.push(18) // bottom-right diagonal is land
-	if (!up(map, location + 1, ocean)) corners.push(19) // top-right diagonal is land
+	if (u && l && !upLeft(map, location)) corners.push(16) // top-left diagonal is land
+	if (d && l && !downLeft(map, location)) corners.push(17) // bottom-left diagonal is land
+	if (d && r && !downRight(map, location)) corners.push(18) // bottom-right diagonal is land
+	if (u && r && !upRight(map, location)) corners.push(19) // top-right diagonal is land
 	return corners
 }
 
@@ -177,3 +174,21 @@ const left = (map: MapObject, location: number, reader: typeof type | typeof oce
 const right = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
 	(location + 1) % map.cols !== 0 &&
 	reader(map.layers.ground, location + 1) === reader(map.layers.ground, location)
+
+// Diagonal neighbours read against the `ocean` flag, with explicit row- and
+// column-bounds checks so a lookup never wraps onto the wrong row or reads
+// out of bounds. Used only for inner-corner detection; `false` (treat as land)
+// is the safe answer off the edge of the map.
+const diagonal =
+	(rowDelta: -1 | 1, colDelta: -1 | 1) =>
+	(map: MapObject, location: number) => {
+		const col = location % map.cols
+		if (col + colDelta < 0 || col + colDelta >= map.cols) return false
+		const target = location + rowDelta * map.cols + colDelta
+		if (target < 0 || target >= map.layers.ground.length) return false
+		return ocean(map.layers.ground, target) === ocean(map.layers.ground, location)
+	}
+const upLeft = diagonal(-1, -1)
+const upRight = diagonal(-1, 1)
+const downLeft = diagonal(1, -1)
+const downRight = diagonal(1, 1)

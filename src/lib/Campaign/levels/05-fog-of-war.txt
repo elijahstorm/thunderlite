@@ -1,26 +1,50 @@
 <start>
-move: 2,9
-talk Vance: "This forest swallows your sight. Units see only a few tiles ahead, and Kael knows it, too."
-move: 10,0
-talk Kael: "Stealth Tanks are waiting in these trees. You won't see them until they're already on you."
-move: 1,9
-talk Vance: "Steady. That Jammer Truck is our eyes. Drive it forward and it uncovers anything hiding nearby.", "Scout with the Jammer, then bring your tanks up behind it. Never advance blind."
-talk Reyes: "Draw them out, then hit them. Understood."
+fog: on
+move: 2,10
+talk Vance: "This forest swallows your sight, and the trees themselves hide what's in them. Kael's Stealth Tanks lurk in here, and you won't see one until a unit is right beside it.", "Lead with the Jammer. It's unarmed, but walk it next to a hidden tank and the whole squad sees it, with no shot fired back. Then your Scorpions finish it."
+talk Vance: "And keep your two Commandos alive. They're the only ones who can take Kael's capital. Lose them both and this attack is over."
+move: 14,1
+talk Kael: "My capital sits past the ridge, and my spotter on the lake watches all of it. You cannot wipe my command from this field. First, my raiders will bleed you in the trees."
+move: 2,10
+talk Reyes: "Then we break the raiders, breach the ridge, and walk the Commandos in quiet. Eyes open."
 </start>
 
 <turn 0,1>
 wait: 1
-move: 8,3
-talk Kael: "There are more of them out there than you'll find in time."
-add unit: 1,"Strike Commando",8,3
-talk Vance: "Keep the Jammer between you and the unknown. Sight wins this fight."
+move: 12,8
+talk Kael: "More of them in the dark. Close in."
+add unit: 1,"Stealth Tank",12,8
+talk Vance: "Another lurker. Flush it with the Jammer before it picks its moment."
 </turn>
 
+<turn 1,1>
+wait: 1
+move: 12,9
+talk Kael: "Bleed them in the trees. The ridge holds whatever's left."
+add unit: 1,"Scorpion Tank",12,9
+talk Vance: "Keep your fire concentrated and the Commandos screened. Don't lose them in the scrum."
+</turn>
+
+<when team 1 units <= 8>
+move: 7,5
+talk Vance: "Their raiders are broken, but that's only half of it. Kael's armor is dug in across the river, guarding the one crossing. We bridge it and break them here.", "Heavy tanks and stealth both. Light up the hidden ones with the Jammer, gang the tanks at the crossing, and never let the Commandos get pinned. His capital itself is barely held, so the moment we're through, slip them in."
+terrain: "Bridge",7,5
+terrain: "Bridge",8,5
+move: 11,2
+talk Kael: "My armor will grind that little squad to scrap on the bridge. You should have stayed in the trees."
+talk Reyes: "Bridge is up. Break the armor, screen the Commandos, and take his capital. We finish this."
+</when>
+
+<when team 0 units "Heavy Commando" == 0>
+talk Vance: "Both Commandos are gone. There's no one left who can take the capital. This attack is finished, Reyes."
+defeat
+</when>
+
 <win>
-talk Vance: "Every hidden unit dragged into the light. That's how you turn an ambush around.", "Reveal first, then strike. You'll lean on that again."
+talk Vance: "Raiders broken, armor wrecked at the crossing, and his capital taken quiet, all while his spotter watched a fight he'd already lost.", "Reveal first, strike second, and never spend the units that matter. Well done, Reyes."
 </win>
 
 <lose>
 talk Kael: "You never saw the blow that finished you."
-talk Vance: "We advanced blind. Lead with the Jammer next time, Reyes."
+talk Vance: "We pushed blind, or spent the Commandos too cheap. Lead with the Jammer, guard what matters, and try again."
 </lose>

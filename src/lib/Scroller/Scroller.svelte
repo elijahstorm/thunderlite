@@ -32,8 +32,21 @@
 	let context: CanvasRenderingContext2D
 	let tiling: Tiling
 
+	let redraw: VoidFunction
 	let reflow: VoidFunction
-	const render = () => reflow && !scroller?.__isDecelerating && !scroller?.__isTracking && reflow()
+	// A redraw request (animation tick, fog fade, overlay change) only needs to
+	// repaint the current view, so it maps to the lightweight `redraw`, never the
+	// heavyweight `reflow`. Reassigning `content.width` clears the canvas and
+	// resets context state, and `reflow` also rebuilds tiling and re-anchors the
+	// scroller — doing that every animation frame dropped frames and flashed the
+	// board white mid-animation. Skipped while the scroller drives its own paint
+	// (touch tracking / deceleration) so we don't paint the same frame twice.
+	const render = () =>
+		redraw && !scroller?.__isDecelerating && !scroller?.__isTracking && redraw()
+	// Content dimensions last applied to the canvas/scroller, so `reflow` can
+	// no-op when a resize event fires with nothing actually changed.
+	let appliedContentWidth = -1
+	let appliedContentHeight = -1
 
 	/**
 	 * Scroll the view so the tile at `(x, y)` lands in the viewport centre.
@@ -125,9 +138,35 @@
 		let rect = container.getBoundingClientRect()
 		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
 
+		// Lightweight repaint of the current scroll position. This is what a redraw
+		// request should do — clear and redraw the tiles where the board already
+		// sits, with no canvas realloc, tiling rebuild, or layout read.
+		redraw = () => {
+			if (!scroller || !context) return
+			const { left, top, zoom } = scroller.getValues()
+			renderCentered(left, top, zoom)
+		}
+
 		reflow = () => {
+			if (!scroller || !context) return
 			const clientWidth = container.clientWidth
 			const clientHeight = container.clientHeight
+			// Assigning canvas.width/height clears the bitmap and resets context
+			// state even when the value is unchanged, and the tiling rebuild +
+			// getBoundingClientRect below are expensive. A resize event (or a
+			// spurious reactive fire) with no real size change must not pay that
+			// cost — just repaint, or the board flickers white during animations.
+			if (
+				clientWidth === content.width &&
+				clientHeight === content.height &&
+				contentWidth === appliedContentWidth &&
+				contentHeight === appliedContentHeight
+			) {
+				redraw()
+				return
+			}
+			appliedContentWidth = contentWidth
+			appliedContentHeight = contentHeight
 			content.width = clientWidth
 			content.height = clientHeight
 			// Resizing the canvas resets all context state, so re-disable smoothing
@@ -149,16 +188,31 @@
 			const r = container.getBoundingClientRect()
 			scroller.setPosition(r.left + container.clientLeft, r.top + container.clientTop)
 			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
+			// setDimensions clamps the scroll position and repaints synchronously
+			// (its scrollTo snaps rather than animates), but the canvas was just
+			// cleared by the resize above — repaint now so we never leave a blank
+			// frame up while an animation waits for the next tick.
+			redraw()
 		}
 
 		reflow()
 	})
 
+	// A redraw request (per-frame animation tick, fog fade, overlay change) just
+	// repaints the current view. Kept separate from the reflow path below so the
+	// hot per-frame case never resizes the canvas or rebuilds tiling.
+	$: {
+		requestRedraw
+		render()
+	}
+
+	// The board's content dimensions changed (editor resized the map, or first
+	// mount). This genuinely needs a reflow to resize the canvas and recompute
+	// scroll bounds; `reflow` itself no-ops if nothing actually changed.
 	$: {
 		contentWidth
 		contentHeight
-		requestRedraw
-		render()
+		reflow?.()
 	}
 </script>
 

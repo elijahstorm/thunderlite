@@ -423,8 +423,11 @@ const scrollerMembers = function () {
 		// Refresh maximums
 		scroller.__computeScrollMax()
 
-		// Refresh scroll position
-		scroller.scrollTo(scroller.__scrollLeft, scroller.__scrollTop, true)
+		// Refresh scroll position. Snap (animate=false) rather than animate: this
+		// runs on a resize/dimension change, where the clamp to the new bounds must
+		// apply this frame. Animating defers the paint to the next rAF, and since
+		// the caller just cleared the canvas to resize it, that gap flashed white.
+		scroller.scrollTo(scroller.__scrollLeft, scroller.__scrollTop, false)
 	}
 
 	/**

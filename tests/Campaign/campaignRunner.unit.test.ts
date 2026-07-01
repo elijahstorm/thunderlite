@@ -7,6 +7,7 @@ import {
 	type CampaignInterface,
 	type CampaignOutcome,
 } from '../../src/lib/Campaign/campaignRunner'
+import { unitData } from '../../src/lib/GameData/unit'
 
 /** One recorded engine op: the method name followed by its arguments. */
 type Op = [string, ...unknown[]]
@@ -23,8 +24,10 @@ const makeRecorder = (): { ops: Op[]; iface: CampaignInterface } => {
 		highlight: (x, y) => void ops.push(['highlight', x, y]),
 		unhighlight: (x, y) => void ops.push(['unhighlight', x, y]),
 		talk: (speaker, lines) => void ops.push(['talk', speaker, lines]),
+		setSpeakerColor: (speaker, color) => void ops.push(['setSpeakerColor', speaker, color]),
 		spawn: (team, unit, x, y) => void ops.push(['spawn', team, unit, x, y]),
 		kill: (x, y) => void ops.push(['kill', x, y]),
+		hurt: (x, y, health) => void ops.push(['hurt', x, y, health]),
 		setTerrain: (terrain, x, y) => void ops.push(['setTerrain', terrain, x, y]),
 		setWeather: (weather, x, y) => void ops.push(['setWeather', weather, x, y]),
 		clearWeather: (x, y) => void ops.push(['clearWeather', x, y]),
@@ -34,6 +37,7 @@ const makeRecorder = (): { ops: Op[]; iface: CampaignInterface } => {
 			void ops.push(['addBuilding', team, building, x, y]),
 		removeBuilding: (x, y) => void ops.push(['removeBuilding', x, y]),
 		ownBuilding: (team, x, y) => void ops.push(['ownBuilding', team, x, y]),
+		defeat: () => void ops.push(['defeat']),
 		wait: (seconds) => void ops.push(['wait', seconds]),
 	}
 	return { ops, iface }
@@ -96,6 +100,18 @@ describe('runCutsceneEvents', () => {
 		])
 	})
 
+	it('dispatches a color command to setSpeakerColor', async () => {
+		const { ops, iface } = makeRecorder()
+		await runCutsceneEvents(parseCutsceneScript('<start>\ncolor Kael: #ef4444\n</start>').start, iface)
+		expect(ops).toEqual([['setSpeakerColor', 'Kael', '#ef4444']])
+	})
+
+	it('dispatches hurt to the interface with its health argument', async () => {
+		const { ops, iface } = makeRecorder()
+		await runCutsceneEvents(parseCutsceneScript('<start>\nhurt unit: 13,2,20\n</start>').start, iface)
+		expect(ops).toEqual([['hurt', 13, 2, 20]])
+	})
+
 	it('dispatches the building / weather / fog / funds commands to their methods', async () => {
 		const { ops, iface } = makeRecorder()
 		const script = parseCutsceneScript(`
@@ -127,6 +143,27 @@ funds: 1,-200
 		])
 	})
 
+	it('calls beginBlock once, before any event in the block', async () => {
+		const ops: string[] = []
+		const { iface } = makeRecorder()
+		const withHook: CampaignInterface = {
+			...iface,
+			beginBlock: () => void ops.push('beginBlock'),
+			talk: () => void ops.push('talk'),
+			camera: () => void ops.push('camera'),
+		}
+
+		await runCutsceneEvents(
+			[
+				{ kind: 'talk', speaker: 'Reyes', lines: ['hi'] },
+				{ kind: 'camera', x: 1, y: 1 },
+			],
+			withHook
+		)
+
+		expect(ops).toEqual(['beginBlock', 'talk', 'camera'])
+	})
+
 	it('awaits each event before starting the next (a pending talk blocks the rest)', async () => {
 		const ops: string[] = []
 		let resolveTalk!: () => void
@@ -140,8 +177,10 @@ funds: 1,-200
 					resolveTalk = resolve
 				})
 			},
+			setSpeakerColor: () => {},
 			spawn: () => {},
 			kill: () => {},
+			hurt: () => {},
 			setTerrain: () => {},
 			setWeather: () => {},
 			clearWeather: () => {},
@@ -150,6 +189,7 @@ funds: 1,-200
 			addBuilding: () => {},
 			removeBuilding: () => {},
 			ownBuilding: () => {},
+			defeat: () => {},
 			wait: () => void ops.push('wait'),
 		}
 
@@ -250,5 +290,64 @@ describe('createCampaignRunner', () => {
 		await runner.enterTurn(0, 1)
 
 		expect(ops).toEqual([])
+	})
+})
+
+describe('<when> conditional triggers', () => {
+	const STRIKE = unitData.findIndex((u) => u.name === 'Strike Commando')
+	const SCORPION = unitData.findIndex((u) => u.name === 'Scorpion Tank')
+	// A 4-tile map carrying just the unit layer the conditions read.
+	const mapWith = (units: ({ team: number; type: number } | null)[]) => ({ layers: { units } })
+
+	const SCRIPT = `
+<when team 1 units <= 1>
+talk Vance: "Their wave is broken."
+add unit: 1,"Stealth Tank",9,2
+</when>
+
+<when team 0 units "Strike Commando" == 0>
+talk Vance: "We've lost the commandos."
+defeat
+</when>
+`
+
+	it('fires a count condition once, only when it holds', async () => {
+		const { ops, iface } = makeRecorder()
+		const runner = createCampaignRunner(parseCutsceneScript(SCRIPT), iface)
+
+		// Two team-1 units present → "team 1 units <= 1" does not hold yet.
+		const two = mapWith([{ team: 1, type: SCORPION }, { team: 1, type: SCORPION }, { team: 0, type: STRIKE }])
+		expect(runner.hasPendingConditions(two)).toBe(false)
+		await runner.checkConditions(two)
+		expect(ops).toEqual([])
+
+		// Down to one team-1 unit → the wave-cleared block fires once.
+		const one = mapWith([{ team: 1, type: SCORPION }, null, { team: 0, type: STRIKE }])
+		expect(runner.hasPendingConditions(one)).toBe(true)
+		await runner.checkConditions(one)
+		await runner.checkConditions(one) // already fired → no repeat
+		expect(ops).toEqual([
+			['talk', 'Vance', ['Their wave is broken.']],
+			['spawn', 1, 'Stealth Tank', 9, 2],
+		])
+	})
+
+	it('fires a typed-count condition and runs defeat when the commandos are gone', async () => {
+		const { ops, iface } = makeRecorder()
+		const runner = createCampaignRunner(parseCutsceneScript(SCRIPT), iface)
+
+		// A surviving Strike Commando keeps the loss condition false (and two team-1
+		// units keep the wave-cleared condition false too).
+		const alive = mapWith([
+			{ team: 0, type: STRIKE },
+			{ team: 1, type: SCORPION },
+			{ team: 1, type: SCORPION },
+		])
+		expect(runner.hasPendingConditions(alive)).toBe(false)
+
+		// No team-0 Strike Commando left (team 1 still has two) → only defeat fires.
+		const dead = mapWith([{ team: 1, type: SCORPION }, { team: 1, type: SCORPION }])
+		await runner.checkConditions(dead)
+		expect(ops).toContainEqual(['defeat'])
 	})
 })

@@ -1,27 +1,43 @@
 <start>
-move: 2,7
-talk Vance: "A war runs on money, Reyes. See your Oil Refinery and Warfactory? The refinery pays you every turn; the factory turns that into new units."
-talk Vance: "Hold your income, build a force, and you can outlast anyone. Lose your supply and the army starves."
-move: 12,1
-talk Kael: "My coffers are deep. I can spend longer than you can stand."
-move: 2,7
-talk Vance: "Then we take what's his. Push toward his refinery, fund your own troops, and capture his Command Center once he's spent."
-talk Reyes: "Economy first. Then we close the door."
+funds: 0,500
+funds: 1,350
+move: 1,9
+talk Vance: "Bad news, Reyes. Kael's dug in rich: an oil well and a town pumping coin, and a heavier column than ours. We can't out-spend him, so we won't try.", "Build cheap and grab fast. Strike Commandos cost next to nothing, and the middle is full of unclaimed oil. Take the western wells before he reaches them."
+move: 7,4
+talk Vance: "Hold the mouth of our base with what we have while your commandos run for the oil. Every well you capture is one he doesn't, and that lone Warfactory builds for whoever takes it."
+talk Vance: "And keep your three Heavy Commandos home for now. They're slow, but their charges crack heavy armor open. When Kael rolls out something big, that's your answer. Don't waste them rushing the middle to die."
+move: 13,2
+talk Kael: "Outnumbered and outspent. Sit in your corner and watch my factories bury you."
+move: 1,9
+talk Vance: "He's only rich while his wells keep pumping. Raid his south town, take his Ground Control, and his line falls silent. Then his capital is open.", "Out-think him, Reyes. Don't out-spend him."
+talk Reyes: "Grab the oil, choke his supply, take the capital. Let's move."
 </start>
 
 <turn 1,1>
 wait: 1
-move: 11,3
-talk Kael: "Fresh steel, straight off the line."
-add unit: 1,"Scorpion Tank",11,3
-talk Vance: "He's spending freely. Build smart, not fast. Quality beats a rushed wave."
+move: 11,2
+talk Kael: "Steel off the line already. How will you keep pace?"
+talk Vance: "Don't try to match him unit for unit. Hold the line, bank the oil, and pick your moment to raid."
 </turn>
 
+<turn 3,1>
+wait: 1
+move: 14,4
+talk Kael: "My coffers only deepen."
+talk Vance: "That south town of his is exposed. Slip a Commando onto it, then his wells and his factory. Starve the rich man and the fight evens out fast."
+</turn>
+
+<when team 1 units "Annihilator Tank" >= 1>
+move: 12,1
+talk Kael: "Behold my Annihilator. Nothing in your budget can stand in front of it."
+talk Vance: "Don't trade tanks with that thing, you'll lose every time. Swarm it with your Heavy Commandos. Three of them gut it before it can answer, and they cost a fraction of what it did. Cheap and clever beats big, Reyes."
+</when>
+
 <win>
-talk Vance: "His supply's broken and his capital is yours. Starve the enemy and the army follows.", "You're thinking like a commander now."
+talk Vance: "His supply's broken and his capital is ours. You beat a richer, bigger enemy by moving faster and striking where it hurt.", "That's command, Reyes, not bookkeeping."
 </win>
 
 <lose>
-talk Kael: "Outspent and overrun. Coin alone was never going to carry you."
-talk Vance: "We let his economy outpace ours. Seize the oil early next time."
+talk Kael: "Coin and steel, exactly as I promised. You never had the numbers."
+talk Vance: "His money buried us. Seize the middle oil sooner, raid his wells and his Ground Control, and never trade him blow for blow. Again."
 </lose>

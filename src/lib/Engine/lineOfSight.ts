@@ -80,17 +80,20 @@ export const hasLineOfSight = (
 // Indirect-fire shadow (idea #4): a long-range shell can't reach a target that
 // sits in the shadow of higher ground between it and the firer — you can't drop
 // rounds onto a unit tucked behind a ridge, or down into a trench. Expressed in
-// tiers: the target is shadowed when some intervening tile is taller than the
-// TARGET tile (so a mountaintop is always hittable, a canyon floor rarely is).
-// This generalises the hand-coded Canyon `Trench` rule to all terrain height.
+// tiers: the target is shadowed when some intervening tile is taller than BOTH
+// vantage points — the firer's own elevation and the target's. Firing from high
+// ground lets you see and reach over lower ridges down onto a target below, so a
+// rocket truck on a hill can hit a tank on the flat even with hills between them.
+// A mountaintop target is always hittable; a canyon floor is reachable only from
+// equally high ground. This generalises the Canyon `Trench` rule to all terrain.
 export const indirectFireShadowed = (
 	map: Pick<MapObject, 'cols' | 'rows' | 'layers'>,
 	from: number,
 	target: number
 ): boolean => {
-	const targetTier = tileHeightTier(map, target)
+	const vantageTier = Math.max(tileHeightTier(map, from), tileHeightTier(map, target))
 	for (const { tile } of lineBetween(map, from, target)) {
-		if (tileHeightTier(map, tile) > targetTier) return true
+		if (tileHeightTier(map, tile) > vantageTier) return true
 	}
 	return false
 }

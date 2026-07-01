@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { getMapBySha } from '$lib/Database/queryMaps'
+import { getMapById } from '$lib/Database/queryMaps'
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-	const result = await getMapBySha(params.sha, locals.user)
+	const result = await getMapById(params.id, locals.user)
 	if (!result) throw error(404, { message: 'No map with that link found.' })
 
 	return {

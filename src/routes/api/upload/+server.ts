@@ -1,11 +1,18 @@
 import { error, json } from '@sveltejs/kit'
-import { hash } from '$lib/Map/Editor/mapEncrypter.js'
-import { db, storage } from '$lib/dontcode/server'
+import { db, storage, isDontCodeError } from '$lib/dontcode/server'
+import { generateMapId } from '$lib/Security/keys'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 
 // Generous cap on the inbound thumbnail data URL (~3MB of base64). A PNG of a
 // pixel-art board is far smaller; this just bounds an abusive/garbage payload.
 const MAX_THUMBNAIL_CHARS = 3_000_000
+
+// How many maps a single user may own. Counts both drafts and published maps —
+// the editor library (/my/maps) surfaces the remaining headroom.
+const MAX_MAPS_PER_USER = 30
+
+// Retries for the (astronomically unlikely) public_id collision on insert.
+const ID_RETRIES = 5
 
 /** Decode a `data:<type>;base64,<data>` URL into bytes for storage upload. */
 const parseDataUrl = (dataUrl: string): { contentType: string; bytes: Uint8Array } | null => {
@@ -14,36 +21,34 @@ const parseDataUrl = (dataUrl: string): { contentType: string; bytes: Uint8Array
 	return { contentType: match[1], bytes: new Uint8Array(Buffer.from(match[2], 'base64')) }
 }
 
-export const POST = async ({ request, locals }) => {
-	const { name, encoded, thumbnail } = await request.json()
+const isConflict = (err: unknown) => isDontCodeError(err) && err.status === 409
 
-	if (!encoded) {
+/**
+ * Publish or update a user's map.
+ *
+ * Maps are now mutable, user-owned rows keyed by an opaque `public_id` (a nanoid
+ * the rest of the app addresses maps by). The full serialized board rides inline
+ * in `map_data` rather than a content-addressed `.txt` in object storage, so the
+ * play/editor pages load a map in a single row read.
+ *
+ *  - No `id` in the body → create a new map. Subject to the per-user quota.
+ *  - `id` of a map this user owns → update it in place (edit a typo, re-snapshot
+ *    the thumbnail) while keeping the same shareable link.
+ *
+ * Returns `{ id }` — the map's `public_id` — either way.
+ */
+export const POST = async ({ request, locals }) => {
+	const owner = locals.user
+	if (!owner) throw error(401, { message: 'Sign in to publish a map.' })
+
+	const { id, name, encoded, thumbnail } = await request.json()
+
+	if (!encoded || typeof encoded !== 'string') {
 		throw error(400, { message: 'No map to upload.' })
 	}
 
-	// Content-addressed: the sha is derived from the map data itself, not its
-	// storage URL. Identical maps therefore dedupe to one row, and two distinct
-	// maps never collide — which the old title-keyed scheme allowed, since map
-	// titles aren't unique (the default is "Unnamed Map").
-	const sha = await new Promise<string>((resolve) => hash(encoded)(resolve))
-
-	// Re-sharing the same map is idempotent: if this exact content is already
-	// published, hand back its existing link instead of failing the unique-sha
-	// constraint (which previously surfaced as a confusing 500 → /editor/undefined).
-	const existing = await db.findOne<{ sha: string }>('maps', { where: { sha }, select: ['sha'] })
-	if (existing) {
-		return json({ sha })
-	}
-
-	const { url } = await storage.uploadPublic(
-		`maps/${sha}.txt`,
-		new Blob([encoded], { type: 'text/plain' }),
-		'text/plain'
-	)
-
 	// A published map must carry a thumbnail (the /make listing renders it), so a
-	// missing/oversized/garbage snapshot is a 400 rather than an empty column. The
-	// editor blocks the share until it can produce one, so this is the boundary guard.
+	// missing/oversized/garbage snapshot is a 400 rather than an empty column.
 	if (typeof thumbnail !== 'string' || thumbnail.length > MAX_THUMBNAIL_CHARS) {
 		throw error(400, { message: 'A map preview is required to publish.' })
 	}
@@ -51,32 +56,80 @@ export const POST = async ({ request, locals }) => {
 	if (!parsedThumbnail) {
 		throw error(400, { message: 'A map preview is required to publish.' })
 	}
-	// Board snapshot → public storage, keyed by the same content sha so it rides
-	// alongside the map blob.
-	const { url: thumbnailUrl } = await storage.uploadPublic(
-		`maps/${sha}.png`,
-		parsedThumbnail.bytes,
-		parsedThumbnail.contentType
-	)
 
-	try {
-		// The `maps` row carries the metadata the community browser (/make) needs;
-		// name/description/thumbnail are NOT NULL, so a partial insert would fail.
-		// insertIgnoreConflict absorbs the race where a concurrent identical share
-		// inserted the same sha between our findOne and here.
-		await db.insertIgnoreConflict('maps', {
-			sha,
-			owner_auth: locals.user,
-			name: typeof name === 'string' && name.trim() ? name.trim() : 'Untitled map',
-			description: '',
-			thumbnail: thumbnailUrl,
-			url,
-			status: 'public',
+	const mapName = typeof name === 'string' && name.trim() ? name.trim() : 'Untitled map'
+
+	// ── Update in place ──────────────────────────────────────────────────────
+	// Re-saving an existing map the caller owns updates the row and keeps its link.
+	if (typeof id === 'string' && id) {
+		const existing = await db.findOne<{ public_id: string; owner_auth: string }>('maps', {
+			where: { public_id: id },
+			select: ['public_id', 'owner_auth'],
 		})
-	} catch (msg) {
-		logToErrorDb(msg)
-		throw error(500, 'Could not save map to database')
+		if (!existing) throw error(404, { message: 'That map no longer exists.' })
+		if (existing.owner_auth !== owner) {
+			throw error(403, { message: 'You can only edit maps you own.' })
+		}
+
+		const { url: thumbnailUrl } = await storage.uploadPublic(
+			`maps/${id}.png`,
+			parsedThumbnail.bytes,
+			parsedThumbnail.contentType
+		)
+
+		try {
+			await db.update(
+				'maps',
+				{ public_id: id },
+				{
+					name: mapName,
+					map_data: encoded,
+					thumbnail: thumbnailUrl,
+					updated_at: new Date().toISOString(),
+				}
+			)
+		} catch (msg) {
+			logToErrorDb(msg)
+			throw error(500, { message: 'Could not save map to database' })
+		}
+		return json({ id })
 	}
 
-	return json({ sha })
+	// ── Create new ───────────────────────────────────────────────────────────
+	const owned = await db.count('maps', { owner_auth: owner })
+	if (owned >= MAX_MAPS_PER_USER) {
+		throw error(403, {
+			message: `You've reached the limit of ${MAX_MAPS_PER_USER} maps. Delete one to publish another.`,
+		})
+	}
+
+	// Mint a fresh public_id and insert; on the rare unique collision, try again.
+	for (let attempt = 0; attempt < ID_RETRIES; attempt++) {
+		const publicId = generateMapId()
+
+		const { url: thumbnailUrl } = await storage.uploadPublic(
+			`maps/${publicId}.png`,
+			parsedThumbnail.bytes,
+			parsedThumbnail.contentType
+		)
+
+		try {
+			await db.insert('maps', {
+				public_id: publicId,
+				owner_auth: owner,
+				name: mapName,
+				description: '',
+				thumbnail: thumbnailUrl,
+				map_data: encoded,
+				status: 'public',
+			})
+			return json({ id: publicId })
+		} catch (msg) {
+			if (isConflict(msg)) continue // public_id clash — remint and retry.
+			logToErrorDb(msg)
+			throw error(500, { message: 'Could not save map to database' })
+		}
+	}
+
+	throw error(500, { message: 'Could not allocate a map id. Please try again.' })
 }

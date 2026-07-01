@@ -4,6 +4,8 @@ import { generateAttackList } from './Interactor/Pathing/attack'
 import { canAttackTarget, hasModifier, isRanged } from './modifiers/canAttack'
 import { computeDamageMultiplier, type AttackRole } from './modifiers/damageMultipliers'
 import { tileHeightTier } from './modifiers/height'
+import { adjacentTiles } from './modifiers/cloak'
+import { isUnitStealthed, type VisibilityMap } from './visibility'
 
 export type { AttackRole }
 
@@ -22,15 +24,45 @@ export type CombatContext = {
 // an uphill penalty here would double-count and make Mountains/Hills oppressive.
 const HIGH_GROUND_PER_TIER = 0.08
 const HIGH_GROUND_CAP = 0.16
+// A sniper (Damage.Highground, the Strider) weaponises elevation far harder than
+// the baseline downhill nudge: +25% per tier, up to +75%. On a peak it's brutal;
+// caught on the flat it has no bonus at all and is paper-thin.
+const SNIPER_PER_TIER = 0.25
+const SNIPER_CAP = 0.75
 
 const highGroundBonus = (
 	map: Pick<MapObject, 'layers'>,
 	attackerTile: number,
-	defenderTile: number
+	defenderTile: number,
+	sniper: boolean
 ): number => {
 	const advantage = tileHeightTier(map, attackerTile) - tileHeightTier(map, defenderTile)
 	if (advantage <= 0) return 1
-	return 1 + Math.min(advantage * HIGH_GROUND_PER_TIER, HIGH_GROUND_CAP)
+	const perTier = sniper ? SNIPER_PER_TIER : HIGH_GROUND_PER_TIER
+	const cap = sniper ? SNIPER_CAP : HIGH_GROUND_CAP
+	return 1 + Math.min(advantage * perTier, cap)
+}
+
+// Aegis projects a protective field over adjacent friendlies: any unit standing
+// next to a teammate with Damage.Aegis takes 30% less damage. Computed here (not
+// as an attacker-side Damage modifier) because the mitigator is a THIRD unit
+// beside the defender, and combat already holds the map geometry to find it.
+const AEGIS_MITIGATION = 0.7
+
+const auraMitigation = (
+	map: Pick<MapObject, 'layers'>,
+	defenderTile: number,
+	defenderTeam: number
+): number => {
+	const geo = map as Partial<VisibilityMap>
+	if (typeof geo.cols !== 'number' || typeof geo.rows !== 'number') return 1
+	for (const adj of adjacentTiles(geo as VisibilityMap, defenderTile)) {
+		const ally = map.layers.units[adj]
+		if (ally && ally.team === defenderTeam && hasModifier(ally, 'Damage.Aegis')) {
+			return AEGIS_MITIGATION
+		}
+	}
+	return 1
 }
 
 const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatContext): number => {
@@ -49,18 +81,38 @@ const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatCo
 	const protection = ground ? (terrainData[ground.type]?.protection ?? 0) : 0
 	const terrainGuard = 1 - protection
 
+	// Is the attacker concealed from the tile it fires on? Adjacency and radar both
+	// need map geometry (cols/rows); when a caller supplies it we ask the canonical
+	// predicate (so a Jammer Truck's radar can deny the stealth ambush), otherwise we
+	// fall back to the persisted cloak flag inside `computeDamageMultiplier`.
+	const geo = ctx.map as Partial<VisibilityMap>
+	const attackerConcealed =
+		ctx.attackerTile != null && typeof geo.cols === 'number' && typeof geo.rows === 'number'
+			? isUnitStealthed(geo as VisibilityMap, ctx.attackerTile, attacker)
+			: undefined
+
 	const modMultiplier = computeDamageMultiplier({
 		attacker,
 		defender,
 		role: ctx.role ?? 'attack',
+		attackerConcealed,
 	})
 
 	const highGround =
 		ctx.attackerTile != null
-			? highGroundBonus(ctx.map, ctx.attackerTile, ctx.defenderTile)
+			? highGroundBonus(
+					ctx.map,
+					ctx.attackerTile,
+					ctx.defenderTile,
+					hasModifier(attacker, 'Damage.Highground')
+				)
 			: 1
 
-	const final = Math.round(baseDamage * matchupBonus * terrainGuard * modMultiplier * highGround)
+	const aura = auraMitigation(ctx.map, ctx.defenderTile, defender.team)
+
+	const final = Math.round(
+		baseDamage * matchupBonus * terrainGuard * modMultiplier * highGround * aura
+	)
 	return final > 0 ? final : 0
 }
 

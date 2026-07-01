@@ -3,6 +3,7 @@ import { buildingData } from '$lib/GameData/building'
 import { terrainData } from '$lib/GameData/terrain'
 import { previewDamage } from '../combat'
 import { generateAttackList } from '../Interactor/Pathing/attack'
+import { unitThreatTiles } from '../Interactor/Pathing/threat'
 import { concealedEnemyTiles } from '../visibility'
 import { isMineableTerrainType } from '../modifiers/miner'
 
@@ -50,16 +51,21 @@ const isOwnedByLivingTeam = (building: BuildingObject): boolean => {
 // threat sum: the AI plays blind, so a stealthed/fogged enemy contributes no fear.
 // Defaults to recomputing it; the planner passes a shared set to avoid recomputing
 // per candidate tile.
+// `ignoreTile` drops one attacker from the tally — used when scoring an attack that
+// *kills* its target: a dead unit can't shoot back next turn, so it shouldn't count
+// toward the firing tile's post-attack danger.
 export const threatToTile = (
 	map: MapObject,
 	tile: number,
 	defender: UnitObject,
 	cpuTeam: number,
-	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam)
+	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam),
+	ignoreTile?: number
 ): number => {
 	let totalIncomingHP = 0
 	const units = map.layers.units
 	for (let i = 0; i < units.length; i++) {
+		if (i === ignoreTile) continue
 		const enemy = units[i]
 		if (!enemy || enemy.team === cpuTeam) continue
 		if (concealed.has(i)) continue
@@ -74,6 +80,50 @@ export const threatToTile = (
 		totalIncomingHP += dmg
 	}
 	return totalIncomingHP
+}
+
+// Total HP of incoming fire `unit` would suffer if it ended its turn on `tile`,
+// counting every visible enemy that could strike it next turn — crucially including
+// DIRECT attackers that move adjacent before firing (via `unitThreatTiles`), which the
+// cheaper `threatToTile` above misses. Use this when the question is "can the enemy
+// actually kill a unit parked here on their turn?", not just "who can shoot it from
+// where they stand now". Concealed enemies (fog / stealth the CPU can't perceive) are
+// skipped, like every other CPU threat term. Damage is forecast from each enemy's
+// current tile — a slightly optimistic but conservative-enough stand-in for wherever
+// it would move to fire.
+export const incomingThreatMoveAware = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam)
+): number => {
+	let total = 0
+	const units = map.layers.units
+	for (let i = 0; i < units.length; i++) {
+		const enemy = units[i]
+		if (!enemy || enemy.team === cpuTeam) continue
+		if (concealed.has(i)) continue
+		if (!unitThreatTiles(map, i, enemy).has(tile)) continue
+		total += previewDamage(enemy, unit, {
+			map,
+			defenderTile: tile,
+			attackerTile: i,
+			role: 'attack',
+		})
+	}
+	return total
+}
+
+// How many unit-producing (actable) buildings `team` owns. Used to value choking a
+// team's production by parking a unit on its factory: blocking their *only* factory
+// shuts production off entirely, while one of several barely dents their output.
+export const factoryCount = (map: MapObject, team: number): number => {
+	let n = 0
+	for (const b of map.layers.buildings) {
+		if (b && b.team === team && buildingData[b.type]?.actable) n++
+	}
+	return n
 }
 
 export const enemyCount = (map: MapObject, cpuTeam: number): number => {

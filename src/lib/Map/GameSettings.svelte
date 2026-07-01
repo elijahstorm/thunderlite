@@ -6,6 +6,7 @@
 	import { gameState } from '$lib/Engine/gameState'
 	import { surrender } from '$lib/Engine/Interactor/interactor'
 	import { shownThreatUnits, toggleAllThreats } from '$lib/Engine/threatOverlay'
+	import { isDevMode, downloadDevLog, devLogSize } from '$lib/Engine/devLog'
 
 	export let map: MapObject | undefined = undefined
 	export let localTeam = 0
@@ -113,6 +114,25 @@
 					<Icon icon="mdi:exit-run" width="18" height="18" />
 					Exit to menu
 				</button>
+
+				{#if isDevMode}
+					<div class="my-1 h-px bg-white/10"></div>
+					<p class="px-3 pt-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400/80">
+						Dev (local only)
+					</p>
+					<button
+						type="button"
+						role="menuitem"
+						on:click={downloadDevLog}
+						class="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
+					>
+						<span class="flex items-center gap-2">
+							<Icon icon="mdi:download" width="18" height="18" />
+							Download game log
+						</span>
+						<span class="text-xs text-white/60">{$devLogSize} acts</span>
+					</button>
+				{/if}
 			{:else}
 				<p class="px-2 py-2 text-xs leading-relaxed text-white/80">
 					{#if view === 'confirmGiveUp'}

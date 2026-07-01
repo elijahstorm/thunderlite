@@ -5,16 +5,35 @@ import { db, type Where } from '$lib/dontcode/server'
 
 type MapRow = MapDBData & { map_type_id: number | null }
 
-// Single public map by its content sha, enriched the same way the /make listing
+// Columns the listing/landing rows need — deliberately excludes the heavy
+// `map_data` blob (only the play/editor loaders read that, via getMapData).
+const MAP_LIST_COLUMNS = [
+	'id',
+	'public_id',
+	'owner_auth',
+	'name',
+	'description',
+	'thumbnail',
+	'status',
+	'plays',
+	'created_at',
+	'updated_at',
+	'map_type_id',
+]
+
+// Single public map by its public_id, enriched the same way the /make listing
 // rows are (type text, info chips, like/share/play counts, owner relationship).
-// Backs the shareable /map/[sha] landing page, so a private map returns null
+// Backs the shareable /map/[id] landing page, so a private map returns null
 // rather than leaking through a direct link.
-export const getMapBySha: (
-	sha: string,
+export const getMapById: (
+	mapId: string,
 	me?: string
-) => Promise<{ map: MapDBData; owner: UserDBData } | null> = async (sha, me = '') => {
+) => Promise<{ map: MapDBData; owner: UserDBData } | null> = async (mapId, me = '') => {
 	try {
-		const row = await db.findOne<MapRow & { status: string }>('maps', { where: { sha } })
+		const row = await db.findOne<MapRow & { status: string }>('maps', {
+			where: { public_id: mapId },
+			select: MAP_LIST_COLUMNS,
+		})
 		if (!row || row.status === 'private') return null
 
 		const [mapType, infoMorphs, likes, shares] = await Promise.all([
@@ -35,7 +54,9 @@ export const getMapBySha: (
 			db.count('share_morph_map', { entity_id: row.id, entity_type: 'map' }),
 		])
 
-		const infoIds = [...new Set(infoMorphs.map((morph) => morph.info_id).filter((id) => id !== null))]
+		const infoIds = [
+			...new Set(infoMorphs.map((morph) => morph.info_id).filter((id) => id !== null)),
+		]
 		const infos = infoIds.length
 			? await db.find<{ id: number; info: string; color: string }>('info', {
 					where: { id: { in: infoIds } },
@@ -106,6 +127,7 @@ export const queryMaps: (
 		// old joins become batched `in` lookups composed in JS below.
 		const rows = await db.find<MapRow>('maps', {
 			where,
+			select: MAP_LIST_COLUMNS,
 			orderBy: { created_at: 'asc' },
 			limit,
 			offset: page * limit,
@@ -188,5 +210,46 @@ export const queryMaps: (
 	return {
 		maps,
 		users,
+	}
+}
+
+// Per-user quota — keep in sync with MAX_MAPS_PER_USER in api/upload.
+export const MAX_MAPS_PER_USER = 30
+
+/**
+ * Every map owned by `owner` (drafts and published), newest first, for the
+ * /my/maps library. Lighter than {@link queryMaps}: no info/like/share joins,
+ * just the row metadata the library cards need, plus the remaining quota.
+ */
+export const queryMyMaps: (
+	owner: string
+) => Promise<{ maps: MapDBData[]; limit: number; remaining: number }> = async (owner) => {
+	if (!owner) return { maps: [], limit: MAX_MAPS_PER_USER, remaining: MAX_MAPS_PER_USER }
+	try {
+		const rows = await db.find<MapRow>('maps', {
+			where: { owner_auth: owner },
+			select: MAP_LIST_COLUMNS,
+			orderBy: { updated_at: 'desc' },
+		})
+		const maps = rows.map(
+			(row) =>
+				({
+					...row,
+					type: null,
+					info: [],
+					likes: 0,
+					shares: 0,
+					trending: false,
+					liked_by_me: 0,
+				}) as unknown as MapDBData
+		)
+		return {
+			maps,
+			limit: MAX_MAPS_PER_USER,
+			remaining: Math.max(0, MAX_MAPS_PER_USER - maps.length),
+		}
+	} catch (msg) {
+		logToErrorDb(msg)
+		throw error(500, 'Could not load your maps')
 	}
 }

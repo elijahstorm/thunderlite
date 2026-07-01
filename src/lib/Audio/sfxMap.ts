@@ -51,6 +51,8 @@ const MOVEMENT_SFX: Record<MovementType, SfxId | null> = {
 	boat: 'movement/boat',
 	warship: 'movement/boat',
 	submarine: 'movement/boat',
+	amphibious: 'movement/boat',
+	'sure-footed': 'movement/foot',
 }
 
 /** Direct-fire weapon class → gun sfx. Indirect units override this below. */

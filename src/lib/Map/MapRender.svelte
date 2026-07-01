@@ -7,7 +7,7 @@
 	import { paint, type VisibilityProvider } from '$lib/Engine/paint'
 	import { canSelectUnit, gameState } from '$lib/Engine/gameState'
 	import { buildingData } from '$lib/GameData/building'
-	import { computeTeamVisibility } from '$lib/Engine/visibility'
+	import { computeTeamVisibility, computeRadarTiles } from '$lib/Engine/visibility'
 	import { onDestroy, onMount, tick } from 'svelte'
 	import {
 		animationFrame,
@@ -23,7 +23,13 @@
 	import { interactionSource, interactionState } from '$lib/Engine/Interactor/interactionState'
 	import { fogOfWarEnabled, viewerVisibility } from '$lib/Engine/fogState'
 	import { fogBusy, unitFadeBusy } from '$lib/Engine/fogRender'
-	import { shownThreatUnits, computeShownThreatTiles } from '$lib/Engine/threatOverlay'
+	import { materializeBusy, materializeSignal } from '$lib/Engine/materialize'
+	import { buildFadeBusy } from '$lib/Engine/buildFade'
+	import {
+		shownThreatUnits,
+		computeShownThreatTiles,
+		computeShownThreatUnitTiles,
+	} from '$lib/Engine/threatOverlay'
 	import { setHoverTile } from '$lib/Engine/uiState'
 	import { dev } from '$app/environment'
 	import { analyzePathDebug, pathDebugEnabled } from '$lib/Engine/Interactor/Pathing/pathDebug'
@@ -33,6 +39,7 @@
 		routeAnimation,
 		animations,
 		repaintSignal,
+		boardBusy,
 	} from '$lib/Engine/Animator/animator'
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 	import { campaignCamera } from '$lib/Campaign/campaignInterface'
@@ -81,7 +88,13 @@
 		const start = performance.now()
 		const step = () => {
 			render()
-			if (performance.now() - start < 120 || fogBusy() || unitFadeBusy()) {
+			if (
+				performance.now() - start < 120 ||
+				fogBusy() ||
+				unitFadeBusy() ||
+				materializeBusy() ||
+				buildFadeBusy()
+			) {
 				fogRaf = requestAnimationFrame(step)
 			} else {
 				fogRaf = 0
@@ -145,6 +158,9 @@
 	$: {
 		$gameState
 		$fogOfWarEnabled
+		// A scripted spawn/terrain change bumps this when it begins its pixel
+		// assemble; kick the same pump so those effects animate too.
+		$materializeSignal
 		pumpFog()
 	}
 
@@ -174,6 +190,22 @@
 		$gameState
 		$fogOfWarEnabled
 		map.threatTiles = computeShownThreatTiles(map, $shownThreatUnits)
+		map.threatUnitTiles = computeShownThreatUnitTiles(map, $shownThreatUnits)
+		render()
+	}
+
+	// Jammer Truck radar rings: our own net always, plus any enemy jammer we can
+	// see. Recompute on the same triggers as the threat overlay — a jammer moving,
+	// the turn flipping, or fog toggling all shift where the rings fall. The enemy
+	// rings are gated by the viewer's fog reach so a jammer hidden in fog leaks none.
+	$: if (!mini && !editor) {
+		$gameState
+		$fogOfWarEnabled
+		map.radarTiles = computeRadarTiles(
+			map,
+			localTeam,
+			$fogOfWarEnabled ? (visibilityProvider()?.visible ?? null) : null
+		)
 		render()
 	}
 
@@ -181,6 +213,10 @@
 	let hudImages: HUDImages = {}
 
 	const hover = (x: number, y: number) => {
+		// The previous action's movement/attack animations are still playing — don't
+		// move the hover marker or redraw route-preview arrows over a board that's
+		// mid-animation. Matches the click gate in GameStateManager.
+		if (!mini && $boardBusy) return
 		const tile = y * map.cols + x
 		if (!mini) setHoverTile(tile)
 		// Movement arrows only make sense while the player is choosing a move

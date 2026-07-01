@@ -162,6 +162,8 @@ const ROCKET = unitIndex('Rocket Truck')
 const CORVETTE = unitIndex('Corvette')
 const HUNTER_SUPPORT = unitIndex('Hunter Support')
 const TURRET = unitIndex('Turret')
+const STEALTH_TANK = unitIndex('Stealth Tank')
+const JAMMER = unitIndex('Jammer Truck')
 
 describe('damage multipliers (B2)', () => {
 	it('Damage.Flak — Flak Tank deals 2× damage to a light-armor target', () => {
@@ -230,6 +232,74 @@ describe('damage multipliers (B2)', () => {
 		// counter = round(70 * 1.5 * 0.85) = round(89.25) = 89.
 		expect(primary).toBe(105)
 		expect(counter).toBe(89)
+	})
+
+	it('Damage.Stealth_Strike — Stealth Tank attacking while hidden deals 2×', () => {
+		const map = makeMap()
+		const stealth: UnitObject = { ...unit(STEALTH_TANK, 0), hidden: true }
+		const scorpion = unit(SCORPION, 1) // armor=medium
+
+		// Stealth Tank: power 30, weapon=light vs armor=medium → no matchup. base = 30.
+		// Ambush (hidden + attacking) doubles it → 60.
+		expect(calculateDamage(stealth, scorpion, { map, defenderTile: 0, role: 'attack' })).toBe(60)
+	})
+
+	it('Damage.Stealth_Strike — no bonus once revealed (not hidden)', () => {
+		const map = makeMap()
+		const stealth: UnitObject = { ...unit(STEALTH_TANK, 0), hidden: false }
+		const scorpion = unit(SCORPION, 1)
+
+		expect(calculateDamage(stealth, scorpion, { map, defenderTile: 0, role: 'attack' })).toBe(30)
+	})
+
+	it('Damage.Stealth_Strike — no bonus when countering, even while hidden', () => {
+		const map = makeMap()
+		const stealth: UnitObject = { ...unit(STEALTH_TANK, 0), hidden: true }
+		const scorpion = unit(SCORPION, 1)
+
+		// A counter is not an ambush, so the bonus is withheld. base = 30.
+		expect(calculateDamage(stealth, scorpion, { map, defenderTile: 0, role: 'counter' })).toBe(30)
+	})
+
+	it('Damage.Stealth_Strike — an enemy Jammer Truck radar denies the ambush', () => {
+		// 5×5 grid so we have map geometry for the radar/adjacency test. A jammer on
+		// the defender's team at tile 0 throws a 2..3 ring; the stealth tank fires from
+		// tile 2 (distance 2 → lit up), so even while `hidden` it lands no double hit.
+		const map = makeFullMap()
+		const jammerTile = 0
+		const attackerTile = 2
+		const defenderTile = 3
+		map.layers.units[jammerTile] = unit(JAMMER, 1)
+		const stealth: UnitObject = { ...unit(STEALTH_TANK, 0), hidden: true }
+		map.layers.units[attackerTile] = stealth
+		const scorpion = unit(SCORPION, 1)
+		map.layers.units[defenderTile] = scorpion
+
+		// power 30, light vs medium → no matchup, radar denies x2 → 30.
+		expect(
+			calculateDamage(stealth, scorpion, { map, defenderTile, attackerTile, role: 'attack' })
+		).toBe(30)
+	})
+
+	it('Damage.Stealth_Strike — ambush still lands when firing outside the radar ring', () => {
+		// Same jammer at tile 0, but the stealth tank fires from tile 1 (distance 1 →
+		// inside the ring's blind inner gap), so it stays concealed and doubles.
+		const map = makeFullMap()
+		map.layers.units[0] = unit(JAMMER, 1)
+		const attackerTile = 1
+		const defenderTile = 2
+		const stealth: UnitObject = { ...unit(STEALTH_TANK, 0), hidden: true }
+		map.layers.units[attackerTile] = stealth
+		map.layers.units[defenderTile] = unit(SCORPION, 1)
+
+		expect(
+			calculateDamage(stealth, map.layers.units[defenderTile]!, {
+				map,
+				defenderTile,
+				attackerTile,
+				role: 'attack',
+			})
+		).toBe(60)
 	})
 })
 

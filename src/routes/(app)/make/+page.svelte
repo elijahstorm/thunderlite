@@ -120,7 +120,7 @@
 				<div class="grid gap-5">
 					{#each maps as map}
 						<a
-							href="/map/{map.sha}"
+							href="/map/{map.public_id}"
 							class="block w-full text-left rounded-xl outline-none transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:-translate-y-0.5"
 						>
 							<MapCard {map} />

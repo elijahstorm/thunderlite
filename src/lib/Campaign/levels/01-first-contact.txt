@@ -1,25 +1,33 @@
 <start>
-move: 1,7
-talk Vance: "Reyes, over here. Glad you made it out.", "Kael's scouts caught your patrol off guard. Let's get you clear of them."
-move: 8,0
-talk Kael: "The patrol survivor. You should have stayed down.", "My commandos will see to the rest."
-move: 1,7
-talk Vance: "Take a breath. Those are light units. Your Heavy Commando's rounds go right through their armor.", "Move in beside one and attack. Let the matchup do the hard part for you."
-talk Reyes: "Got it. Let's show them we're not done yet."
+move: 1,6
+talk Vance: "Reyes, over here. Glad you made it out.", "Kael's scouts caught your patrol in the open. Let's clear them off you."
+move: 9,1
+talk Kael: "The patrol survivor. You should have stayed down.", "Scouts, run him down."
+move: 1,6
+talk Vance: "Look at what he sent: light scouts, thin armor. Your rifles are light weapons, and light tears through light. Move in beside one and fire.", "And that Flak Tank? Light armor is exactly what it was built to shred. Point it at a scout and watch what happens."
+talk Vance: "One rule for now: attack from the trees for cover, or gang up so only one of them can fire back."
+talk Reyes: "Right weapon, right target. Let's show them we're not done."
 </start>
 
 <turn 0,1>
-move: 8,2
-talk Kael: "Send up another. Don't let one recruit hold you."
-add unit: 1,"Strike Commando",8,2
-talk Vance: "Just one more scout. Concentrate your fire and it's a non-issue."
+move: 10,2
+talk Kael: "Another. Don't let a single recruit hold the line."
+add unit: 1,"Strike Commando",10,2
+talk Vance: "Still just light armor. Same answer. Keep your fire concentrated."
+</turn>
+
+<turn 1,1>
+move: 9,3
+talk Kael: "Again. Bleed them dry."
+add unit: 1,"Strike Commando",9,3
+talk Vance: "He's feeding you scouts one at a time. Let the Flak do the heavy lifting and mop up with your rifles."
 </turn>
 
 <win>
-talk Vance: "Nicely done, Reyes. That's the whole idea: the right weapon against the right armor.", "This was only a scouting party, though. Kael will be back with more."
+talk Vance: "Cleanly done, Reyes. That's the whole idea: match your weapon to their armor and the fight's half won.", "This was only a scouting party. Kael will be back with heavier metal."
 talk Reyes: "Then we'll be ready for him."
 </win>
 
 <lose>
-talk Vance: "Ease off and pull back. We lost too many.", "Take a moment, then try again. Choose your targets by their armor and they'll fall faster."
+talk Vance: "Pull back, we lost too many.", "Take a breath and try again. Light weapons for light armor, and fight from cover when you can."
 </lose>

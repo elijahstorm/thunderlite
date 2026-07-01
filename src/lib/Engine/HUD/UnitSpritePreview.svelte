@@ -35,17 +35,17 @@
 		const columns = Math.max(1, Math.round(image.naturalWidth / frameWidth))
 		const col = direction % columns
 
-		// Fit the whole frame inside the box, centered, preserving aspect — taller
-		// units (yOffset > 0) stay proportional instead of being squashed.
-		const aspect = frameWidth / frameHeight
-		let drawW = size
-		let drawH = size
-		if (aspect > 1) drawH = size / aspect
-		else drawW = size * aspect
-		const dx = (size - drawW) / 2
-		const dy = (size - drawH) / 2
-
-		ctx.drawImage(image, col * frameWidth, 0, frameWidth, frameHeight, dx, dy, drawW, drawH)
+		// Show only the unit's on-tile footprint: the bottom SPRITE×SPRITE block of the
+		// frame. A tall unit (yOffset > 0, e.g. the Annihilator Tank at 60×120) carries
+		// extra "headroom" above that footprint — the part that, on the map, bleeds up
+		// into the tile above. Drawing the whole frame in a square icon either shrinks
+		// the unit to a dot (aspect preserved) or stretches it (aspect broken), so we
+		// crop the headroom away and scale just the footprint to fill the icon. Every
+		// unit, big or small, then renders at the same consistent size; the headroom is
+		// simply not shown here.
+		const footX = col * frameWidth + (frameWidth - SPRITE) / 2
+		const footY = frameHeight - SPRITE
+		ctx.drawImage(image, footX, footY, SPRITE, SPRITE, 0, 0, size, size)
 	}
 
 	const stopRotation = () => {

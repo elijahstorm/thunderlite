@@ -127,6 +127,23 @@ type MapObject = MapSettings & {
 	 * the enemy units the player has toggled on). Recomputed in `MapRender` from
 	 * the `shownThreatUnits` store; see `threatOverlay.ts`. */
 	threatTiles?: Set<number>
+	/** Tiles currently occupied by the toggled enemy units themselves — framed with
+	 * a red outline/tint so the player can tell which unit owns the reach painted
+	 * around it. Recomputed in `MapRender` alongside `threatTiles`. */
+	threatUnitTiles?: Set<number>
+	/** Tiles lit by Jammer Truck radar rings, split so the painter can tint them
+	 * apart: `own` is the local viewer's own detection net (always shown), `enemy`
+	 * is the ring of any enemy jammer the viewer can currently see. Recomputed in
+	 * `MapRender`; see `computeRadarTiles` in `visibility.ts`. */
+	radarTiles?: { own: Set<number>; enemy: Set<number> }
+	/** Dev-only inspection overlay data (drawn only when the dev HUD is toggled on).
+	 * `debugHeat` tints tiles amber by an arbitrary 0..1 value (e.g. the CPU's stealth
+	 * suspicion / fog belief); `debugFocus` rings a single highlighted tile;
+	 * `debugCleared` tints tiles teal by a 0..1 "recently ruled-out" value, shown only
+	 * where there's no `debugHeat`. Set by dev pages. */
+	debugHeat?: Record<number, number>
+	debugFocus?: number
+	debugCleared?: Record<number, number>
 }
 type MapProcesser = MapSettings & {
 	title?: string | null
@@ -226,14 +243,14 @@ type UserDBData = {
 }
 type MapDBData = {
 	id: number
-	sha: string
+	public_id: string
 	owner_auth: string
 	name: string
 	description: string
 	type: string
 	info: { info: string; color: string }[]
 	thumbnail: string
-	url: string
+	status: string
 	plays: number
 	likes: number
 	liked_by_me: number

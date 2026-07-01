@@ -1,6 +1,7 @@
 import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { gameState, markTileActed, type Player, type PlayerControls } from './gameState'
+import { beginBuildFade } from './buildFade'
 
 export type BuildableUnit = {
 	type: number
@@ -98,6 +99,8 @@ export const spawnBuiltUnit = (
 		team,
 		health: data.health,
 	}
+	// Quick fade-in so the fresh unit eases onto the board instead of popping.
+	beginBuildFade(spawnTile)
 
 	gameState.update((s) => ({
 		...s,

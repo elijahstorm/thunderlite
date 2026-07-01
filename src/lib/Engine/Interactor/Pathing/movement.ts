@@ -94,13 +94,24 @@ export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | 
 	const t = terrainData[terrain.type]
 	if (u.type === 'air')
 		return sky && skyData[sky.type]?.modifiers.includes('treacherous') ? skyData[sky.type].drag : 1
+	// Sure-footed walkers (Strider) treat every passable tile the same — no rough,
+	// slippery or rugged penalty and no terrain-drag scaling. They climb mountains
+	// as easily as crossing a road; ocean is still gated off by validTerrain.
+	if (u.movementType === 'sure-footed') return 1
+	// Hovercraft skim land and shallows freely but plough slowly through open ocean
+	// (deep water that isn't a Shallow shore/port). Scales by terrain drag so reefs
+	// and archipelago still bite.
+	if (u.movementType === 'amphibious')
+		return (t.ocean && !t.modifiers.includes('Shallow') ? 2 : 1) * t.drag
 	// Tires cross rough terrain (hills, forest) poorly, but the 3x penalty already IS
 	// the final cost — it must NOT also be scaled by the terrain's own `drag`, or a
 	// wheel unit would spend its entire move climbing a single hill (3 * drag 2 = 6).
 	// Every other movement type still scales by terrain drag below.
 	if (t.details === 'rough' && u.movementType === 'wheel') return 3
 	return (
-		(t.name === 'Shore' && u.movementType === 'warship') ||
+		// Shallow water (Shore) bottoms out a deep-draft warship; a High Bridge spans
+		// deep water, so it isn't Shallow and ships pass freely beneath it.
+		(t.modifiers.includes('Shallow') && u.movementType === 'warship') ||
 		(t.details === 'rugged' && (u.movementType === 'wheel' || u.movementType === 'tank'))
 			? IMPASSABLE
 			: t.details === 'rough' && u.movementType === 'boat'
@@ -148,10 +159,12 @@ export const validTerrain = (terrain: GroundObject, unit: UnitObject) => {
 	if (u.movementType === 'none') return false
 	if (t.details === 'impassable') return false
 	if (u.type === 'air') return true
-	if (t.name === 'Shore') return true
-	// A High Bridge spans deep water: ground units cross the deck while ships pass
-	// beneath it, so both are allowed (a plain Bridge sits low and blocks ships).
-	if (t.name === 'High Bridge') return u.type === 'ground' || u.type === 'sea'
+	// Hovercraft go anywhere that isn't impassable — land, shore and open water alike.
+	if (u.movementType === 'amphibious') return true
+	// Amphibious terrain (Shore, High Bridge) takes both ground and sea: ground units
+	// cross the deck/sand while ships occupy the water, so both are allowed (a plain
+	// Bridge sits low and blocks ships — it isn't Amphibious).
+	if (t.modifiers.includes('Amphibious')) return u.type === 'ground' || u.type === 'sea'
 	if (t.ocean) return u.type === 'sea'
 	return u.type === 'ground'
 }
@@ -168,9 +181,9 @@ export const canPlaceUnit = (terrain: GroundObject, unit: UnitObject, sky?: SkyO
 	if (t.details === 'impassable') return false
 	if (u.type === 'air') return true
 	const terrainAllows =
-		t.name === 'Shore'
+		u.movementType === 'amphibious'
 			? true
-			: t.name === 'High Bridge'
+			: t.modifiers.includes('Amphibious')
 				? u.type === 'ground' || u.type === 'sea'
 				: t.ocean
 					? u.type === 'sea'

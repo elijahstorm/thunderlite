@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte'
 	import Animator from '$lib/Engine/Animator/Animator.svelte'
+	import { animationFrame } from '$lib/Sprites/animationFrameCount'
 	import { interactionState } from '$lib/Engine/Interactor/interactionState'
 	import { setBoardGeometry, clearBoardGeometry } from '$lib/Engine/HUD/boardGeometry'
+	import { campaignScriptActive } from '$lib/Campaign/scriptGate'
+	import { boardBusy } from '$lib/Engine/Animator/animator'
 
 	export let interfacer: InterfaceInteraction
 	export let select: (x: number, y: number) => void
@@ -84,14 +87,30 @@
 
 	{#if !mini && !editor}
 		<div class="col-start-1 row-start-1 pointer-events-none">
-			{#if $interactionState === 'select' && canSelectAt(interfacer.hover.x, interfacer.hover.y)}
-				<img
-					class="absolute"
-					src="/game/play/icon/move/hover.png"
-					style={position(interfacer.hover)}
-					alt="hovered tile"
-				/>
+			{#if $interactionState === 'select' && !$campaignScriptActive && !$boardBusy && canSelectAt(interfacer.hover.x, interfacer.hover.y)}
+				<!-- hover.png is a 60x120 two-frame vertical strip. We flip frames off the
+				     shared `animationFrame` clock (the same 200ms beat tile-select rides),
+				     so the hover marker stays in phase no matter when hovering begins. -->
+				<div
+					class="absolute hover-marker"
+					style={`${position(interfacer.hover)} background-position-y: ${
+						$animationFrame % 2 ? '100%' : '0%'
+					};`}
+					aria-label="hovered tile"
+				></div>
 			{/if}
 		</div>
 	{/if}
 </section>
+
+<style>
+	/* The strip stacks two 60x60 frames vertically (image is 60x120). Scaling the
+	   background to 200% height lets us show one frame at a time; which frame is
+	   shown is driven inline from the shared animation clock, not a CSS keyframe,
+	   so the pulse stays in phase with the board's other tile animations. */
+	.hover-marker {
+		background-image: url('/game/play/icon/move/hover.png');
+		background-repeat: no-repeat;
+		background-size: 100% 200%;
+	}
+</style>

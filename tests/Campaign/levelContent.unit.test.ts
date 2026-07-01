@@ -105,11 +105,15 @@ describe('tutorial beats (levels 1-3)', () => {
 	const buildingsOf = (id: string, team: number): number[] =>
 		(getLevelMapData(id)?.layers.buildings ?? []).filter((b) => b.team === team).map((b) => b.type)
 
-	it('level 1 sets up the weapon-vs-armor matchup: player heavy gun vs enemy light armor', () => {
+	it('level 1 sets up the weapon-vs-armor matchup: player light weapons vs enemy light armor', () => {
 		const player = unitsOf('01-first-contact', 0)
 		const enemy = unitsOf('01-first-contact', 1)
-		expect(player).toContain(HEAVY_COMMANDO)
-		// Strike Commandos are light-armored — the matchup the heavy gun exploits.
+		// The engine grants the 1.5x matchup bonus on weaponType === armorType, so a
+		// LIGHT weapon is what counters light armor — the lesson level 1 teaches. The
+		// Heavy Commando (heavy weapon) is held back for level 3's heavy-armor problem.
+		expect(player.some((t) => unitData[t].weaponType === 'light')).toBe(true)
+		expect(player).not.toContain(HEAVY_COMMANDO)
+		// Strike Commandos are light-armored — the matchup the light weapons exploit.
 		expect(enemy).toContain(STRIKE_COMMANDO)
 		expect(enemy.every((t) => unitData[t].armorType === 'light')).toBe(true)
 	})

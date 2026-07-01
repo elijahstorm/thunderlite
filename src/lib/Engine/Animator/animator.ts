@@ -1,8 +1,10 @@
-import { get, writable } from 'svelte/store'
+import { derived, get, writable } from 'svelte/store'
 import { pathFinder } from '../Interactor/Pathing/pathFinder'
 import { animationData, ANIMATION_EXPLOSION } from '$lib/GameData/animation'
 import { animationFrame, overlayFrame } from '$lib/Sprites/animationFrameCount'
 import { rendererStore } from '$lib/Sprites/spriteStore'
+import { clearMaterialize } from '$lib/Engine/materialize'
+import { clearBuildFade } from '$lib/Engine/buildFade'
 import { generateKey } from '$lib/Security/keys'
 
 export const ANIMATION_TIME = 200
@@ -82,6 +84,16 @@ export const animations = writable<
 	}[]
 >([])
 
+// True whenever the board is mid-animation: a unit walking its route, combat
+// overlays on screen, or a multi-beat attack/health-bar ease in flight. Player
+// input gating (clicks, hover marker, route preview) reads this so nothing can
+// select or move a unit until the previous action's animations have settled.
+export const boardBusy = derived(
+	[routeAnimation, animations, animationBusy],
+	([$routeAnimation, $animations, $animationBusy]) =>
+		$routeAnimation !== null || $animations.length > 0 || $animationBusy > 0
+)
+
 // Cancel any in-flight animation timers and reset both overlay stores to idle.
 // Call this when the board's map data is swapped (dev scene switches, resets) so
 // a unit mid-walk on the previous map can't leak a ghost overlay onto the new one.
@@ -97,6 +109,8 @@ export const clearAnimations = () => {
 	animationBusy.set(0)
 	routeAnimation.set(null)
 	animations.set([])
+	clearMaterialize()
+	clearBuildFade()
 }
 
 export const animateRoute = (

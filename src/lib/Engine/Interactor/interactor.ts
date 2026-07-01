@@ -5,7 +5,7 @@ import {
 	generatePreviewList,
 	findActionAtTile,
 } from '$lib/Layers/tileHighlighter'
-import { computeThreatTiles } from './Pathing/threat'
+import { computeThreatSeverity } from './Pathing/threat'
 import { toggleThreatUnit, viewerTeam } from '../threatOverlay'
 import { get } from 'svelte/store'
 import { animateRoute, animateHealthBar } from '../Animator/animator'
@@ -15,7 +15,8 @@ import { buildingData } from '$lib/GameData/building'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
 import { truncateRouteAtCollision } from './Pathing/movement'
-import { concealedEnemyTiles } from '../visibility'
+import { concealedEnemyTiles, isUnitStealthed } from '../visibility'
+import { recordStealthPassthrough } from '../cpuAi/stealthMemory'
 import { canSelectUnit, gameState } from '../gameState'
 import { openBuildMenu, closeBuildMenu } from '../HUD/buildMenuStore'
 import { applyAction } from '../applyAction'
@@ -101,7 +102,11 @@ const select: Interactor = ({ map, tile }) => {
 		// combined danger map across several enemies instead of inspecting them one
 		// at a time. (Own already-acted units fall through to the transient preview.)
 		if (unit.team !== get(viewerTeam)) {
-			toggleThreatUnit(tile)
+			// A stealthed/cloaked enemy must stay invisible: clicking its tile reveals
+			// neither that it's there nor its reach — it's a no-op, as if the player had
+			// clicked empty ground. (Fogged tiles can't be meaningfully clicked.)
+			if (isUnitStealthed(map, tile, unit)) return
+			toggleThreatUnit(unit)
 			return
 		}
 		// Own unit that has already acted — show a read-only preview of its
@@ -115,7 +120,7 @@ const select: Interactor = ({ map, tile }) => {
 
 	highlightActionsList(
 		map,
-		generateActionsList(map, tile, unit, computeThreatTiles(map, unit.team))
+		generateActionsList(map, tile, unit, computeThreatSeverity(map, unit))
 	)
 	interactionSource.set(tile)
 	interactionState.set('choice')
@@ -221,6 +226,9 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	map.layers.units[tile] = null
 	animateRoute(map, unit, tile, finalTile, route).then(() => {
 		map.layers.units[tile] = unit
+		// A stealth unit that slipped through an enemy jammer's radar mid-route is
+		// logged so the watching CPU "remembers" a cloaked threat is about.
+		recordStealthPassthrough(map, route, unit)
 		commit(map, { kind: 'move', from: tile, to: finalTile })
 		// Walked into a concealed enemy mid-route: turn over, skip menu / callback.
 		if (collided) return

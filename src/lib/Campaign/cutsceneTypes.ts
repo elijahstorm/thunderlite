@@ -14,6 +14,9 @@
 export type CutsceneEvent =
 	/** Show one speaker saying one or more lines. Lines preserved verbatim. */
 	| { kind: 'talk'; speaker: string; lines: string[] }
+	/** Set a speaker's dialogue colour for the rest of the level. `color` is a CSS
+	 * colour (hex like `#ef4444` or a colour name). */
+	| { kind: 'speakerColor'; speaker: string; color: string }
 	/** Pan the camera to a tile. */
 	| { kind: 'camera'; x: number; y: number }
 	/** Highlight a tile. */
@@ -26,6 +29,8 @@ export type CutsceneEvent =
 	| { kind: 'spawn'; team: number; unit: string; x: number; y: number }
 	/** Remove whatever unit occupies a tile. */
 	| { kind: 'kill'; x: number; y: number }
+	/** Set the current health of the unit at a tile (clamped to 1..max; never kills). */
+	| { kind: 'hurt'; x: number; y: number; health: number }
 	/** Replace the terrain at a tile. */
 	| { kind: 'setTerrain'; terrain: string; x: number; y: number }
 	/** Set the weather/sky at a tile. `weather` matches a `skyData` name. */
@@ -42,8 +47,32 @@ export type CutsceneEvent =
 	| { kind: 'removeBuilding'; x: number; y: number }
 	/** Change the owning team of the building at a tile. */
 	| { kind: 'ownBuilding'; team: number; x: number; y: number }
+	/** Immediately end the match as a defeat for the local player. */
+	| { kind: 'defeat' }
 
 export type CutsceneEventKind = CutsceneEvent['kind']
+
+/** Comparison operators a `<when>` condition can use. */
+export type CompareOp = '<' | '<=' | '==' | '>=' | '>'
+
+/**
+ * A `<when>` trigger condition: compares a team's unit count against `count`.
+ * When `unitTypes` is null the whole team is counted; otherwise only units whose
+ * type name is in the list. e.g. `team 1 units <= 2`, or
+ * `team 0 units "Strike Commando","Heavy Commando" == 0`.
+ */
+export interface TriggerCondition {
+	team: number
+	unitTypes: string[] | null
+	op: CompareOp
+	count: number
+}
+
+/** A `<when COND> … </when>` block: its events fire once, when COND first holds. */
+export interface ConditionalBlock {
+	condition: TriggerCondition
+	events: CutsceneEvent[]
+}
 
 /**
  * Events grouped by the block marker that contained them. `turns` is keyed by
@@ -56,6 +85,8 @@ export interface CutsceneScript {
 	win: CutsceneEvent[]
 	lose: CutsceneEvent[]
 	turns: Record<number, Record<number, CutsceneEvent[]>>
+	/** `<when COND>` trigger blocks, each fired once the first time COND holds. */
+	conditions: ConditionalBlock[]
 }
 
 /**

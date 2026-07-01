@@ -17,7 +17,7 @@
 			<p class="text-zinc-500 dark:text-zinc-400">
 				This is a brief summary of the politics story. Click the link to read more.
 			</p>
-			<a class="text-blue-500 hover:text-blue-700 mt-4" href="#"> Read More </a>
+			<button type="button" class="text-blue-500 hover:text-blue-700 mt-4"> Read More </button>
 		</div>
 		<div>
 			<img
@@ -32,7 +32,7 @@
 			<p class="text-zinc-500 dark:text-zinc-400">
 				This is a brief summary of the politics story. Click the link to read more.
 			</p>
-			<a class="text-blue-500 hover:text-blue-700 mt-4" href="#"> Read More </a>
+			<button type="button" class="text-blue-500 hover:text-blue-700 mt-4"> Read More </button>
 		</div>
 		<div>
 			<img
@@ -47,7 +47,7 @@
 			<p class="text-zinc-500 dark:text-zinc-400">
 				This is a brief summary of the politics story. Click the link to read more.
 			</p>
-			<a class="text-blue-500 hover:text-blue-700 mt-4" href="#"> Read More </a>
+			<button type="button" class="text-blue-500 hover:text-blue-700 mt-4"> Read More </button>
 		</div>
 	</div>
 </section>

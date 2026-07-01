@@ -3,6 +3,9 @@ import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { gameState } from '../gameState'
 import { buildableUnits, type BuildableUnitsOptions } from '../build'
+import { previewDamage } from '../combat'
+import { unitTypeHasRadar, hasRadarField } from '../visibility'
+import { lurkingStealthCount } from './stealthMemory'
 import type { SerializedAction } from '../Interactor/serializedAction'
 
 type ArmyMix = {
@@ -51,11 +54,54 @@ const findProducerBuildings = (map: MapObject, cpuTeam: number): number[] => {
 	return out
 }
 
+type StealthHunt = {
+	// Enemy cloak units the CPU remembers but can't see right now.
+	lurking: number
+	// Jammer Trucks the CPU already fields — don't keep churning them out.
+	ownRadar: number
+}
+
+// How well a freshly-built `unitType` matches up against the enemy army the CPU can
+// currently see. Runs the real combat math (weapon/armor matchup, Flak vs light armor,
+// etc.) against each enemy on its own tile — no lookahead, just "would this actually
+// hurt what they field, and survive what they bring back". Returns ~0 when there's
+// nothing to counter. This is what makes the CPU *react to what the player builds*:
+// flood it with light armor and it shifts toward Flak instead of churning the same
+// brick every turn. `defenderTile` doubles as a terrain proxy for the incoming hit —
+// rough, but enough to bias production sensibly.
+const counterEffectiveness = (
+	map: MapObject,
+	unitType: number,
+	cpuTeam: number,
+	enemies: { tile: number; unit: UnitObject }[]
+): number => {
+	const data = unitData[unitType]
+	if (!data || enemies.length === 0) return 0
+	const fresh: UnitObject = { type: unitType, team: cpuTeam, health: data.health, state: 0 }
+	const freshMax = data.health || 1
+	let offense = 0
+	let defense = 0
+	for (const { tile, unit } of enemies) {
+		const ed = unitData[unit.type]
+		if (!ed) continue
+		const eMax = ed.health || 1
+		const eHp = unit.health ?? eMax
+		const out = previewDamage(fresh, unit, { map, defenderTile: tile, role: 'attack' })
+		offense += Math.min(out, eHp) / eMax
+		const inc = previewDamage(unit, fresh, { map, defenderTile: tile, role: 'attack' })
+		defense += Math.min(inc, freshMax) / freshMax
+	}
+	const n = enemies.length
+	return (offense / n) * 120 - (defense / n) * 40
+}
+
 const scoreBuildChoice = (
 	unitType: number,
 	mix: ArmyMix,
 	ownCaptureCount: number,
-	enemyAirThreat: boolean
+	enemyAirThreat: boolean,
+	hunt: StealthHunt,
+	counter: number
 ): number => {
 	const data = unitData[unitType]
 	if (!data) return -Infinity
@@ -63,9 +109,24 @@ const scoreBuildChoice = (
 
 	let score = 100 + (data.power + data.health) * 0.4
 
+	// Reward building a real counter to what the enemy currently fields.
+	score += counter
+
 	if (enemyAirThreat && isAntiAir(unitType)) score += 250
 	if (ownCaptureCount < 2 && isCaptureCapable(unitType)) score += 200
 	if (data.movement >= 4) score += 30
+
+	// Cloak hunters: when the CPU believes ambushers lurk, it wants eyes. A first
+	// Jammer Truck (mobile radar that flushes them and screens our line) is a high
+	// priority; further ones taper off. Failing that, a cheap fast scout to probe.
+	if (hunt.lurking > 0) {
+		if (unitTypeHasRadar(unitType)) {
+			// One mobile radar is plenty to sweep a hunch — don't stockpile jammers.
+			score += hunt.ownRadar === 0 ? 220 : 0
+		} else if (data.movement >= 5 && cost <= 300 && data.sight > 0) {
+			score += 60
+		}
+	}
 
 	return score - cost * 0.1
 }
@@ -91,13 +152,34 @@ export const rankBuildableTypes = (
 	const enemyAirThreat = mix.air > 0 && mix.air * 3 >= mix.totalEnemies
 
 	let ownCaptureCount = 0
+	let ownRadar = 0
 	for (const u of map.layers.units) {
-		if (u && u.team === cpuTeam && isCaptureCapable(u.type)) ownCaptureCount++
+		if (!u || u.team !== cpuTeam) continue
+		if (isCaptureCapable(u.type)) ownCaptureCount++
+		if (hasRadarField(u)) ownRadar++
+	}
+	const hunt: StealthHunt = { lurking: lurkingStealthCount(map, cpuTeam), ownRadar }
+
+	// Visible enemy army, used to score how well each buildable type counters it.
+	const enemies: { tile: number; unit: UnitObject }[] = []
+	for (let i = 0; i < map.layers.units.length; i++) {
+		const u = map.layers.units[i]
+		if (u && u.team !== cpuTeam) enemies.push({ tile: i, unit: u })
 	}
 
 	return buildableUnits(player, opts)
 		.filter((c) => c.buildable)
-		.map((c) => ({ type: c.type, score: scoreBuildChoice(c.type, mix, ownCaptureCount, enemyAirThreat) }))
+		.map((c) => ({
+			type: c.type,
+			score: scoreBuildChoice(
+				c.type,
+				mix,
+				ownCaptureCount,
+				enemyAirThreat,
+				hunt,
+				counterEffectiveness(map, c.type, cpuTeam, enemies)
+			),
+		}))
 		.sort((a, b) => b.score - a.score)
 }
 

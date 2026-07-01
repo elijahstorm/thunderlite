@@ -4,6 +4,7 @@
 	import { defeatAnimating } from '../defeat'
 	import { onMatchEnd, lastMatchResult, type MatchResult } from '../matchEnd'
 	import type { PlayerMatchStats } from '../matchStats'
+	import { isDevMode, downloadDevLog, devLogSize } from '../devLog'
 
 	/** The team controlled on this machine — used to frame the banner as Victory/Defeat. */
 	export let localTeam = 0
@@ -171,6 +172,21 @@
 					</a>
 				{/if}
 			</footer>
+
+			{#if isDevMode}
+				<div class="-mx-2 mt-1 border-t border-white/10 pt-3">
+					<p class="mb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-amber-400/80">
+						Dev (local only)
+					</p>
+					<button
+						type="button"
+						on:click={downloadDevLog}
+						class="mx-auto block rounded bg-amber-500/15 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/25"
+					>
+						Download game log ({$devLogSize} acts)
+					</button>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

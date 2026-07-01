@@ -51,7 +51,15 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { skyData } from '$lib/GameData/sky'
-import { CutsceneParseError, type CutsceneEvent, type CutsceneScript } from './cutsceneTypes'
+import { terrainData } from '$lib/GameData/terrain'
+import {
+	CutsceneParseError,
+	type CompareOp,
+	type ConditionalBlock,
+	type CutsceneEvent,
+	type CutsceneScript,
+	type TriggerCondition,
+} from './cutsceneTypes'
 
 /** Valid `spawn` unit names — anything else is an authoring mistake. */
 const VALID_UNIT_NAMES: ReadonlySet<string> = new Set(unitData.map((u) => u.name))
@@ -78,7 +86,7 @@ interface ArgField {
  * @throws {CutsceneParseError} on any malformed line, carrying its line number.
  */
 export const parseCutsceneScript = (input: string): CutsceneScript => {
-	const script: CutsceneScript = { start: [], win: [], lose: [], turns: {} }
+	const script: CutsceneScript = { start: [], win: [], lose: [], turns: {}, conditions: [] }
 	const lines = input.split('\n')
 
 	let current: CutsceneEvent[] | null = null
@@ -129,7 +137,7 @@ export const parseCutsceneScript = (input: string): CutsceneScript => {
 
 		if (current === null) {
 			throw new CutsceneParseError(
-				`command "${line}" outside of any <start>/<win>/<lose>/<turn> block`,
+				`command "${line}" outside of any <start>/<win>/<lose>/<turn>/<when> block`,
 				lineNo
 			)
 		}
@@ -179,9 +187,49 @@ const openBlock = (script: CutsceneScript, tag: ParsedTag, lineNo: number): Cuts
 			if (!script.turns[round][team]) script.turns[round][team] = []
 			return script.turns[round][team]
 		}
+		case 'when': {
+			const block: ConditionalBlock = { condition: parseCondition(tag.attr, lineNo), events: [] }
+			script.conditions.push(block)
+			return block.events
+		}
 		default:
 			throw new CutsceneParseError(`unknown block tag <${tag.name}>`, lineNo)
 	}
+}
+
+/**
+ * Parse a `<when>` attribute into a {@link TriggerCondition}. Grammar:
+ *   team <N> units [<"Name">[,"Name"]…] <op> <K>
+ * where `<op>` is one of `< <= == >= >`. With no unit-name list the whole team is
+ * counted; with one, only units of those types. Examples:
+ *   team 1 units <= 2
+ *   team 0 units "Strike Commando","Heavy Commando" == 0
+ */
+const parseCondition = (attr: string, lineNo: number): TriggerCondition => {
+	const m = attr.trim().match(/^team\s+(\d+)\s+units\s*(.*?)\s*(<=|>=|==|<|>)\s*(\d+)$/)
+	if (!m) {
+		throw new CutsceneParseError(
+			`<when> requires 'team N units [\"Name\",…] OP K' (OP one of < <= == >= >), got "${attr}"`,
+			lineNo
+		)
+	}
+	const middle = m[2].trim()
+	let unitTypes: string[] | null = null
+	if (middle !== '') {
+		unitTypes = [...middle.matchAll(/"([^"]+)"/g)].map((q) => q[1])
+		if (unitTypes.length === 0) {
+			throw new CutsceneParseError(
+				`<when> unit list must be quoted names, got "${middle}"`,
+				lineNo
+			)
+		}
+		for (const name of unitTypes) {
+			if (!VALID_UNIT_NAMES.has(name)) {
+				throw new CutsceneParseError(`<when> references unknown unit "${name}"`, lineNo)
+			}
+		}
+	}
+	return { team: parseInt(m[1], 10), unitTypes, op: m[3] as CompareOp, count: parseInt(m[4], 10) }
 }
 
 /**
@@ -196,6 +244,14 @@ const parseCommandInto = (
 	lineNo: number
 ): number => {
 	const raw = lines[i]
+
+	// No-argument commands (no colon). Keep this list above the `:` requirement.
+	const bare = raw.trim()
+	if (bare === 'defeat') {
+		events.push({ kind: 'defeat' })
+		return i
+	}
+
 	const colon = raw.indexOf(':')
 	if (colon === -1) {
 		throw new CutsceneParseError(`expected ':' in command "${raw.trim()}"`, lineNo)
@@ -216,6 +272,23 @@ const parseCommandInto = (
 			const { talkLines, lastIndex } = collectTalk(lines, i, argStr, lineNo)
 			events.push({ kind: 'talk', speaker: qualifier, lines: talkLines })
 			return lastIndex
+		}
+		case 'color': {
+			// `color <Speaker>: <hex|name>` — set a speaker's dialogue colour for the
+			// level. Restricted to a hex code or a plain colour word so the value is
+			// safe to drop straight into an inline style.
+			if (qualifier === '') {
+				throw new CutsceneParseError('color requires a speaker', lineNo)
+			}
+			const value = argStr.trim()
+			if (!/^#[0-9a-fA-F]{3,8}$/.test(value) && !/^[a-zA-Z]+$/.test(value)) {
+				throw new CutsceneParseError(
+					`color expects a hex code (e.g. #ef4444) or a colour name, got "${value}"`,
+					lineNo
+				)
+			}
+			events.push({ kind: 'speakerColor', speaker: qualifier, color: value })
+			return i
 		}
 		case 'move': {
 			requireNoQualifier(keyword, qualifier, lineNo)
@@ -301,6 +374,25 @@ const parseCommandInto = (
 			}
 			const [x, y] = coordPair(argStr, lineNo)
 			events.push({ kind: 'kill', x, y })
+			return i
+		}
+		case 'hurt': {
+			if (qualifier !== 'unit') {
+				throw new CutsceneParseError(`unknown command "hurt ${qualifier}"`, lineNo)
+			}
+			const fields = splitArgFields(argStr, lineNo)
+			if (fields.length !== 3) {
+				throw new CutsceneParseError(
+					`hurt unit expects "x,y,health" (3 args), got ${fields.length}`,
+					lineNo
+				)
+			}
+			events.push({
+				kind: 'hurt',
+				x: intArg(fields[0].value, lineNo, 'x'),
+				y: intArg(fields[1].value, lineNo, 'y'),
+				health: intArg(fields[2].value, lineNo, 'health'),
+			})
 			return i
 		}
 		case 'remove': {
@@ -583,4 +675,46 @@ const scanQuotedList = (s: string): { complete: boolean; malformed: boolean; val
 	if (values.length === 0) return { complete: false, malformed: true, values } // no lines at all
 	if (expectMore) return { complete: false, malformed: false, values } // trailing comma → need more
 	return { complete: true, malformed: false, values }
+}
+
+/**
+ * Sprite-warming helper: every terrain / building / sky (weather) TYPE that a
+ * script can introduce at runtime via `terrain` / `add building` / `weather`.
+ *
+ * The renderer only preloads sprites for the types present in the *initial* map
+ * (a culling optimisation). A script that swaps in a terrain — say a `Bridge`
+ * that no starting tile uses — would otherwise have no sprite and render blank.
+ * Game.svelte unions these indices into the preload set so scripted changes show.
+ */
+export const scriptReferencedTypeIndices = (
+	script: CutsceneScript
+): { ground: number[]; buildings: number[]; sky: number[] } => {
+	const ground = new Set<number>()
+	const buildings = new Set<number>()
+	const sky = new Set<number>()
+
+	const turnEvents = Object.values(script.turns).flatMap((byTeam) => Object.values(byTeam).flat())
+	const conditionEvents = script.conditions.flatMap((c) => c.events)
+	const all: CutsceneEvent[] = [
+		...script.start,
+		...script.win,
+		...script.lose,
+		...turnEvents,
+		...conditionEvents,
+	]
+
+	for (const e of all) {
+		if (e.kind === 'setTerrain') {
+			const i = terrainData.findIndex((t) => t.name === e.terrain)
+			if (i >= 0) ground.add(i)
+		} else if (e.kind === 'addBuilding') {
+			const i = buildingData.findIndex((b) => b.name === e.building)
+			if (i >= 0) buildings.add(i)
+		} else if (e.kind === 'setWeather') {
+			const i = skyData.findIndex((s) => s.name === e.weather)
+			if (i >= 0) sky.add(i)
+		}
+	}
+
+	return { ground: [...ground], buildings: [...buildings], sky: [...sky] }
 }

@@ -19,9 +19,11 @@ const unitIndex = (name: string) => {
 const PLAINS = terrainIndex('Plains')
 const HILLS = terrainIndex('Hills')
 const MOUNTAIN = terrainIndex('Mountain')
+const FOREST = terrainIndex('Forest')
 
 const STRIKE_COMMANDO = unitIndex('Strike Commando') // sight 2, range [1,1] (non-ranged)
 const ROCKET_TRUCK = unitIndex('Rocket Truck') // sight 4, range [3,5] (ranged)
+const JAMMER_TRUCK = unitIndex('Jammer Truck') // sight 2, radar ring range [2,3]
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
 const unit = (type: number, team = 0): UnitObject => ({ type, state: 0, team })
@@ -141,6 +143,57 @@ describe('computeTeamVisibility', () => {
 		const farTile = (4 + sight) * 9 + 4
 		expect(enlarged.has(farTile)).toBe(true)
 		expect(without.has(farTile)).toBe(false)
+	})
+
+	it('hides a forest tile that lies beyond point-blank range of every viewer', () => {
+		const map = makeMap(7, 7)
+		const center = 3 * 7 + 3
+		map.layers.units[center] = unit(STRIKE_COMMANDO, 0) // sight 2
+		const near = 3 * 7 + 4 // distance 1 (adjacent)
+		const far = 3 * 7 + 5 // distance 2 (within sight, but concealed)
+		map.layers.ground[near] = ground(FOREST)
+		map.layers.ground[far] = ground(FOREST)
+		const visible = computeTeamVisibility(map, 0)
+
+		// A plains tile at distance 2 is still seen; the forest at the same range is not.
+		expect(visible.has(far - 1 + 7)).toBe(true) // sanity: open ground in range stays visible
+		expect(visible.has(near)).toBe(true) // adjacent forest is visible
+		expect(visible.has(far)).toBe(false) // distant forest is concealed
+	})
+
+	it('reveals a forest the viewer stands on', () => {
+		const map = makeMap(5, 5)
+		const center = 2 * 5 + 2
+		map.layers.ground[center] = ground(FOREST)
+		map.layers.units[center] = unit(STRIKE_COMMANDO, 0)
+		expect(computeTeamVisibility(map, 0).has(center)).toBe(true)
+	})
+
+	it('does not block sight to open ground sitting behind a forest', () => {
+		const map = makeMap(7, 7)
+		const center = 3 * 7 + 3
+		map.layers.units[center] = unit(STRIKE_COMMANDO, 0) // sight 2
+		map.layers.ground[3 * 7 + 4] = ground(FOREST) // forest one tile to the east
+		const beyond = 3 * 7 + 5 // open ground two tiles east, behind the forest
+		expect(computeTeamVisibility(map, 0).has(beyond)).toBe(true)
+	})
+
+	it("reveals a forest swept by a friendly radar ring with no unit beside it", () => {
+		const map = makeMap(9, 9)
+		const center = 4 * 9 + 4
+		map.layers.units[center] = unit(JAMMER_TRUCK, 0) // sight 2, radar ring 2..3
+		const radarForest = 4 * 9 + 7 // distance 3: outside sight, inside radar ring
+		map.layers.ground[radarForest] = ground(FOREST)
+		expect(computeTeamVisibility(map, 0).has(radarForest)).toBe(true)
+	})
+
+	it('does not reveal a forest in an enemy radar ring', () => {
+		const map = makeMap(9, 9)
+		const center = 4 * 9 + 4
+		map.layers.units[center] = unit(JAMMER_TRUCK, 1) // enemy jammer
+		const radarForest = 4 * 9 + 7 // distance 3 from the enemy jammer
+		map.layers.ground[radarForest] = ground(FOREST)
+		expect(computeTeamVisibility(map, 0).has(radarForest)).toBe(false)
 	})
 
 	it('clips to the map edges', () => {

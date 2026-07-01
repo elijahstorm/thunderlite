@@ -29,6 +29,7 @@ const buildingIndex = (name: string): number => {
 const PLAINS = terrainIndex('Plains')
 const SCORPION_TANK = unitIndex('Scorpion Tank')
 const STRIKE_COMMANDO = unitIndex('Strike Commando')
+const STEALTH_TANK = unitIndex('Stealth Tank')
 const CITY = buildingIndex('City')
 
 const makeMap = (cols: number, rows: number): MapObject =>
@@ -177,6 +178,34 @@ describe('applyAction determinism', () => {
 		resetGameState()
 		const second = run()
 		expect(second).toEqual(first)
+	})
+
+	it('a stealth attacker that leaves its target alive is revealed (drops its cloak)', () => {
+		const map = makeMap(5, 5)
+		const attackerTile = 12
+		placeUnit(map, attackerTile, STEALTH_TANK, 0) // hidden flag undefined = still cloaked
+		placeUnit(map, 13, SCORPION_TANK, 1) // tanky enough to survive the hit
+		initGameStateFromMap(map)
+		applyAction(map, { kind: 'attack', from: attackerTile, to: 13 })
+
+		const attacker = map.layers.units[attackerTile]
+		expect(attacker?.type).toBe(STEALTH_TANK) // it survived the counter
+		expect(map.layers.units[13]?.type).toBe(SCORPION_TANK) // target survived
+		expect(attacker?.hidden).toBe(false) // firing without a kill exposes it
+	})
+
+	it('a stealth attacker that kills its target keeps its cloak (no witness)', () => {
+		const map = makeMap(5, 5)
+		const attackerTile = 12
+		const attacker = { type: STEALTH_TANK, state: 0, team: 0, health: unitData[STEALTH_TANK].health, hidden: true }
+		map.layers.units[attackerTile] = attacker
+		placeUnit(map, 13, STRIKE_COMMANDO, 1, 1) // 1 HP — one shot kills it
+		initGameStateFromMap(map)
+		applyAction(map, { kind: 'attack', from: attackerTile, to: 13 })
+
+		expect(map.layers.units[13]).toBeNull() // target dead
+		// Cloak untouched by the attack: a silent kill leaves it hidden.
+		expect(map.layers.units[attackerTile]?.hidden).toBe(true)
 	})
 
 	it('attacking flags a capture-capable unit so it skips next turn’s capture', () => {

@@ -6,7 +6,7 @@
 		<img class="w-full h-full object-cover" src="/images/embedded-card.png" alt="User Post" />
 	</div>
 	<div class="flex items-center gap-2">
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Like">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -25,7 +25,7 @@
 				</path>
 			</svg>
 		</button>
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Comment">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -42,7 +42,7 @@
 				<path d="M20 18v-2a4 4 0 0 0-4-4H4"> </path>
 			</svg>
 		</button>
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Share">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -59,7 +59,7 @@
 				<path d="M22 2 11 13"> </path>
 			</svg>
 		</button>
-		<button class="focus:outline-none ml-auto">
+		<button class="focus:outline-none ml-auto" aria-label="Save">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"

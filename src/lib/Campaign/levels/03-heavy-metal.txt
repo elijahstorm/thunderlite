@@ -1,24 +1,31 @@
 <start>
-move: 10,1
-talk Kael: "Meet my Annihilator, the heaviest armor on this field.", "Come at it however you like. It won't matter."
-move: 1,8
-talk Vance: "He's right about one thing: light and medium guns barely dent heavy armor.", "But heavy weapons answer it. Your Heavy Commandos and that Rocket Truck are what we need here."
-talk Vance: "And don't go in alone. Attack within range and the enemy strikes back, so hit it from a distance, or gang up so it can only answer one of you."
-talk Reyes: "So we don't take it head-on. We surround it."
+move: 14,5
+talk Kael: "Meet my Annihilator, the heaviest armor on this field. I'm driving it straight down your throat.", "And while you fuss over it, my armor takes both your flanks and a runner takes your base."
+move: 3,5
+talk Vance: "Light and medium fire barely marks heavy armor. But heavy answers heavy: your Heavy Commandos and that Rocket Truck carry the weapons that bite.", "Never trade blows with it up close. It hits back hard enough to drop a Commando in one swing."
+talk Vance: "So work it from range. Keep the Rocket and Mortar up on the hills where they can see, and shell the Annihilator as it grinds through the center gap. Fall back as it closes. It's slow. It can't catch a truck.", "Screen the trucks with your Commandos and hold the side gaps with your Scorpions. And watch that scout breaking for our Command Center."
+talk Reyes: "Shell the big one through the gap, screen the guns, hold the flanks, guard home. We're spread thin, but we can do this."
 </start>
 
 <turn 0,1>
-move: 10,3
-talk Kael: "My Scorpion will flank you while the Annihilator does the rest."
-add unit: 1,"Scorpion Tank",10,3
-talk Vance: "Handle the Annihilator with your heavy guns. Let the Scorpion come to you."
+move: 9,2
+talk Kael: "Press the north gap. Get in among their guns."
+add unit: 1,"Scorpion Tank",12,2
+talk Vance: "There's the flank pressure. Your Scorpion matches that armor, and the Mortar will thin them. Don't let them reach the trucks."
+</turn>
+
+<turn 1,1>
+move: 9,8
+talk Kael: "South gap as well. Bury them from every side."
+add unit: 1,"Lance Tank",12,8
+talk Vance: "Hold the line and keep the rockets on the Annihilator. Break the big one and the rest loses its nerve."
 </turn>
 
 <win>
-talk Vance: "Even the heaviest armor gives way to the right weapon and good positioning.", "Hold onto that. Kael will only keep building bigger machines."
+talk Vance: "The Annihilator's a wreck and his wings have folded. Even the heaviest armor gives way to the right weapon and good footing.", "Hold onto that, Reyes. Kael will only keep building bigger machines."
 </win>
 
 <lose>
-talk Kael: "Predictable. You spent your strength on armor you could never touch."
-talk Vance: "Heavy guns, Reyes, and never trade blows you can't win. Let's try again."
+talk Kael: "Predictable. You spent your strength on armor you could never touch, and left your flanks and your back wide open."
+talk Vance: "Heavy guns on heavy armor, range before the charge, and never leave the guns or home undefended. Again."
 </lose>

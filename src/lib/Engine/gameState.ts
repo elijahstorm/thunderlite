@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store'
 import { buildingData } from '$lib/GameData/building'
 import { unitData } from '$lib/GameData/unit'
+import { resetSmoke } from './smokeState'
 
 /**
  * The owner value for an unclaimed (neutral) building. Players are teams 0–3;
@@ -27,6 +28,28 @@ export type Player = {
 	// the CPU witnesses (builds, deaths, sightings) — see cpuAi/stealthMemory.ts.
 	// Absent until the AI has observed something; clamped >= 0.
 	stealthMemory?: Record<number, number>
+	// CPU "hunch" about WHERE an enemy cloaked unit is — a fuzzy heat map keyed by
+	// tile index. Concrete sightings (a radar flush, a unit seen before it re-cloaks,
+	// a factory roll-out) plant heat; each of the CPU's turns the cloud decays and
+	// bleeds into neighbouring tiles, so an old sighting widens into a vague region
+	// rather than a precise pin. The planner steers probes and radar toward the
+	// hottest tile. See `cpuAi/stealthMemory.ts`.
+	stealthSuspicion?: Record<number, number>
+	// CPU "hunch" about enemies hidden by FOG (not stealth): a heat map of where a
+	// contact it lost track of probably is. Seeded when an enemy it had eyes on slips
+	// into fog, or when one of its own units is destroyed into the dark; it decays,
+	// spreads, and is ruled out where the CPU regains vision. Drives fog caution so the
+	// AI stops marching blindly into a region something just vanished into. See
+	// `cpuAi/fogMemory.ts`. `fogScan` is the previous turn's vision snapshot it diffs
+	// against to detect those transitions.
+	fogBelief?: Record<number, number>
+	fogScan?: { enemies: number[]; own: number[] }
+	// CPU "rule-out" memory: tiles it recently got true eyes into and found empty of
+	// enemies (for a Forest/Conceals tile that means standing right beside it). Decays
+	// over a few turns so a swept-clear patch eventually becomes worth re-checking
+	// again — something could have moved in. Damps the scout drive away from
+	// just-searched ground so the CPU expands its search instead of re-treading it.
+	fogCleared?: Record<number, number>
 }
 
 const emptyControls = (): PlayerControls => ({ ground: false, air: false, sea: false })
@@ -100,6 +123,7 @@ export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] =>
 }
 
 export const initGameStateFromMap = (map: MapProcesser | MapObject): void => {
+	resetSmoke()
 	const players = derivePlayersFromMap(map)
 	const startingFunds = Math.max(0, Math.floor(map.funds ?? 0))
 	gameState.set({
@@ -125,6 +149,7 @@ export const refreshControlsFromMap = (map: MapProcesser | MapObject): void => {
 
 export const resetGameState = (): void => {
 	gameState.set(makeInitialState())
+	resetSmoke()
 }
 
 export const markTileActed = (tile: number): void => {

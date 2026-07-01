@@ -17,12 +17,12 @@ export const POST = async ({ request, locals }) => {
 		if (!room || members.length === 0) {
 			throw error(404, 'Game session does not exist')
 		}
-		if (!room.sha) throw error(500, 'Game session is missing map data')
+		if (!room.map_id) throw error(500, 'Game session is missing map data')
 
 		// Already in this room — just refresh the pointer and return the map.
 		if (members.includes(userSession)) {
 			await gameStore.setPlayerGame(userSession, session)
-			return json({ session, sha: room.sha })
+			return json({ session, mapId: room.map_id })
 		}
 
 		if (members.length >= MAX_PLAYERS) {
@@ -37,7 +37,7 @@ export const POST = async ({ request, locals }) => {
 		}
 		await gameStore.setPlayerGame(userSession, session)
 
-		return json({ session, sha: room.sha })
+		return json({ session, mapId: room.map_id })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		logToErrorDb(msg)

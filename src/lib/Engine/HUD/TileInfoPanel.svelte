@@ -4,6 +4,7 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { buildingData } from '$lib/GameData/building'
 	import { isWalletUnit, walletOf } from '../wallet'
+	import ModifierBadges from './ModifierBadges.svelte'
 
 	export let map: MapObject | undefined = undefined
 
@@ -37,18 +38,7 @@
 					Protection: {Math.round(terrain.protection * 100)}%
 				</div>
 				<div class="opacity-80">Height: {terrain.height}</div>
-				{#if terrain.modifiers.length > 0}
-					<div class="mt-1 flex flex-wrap gap-1">
-						{#each terrain.modifiers as mod (mod)}
-							<span
-								class="px-1 py-px rounded bg-white/10 text-[10px]"
-								data-testid="tile-info-terrain-modifier"
-							>
-								{mod}
-							</span>
-						{/each}
-					</div>
-				{/if}
+				<ModifierBadges modifiers={terrain.modifiers} testid="tile-info-terrain-modifier" />
 			</div>
 		{/if}
 
@@ -59,18 +49,7 @@
 				<div class="opacity-80">
 					Stature: {building.stature ?? buildingInfo.stature}/{buildingInfo.stature}
 				</div>
-				{#if buildingInfo.modifiers.length > 0}
-					<div class="mt-1 flex flex-wrap gap-1">
-						{#each buildingInfo.modifiers as mod (mod)}
-							<span
-								class="px-1 py-px rounded bg-white/10 text-[10px]"
-								data-testid="tile-info-building-modifier"
-							>
-								{mod}
-							</span>
-						{/each}
-					</div>
-				{/if}
+				<ModifierBadges modifiers={buildingInfo.modifiers} testid="tile-info-building-modifier" />
 			</div>
 		{/if}
 
@@ -86,18 +65,7 @@
 				<div class="opacity-80">
 					Range: {unitInfo.range[0]}–{unitInfo.range[1]}
 				</div>
-				{#if unitInfo.modifiers.length > 0}
-					<div class="mt-1 flex flex-wrap gap-1">
-						{#each unitInfo.modifiers as mod (mod)}
-							<span
-								class="px-1 py-px rounded bg-white/10 text-[10px]"
-								data-testid="tile-info-modifier"
-							>
-								{mod}
-							</span>
-						{/each}
-					</div>
-				{/if}
+				<ModifierBadges modifiers={unitInfo.modifiers} testid="tile-info-modifier" />
 			</div>
 		{/if}
 

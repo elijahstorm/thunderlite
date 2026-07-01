@@ -109,6 +109,7 @@
 		{localTeam}
 		mode="campaign"
 		campaignLevelId={level.id}
+		minimap
 		{onContinue}
 		{onRetry}
 		interactor={socket ? socketSelect(socket, () => map) : undefined}

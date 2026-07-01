@@ -10,7 +10,7 @@
  * guarantees — see the `create_game_*` / `create_player_game` migrations.
  *
  *   game:{session} set          → game_member rows (seat = join order)
- *   user-game:{us} hash         → player_game pointer + game_room.sha
+ *   user-game:{us} hash         → player_game pointer + game_room.map_id
  *   game-current:{session}      → game_room.current_turn
  *   game-events:{session} list  → game_event rows (seq = list index)
  *   game-result:{session} lock  → removed; matches.session_id unique IS the lock
@@ -27,7 +27,7 @@ export const MAX_PLAYERS = 2
 const ROOM_TTL_MS = 1000 * 60 * 60 * 24
 const APPEND_RETRIES = 8
 
-type RoomRow = { session: string; sha: string; current_turn: string | null; expires_at: number }
+type RoomRow = { session: string; map_id: string; current_turn: string | null; expires_at: number }
 type MemberRow = { user_session: string; seat: number }
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = { seq: number; user_session: string; action: unknown; ts: number }
@@ -60,8 +60,10 @@ async function getRoom(session: string): Promise<RoomRow | null> {
 	return room
 }
 
-/** The room the player is currently in (with its map sha), or null. */
-async function currentGame(userSession: string): Promise<{ session: string; sha: string } | null> {
+/** The room the player is currently in (with its map id), or null. */
+async function currentGame(
+	userSession: string
+): Promise<{ session: string; mapId: string } | null> {
 	const pointer = await db.findOne<PlayerGameRow>('player_game', {
 		where: { user_session: userSession },
 		select: ['session', 'expires_at'],
@@ -69,7 +71,7 @@ async function currentGame(userSession: string): Promise<{ session: string; sha:
 	if (!pointer || expired(pointer.expires_at)) return null
 	const room = await getRoom(pointer.session)
 	if (!room) return null
-	return { session: room.session, sha: room.sha }
+	return { session: room.session, mapId: room.map_id }
 }
 
 /** Point a player at a room (latest wins), refreshing the TTL. */
@@ -82,13 +84,13 @@ async function setPlayerGame(userSession: string, session: string): Promise<void
 }
 
 /**
- * Create a room for `userSession` on map `sha`. The creator takes seat 0 and the
- * first turn. Returns the shareable session code.
+ * Create a room for `userSession` on map `mapId` (a map's `public_id`). The
+ * creator takes seat 0 and the first turn. Returns the shareable session code.
  */
-async function createRoom(userSession: string, sha: string): Promise<string> {
+async function createRoom(userSession: string, mapId: string): Promise<string> {
 	const session = generateKey()
 	const expires_at = now() + ROOM_TTL_MS
-	await db.insert('game_room', { session, sha, current_turn: userSession, expires_at })
+	await db.insert('game_room', { session, map_id: mapId, current_turn: userSession, expires_at })
 	await db.insert('game_member', { session, user_session: userSession, seat: 0 })
 	await setPlayerGame(userSession, session)
 	return session
@@ -144,7 +146,9 @@ async function setCurrentTurn(session: string, nextUserSession: string): Promise
 const toEvent = (row: EventRow): GameEvent => ({
 	id: Number(row.seq),
 	userSession: row.user_session,
-	action: (typeof row.action === 'string' ? JSON.parse(row.action) : row.action) as SerializedAction,
+	action: (typeof row.action === 'string'
+		? JSON.parse(row.action)
+		: row.action) as SerializedAction,
 	ts: Number(row.ts),
 })
 

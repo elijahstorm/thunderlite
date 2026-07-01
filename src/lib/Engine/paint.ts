@@ -7,6 +7,11 @@ import { interactionSource } from './Interactor/interactionState'
 import { computeFogMask, drawFog, observeFog, observeUnitFade } from './fogRender'
 import { isUnitStealthed } from './visibility'
 import { isWalletUnit, walletOf } from './wallet'
+import { observeMaterialize, drawMaterialize } from './materialize'
+import { observeBuildFade } from './buildFade'
+import { boardBusy } from './Animator/animator'
+import { campaignScriptActive } from '$lib/Campaign/scriptGate'
+import { devHudEnabled } from '$lib/Dev/devHud'
 import { get } from 'svelte/store'
 
 type ActiveObject = { state: number; type: number; team?: number }
@@ -51,11 +56,19 @@ export const paint =
 		const hasSelection = get(interactionSource) !== null
 		const tileVisible = !fog || fog.visible.has(tile)
 		const unitAtTile = map.layers.units[tile] ?? null
+		// Script-driven spawn/terrain assemble for this tile (or null). Read once and
+		// reused for both hiding a spawning unit and drawing the cover below.
+		const materialize = observeMaterialize(tile)
+		// A freshly-spawned unit is placed in the data immediately (so sight and win
+		// conditions are correct) but stays hidden while the energy fully covers the
+		// tile. Once the cover starts fading out (`covered` flips false) the unit is
+		// drawn again, so it's revealed by the glow dissolving rather than popping in.
+		const spawning = materialize?.kind === 'spawn' && materialize.covered
 		const hideEnemyUnit =
 			!tileVisible && unitAtTile !== null && fog !== null && unitAtTile.team !== fog.team
 		// A unit mid attack-animation stays on the map for fog-of-war sight, but its
 		// idle sprite is suppressed here so only the attack overlay is drawn.
-		const hideIdleUnit = hideEnemyUnit || (unitAtTile?.animating ?? false)
+		const hideIdleUnit = hideEnemyUnit || spawning || (unitAtTile?.animating ?? false)
 		const state = get(gameState)
 		const unitActed =
 			unitAtTile !== null && unitAtTile.team === state.currentTeam && state.actedTiles.has(tile)
@@ -71,16 +84,37 @@ export const paint =
 		const stealthed = unitAtTile !== null && isUnitStealthed(map, tile, unitAtTile)
 		const unitAlphaTarget =
 			stealthed && localTeam >= 0 ? (unitAtTile!.team === localTeam ? 0.5 : 0) : 1
-		const unitAlpha = unitAtTile !== null ? observeUnitFade(tile, unitAlphaTarget) : 1
+		// Cloak fade × build fade-in: a freshly-built unit eases up from transparent,
+		// then settles at whatever the cloak state calls for.
+		const unitAlpha =
+			unitAtTile !== null ? observeUnitFade(tile, unitAlphaTarget) * observeBuildFade(tile) : 1
 
 		context.save()
 		context.translate(left, top)
 
 		render.always(map.layers.ground[tile], renderData.ground)
 		render.corners(map.layers.ground[tile], renderData.ground)
+		// A terrain rebuild is part of the ground, so its energy cover draws here —
+		// under the units, buildings and overlays — otherwise it washes over a unit
+		// standing on the tile, which reads as the unit dissolving rather than the
+		// ground beneath it rebuilding. (The spawn cover is drawn later, up at the
+		// unit layer, since it stands in for the hidden unit itself.)
+		if (materialize?.kind === 'terrain') {
+			drawMaterialize(context, width, height, materialize.progress, materialize.kind)
+		}
 		// Persistent enemy-threat overlay, drawn under the active selection
 		// highlights so a unit you're currently moving still reads on top.
 		render.threat(map.threatTiles?.has(tile) ?? false)
+		// Jammer Truck radar rings: our own detection net in calm teal, an enemy
+		// jammer's net (only ones we can see) in warning amber. Own wins a contested
+		// tile — knowing our own coverage matters more than flagging theirs.
+		render.radar(
+			(map.radarTiles?.own.has(tile) ?? false)
+				? 'own'
+				: (map.radarTiles?.enemy.has(tile) ?? false)
+					? 'enemy'
+					: null
+		)
 		const buildingAtTile = map.layers.buildings[tile] ?? null
 		const hideEnemyBuildingCapture =
 			!tileVisible && fog !== null && buildingAtTile !== null && buildingAtTile.team !== fog.team
@@ -104,6 +138,16 @@ export const paint =
 		// standing on, an actable building gave no visible feedback and felt broken.
 		// Still drawn before the unit below, so a unit on the tile reads on top.
 		render.highlights(map.highlights[tile])
+		// The enemy unit whose reach the player has toggled on. Its sprite frame
+		// matches the draw below (frame 0 unless it idle-animates) so the outline
+		// silhouette stays pixel-aligned with it.
+		const isThreatSource =
+			(map.threatUnitTiles?.has(tile) ?? false) && !hideIdleUnit && unitAlpha > 0.01
+		const threatSpriteFrame = unitAnimates ? (paused ? 0 : get(animationFrame)) : 0
+		if (isThreatSource && unitAtTile) {
+			// Red outline ring, drawn under the sprite so only the offset ring shows.
+			render.threatOutline(unitAtTile, renderData.unit, threatSpriteFrame, true)
+		}
 		if (!hideIdleUnit && unitAlpha > 0.01) {
 			const drawUnit = unitAnimates ? render.conditionally : render.conditionallyStatic
 			context.save()
@@ -128,8 +172,13 @@ export const paint =
 			render.carryBadge(unitAtTile.rescuedUnit, renderData.unit)
 			context.restore()
 		}
+		// Faint red tint shaped to the unit, drawn over the sprite (so it tints the
+		// unit) but before the HP bar so the bar stays crisp on top.
+		if (isThreatSource && unitAtTile) {
+			render.threatTint(unitAtTile, renderData.unit, threatSpriteFrame, true)
+		}
 		// Money/status overlays, drawn FIRST so the HP bar below can paint over them.
-		const unitVisible = unitAtTile !== null && !hideEnemyUnit && unitAlpha > 0.01
+		const unitVisible = unitAtTile !== null && !hideEnemyUnit && !spawning && unitAlpha > 0.01
 		if (unitVisible) {
 			// Warmachine holdings tag, drawn with the unit so it tracks through its
 			// animations and is hidden by the same fog/enemy rules. Sits top-right.
@@ -157,6 +206,14 @@ export const paint =
 		render.conditionally(map.layers.sky[tile], renderData.sky)
 		render.advice(map.highlights[tile], hudImages.advice)
 		render.route(map.route[tile])
+
+		// Spawn assemble (read at the top of the tile): the energy stands in for the
+		// hidden unit, so it draws up here over the tile's content, but before the fog
+		// veil below so a materialising tile that's out of sight still gets shrouded.
+		// The terrain variant is drawn earlier, down at the ground layer.
+		if (materialize?.kind === 'spawn') {
+			drawMaterialize(context, width, height, materialize.progress, materialize.kind)
+		}
 
 		// Fog veil. Every tile carries a fade level eased toward its target
 		// (covered → 1, visible → 0), so the veil animates in and out instead of
@@ -191,6 +248,12 @@ export const paint =
 			!editor &&
 			state.currentTeam === localTeam &&
 			!hasSelection &&
+			// A campaign block has frozen input — nothing is selectable until it
+			// finishes, so don't pulse units/buildings as if they were.
+			!get(campaignScriptActive) &&
+			// The previous action's movement/attack animations are still playing —
+			// input is gated, so don't pulse pieces as actionable until it settles.
+			!get(boardBusy) &&
 			((!hideIdleUnit && unitAnimates) || buildingSelectable)
 		) {
 			render.tileAnimation(renderData.animation(ANIMATION_SELECT))
@@ -207,6 +270,20 @@ export const paint =
 		// clear "here the map ends" cue instead of terrain bleeding straight into
 		// the backdrop. Drawn last so it sits above everything as a clean frame.
 		render.mapBorder(col === 0, col === map.cols - 1, row === 0, row === map.rows - 1)
+
+		// Dev-only inspection HUD (toggled with Q on dev playgrounds): tile index +
+		// coords, plus an optional heat tint / focus ring from `map.debug*`. Drawn last
+		// so it reads on top of everything.
+		if (get(devHudEnabled)) {
+			render.devHud(
+				tile,
+				col,
+				row,
+				map.debugHeat?.[tile] ?? 0,
+				map.debugFocus === tile,
+				map.debugCleared?.[tile] ?? 0
+			)
+		}
 
 		context.restore()
 	}
@@ -226,6 +303,10 @@ const contextProvider = (
 	carryBadge: carryBadge(width, height)(context),
 	highlights: highlights(width, height, frame)(context),
 	threat: threatHighlight(width, height, frame)(context),
+	threatOutline: unitThreatOutline(width, height, frame, scale)(context),
+	threatTint: unitThreatTint(width, height, frame, scale)(context),
+	radar: radarHighlight(width, height, frame)(context),
+	devHud: devHud(width, height)(context),
 	playInfo: playInfo(width, height, scale)(context),
 	walletLabel: walletLabel(width, height, scale)(context),
 	captureProgress: captureProgress(width, height, scale)(context),
@@ -235,6 +316,230 @@ const contextProvider = (
 	tileAnimation: tileAnimation(width, height, frame)(context),
 	mapBorder: mapBorder(width, height)(context),
 })
+
+// Source-unit marker for the persistent threat overlay: a red outline + faint
+// red tint that hug the enemy unit's actual sprite (not just its tile), so it's
+// obvious which unit owns the crimson reach painted around it.
+//
+// Built by recolouring the unit's own sprite into a flat-red silhouette on a
+// scratch canvas (keeping the sprite's alpha shape), then stamping it: offset in
+// 8 directions *under* the real sprite for a crisp outline ring, and once on top
+// at low alpha for the tint. The outline pulses in step with the reach wash so
+// the source and its reach read as one thing.
+const SILHOUETTE_PAD = 4
+let silhouetteScratch: HTMLCanvasElement | null = null
+
+// Recolour a unit sprite frame to a flat colour on a padded scratch canvas, using
+// the exact source/destination math as `renderObject` so the silhouette lands
+// pixel-aligned with the drawn sprite. Returns the scratch canvas (whose top-left
+// maps to tile coord `-SILHOUETTE_PAD, -SILHOUETTE_PAD`), or null if the sprite
+// isn't loaded yet.
+const tintedUnitSilhouette = (
+	context: CanvasRenderingContext2D,
+	unit: ActiveObject,
+	renderer: (type: number) => ObjectSpriteRenderer | null,
+	frame: number,
+	scale: number,
+	width: number,
+	height: number,
+	color: string
+): HTMLCanvasElement | null => {
+	const render = renderer(unit.type)
+	const sprite = render?.sprite?.[unit.team ?? 0]
+	if (!sprite) return null
+	if (!silhouetteScratch) {
+		silhouetteScratch = context.canvas.ownerDocument.createElement('canvas')
+	}
+	const c = silhouetteScratch
+	const w = Math.ceil(width + SILHOUETTE_PAD * 2)
+	const h = Math.ceil(height + SILHOUETTE_PAD * 2)
+	if (c.width !== w) c.width = w
+	if (c.height !== h) c.height = h
+	const ctx = c.getContext('2d')
+	if (!ctx) return null
+	ctx.clearRect(0, 0, w, h)
+	// Same draw as renderObject, shifted by the padding so a bleeding sprite isn't
+	// clipped at the scratch edge.
+	ctx.drawImage(
+		sprite,
+		unit.state * (spriteSize + render!.xOffset),
+		(frame % render!.frames) * (spriteSize + render!.yOffset),
+		spriteSize + render!.xOffset,
+		spriteSize + render!.yOffset,
+		SILHOUETTE_PAD - render!.xOffset / scale,
+		SILHOUETTE_PAD - render!.yOffset / scale,
+		width + render!.xOffset / scale,
+		height + render!.yOffset / scale
+	)
+	// Keep the sprite's alpha shape, replace its colour with a flat fill.
+	ctx.globalCompositeOperation = 'source-in'
+	ctx.fillStyle = color
+	ctx.fillRect(0, 0, w, h)
+	ctx.globalCompositeOperation = 'source-over'
+	return c
+}
+
+// Crisp red outline ring around the unit's silhouette. Drawn BEFORE the real
+// sprite so the sprite covers the centre, leaving only the offset ring showing.
+// `spriteFrame` must match the frame the sprite itself is drawn at (0 for units
+// that don't idle-animate) or the outline drifts off an animating sprite.
+const unitThreatOutline =
+	(width: number, height: number, animFrame: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(
+		unit: ActiveObject | null,
+		renderer: (type: number) => ObjectSpriteRenderer | null,
+		spriteFrame: number,
+		active: boolean
+	) => {
+		if (!active || !unit) return
+		const sil = tintedUnitSilhouette(
+			context,
+			unit,
+			renderer,
+			spriteFrame,
+			scale,
+			width,
+			height,
+			'rgb(239, 68, 68)'
+		)
+		if (!sil) return
+		const pulse = (Math.sin(animFrame * 0.35) + 1) / 2
+		const t = Math.max(1.5, width / 22) // outline thickness in canvas px
+		const offsets: Array<[number, number]> = [
+			[-t, 0],
+			[t, 0],
+			[0, -t],
+			[0, t],
+			[-t, -t],
+			[t, -t],
+			[-t, t],
+			[t, t],
+		]
+		context.save()
+		context.globalAlpha = 0.85 + pulse * 0.15
+		for (const [dx, dy] of offsets) {
+			context.drawImage(sil, -SILHOUETTE_PAD + dx, -SILHOUETTE_PAD + dy)
+		}
+		context.restore()
+	}
+
+// Faint red wash shaped to the unit — a "very slight tint" so the sprite still
+// reads. Drawn AFTER the real sprite so it sits on the unit, not the tile.
+const unitThreatTint =
+	(width: number, height: number, animFrame: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(
+		unit: ActiveObject | null,
+		renderer: (type: number) => ObjectSpriteRenderer | null,
+		spriteFrame: number,
+		active: boolean
+	) => {
+		if (!active || !unit) return
+		const sil = tintedUnitSilhouette(
+			context,
+			unit,
+			renderer,
+			spriteFrame,
+			scale,
+			width,
+			height,
+			'rgb(220, 38, 38)'
+		)
+		if (!sil) return
+		const pulse = (Math.sin(animFrame * 0.35) + 1) / 2
+		context.save()
+		context.globalAlpha = 0.18 + pulse * 0.1
+		context.drawImage(sil, -SILHOUETTE_PAD, -SILHOUETTE_PAD)
+		context.restore()
+	}
+
+// Jammer Truck radar ring. Reads apart from the crimson threat wash: a calm,
+// translucent wash with a slow breathing pulse and a dotted perimeter — teal for
+// our own detection net, amber for an enemy jammer's. No hatching, so "radar
+// coverage" never reads as "attack reach".
+const radarHighlight =
+	(width: number, height: number, frame: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(kind: 'own' | 'enemy' | null) => {
+		if (!kind) return
+		const pulse = (Math.sin(frame * 0.18) + 1) / 2
+		const palette =
+			kind === 'own'
+				? { fill: '45, 212, 191', edge: '153, 246, 228' } // teal-400 / teal-200
+				: { fill: '251, 146, 60', edge: '254, 215, 170' } // orange-400 / orange-200
+		context.save()
+
+		context.fillStyle = `rgba(${palette.fill}, ${0.1 + pulse * 0.06})`
+		context.fillRect(0, 0, width, height)
+
+		// Dotted perimeter — a light, scanning frame distinct from the threat dashes.
+		context.strokeStyle = `rgba(${palette.edge}, ${0.55 + pulse * 0.15})`
+		context.lineWidth = 1.5
+		const dot = Math.max(2, Math.round(width / 20))
+		context.setLineDash([dot, dot * 2])
+		context.lineDashOffset = -(frame * 0.8) % (dot * 3)
+		context.strokeRect(2, 2, width - 4, height - 4)
+		context.setLineDash([])
+
+		context.restore()
+	}
+
+// Dev-only per-tile inspection HUD: tile index + coords, plus optional heat/focus/
+// cleared debug tints sourced from `map.debug*`.
+const devHud =
+	(width: number, height: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(tile: number, x: number, y: number, heat: number, isFocus: boolean, cleared: number) => {
+		context.save()
+
+		if (heat > 0) {
+			// Amber: "something might be here" (belief / suspicion).
+			context.fillStyle = `rgba(251, 191, 36, ${Math.min(0.6, heat * 0.55)})`
+			context.fillRect(0, 0, width, height)
+		} else if (cleared > 0) {
+			// Teal: "recently swept clear" (rule-out memory), fading as the confidence
+			// decays. Only shown where there's no live suspicion, so the two never fight.
+			context.fillStyle = `rgba(45, 212, 191, ${Math.min(0.35, cleared * 0.3)})`
+			context.fillRect(0, 0, width, height)
+		}
+
+		if (isFocus) {
+			context.strokeStyle = 'rgba(239, 68, 68, 0.95)'
+			context.lineWidth = 2.5
+			context.strokeRect(2, 2, width - 4, height - 4)
+		}
+
+		const fontPx = Math.max(7, Math.round(height * 0.16))
+		context.font = `${fontPx}px ui-monospace, monospace`
+		context.textBaseline = 'top'
+		// Tile index, top-left.
+		context.fillStyle = 'rgba(15, 23, 42, 0.7)'
+		context.fillText(`${tile}`, 3.5, 3.5)
+		context.fillStyle = 'rgba(226, 232, 240, 0.95)'
+		context.fillText(`${tile}`, 3, 3)
+		// (x,y) coords, bottom-left.
+		const coord = `${x},${y}`
+		context.textBaseline = 'bottom'
+		context.fillStyle = 'rgba(15, 23, 42, 0.7)'
+		context.fillText(coord, 3.5, height - 2.5)
+		context.fillStyle = 'rgba(148, 163, 184, 0.95)'
+		context.fillText(coord, 3, height - 3)
+
+		// Heat value, top-right, when present.
+		if (heat > 0) {
+			const label = heat.toFixed(2)
+			context.textBaseline = 'top'
+			context.textAlign = 'right'
+			context.fillStyle = 'rgba(15, 23, 42, 0.8)'
+			context.fillText(label, width - 2.5, 3.5)
+			context.fillStyle = 'rgba(253, 230, 138, 1)'
+			context.fillText(label, width - 3, 3)
+			context.textAlign = 'left'
+		}
+
+		context.restore()
+	}
 
 // Map-boundary frame: a riveted gunmetal armour plate running along whichever
 // sides of an edge tile face off-map — the battlefield reads as fenced in by a

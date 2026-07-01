@@ -121,6 +121,12 @@ export const pathFinder = (
 		const ay = Math.floor(adj / cols)
 		if (Math.abs(ax - ex) + Math.abs(ay - ey) !== 1) continue
 		if (best[adj] === Infinity) continue
+		// `passable()` lets the route thread THROUGH a friendly unit, but the
+		// attacker has to STOP on its approach tile — so a tile occupied by a
+		// (visible) unit can't be the landing spot. Concealed enemies are treated
+		// as empty here, matching the rest of the fog-aware pathing; the mover
+		// collides and halts short via truncateRouteAtCollision if one's really there.
+		if (map.layers.units[adj] && !concealed.has(adj)) continue
 		if (
 			approach === -1 ||
 			best[adj] < best[approach] ||

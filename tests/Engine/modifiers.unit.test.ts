@@ -168,7 +168,7 @@ describe('Start_Turn.Heal_Team handler', () => {
 		expect(map.layers.units[5]!.health).toBe(maxHp)
 	})
 
-	it('does not heal enemy units standing on the Command Center', () => {
+	it('hurts an enemy unit camping the Command Center by 10 HP', () => {
 		const map = makeMap()
 		map.layers.buildings[5] = building(1, COMMAND_CENTER_TYPE)
 		map.layers.units[5] = unit(0, STRIKE_COMMANDO_TYPE, 20)
@@ -176,7 +176,18 @@ describe('Start_Turn.Heal_Team handler', () => {
 
 		runHeal(map, 5)
 
-		expect(map.layers.units[5]!.health).toBe(20)
+		expect(map.layers.units[5]!.health).toBe(10)
+	})
+
+	it('kills an enemy unit when the damage drops it to zero HP', () => {
+		const map = makeMap()
+		map.layers.buildings[5] = building(1, COMMAND_CENTER_TYPE)
+		map.layers.units[5] = unit(0, STRIKE_COMMANDO_TYPE, 10)
+		initGameStateFromMap(map)
+
+		runHeal(map, 5)
+
+		expect(map.layers.units[5]).toBeNull()
 	})
 
 	it('is safe when no unit is on the Command Center', () => {

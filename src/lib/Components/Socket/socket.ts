@@ -50,6 +50,9 @@ export const socketSelect =
 export const socketEndTurn =
 	(_socket: Pick<WebSocket, 'send'>, getMap?: () => MapObject | undefined) => () => {
 		const map = getMap?.()
-		if (map) applyAction(map, { kind: 'end-turn' })
+		// This is the local player's own end-turn, so it's live like their other
+		// committed actions — that credits the turn (and auto-captures) to match stats.
+		// Relayed opponent end-turns still arrive silently and don't double-count.
+		if (map) applyAction(map, { kind: 'end-turn' }, { live: true })
 		emitOutgoingAction({ kind: 'end-turn' })
 	}

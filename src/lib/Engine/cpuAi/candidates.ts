@@ -84,10 +84,16 @@ export const generatePlansFor = (
 				const target = map.layers.units[targetTile]
 				if (!target) continue
 				const atk = scoreAttack(map, unit, dest, target, targetTile)
+				// When the shot kills, the target won't be alive to retaliate next turn, so
+				// drop it from the firing tile's survival term — otherwise the corpse would
+				// scare the CPU off its own clean kill.
+				const atkPosition = atk.killsTarget
+					? scorePositionBonus(map, dest, unit, cpuTeam, concealed, lurking, targetTile)
+					: position
 				plans.push({
 					unitTile,
 					kind: 'attack',
-					score: atk.score + position * 0.5,
+					score: atk.score + atkPosition * 0.5,
 					actions: [...moveActions(unitTile, dest), { kind: 'attack', from: dest, to: targetTile }],
 				})
 			}

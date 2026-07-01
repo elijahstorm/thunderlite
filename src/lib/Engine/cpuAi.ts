@@ -7,7 +7,13 @@ import { animateAttackSequence } from './attackSequence'
 import { pathFinder } from './Interactor/Pathing/pathFinder'
 import { truncateRouteAtCollision } from './Interactor/Pathing/movement'
 import { concealedEnemyTiles } from './visibility'
-import { observeStealthSightings } from './cpuAi/stealthMemory'
+import {
+	observeStealthSightings,
+	recordStealthPassthrough,
+	decayStealthSuspicion,
+	clearSearchedSuspicion,
+} from './cpuAi/stealthMemory'
+import { updateFogBelief } from './cpuAi/fogMemory'
 import { bestPlanFor } from './cpuAi/candidates'
 import { pickBuildOnce } from './cpuAi/production'
 import type { SerializedAction } from './Interactor/serializedAction'
@@ -83,7 +89,17 @@ export const runCpuTurn = ({
 	// Reconcile this CPU's fuzzy stealth memory against what it can plainly see as
 	// the turn opens — it can't believe an enemy has fewer cloak units than are
 	// currently revealed. Build/death sightings during play adjust it from there.
+	// NB: the hunch is NOT decayed here — anything learned during the enemy's turn
+	// (e.g. a stealth unit that broke cover to attack) must be at full strength while
+	// the CPU plans this turn. Decay happens when the CPU *ends* its turn (see
+	// `finish`), modelling the one move the enemy gets before the CPU acts again.
 	observeStealthSightings(map, startTeam)
+	// Rule out the patches of the hunch it has already swept (radar / point-blank) and
+	// found empty, so its best guess moves on instead of camping a dead spot forever.
+	clearSearchedSuspicion(map, startTeam)
+	// Update its belief about fog-hidden contacts (enemies it lost into the fog, units
+	// of its own destroyed into the dark) so it can be wary of those regions this turn.
+	updateFogBelief(map, startTeam)
 
 	let cancelled = false
 	let timer: ReturnType<typeof setTimeout> | null = null
@@ -104,6 +120,10 @@ export const runCpuTurn = ({
 
 	const finish = () => {
 		if (!stillOurTurn()) return
+		// Age the location hunch by one step as the CPU hands the turn over: by the time
+		// it acts again the enemy will have had a move, so its certainty widens and fades
+		// now — not at the start of its turn, which would stale fresh intel before use.
+		decayStealthSuspicion(map, startTeam)
 		endTurn()
 	}
 
@@ -148,6 +168,9 @@ export const runCpuTurn = ({
 			await safeAnimate(() => animateRoute(map, unit, action.from, finalTile, walked))
 			map.layers.units[action.from] = unit
 			if (cancelled) return false
+			// A cloaked unit caught crossing an enemy radar ring mid-route is logged so
+			// the watching player "remembers" a stealth threat is about.
+			recordStealthPassthrough(map, walked, unit)
 			commit(map, { kind: 'move', from: action.from, to: finalTile })
 			return !collided
 		}

@@ -24,13 +24,13 @@
 		},
 		{
 			title: 'Company',
-			links: [{ href: '/about', text: 'About' }],
+			links: [{ href: '/about', label: 'About' }],
 		},
 		{
 			title: 'Legal',
 			links: [
-				{ href: '/privacy', text: 'Privacy Policy' },
-				{ href: 'http://elijahstorm.github.io/', text: 'More by Elijah' },
+				{ href: '/privacy', label: 'Privacy Policy' },
+				{ href: 'http://elijahstorm.github.io/', label: 'More by Elijah' },
 			],
 		},
 	]
@@ -86,7 +86,7 @@
 											href={link.href}
 											class="text-sm text-foreground/80 hover:text-foreground transition-colors"
 										>
-											{link.text}
+											{link.label}
 										</a>
 									</li>
 								{/each}

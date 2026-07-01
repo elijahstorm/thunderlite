@@ -15,10 +15,19 @@
  *   - `finish(result)` off the J1 match-end hook (win or lose block).
  */
 
-import type { CutsceneEvent, CutsceneScript } from './cutsceneTypes'
+import { unitData } from '$lib/GameData/unit'
+import type { CompareOp, CutsceneEvent, CutsceneScript } from './cutsceneTypes'
 
 /** A value that may be produced synchronously or asynchronously. */
 type MaybePromise<T> = T | Promise<T>
+
+/** The minimal map slice `<when>` conditions read: the unit layer's team/type. */
+export interface ConditionMap {
+	layers: { units: ReadonlyArray<{ team: number; type: number } | null> }
+}
+
+const compareCount = (n: number, op: CompareOp, k: number): boolean =>
+	op === '<' ? n < k : op === '<=' ? n <= k : op === '==' ? n === k : op === '>=' ? n >= k : n > k
 
 /**
  * The side-effecting surface the runner drives. Every method may return a
@@ -35,10 +44,14 @@ export interface CampaignInterface {
 	unhighlight(x: number, y: number): MaybePromise<void>
 	/** Show one speaker's lines; resolves once the player advances past the last. */
 	talk(speaker: string, lines: string[]): MaybePromise<void>
+	/** Set a speaker's dialogue colour (CSS colour) for the rest of the level. */
+	setSpeakerColor(speaker: string, color: string): MaybePromise<void>
 	/** Spawn a unit for a team at a tile. */
 	spawn(team: number, unit: string, x: number, y: number): MaybePromise<void>
 	/** Remove whatever unit occupies a tile. */
 	kill(x: number, y: number): MaybePromise<void>
+	/** Set the current health of the unit at a tile (clamped to 1..max; never kills). */
+	hurt(x: number, y: number, health: number): MaybePromise<void>
 	/** Replace the terrain at a tile. */
 	setTerrain(terrain: string, x: number, y: number): MaybePromise<void>
 	/** Set the weather/sky at a tile. */
@@ -55,8 +68,23 @@ export interface CampaignInterface {
 	removeBuilding(x: number, y: number): MaybePromise<void>
 	/** Change the owning team of the building at a tile. */
 	ownBuilding(team: number, x: number, y: number): MaybePromise<void>
+	/** End the match immediately as a defeat for the local player. */
+	defeat(): MaybePromise<void>
 	/** Timed pause for `seconds`. */
 	wait(seconds: number): MaybePromise<void>
+	/**
+	 * Called once before a block's events run. Lets the impl reset per-block state
+	 * (e.g. clear the "skip rest of dialogue" flag the Skip button sets). Optional
+	 * so headless test fakes can omit it.
+	 */
+	beginBlock?(): MaybePromise<void>
+	/**
+	 * Commit any batched visual state the block accumulated (e.g. a run of
+	 * `setTerrain` calls coalesces into a single repaint so terrain connections
+	 * recompute once). Called at the end of every block; optional so headless
+	 * test fakes can omit it.
+	 */
+	flush?(): MaybePromise<void>
 }
 
 /**
@@ -74,9 +102,15 @@ export const runCutsceneEvents = async (
 	events: readonly CutsceneEvent[],
 	iface: CampaignInterface
 ): Promise<void> => {
+	// Let the impl reset per-block state (e.g. the dialogue skip flag) so a Skip
+	// in one block never silences the next.
+	await iface.beginBlock?.()
 	for (const event of events) {
 		await dispatchEvent(event, iface)
 	}
+	// Flush any visual changes the block batched (terrain repaints, etc.) so they
+	// land before control returns to the player, even if the block never paused.
+	await iface.flush?.()
 }
 
 /** Route a single event to its interface method. */
@@ -84,6 +118,8 @@ const dispatchEvent = (event: CutsceneEvent, iface: CampaignInterface): MaybePro
 	switch (event.kind) {
 		case 'talk':
 			return iface.talk(event.speaker, event.lines)
+		case 'speakerColor':
+			return iface.setSpeakerColor(event.speaker, event.color)
 		case 'camera':
 			return iface.camera(event.x, event.y)
 		case 'highlight':
@@ -94,6 +130,8 @@ const dispatchEvent = (event: CutsceneEvent, iface: CampaignInterface): MaybePro
 			return iface.spawn(event.team, event.unit, event.x, event.y)
 		case 'kill':
 			return iface.kill(event.x, event.y)
+		case 'hurt':
+			return iface.hurt(event.x, event.y, event.health)
 		case 'setTerrain':
 			return iface.setTerrain(event.terrain, event.x, event.y)
 		case 'setWeather':
@@ -110,6 +148,8 @@ const dispatchEvent = (event: CutsceneEvent, iface: CampaignInterface): MaybePro
 			return iface.removeBuilding(event.x, event.y)
 		case 'ownBuilding':
 			return iface.ownBuilding(event.team, event.x, event.y)
+		case 'defeat':
+			return iface.defeat()
 		case 'wait':
 			return iface.wait(event.seconds)
 	}
@@ -131,6 +171,10 @@ export interface CampaignRunner {
 	finish(outcome: CampaignOutcome): Promise<void>
 	/** True once a win/lose block has played. */
 	hasFinished(): boolean
+	/** Whether any unfired `<when>` block's condition currently holds (no side effects). */
+	hasPendingConditions(map: ConditionMap): boolean
+	/** Fire every unfired `<when>` block whose condition now holds, each once. */
+	checkConditions(map: ConditionMap): Promise<void>
 }
 
 /**
@@ -145,6 +189,27 @@ export const createCampaignRunner = (
 	let started = false
 	let finished = false
 	const firedTurns = new Set<string>()
+
+	// Resolve each `<when>` block's unit-type names to type indices once, and track
+	// whether it has already fired.
+	const conditions = script.conditions.map((block) => ({
+		...block,
+		typeIdx: block.condition.unitTypes
+			? new Set(block.condition.unitTypes.map((name) => unitData.findIndex((u) => u.name === name)))
+			: null,
+		fired: false,
+	}))
+
+	type ResolvedCondition = (typeof conditions)[number]
+	const holds = (c: ResolvedCondition, map: ConditionMap): boolean => {
+		let n = 0
+		for (const u of map.layers.units) {
+			if (!u || u.team !== c.condition.team) continue
+			if (c.typeIdx && !c.typeIdx.has(u.type)) continue
+			n++
+		}
+		return compareCount(n, c.condition.op, c.condition.count)
+	}
 
 	return {
 		start: async () => {
@@ -166,5 +231,17 @@ export const createCampaignRunner = (
 			await runCutsceneEvents(localPlayerWon(outcome) ? script.win : script.lose, iface)
 		},
 		hasFinished: () => finished,
+		hasPendingConditions: (map) =>
+			!finished && conditions.some((c) => !c.fired && holds(c, map)),
+		checkConditions: async (map) => {
+			if (finished) return
+			for (const c of conditions) {
+				if (c.fired || !holds(c, map)) continue
+				c.fired = true
+				await runCutsceneEvents(c.events, iface)
+				// A `defeat` in the block ends the match; stop firing further conditions.
+				if (finished) break
+			}
+		},
 	}
 }

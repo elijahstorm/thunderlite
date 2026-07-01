@@ -107,16 +107,17 @@ describe('generateActionsList — threat warnings on movement tiles', () => {
 		const mover = unit(STRIKE_COMMANDO, 0)
 		map.layers.units[selfTile] = mover
 
-		// A single reachable tile is "threatened"; the unit's own tile is not.
+		// A single reachable tile is "threatened" with half the mover's HP of
+		// incoming fire (STRIKE_COMMANDO has 40 HP); the unit's own tile is not.
 		const threatened = xy(cols, 8, 7)
-		const actions = generateActionsList(map, selfTile, mover, new Set([threatened]))
+		const actions = generateActionsList(map, selfTile, mover, new Map([[threatened, 20]]))
 
 		const moveHighlights = actions.filter((h) => h.type === 0)
 		const exposed = moveHighlights.find((h) => h.tile === threatened)
 		const safe = moveHighlights.find((h) => h.tile === selfTile)
 
 		expect(exposed?.threatened).toBe(true)
-		expect(exposed?.tip).toBe(2) // "bad" → warning icon
+		expect(exposed?.tip).toBe(2) // half-health threat → "bad" warning icon
 		expect(safe?.threatened).toBe(false)
 		expect(safe?.tip).toBe(0) // "good" → empty badge, no warning icon
 

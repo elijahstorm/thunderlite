@@ -99,7 +99,7 @@
 				</div>
 
 				<p class="text-xs text-muted-foreground">
-					Map <span class="font-mono">{gameData.sha}</span>
+					Map <span class="font-mono">{gameData.mapId}</span>
 				</p>
 			</section>
 		{:else}

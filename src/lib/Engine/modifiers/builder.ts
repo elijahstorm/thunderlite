@@ -1,6 +1,7 @@
 import { unitData } from '$lib/GameData/unit'
 import { terrainData } from '$lib/GameData/terrain'
 import { markTileActed } from '$lib/Engine/gameState'
+import { beginBuildFade } from '$lib/Engine/buildFade'
 import { walletOf } from '$lib/Engine/wallet'
 import { validTerrain } from '$lib/Engine/Interactor/Pathing/movement'
 
@@ -85,6 +86,8 @@ export const buildAdjacent = (
 		team,
 		health: data.health,
 	}
+	// Quick fade-in so the fresh unit eases onto the board instead of popping.
+	beginBuildFade(spawnTile)
 
 	builder.wallet = funds - data.cost
 

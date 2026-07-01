@@ -69,6 +69,44 @@ camera move, or a cleanup spawn.
 arrive on round 3, a storm that rolls in on round 5, a funds bonus at the start
 of the player's second turn, and so on.
 
+### Conditional triggers — `<when>`
+
+```
+<when COND>
+  …commands…
+</when>
+```
+
+A `<when>` block fires **once**, the first time its condition becomes true
+(checked at the start of each side-turn). Use it to react to the state of the
+battle rather than the clock — for example, springing a second phase once the
+enemy's first wave is destroyed, or ending the match the moment the player loses
+a key unit. The condition counts units:
+
+```
+team <N> units <op> <K>                      whole-team count
+team <N> units "Name"[,"Name"…] <op> <K>     count of just those unit types
+```
+
+`<op>` is one of `< <= == >= >`. Examples:
+
+```
+<when team 1 units <= 2>           # the enemy is down to its last two units
+  talk Vance: "Their assault is spent. Push for the capital now."
+  terrain: "Road",9,3              # blast open a path
+  add unit: 1,"Stealth Tank",10,2  # a fresh defender
+</when>
+
+<when team 0 units "Strike Commando","Heavy Commando" == 0>
+  talk Vance: "Both commandos are gone. We can't take the objective."
+  defeat                           # force a loss (see below)
+</when>
+```
+
+Tip: to make a unit's loss matter without it auto-winning, keep the enemy alive
+some other way (a sealed garrison, a separate force) so reaching zero of one
+group triggers your `<when>` instead of the engine's default rout win.
+
 ---
 
 ## Coordinates
@@ -99,6 +137,23 @@ multiple physical lines.
 
 ```
 talk Vance: "Reyes, over here.", "Kael's scouts caught your patrol off guard."
+```
+
+### `color` — set a speaker's dialogue colour
+
+```
+color <Speaker>: <hex|name>
+```
+
+Sets the colour used for `<Speaker>`'s name, line text, and the dialogue box's
+accent border, so it is obvious when a line changes hands. The value is a hex
+code (`#ef4444`, `#fff`) or a plain CSS colour name (`teal`, `crimson`). The
+colour applies for the rest of the level, so set your cast up once (usually in
+`<start>`). Speakers with no `color` keep a sensible default.
+
+```
+color Reyes: #4ade80
+color Kael: crimson
 ```
 
 ### `move` — pan the camera
@@ -148,6 +203,30 @@ kill unit: x,y
 
 Removes whatever unit occupies `x,y`, running its death effects and re-checking
 win conditions.
+
+### `hurt unit` — injure a unit
+
+```
+hurt unit: x,y,health
+```
+
+Sets the current health of the unit at `x,y` to `health` (clamped to between 1
+and the unit's max, so it injures but never kills — use `kill unit` for that).
+Handy for a "battle already underway" feel where troops start battered.
+
+```
+hurt unit: 9,3,40
+```
+
+### `defeat` — end the match as a loss
+
+```
+defeat
+```
+
+Immediately ends the match as a defeat for the player and plays the `<lose>`
+block. Takes no arguments. Almost always used inside a `<when>` block to enforce
+a custom failure condition (e.g. losing an escort unit you must keep alive).
 
 ### `add building` — place a building
 
@@ -250,12 +329,15 @@ funds: 1,-200
 
 ```
 talk <Speaker>: "line", "line"     dialogue (pauses)
+color <Speaker>: #hex | name       set a speaker's dialogue colour
 move: x,y                          pan camera
 hl: x,y                            highlight a tile
 unhl: x,y                          remove a highlight
 wait: seconds                      pause (decimals ok)
 add unit: team,"Name",x,y          spawn a unit
 kill unit: x,y                     remove a unit
+hurt unit: x,y,health              injure a unit (never kills)
+defeat                             end the match as a loss
 add building: team,"Name",x,y      place a building
 remove building: x,y               remove a building
 own building: team,x,y             change a building's owner

@@ -3,8 +3,9 @@ import { unitData } from '$lib/GameData/unit'
 import { calculateDamage, canCounterAttack } from './combat'
 import { gameState, markTileActed } from './gameState'
 import { runModifiers } from './modifiers'
-import { revealCloakedAdjacentTo } from './modifiers/cloak'
+import { adjacentTiles, hasAdjacentEnemy, revealCloakedAdjacentTo } from './modifiers/cloak'
 import { applyLancePassthrough } from './modifiers/lance'
+import { burnForestAround } from './modifiers/burn'
 import { applyVultureKill } from './modifiers/vulture'
 import { mine } from './modifiers/miner'
 import { hasModifier } from './modifiers/canAttack'
@@ -19,8 +20,15 @@ import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction, type SfxAction, type SfxUnitRef } from '$lib/Audio/sfxMap'
 import { recordMatchStat, type StatEvent } from './matchStats'
 import { isStealthUnit } from './visibility'
-import { recordStealthBuild, recordStealthDeath } from './cpuAi/stealthMemory'
+import {
+	recordStealthBuild,
+	recordStealthDeath,
+	recordPerceivedStealth,
+	noteStealthRevealed,
+} from './cpuAi/stealthMemory'
+import { recordFogKill } from './cpuAi/fogMemory'
 import type { SerializedAction } from './Interactor/serializedAction'
+import { recordAction } from './devLog'
 
 /**
  * Options threaded through the apply path. `applyAction` stays deterministic and
@@ -74,14 +82,18 @@ const reduceHealth = (
 	attackerTile: number,
 	role: 'attack' | 'counter',
 	fx: SfxEmit,
-	stat: StatEmit
+	stat: StatEmit,
+	// Splash and other secondary hits land at a fraction of the full blow.
+	damageScale = 1
 ): boolean => {
-	const damage = calculateDamage(attacker, target, {
-		map: map as MapObject,
-		defenderTile: tile,
-		attackerTile,
-		role,
-	})
+	const damage = Math.round(
+		calculateDamage(attacker, target, {
+			map: map as MapObject,
+			defenderTile: tile,
+			attackerTile,
+			role,
+		}) * damageScale
+	)
 	const max = unitData[target.type]?.health ?? 0
 	const current = target.health ?? max
 	const next = Math.max(0, current - damage)
@@ -124,6 +136,17 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: 
 		map,
 	})
 	revealCloakedAdjacentTo(map as MapObject, to, unit.team)
+	// A move can flush a cloaked unit into the open — the mover ends point-blank to it,
+	// or a collision halts the mover right beside it. Record every stealth unit now
+	// perceivable to any team, so the watcher pins its tile while it's exposed rather
+	// than only sampling at its own turn start (by when it has slipped back into fog).
+	recordPerceivedStealth(map)
+	// A stealth unit re-settles its own cloak the instant it finishes moving, rather than
+	// staying flushed (`hidden === false` from a prior point-blank reveal) until its
+	// End_Turn.Cloak. Walk a stealth tank out from under an enemy and it vanishes the
+	// moment it reaches safety — same reveal-when-adjacent rule the End_Turn handler uses.
+	// Ordered after recordPerceivedStealth so the watcher still pins where it went.
+	if (isStealthUnit(unit)) unit.hidden = !hasAdjacentEnemy(map, to, unit.team)
 	markTileActed(to)
 }
 
@@ -139,12 +162,29 @@ const applyAttack = (
 	if (!attacker || !target) return
 
 	fx('attack', attacker)
+	// Firing breaks cover: a cloaked attacker is seen by everyone, who now know it
+	// exists and the tile it struck from — even if it re-cloaks the instant the smoke
+	// clears (e.g. it killed the only unit that was keeping it flushed).
+	if (isStealthUnit(attacker)) noteStealthRevealed(map, from, attacker)
 	// A capture-capable unit that attacks forfeits next turn's auto-capture tick;
 	// the flag is consumed by the Start_Turn capture handler. Tagged only on
 	// capturers so the field never spreads to units that can't capture anyway.
 	if (hasModifier(attacker, 'Start_Turn.Capture')) attacker.attacked = true
 	const targetDied = reduceHealth(map, attacker, target, to, from, 'attack', fx, stat)
 	applyLancePassthrough(map as MapObject, from, to)
+
+	// Scorcher's flame washes over everything around the target (Attack.Splash) and
+	// scorches any forest it touches (Attack.Burn). Both run on the opening blow only
+	// (like Lance), never on a counter, and splash lands at half strength.
+	if (hasModifier(attacker, 'Attack.Splash')) {
+		for (const adj of adjacentTiles(map as MapObject, to)) {
+			const splashed = map.layers.units[adj]
+			if (splashed && splashed.team !== attacker.team) {
+				reduceHealth(map, attacker, splashed, adj, from, 'attack', fx, stat, 0.5)
+			}
+		}
+	}
+	if (hasModifier(attacker, 'Attack.Burn')) burnForestAround(map, to)
 
 	let attackerDied = false
 	if (
@@ -160,7 +200,19 @@ const applyAttack = (
 		attackerDied = reduceHealth(map, target, attacker, from, to, 'counter', fx, stat)
 	}
 
+	// Firing reveals a cloaked attacker — but only if it left a witness. A surviving
+	// target (and its nearby allies) saw exactly where the shot came from, so the
+	// attacker drops its cloak and stays exposed rather than blinking out the moment
+	// the attack resolves. A clean kill leaves nobody to tell, so the killer keeps its
+	// cloak (its `hidden` flag is untouched here and re-settles at its End_Turn.Cloak).
+	if (isStealthUnit(attacker) && !targetDied && !attackerDied) attacker.hidden = false
+
 	markTileActed(from)
+	// A unit destroyed by a foe it couldn't see plants a fog hunch at the killer's
+	// tile for the loser, so the AI learns roughly where the threat struck from
+	// (replaces the old, move-confused own-unit tile diff).
+	if (targetDied) recordFogKill(map, from, target.team)
+	if (attackerDied) recordFogKill(map, to, attacker.team)
 	if (targetDied && !attackerDied) applyVultureKill(attacker, from)
 	applyWinConditions(map as MapObject)
 }
@@ -170,6 +222,8 @@ export const applyAction = (
 	action: SerializedAction,
 	opts: ApplyActionOptions = {}
 ): void => {
+	// Dev-only: log the action + the board it acted on (no-op in prod / tests).
+	recordAction(map, action)
 	const fx = makeSfxEmit(opts)
 	const stat = makeStatEmit(opts)
 	switch (action.kind) {

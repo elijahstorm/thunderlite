@@ -7,6 +7,8 @@ import {
 	beginAnimationBeat,
 	endAnimationBeat,
 } from './Animator/animator'
+import { hasModifier } from './modifiers/canAttack'
+import { computeBehindTile } from './modifiers/lance'
 import type { SerializedAction } from './Interactor/serializedAction'
 
 /**
@@ -79,9 +81,34 @@ export const animateAttackSequence = async (
 	const attackerHealthAfter = Math.max(0, attackerHealthBefore - counterDamage)
 	const attackerWillDie = willCounter && attackerHealthAfter <= 0
 
-	// Freeze both bars at their pre-combat values; we release them step by step.
+	// A lancing attacker also strikes the unit directly behind the target on the
+	// same beat (see `applyLancePassthrough`, which commits this hit). Predict it
+	// here against the same pre-combat state — the passthrough's damage scales off
+	// the attacker's current health, which the counter only reduces *after* this
+	// hit lands — so its bar can drain in lockstep with the target's instead of
+	// snapping to its new value after the whole sequence commits.
+	const behindTile = hasModifier(attacker, 'Attack.Lance')
+		? computeBehindTile(map, attackerTile, targetTile)
+		: null
+	const passthrough = behindTile !== null ? map.layers.units[behindTile] : null
+	const passthroughMax = passthrough ? (unitData[passthrough.type]?.health ?? 0) : 0
+	const passthroughHealthBefore = passthrough ? (passthrough.health ?? passthroughMax) : 0
+	const passthroughDamage =
+		passthrough && behindTile !== null
+			? calculateDamage(attacker, passthrough, {
+					map,
+					defenderTile: behindTile,
+					attackerTile,
+					role: 'attack',
+				})
+			: 0
+	const passthroughHealthAfter = Math.max(0, passthroughHealthBefore - passthroughDamage)
+	const passthroughWillDie = !!passthrough && passthroughHealthAfter <= 0
+
+	// Freeze every involved bar at its pre-combat value; we release them step by step.
 	attacker.displayHealth = attackerHealthBefore
 	target.displayHealth = targetHealthBefore
+	if (passthrough) passthrough.displayHealth = passthroughHealthBefore
 
 	// Hold the board "busy" for the whole exchange — its quiet gaps (between the
 	// strike, the bar ease, and the counter) leave `animations` momentarily empty,
@@ -93,19 +120,37 @@ export const animateAttackSequence = async (
 		// 1. The attacker swings.
 		await animateAttack(map, attacker, attackerTile, targetTile)
 
-		// 2. The target: explode if it died, otherwise drain its bar to the new value.
+		// 2. The target — and, for a lancing attacker, the unit behind it — take the
+		//    hit on the same beat: their bars drain in lockstep (and any explosions
+		//    play together) rather than one waiting on the other to finish.
+		const hits: Promise<void>[] = []
+
 		if (targetWillDie) {
 			target.displayHealth = undefined
 			// Hide the doomed unit's idle sprite under the blast; the commit below
 			// removes it from the board for good.
 			target.animating = true
-			await animateExplosion(map, targetTile)
+			hits.push(animateExplosion(map, targetTile))
 		} else {
 			// `hold` — park the bar at its new value; the real `health` is only
 			// committed in the `finally` below, so clearing now would flash the stale
 			// pre-combat value and snap the bar back up.
-			await animateHealthBar(target, targetHealthBefore, targetHealthAfter, true)
+			hits.push(animateHealthBar(target, targetHealthBefore, targetHealthAfter, true))
 		}
+
+		if (passthrough && behindTile !== null) {
+			if (passthroughWillDie) {
+				passthrough.displayHealth = undefined
+				passthrough.animating = true
+				hits.push(animateExplosion(map, behindTile))
+			} else {
+				hits.push(
+					animateHealthBar(passthrough, passthroughHealthBefore, passthroughHealthAfter, true)
+				)
+			}
+		}
+
+		await Promise.all(hits)
 
 		// 3 & 4. The survivor returns fire, then the attacker takes the hit.
 		if (willCounter) {
@@ -139,6 +184,10 @@ export const animateAttackSequence = async (
 		if (map.layers.units[attackerTile] === attacker) {
 			attacker.displayHealth = undefined
 			attacker.animating = false
+		}
+		if (passthrough && behindTile !== null && map.layers.units[behindTile] === passthrough) {
+			passthrough.displayHealth = undefined
+			passthrough.animating = false
 		}
 
 		// Release the board. This re-arms the auto-end-turn watcher, which now sees

@@ -18,6 +18,11 @@ export const canAttackTarget = (attacker: UnitObject, defender: UnitObject): boo
 	const defenderStats = unitData[defender.type]
 	if (!attackerStats || !defenderStats) return false
 
+	// An unarmed unit (Jammer Truck, Transporter, Leviathan) has no shot to take:
+	// it shouldn't surface an attack range or attack action. Mirrors the power-0
+	// defender check in combat's counterattack gate.
+	if (attackerStats.power === 0) return false
+
 	if (defenderStats.type === 'air' && !hasModifier(attacker, 'Can_Attack.Air_Raid')) {
 		return false
 	}

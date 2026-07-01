@@ -8,6 +8,7 @@ import { runModifiers, type ModifierContext, type ModifierPhase } from './modifi
 import { applySkyHiding } from './visibility'
 import { resetCaptureProgress } from './modifiers/capture'
 import { applyWinConditions } from './winConditions'
+import { decaySmoke } from './smokeState'
 
 export const STORM_DAMAGE = 10
 
@@ -163,6 +164,10 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 		turnNumber: advance.wrapped ? state.turnNumber + 1 : state.turnNumber,
 		actedTiles: new Set<number>(),
 	}))
+
+	// Smoke screens thin out one step per turn handover; expired tiles clear. A
+	// Shroud re-lays its own at the start of its turn (Move phase, below).
+	decaySmoke()
 
 	if (map) {
 		const after = get(gameState)

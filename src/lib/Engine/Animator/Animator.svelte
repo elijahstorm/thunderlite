@@ -10,6 +10,8 @@
 	import { animationFrame, overlayFrame } from '$lib/Sprites/animationFrameCount'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { viewerVisibility } from '$lib/Engine/fogState'
+	import { viewerTeam } from '$lib/Engine/threatOverlay'
+	import { isUnitStealthed } from '$lib/Engine/visibility'
 	import { fly } from 'svelte/transition'
 	import { linear } from 'svelte/easing'
 
@@ -27,14 +29,36 @@
 	const tileVisible = (tile: number, fog: typeof $viewerVisibility) =>
 		fog === null || fog.visible.has(tile)
 
-	// The viewer's own moving unit always renders above the fog, even on tiles
-	// that are dark from its start vantage. We don't recompute sight per step of
-	// a long move (the fog only refreshes once the unit lands), so without this
-	// our own unit would vanish mid-path the moment it left the start tile's
-	// visible radius and reappear only at its destination. Enemy moves still
-	// respect the mask — they must stay hidden while crossing our blind spots.
-	const routeVisible = (route: typeof $routeAnimation, fog: typeof $viewerVisibility, step: number) =>
-		route !== null && (fog === null || route.unit.team === fog.team || tileVisible(route.route[step], fog))
+	// Whether the moving unit's sprite should render at path `step`, from the local
+	// viewer's vantage. The viewer's own unit always renders above the fog, even on
+	// tiles dark from its start vantage: we don't recompute sight per step (fog only
+	// refreshes once it lands), so without this it would blink out the moment it left
+	// its start tile's radius. An enemy step is suppressed when fog covers that tile,
+	// or when the unit is concealed there (cloak / stealth) — evaluated per step, so a
+	// stealth unit only flickers into view for the stretch of its path that crosses
+	// our jammer's radar ring, then vanishes again once it leaves.
+	const routeVisible = (
+		route: typeof $routeAnimation,
+		fog: typeof $viewerVisibility,
+		team: number,
+		step: number
+	) => {
+		if (route === null) return false
+		const tile = route.route[step]
+		if (route.unit.team === team) return true
+		if (fog !== null && !fog.visible.has(tile)) return false
+		return !isUnitStealthed(route.map, tile, route.unit)
+	}
+
+	// Per-step opacity for the moving sprite, mirroring the static board (paint.ts):
+	// the viewer's own concealed unit walks at half opacity so you can still read it,
+	// and snaps back to solid for the tiles it spends inside an enemy radar ring (it's
+	// exposed there). Enemy units only ever reach here when routeVisible already
+	// cleared them, so they ride at full strength.
+	const routeOpacity = (route: typeof $routeAnimation, team: number, step: number) => {
+		if (route === null || route.unit.team !== team) return 1
+		return isUnitStealthed(route.map, route.route[step], route.unit) ? 0.5 : 1
+	}
 
 	const traverseRoute = (route: number[] | null) => {
 		if (route === null) {
@@ -53,12 +77,19 @@
 
 	const parseRoute = (route: typeof $routeAnimation) => {
 		if (route === null) return null
+		// The renderer may be missing (a unit type's sprite hasn't decoded yet, or
+		// a headless/test context) — never index into it blindly. A throw here lands
+		// inside the render effect and corrupts the whole reactive tree, which reads
+		// as "animations freeze and the board snaps to its final state". Bail to null
+		// (render() treats that as no overlay) instead.
+		const source = $rendererStore.units[route.unit.type]?.sprite?.[route.unit.team ?? 0]?.src
+		if (!source) return null
 		const { x, y } = tileToXY(route.map, route.route[index])
 		const unit = unitData[route.unit.type]
 		return {
 			x,
 			y,
-			source: $rendererStore.units[route.unit.type].sprite[route.unit.team ?? 0]?.src,
+			source,
 			xOffset: unit.xOffset,
 			yOffset: unit.yOffset,
 			frames: unit.frames,
@@ -181,7 +212,7 @@
 	}, ANIMATION_TIME)
 </script>
 
-{#if $routeAnimation && routeVisible($routeAnimation, $viewerVisibility, index)}
+{#if $routeAnimation && routeVisible($routeAnimation, $viewerVisibility, $viewerTeam, index)}
 	{@const route = $routeAnimation}
 	{#key index}
 		{@const flyParams = {
@@ -191,10 +222,10 @@
 			opacity: 1,
 		}}
 		{@const bar = parseRouteHealth(route)}
+		{@const alpha = hideNewInstance ? 0 : routeOpacity(route, $viewerTeam, index)}
 		<div
 			class="absolute overflow-clip"
-			class:opacity-0={hideNewInstance}
-			style={render(parseRoute(route), $animationFrame)}
+			style={`${render(parseRoute(route), $animationFrame)} opacity: ${alpha};`}
 			out:fly={flyParams}
 		>
 			{#if bar}

@@ -58,14 +58,14 @@ export const terrainData: TerrainData[] = [
 		yOffset: 0,
 		connector: 2,
 		name: 'Forest',
-		description: 'Gives defense boost',
+		description: 'Gives a defense boost and hides units inside it from distant enemies in fog',
 		details: 'rough',
 		ocean: false,
 		protection: 0.2,
 		damage: 0,
 		height: 5,
 		drag: 2,
-		modifiers: [],
+		modifiers: ['Conceals'],
 	},
 	{
 		url: '/game/play/terrain/mountain.png',
@@ -109,7 +109,7 @@ export const terrainData: TerrainData[] = [
 		description: 'Dips down, but ranged units cannot target here',
 		details: 'slippery',
 		ocean: false,
-		protection: 0.3,
+		protection: 0.5,
 		damage: 0,
 		height: -10,
 		drag: 1,
@@ -274,7 +274,7 @@ export const terrainData: TerrainData[] = [
 		damage: 0,
 		height: 0,
 		drag: 1,
-		modifiers: ['Port'],
+		modifiers: ['Port', 'Amphibious', 'Shallow'],
 	},
 	{
 		url: '/game/play/terrain/bridge.png',
@@ -306,7 +306,7 @@ export const terrainData: TerrainData[] = [
 		damage: 0,
 		height: 20,
 		drag: 1,
-		modifiers: [],
+		modifiers: ['Amphibious'],
 	},
 ]
 

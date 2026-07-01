@@ -4,13 +4,15 @@
 	import { gameState, initGameStateFromMap } from './gameState'
 	import { emitMatchEnd, resetMatchEnd, buildMatchResult, type MatchMode } from './matchEnd'
 	import { resetMatchStats, matchStatsList } from './matchStats'
+	import { resetDevLog } from './devLog'
 	import { registerRecordMatch } from '$lib/Database/recordMatch'
 	import { registerCampaignProgress } from '$lib/Campaign/progress'
 	import { endTurn } from './turnLoop'
+	import { applyAction } from './applyAction'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
 	import { teamHasPendingActions } from './pendingActions'
-	import { routeAnimation, animations, animationBusy } from './Animator/animator'
+	import { routeAnimation, animations, animationBusy, boardBusy } from './Animator/animator'
 	import { actionMenuState } from './HUD/actionMenuStore'
 	import { buildMenuState } from './HUD/buildMenuStore'
 	import { interactionState, interactionSource } from './Interactor/interactionState'
@@ -24,6 +26,7 @@
 	import StatsScreen from './HUD/StatsScreen.svelte'
 	import TurnTransition from './HUD/TurnTransition.svelte'
 	import { turnTransitionActive } from './HUD/turnTransitionStore'
+	import { campaignScriptActive } from '$lib/Campaign/scriptGate'
 
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	export let endTurnAction: (() => void) | undefined = undefined
@@ -78,6 +81,7 @@
 		// can fire its own match-end event (J1), and zero the stat tracker (J2).
 		resetMatchEnd()
 		resetMatchStats()
+		resetDevLog(localTeam)
 		// F3 weather → env ambience: loop the matching track while sky weather is
 		// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
 		// re-renders and replayed states never restack the loop.
@@ -133,6 +137,12 @@
 		if (active) return
 		if (!isMultiplayer && $gameState.currentTeam !== localTeam) return
 		if ($turnTransitionActive) return
+		// A campaign block is mutating the board — swallow input until it finishes so
+		// a move can't resolve against a board the script is mid-rewrite of.
+		if ($campaignScriptActive) return
+		// Movement/attack animations from the previous action are still playing — swallow
+		// input until the board settles so a click can't select or move a unit mid-anim.
+		if ($boardBusy) return
 
 		// A tap while a moved unit's menu is "peeking" re-summons that menu rather
 		// than running a fresh selection — the unit is still mid-decision, so the
@@ -186,6 +196,14 @@
 			endTurnAction()
 			return
 		}
+		// Local/campaign end-turn (no socket): route through `applyAction` live so the
+		// turn and any auto-captures are credited to match stats, just like the socket
+		// path. Calling `endTurn` directly bypasses the stat sink and left the Turns and
+		// Captures columns stuck at 0 on the results screen.
+		if (map) {
+			applyAction(map, { kind: 'end-turn' }, { live: true })
+			return
+		}
 		endTurn({ map })
 	}
 
@@ -203,6 +221,7 @@
 		initGameStateFromMap(map)
 		resetMatchEnd()
 		resetMatchStats()
+		resetDevLog(localTeam)
 	}
 
 	// `$turnTransitionActive` is part of the key so the CPU only starts thinking
@@ -214,16 +233,19 @@
 	let lastCpuKey = ''
 	$: {
 		const s = $gameState
-		const transitioning = $turnTransitionActive
+		// Hold the CPU off while a campaign block runs, the same way as the turn
+		// transition: the gate collapses the key to '' (cancelling any in-flight
+		// handle), and when the block ends the block re-fires and schedules the turn.
+		const blocked = $turnTransitionActive || $campaignScriptActive
 		const isCpu = !isMultiplayer && s.phase === 'playing' && s.currentTeam !== localTeam
-		const key = isCpu && !transitioning ? `${s.currentTeam}:${s.turnNumber}` : ''
+		const key = isCpu && !blocked ? `${s.currentTeam}:${s.turnNumber}` : ''
 		if (key !== lastCpuKey) {
 			lastCpuKey = key
 			if (cpuHandle) {
 				cpuHandle.cancel()
 				cpuHandle = null
 			}
-			if (isCpu && !transitioning && map) {
+			if (isCpu && !blocked && map) {
 				cpuHandle = runCpuTurn({
 					humanTeam: localTeam,
 					endTurn: handleEndTurn,
@@ -265,7 +287,11 @@
 			!$actionMenuState.peeking &&
 			!$buildMenuState.open &&
 			$interactionState === 'select' &&
-			$interactionSource === null
+			$interactionSource === null &&
+			// A running campaign block leaves the engine "idle" (its talk/wait pauses
+			// aren't engine animations), so without this guard the turn would auto-end
+			// out from under a script playing at the start of the player's turn.
+			!$campaignScriptActive
 		if (
 			map &&
 			s.phase === 'playing' &&

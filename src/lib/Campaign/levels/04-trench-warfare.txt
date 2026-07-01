@@ -1,27 +1,40 @@
 <start>
-move: 4,7
-talk Vance: "Kael's column is rolling down the coast. We can't beat it in the open, so we won't fight in the open."
-talk Vance: "Dig in. A unit in a canyon trench takes far less damage. Let the terrain be your armor."
-terrain: "Canyon",4,8
-terrain: "Canyon",5,8
-talk Vance: "There. Trenches ready. Hold this line and make every charge cost them."
-move: 5,1
-talk Kael: "Holding a ditch won't save you. My armor will roll right over it."
-talk Reyes: "Let them come. We hold."
+move: 5,3
+talk Vance: "Kael's armor is closing fast, and he's running boats around to land troops on that beach. We can't win this in the open. We dig in deep, two lines.", "A canyon trench cuts the damage you take hard, and his artillery can't drop a shell into a trench at all. Front rank holds the line, reserve rank waits behind to plug any break. Every trooper carves their own cover. Dig in."
+terrain: "Canyon",5,1
+terrain: "Canyon",5,2
+terrain: "Canyon",5,3
+terrain: "Canyon",5,4
+terrain: "Canyon",3,2
+terrain: "Canyon",3,4
+talk Vance: "Lines set. Keep the Rocket Truck back on the hill where it can see the whole field.", "One rule for the truck: an indirect gun cannot move and fire in the same turn. Hold it still, let the range do the work, and never let it get caught up close."
+move: 9,3
+talk Kael: "A ditch won't save you. My guns will dig you out, and my landing party takes your flank."
+move: 5,3
+talk Vance: "His guns can't touch you in cover, so make him bleed for every tile. Hold the front one trooper to one tank, fall back to the reserve trench if a man gets pressed, and let the Rocket thin the charge. Swing your Scorpion to meet the beach. Their assault breaks here."
+talk Reyes: "Two lines, hold the beach, let the Rocket work. We hold."
 </start>
 
 <turn 0,1>
 wait: 1
-move: 6,0
-talk Kael: "Second wave. Push through the trench."
-add unit: 1,"Scorpion Tank",6,0
-talk Vance: "Stay in cover and let them break against your line. Patience wins this one."
+move: 10,6
+talk Kael: "Boats to the beach. Take their flank while the column pins them."
+add unit: 1,"Scorpion Tank",10,6
+talk Vance: "There's the landing. Meet it on the sand, but keep both lines manned and the Rocket firing."
+</turn>
+
+<turn 1,1>
+wait: 1
+move: 10,3
+talk Kael: "More steel to the front. Bury them."
+add unit: 1,"Scorpion Tank",10,3
+talk Vance: "Hold the canyons and let his charge spend itself. Once it's broken, we step out and finish them."
 </turn>
 
 <win>
-talk Vance: "The assault's spent and we're still standing. The terrain held the line.", "You're learning to make the map fight for you."
+talk Vance: "The assault's spent, the landing's thrown back, and our lines never broke. The terrain held for us.", "You're learning to make the map fight for you, Reyes."
 </win>
 
 <lose>
-talk Vance: "They've broken through. We left the trenches too soon.", "Hold your cover next time, Reyes. Let them come to you."
+talk Vance: "They've broken through, or the beach turned our flank.", "Keep the front solid so they come one at a time, fall back to the reserve when pressed, and let the Rocket soften the charge. Again."
 </lose>

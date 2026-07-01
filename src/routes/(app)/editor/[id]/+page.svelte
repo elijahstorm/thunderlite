@@ -4,6 +4,7 @@
 
 	export let data: PageData
 	$: mapHash = data.mapHash
+	$: mapId = data.mapId
 </script>
 
-<MapEditor {mapHash} />
+<MapEditor {mapHash} {mapId} />

@@ -83,4 +83,18 @@ export const devPages: DevPage[] = [
 		tag: 'stealth',
 		ready: true,
 	},
+	{
+		href: '/dev/stealth-hunt',
+		title: 'Stealth Hunt (AI)',
+		blurb: 'Brief the CPU about lurking cloak units and watch it hunt across scenarios — building radar, probing toward its fuzzy best-guess location, and screening valuable units. Live intel readout.',
+		tag: 'ai',
+		ready: true,
+	},
+	{
+		href: '/dev/fog-belief',
+		title: 'Fog Belief (AI)',
+		blurb: "The CPU's hunch about fog-hidden contacts: dart units in and out of its sight, or kill a forward unit, and watch it seed a fuzzy belief where things vanished — then grow wary of those regions. Scan-on-demand + live heat readout.",
+		tag: 'ai',
+		ready: true,
+	},
 ]

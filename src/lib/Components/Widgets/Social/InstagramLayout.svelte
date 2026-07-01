@@ -4,7 +4,7 @@
 
 <div class="w-full h-full flex flex-col min-w-[360px] max-w-[960px]">
 	<header class="h-16 flex items-center justify-between px-4 border-b-2 border-gray-300">
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Camera">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -25,7 +25,7 @@
 			</svg>
 		</button>
 		<div class="h-10 w-32 bg-gray-200"></div>
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Messages">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -47,7 +47,7 @@
 		<InstagramPost />
 	</main>
 	<footer class="h-16 flex items-center justify-around px-4 border-t-2 border-gray-300">
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Home">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -64,7 +64,7 @@
 				<polyline points="9 22 9 12 15 12 15 22"> </polyline>
 			</svg>
 		</button>
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Search">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -81,7 +81,7 @@
 				<path d="m21 21-4.3-4.3"> </path>
 			</svg>
 		</button>
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="New post">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
@@ -98,7 +98,7 @@
 				<path d="M12 5v14"> </path>
 			</svg>
 		</button>
-		<button class="focus:outline-none">
+		<button class="focus:outline-none" aria-label="Notifications">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"

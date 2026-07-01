@@ -11,9 +11,8 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { mapStore, playMapStore } from './mapStore'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
-	import { open, save } from './Editor/fileManager'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
-	import { share } from './Editor/mapShare'
+	import { publishMap, shareLink } from './Editor/mapShare'
 	import { renderMapThumbnail } from './Editor/mapThumbnail'
 	import { skyData } from '$lib/GameData/sky'
 	import { buildingData } from '$lib/GameData/building'
@@ -24,6 +23,10 @@
 	import { carriableUnitTypes, isTransportType } from '$lib/Engine/modifiers/transport'
 
 	export let mapHash: string | undefined = undefined
+	// The map's `public_id` when editing an existing, saved map. Save/Share write
+	// back to this row (mutable maps), so the shareable link stays stable across
+	// edits. New maps start undefined and adopt the id their first save mints.
+	export let mapId: string | undefined = undefined
 
 	const maxTeamAmount = 4
 	const size = 64
@@ -41,9 +44,12 @@
 	let skyType = 0
 	let team = 0
 	let erasing = false
-	// True while a Share upload is in flight, so the toolbar can show a spinner
-	// and we never fire a second overlapping upload from a double-click.
+	// True while a Save/Share upload is in flight, so the toolbar can show a
+	// spinner and we never fire a second overlapping upload from a double-click.
+	let saving = false
 	let sharing = false
+	// The saved map's id, adopted on first save so later saves update in place.
+	let currentMapId: string | undefined = mapId
 	// The passenger a placed transport carries (a unit type), or null for empty.
 	// Persists across placements so several loaded transports drop without reselecting.
 	let cargoType: number | null = null
@@ -100,7 +106,8 @@
 	// Passenger options for the currently-selected unit — only transports can carry,
 	// and only the types each transport legally accepts. Drop a stale cargo choice
 	// when switching to a unit that can't carry it (or can't carry at all).
-	$: carriable = editType === 'units' && isTransportType(unitType) ? carriableUnitTypes(unitType) : []
+	$: carriable =
+		editType === 'units' && isTransportType(unitType) ? carriableUnitTypes(unitType) : []
 	$: if (cargoType !== null && !carriable.includes(cargoType)) cargoType = null
 
 	const select = (x: number, y: number) => {
@@ -152,44 +159,63 @@
 	const changeTeam = (index: number) => () => (team = index)
 	const toggleErase = () => (erasing = !erasing)
 
-	const saveMap = () => save(mapHasher(map))
-	const openMap = () =>
-		open((content: string | null) => {
-			if (content) map = deriveFromHash(content)
+	// Persist the current map to the user's library (DB-backed — no local files).
+	// A published map must carry a thumbnail for the /make listing, so block the
+	// upload until the board can actually be snapshotted (sprites loaded and the
+	// canvas exportable) rather than saving a thumbnail-less row. Adopts the
+	// minted id on first save and rewrites the URL to /editor/<id> so subsequent
+	// saves (and the browser back/forward) target the same row.
+	const persist = async (): Promise<string | null> => {
+		const thumbnail = renderMapThumbnail(map)
+		if (!thumbnail) {
+			addToast('Map preview is still loading — try again in a moment.', 'warn')
+			return null
+		}
+		const result = await publishMap(mapHasher(map), thumbnail, {
+			id: currentMapId,
+			name: map?.title ?? 'Untitled map',
 		})
+		if (!result) return null
+		if (!currentMapId) {
+			currentMapId = result.id
+			await goto(`/editor/${result.id}`, { replaceState: true, noScroll: true, keepFocus: true })
+		}
+		return result.id
+	}
+
+	const saveMap = async () => {
+		if (saving || sharing) return
+		saving = true
+		try {
+			if (await persist()) addToast('Saved to your maps')
+		} finally {
+			saving = false
+		}
+	}
 	const shareMap = async () => {
-		if (sharing) return
+		if (saving || sharing) return
 		sharing = true
 		try {
-			// A published map must carry a thumbnail for the /make listing, so block
-			// the upload until the board can actually be snapshotted (sprites loaded
-			// and the canvas exportable) rather than publishing a thumbnail-less row.
-			const thumbnail = renderMapThumbnail(map)
-			if (!thumbnail) {
-				addToast('Map preview is still loading — try sharing again in a moment.', 'warn')
-				return
-			}
-			await share(map?.title ?? 'ThunderLite Online', mapHasher(map), thumbnail)
+			const id = await persist()
+			if (id) await shareLink(id, map?.title ?? 'ThunderLite Online')
 		} finally {
 			sharing = false
 		}
 	}
 	const playMap = async () => {
 		if (!canPlay) return
-		const sha = mapHasher(map)
 		mapStore.set(map)
-		playMapStore.set(deriveFromHash(sha))
-		// Editor "Play" is always a local test of the in-progress map, which may
-		// not be saved to the backend yet. Go straight to ephemeral play instead
-		// of creating a backend room (which 400s for unregistered map hashes).
-		await goto(`/play?ephemeral=1&sha=${encodeURIComponent(sha)}`)
+		// Hand a deep clone (round-tripped through the serializer) to the play page
+		// so gameplay mutations never leak back into the editor draft. The board
+		// rides in the client store across navigation — nothing in the URL.
+		playMapStore.set(deriveFromHash(mapHasher(map)))
+		await goto(`/play?ephemeral=1`)
 	}
 
 	const tools = [
-		{ label: 'Open', icon: 'fluent:folder-32-filled', act: openMap },
 		{ label: 'Save', icon: 'fluent:save-24-filled', act: saveMap },
 		{ label: 'Share', icon: 'gg:share', act: shareMap },
-	]
+	] as const
 
 	const scriptReference = [
 		'talk Speaker: "line one", "line two"',
@@ -242,7 +268,7 @@
 
 		<div class="flex items-center gap-1">
 			{#each tools as tool (tool.label)}
-				{@const busy = tool.label === 'Share' && sharing}
+				{@const busy = (tool.label === 'Save' && saving) || (tool.label === 'Share' && sharing)}
 				<button
 					type="button"
 					on:click={tool.act}
@@ -259,7 +285,7 @@
 						height="16"
 						class={busy ? 'animate-spin' : ''}
 					/>
-					<span class="hidden lg:inline">{busy ? 'Sharing…' : tool.label}</span>
+					<span class="hidden lg:inline">{busy ? `${tool.label}…` : tool.label}</span>
 				</button>
 			{/each}
 			<button
@@ -368,9 +394,10 @@
 	<section class="flex flex-col gap-3">
 		<p class="text-sm text-muted-foreground">
 			Author cutscene-style logic that runs while this map is played: dialogue, camera moves,
-			spawns, weather, funds, victory/defeat, and more. Blocks fire on level load
-			(<code>&lt;start&gt;</code>), each side-turn (<code>&lt;turn N,T&gt;</code>), and match end
-			(<code>&lt;win&gt;</code> / <code>&lt;lose&gt;</code>).
+			spawns, weather, funds, victory/defeat, and more. Blocks fire on level load (<code
+				>&lt;start&gt;</code
+			>), each side-turn (<code>&lt;turn N,T&gt;</code>), and match end (<code>&lt;win&gt;</code> /
+			<code>&lt;lose&gt;</code>).
 		</p>
 
 		<textarea
@@ -388,7 +415,8 @@
 			>
 				<Icon icon="mdi:alert-circle" width="16" height="16" class="mt-0.5 shrink-0" />
 				<span>
-					{#if scriptError.line > 0}<strong>Line {scriptError.line}:</strong> {/if}{scriptError.message}
+					{#if scriptError.line > 0}<strong>Line {scriptError.line}:</strong>
+					{/if}{scriptError.message}
 				</span>
 			</div>
 		{:else if map.script && map.script.trim() !== ''}
@@ -412,7 +440,11 @@
 	</section>
 
 	{#snippet footer()}
-		<button type="button" on:click={() => (openScriptModal = false)} class="btn btn-primary ml-auto">
+		<button
+			type="button"
+			on:click={() => (openScriptModal = false)}
+			class="btn btn-primary ml-auto"
+		>
 			<Icon icon="mdi:check" width="16" height="16" />
 			Done
 		</button>
@@ -609,8 +641,9 @@
 		class="pointer-events-none min-w-fit object-cover object-top-left"
 		src={terrainData[tType].url}
 		alt={terrainData[tType].name}
-		style="margin: {-terrainData[tType].yOffset}px {-terrainData[tType].xOffset}px 0 {-(terrainData[tType]
-			.editorState ?? 0) * 60}px;"
+		style="margin: {-terrainData[tType].yOffset}px {-terrainData[tType].xOffset}px 0 {-(
+			terrainData[tType].editorState ?? 0
+		) * 60}px;"
 	/>
 {/snippet}
 
