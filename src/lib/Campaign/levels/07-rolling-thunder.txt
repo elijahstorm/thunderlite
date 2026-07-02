@@ -1,28 +1,28 @@
 <start>
 funds: 0,500
 funds: 1,500
-move: 7,5
-talk Vance: "There's the pass, Reyes. One road through the whole range, and Kael dug in across it. Funnel your column up that gap and he'll cut it apart, one tank at a time."
 move: 7,1
-talk Vance: "His army and his capital sit behind the wall, out of our reach. We can't soften them from down here. We have to break the pass to get at them."
+talk Vance: "Bad news, Reyes. Kael's massing his whole armored column behind the pass. He means to roll it straight through that gap and bury us under steel. We can't trade him tank for tank."
+move: 7,5
+talk Vance: "But he has to come through one road to do it, and that gap is a funnel. Set your guns behind it and every tank he sends is just a target in the open."
 move: 6,7
-talk Vance: "So roll your Mortar and Rocket Trucks up onto the hills flanking the road. The high ground gives them the reach to rule the open ground and shatter his armor before it ever closes."
-move: 6,6
-talk Vance: "Mind the gunners he's dug into the trenches at the mouth, though. Shells skip clean over a trench. That's tanks up close, or nothing."
+talk Vance: "Get your Mortars and Rocket up onto these hills. The high ground gives them the reach to break his armor in the gap, long before it closes on our line."
 move: 6,2
-talk Vance: "And he's got a Rocket Truck dug in past the wall, out of your reach from here. Run a unit up the road or send your Commando over the rocks to put it down. Until it's silenced, it bleeds your guns."
+talk Vance: "And watch his own Rocket Truck dug in past the wall. It'll range your guns if you let it. Screen your trucks, and put it down the moment you get the opening."
+move: 0,8
+talk Vance: "Send your Commandos wide for those two wells while the road's still quiet. The extra coin keeps your guns firing, and you'll want every shell for what's coming."
 move: 7,0
-talk Kael: "Come up the road, then. Every gun I have is ranged on that gap, and more rolling in behind me. This is where your war ends, Reyes."
-talk Reyes: "High ground, then his guns, then the gap. We bring the thunder this time. Move."
+talk Kael: "Hear that, Reyes? That's my column warming up. I will roll over your little firebase and grind it into the pass."
+talk Reyes: "Let him come. We hold the gap, break his waves, and when his thunder's spent, we take the pass ourselves. Guns ready."
 </start>
 
 <turn 1,1>
 wait: 1
 move: 9,2
-talk Kael: "Bring the column up. Let it build."
+talk Kael: "First wave. Roll them through."
 add unit: 1,"Scorpion Tank",5,2
 add unit: 1,"Scorpion Tank",9,2
-talk Vance: "He's massing behind that wall. The longer we stall, the heavier the steel we'll have to break. Keep the pressure on, Reyes."
+talk Vance: "Here they come. Hold the line and break them in the open, before they ever reach your guns."
 </turn>
 
 <turn 3,1>
@@ -36,7 +36,7 @@ add unit: 1,"Scorpion Tank",10,1
 
 <when team 1 units "Annihilator Tank" >= 1>
 move: 5,1
-talk Vance: "An Annihilator in his line. You've cracked one of those before. Don't waste shells on that hull and don't trade tanks with it. Your Heavy Commando's charges punch clean through."
+talk Vance: "An Annihilator leading the wave. You've cracked one before. Keep the shells off that hull and let your Heavy Commandos punch it down. Don't let it reach the trucks."
 </when>
 
 <when team 1 units "Annihilator Tank" >= 2>
@@ -55,18 +55,18 @@ add unit: 1,"Scorpion Tank",5,2
 </turn>
 
 <when team 1 units "Rocket Truck" == 0>
-talk Vance: "His battery is silenced. The gap is yours to shell now, free and clear. Walk your fire up the road and push the tanks through."
+talk Vance: "His battery is silenced. Your guns can work that gap unanswered now. Hold the line and keep breaking his armor as it rolls in."
 </when>
 
 <when team 0 units "Mortar Truck","Rocket Truck" == 0>
-talk Vance: "Both guns gone. The thunder's spent, Reyes. We crack this pass on armor and nerve now, or not at all."
+talk Vance: "The guns are gone, Reyes. Without them we can't hold this gap. It's down to armor and nerve now."
 </when>
 
 <win>
-talk Vance: "The pass is broken, and his capital with it. High ground, then his guns, then the gap, in that order.", "He never got to roll that column. That is how you take a fortified line, Reyes."
+talk Vance: "You held the gap and broke his column wave after wave, then rolled up the pass and finished him on the ground he chose.", "That's how you beat a bigger army, Reyes. Let it shatter on your guns first, then take what's left."
 </win>
 
 <lose>
-talk Kael: "Up the road and into my guns, exactly as I told you. A pity."
-talk Vance: "We charged before we owned the high ground, or we lost the guns too early. Take the hills, kill his battery, then break the pass. Again."
+talk Kael: "My column rolled right over your little firebase, exactly as I promised."
+talk Vance: "The line broke. We let his armor close on the guns, or we ran the wells dry and couldn't keep firing. Hold the high ground, break them in the gap, and never let them reach the trucks. Again."
 </lose>

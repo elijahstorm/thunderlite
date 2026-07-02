@@ -12,6 +12,8 @@
 	import { onMatchEnd } from './matchEnd'
 	import { createCampaignRunner } from '$lib/Campaign/campaignRunner'
 	import { createCampaignInterface } from '$lib/Campaign/campaignInterface'
+	import { upcomingSpawns } from '$lib/Campaign/spawnTelegraph'
+	import { repaintSignal } from '$lib/Engine/Animator/animator'
 	import { scriptReferencedTypeIndices } from '$lib/Campaign/cutsceneScript'
 	import { beginScriptBlock, endScriptBlock, resetScriptGate } from '$lib/Campaign/scriptGate'
 	import Dialogue from '$lib/Campaign/Dialogue.svelte'
@@ -131,6 +133,19 @@
 			const key = `${round}:${team}`
 			if (key !== lastKey) {
 				lastKey = key
+				// Telegraph: look ahead at the script and mark the tiles where each
+				// team's reinforcements will land on their next turn. Purely an
+				// indicator (owner-only marker + CPU planning); the spawns still fire
+				// when their own turn block runs. Recomputed on every side-turn so a
+				// team eliminated mid-match, or a spawn that just landed, drops out.
+				map.scheduledSpawns = upcomingSpawns(
+					campaign,
+					state.players,
+					team,
+					state.turnNumber,
+					map.cols
+				)
+				repaintSignal.update((n) => n + 1)
 				void (async () => {
 					await runGated(campaign.turns[round]?.[team], () => runner.enterTurn(round, team))
 					// After the side-turn block, fire any `<when>` triggers whose condition

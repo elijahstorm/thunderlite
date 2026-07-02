@@ -4,7 +4,7 @@
 	import TileSelector from '$lib/Layers/TileSelector.svelte'
 	import Game from '$lib/Engine/Game.svelte'
 	import Loader from '$lib/Components/Widgets/Helpers/Loader.svelte'
-	import { paint, type VisibilityProvider } from '$lib/Engine/paint'
+	import { paint, flushDeferredOverlays, type VisibilityProvider } from '$lib/Engine/paint'
 	import { canSelectUnit, gameState } from '$lib/Engine/gameState'
 	import { buildingData } from '$lib/GameData/building'
 	import { computeTeamVisibility, computeRadarTiles } from '$lib/Engine/visibility'
@@ -389,6 +389,7 @@
 							contentWidth={cellWidth * map.cols}
 							contentHeight={cellHeight * map.rows}
 							paint={paint(renderData, hudImages, pause, visibilityProvider, localTeam, editor)(() => map)}
+							afterPaint={flushDeferredOverlays}
 							{requestRedraw}
 							{handleClick}
 							{handleHover}

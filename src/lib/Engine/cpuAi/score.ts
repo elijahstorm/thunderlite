@@ -387,6 +387,29 @@ const scoreFactoryBlock = (
 	return FACTORY_BLOCK_BONUS / Math.max(1, factoryCount(map, building.team))
 }
 
+// One of the CPU's own scripted reinforcements is telegraphed onto this tile next
+// turn (map.scheduledSpawns; see Campaign/spawnTelegraph.ts). A drop blocked by the
+// CPU's own unit is forfeited (campaignInterface.spawn), so ending here costs the
+// value of the incoming unit — the AI drifts off to let the reinforcement land.
+// It's only a *penalty*, not a veto: a strong attack or a factory block this turn
+// can still outweigh it, in which case the CPU holds and sacrifices the drop. That
+// "hold vs. vacate" trade is the whole point. `REINFORCEMENT_WEIGHT` tunes how
+// hard the CPU protects the landing zone.
+const REINFORCEMENT_WEIGHT = 0.5
+const scoreReinforcementTile = (map: MapObject, tile: number, cpuTeam: number): number => {
+	const scheduled = map.scheduledSpawns
+	if (!scheduled || scheduled.length === 0) return 0
+	let penalty = 0
+	for (const s of scheduled) {
+		if (s.tile !== tile || s.team !== cpuTeam) continue
+		// A fresh reinforcement lands at full HP, so its value is just its cost
+		// (mirrors unitValue for a full-health unit); fall back like unitValue does.
+		const cost = unitData[s.unitType]?.cost ?? 0
+		penalty += (cost > 0 ? cost : 50) * REINFORCEMENT_WEIGHT
+	}
+	return penalty
+}
+
 // `concealed` (enemies the CPU can't perceive) is threaded into the threat and
 // closest-enemy terms so the AI scores positions blind to fogged/stealthed foes.
 // `lurking` is the count of enemy stealth units the CPU *remembers but can't see*
@@ -437,7 +460,12 @@ export const scorePositionBonus = (
 	// Choke enemy production by ending on (and thus occupying) their factory — only
 	// counted when the blocker can't be killed off it next turn (see scoreFactoryBlock).
 	const block = scoreFactoryBlock(map, tile, unit, cpuTeam, concealed)
-	return cover - threat + advance + defense + stealth - caution + hunt - phantom + explore + block
+	// Vacate a tile our own reinforcement is about to land on (a blocked drop is lost),
+	// unless the positive terms above make holding worth the sacrifice.
+	const reinforcement = scoreReinforcementTile(map, tile, cpuTeam)
+	return (
+		cover - threat + advance + defense + stealth - caution + hunt - phantom + explore + block - reinforcement
+	)
 }
 
 // The Warmachine is the player's life (Death.Insta_Lose) *and* their economy. The

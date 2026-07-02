@@ -34,5 +34,5 @@
 	<TurnPill />
 	<PlayerList />
 	<EndTurnButton {onEndTurn} {localTeam} {cpuOpponent} />
-	<TileInfoPanel {map} />
+	<TileInfoPanel {map} {localTeam} />
 </div>

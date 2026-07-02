@@ -23,6 +23,7 @@ import { beginMaterialize } from '$lib/Engine/materialize'
 import { beginScriptedMutation, endScriptedMutation } from './scriptGate'
 import { fogOfWarEnabled } from '$lib/Engine/fogState'
 import { runModifiers } from '$lib/Engine/modifiers'
+import { validTerrain } from '$lib/Engine/Interactor/Pathing/movement'
 import { applyWinConditions } from '$lib/Engine/winConditions'
 import { showDialogue, resetDialogueSkip } from './dialogueStore'
 import { setSpeakerColorOverride, resetSpeakerColors } from './speakerColors'
@@ -117,12 +118,29 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 			const type = unitTypeByName(unit)
 			if (type < 0) return
 			const tile = tileFor(map, x, y)
-			map.layers.units[tile] = {
+			const incoming: UnitObject = {
 				type,
 				state: 0,
 				team,
 				health: unitData[type].health,
 			}
+			// The arriving unit has to be able to stand here. Terrain it can't survive
+			// on (a land unit dropped onto sea) forfeits the reinforcement outright —
+			// the telegraph still warns of it, but nothing lands. This never strands a
+			// unit in an illegal tile the way the old unconditional placement could.
+			const ground = map.layers.ground[tile]
+			if (!ground || !validTerrain(ground, incoming)) return
+			const occupant = map.layers.units[tile]
+			if (occupant) {
+				// The owner's own unit still parked here blocks the drop and forfeits it
+				// (they had a turn's warning to clear the tile). An enemy sitting on it
+				// gets no such warning — the arrival ambushes it: run the engine death
+				// path first, then land on the freed tile.
+				if (occupant.team === team) return
+				map.layers.units[tile] = null
+				runModifiers(occupant, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+			}
+			map.layers.units[tile] = incoming
 			// Pixel warp-in so the unit assembles onto the board instead of popping
 			// into being between frames. The unit is placed now (so sight and win
 			// conditions are correct) but stays hidden under the assemble; hold the
@@ -167,7 +185,18 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 			beginScriptedMutation()
 			beginMaterialize(tile, 'terrain', {
 				onReveal: () => {
-					map.layers.ground[tile] = { type, state: 0 }
+					const ground: GroundObject = { type, state: 0 }
+					map.layers.ground[tile] = ground
+					// Natural-disaster rule: a unit the reshaped tile can no longer hold (a
+					// tank left standing where new sea appears) is drowned/crushed on the
+					// spot, no warning. Reuse the engine death path so Death modifiers and
+					// win conditions fire exactly as a combat kill would.
+					const occupant = map.layers.units[tile]
+					if (occupant && !validTerrain(ground, occupant)) {
+						map.layers.units[tile] = null
+						runModifiers(occupant, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+						applyWinConditions(map)
+					}
 					repaintSignal.update((n) => n + 1)
 				},
 				onDone: endScriptedMutation,

@@ -77,14 +77,6 @@ const carryHPRatio = (carrier: UnitObject, passengerMaxHP: number, passengerHP: 
 	return Math.max(1, Math.round(carrierMax * ratio))
 }
 
-const restoreHPRatio = (passenger: UnitObject, carrier: UnitObject): number => {
-	const passengerMax = unitData[passenger.type].health
-	const carrierMax = unitData[carrier.type].health
-	const carrierHP = carrier.health ?? carrierMax
-	const ratio = carrierHP / carrierMax
-	return Math.max(1, Math.round(passengerMax * ratio))
-}
-
 export const transportLoad = (
 	map: MapObject | MapProcesser,
 	commandoTile: number,
@@ -238,7 +230,9 @@ export const landUnload = (
 	const valid = landTiles(map, transportTile)
 	if (!valid.includes(destination)) return { ok: false, reason: 'invalid-destination' }
 
-	rescued.health = restoreHPRatio(rescued, transport)
+	// The passenger is stored intact on load, so its `health` still holds the exact
+	// hurt amount it embarked with. Restore that verbatim rather than recomputing from
+	// the carrier's scaled HP, which would drift the ratio through double rounding.
 	transport.rescuedUnit = null
 	map.layers.units[transportTile] = null
 	map.layers.units[destination] = rescued

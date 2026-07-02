@@ -49,14 +49,11 @@
 	// shared store in step with this board's viewer.
 	$: viewerTeam.set(localTeam)
 
-	// Each turn handoff reshuffles enemy positions, so the captured set of shown
-	// units would be stale. Clear it so the player re-assesses from a clean slate
-	// (one keypress / toggle brings the whole danger map back).
-	let lastTurn = -1
-	$: if ($gameState.turnNumber !== lastTurn) {
-		lastTurn = $gameState.turnNumber
-		clearThreatOverlay()
-	}
+	// The threat overlay is keyed by unit object reference (see threatOverlay.ts):
+	// it follows each enemy as it moves and self-heals when a unit dies or slips
+	// into fog, so it stays accurate across turn handoffs without being cleared.
+	// Wiping it on every turn change would drop the player's intentional selection
+	// right when they want to re-assess the danger map at the start of their turn.
 
 	// `t` toggles the whole enemy-range overlay on/off. Ignored while typing in a
 	// field so it never fights chat / name inputs elsewhere on the page.

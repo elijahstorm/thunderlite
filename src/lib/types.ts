@@ -83,6 +83,23 @@ type Route = {
 	rotate: number
 	index: number
 }
+/**
+ * A predicted upcoming reinforcement, derived by looking ahead at the owning
+ * team's next scripted turn block (see Campaign/spawnTelegraph.ts). Purely an
+ * indicator — the real spawn still fires when that block runs — so it changes no
+ * script timing. Rendered as a ghost-sprite marker only to the owning viewer,
+ * and read by the CPU so it can weigh vacating the reserved tile.
+ */
+type SpawnTelegraph = {
+	/** Tile index (y * cols + x) the reinforcement is scripted to arrive on. */
+	tile: number
+	/** The team the reinforcement belongs to (only its owner sees the marker). */
+	team: number
+	/** `unitData` index of the incoming unit — drives the ghost sprite. */
+	unitType: number
+	/** The incoming unit's display name — shown in the tile tooltip. */
+	unitName: string
+}
 
 type MapLayers = {
 	ground: GroundObject[]
@@ -136,6 +153,11 @@ type MapObject = MapSettings & {
 	 * is the ring of any enemy jammer the viewer can currently see. Recomputed in
 	 * `MapRender`; see `computeRadarTiles` in `visibility.ts`. */
 	radarTiles?: { own: Set<number>; enemy: Set<number> }
+	/** Reinforcements predicted to land on their owning team's next turn, computed
+	 * each turn transition by looking ahead at the campaign script. Only set on
+	 * scripted campaign levels; each entry is drawn (ghost marker) solely to the
+	 * team that owns it and is read by the CPU scorer. See `spawnTelegraph.ts`. */
+	scheduledSpawns?: SpawnTelegraph[]
 	/** Dev-only inspection overlay data (drawn only when the dev HUD is toggled on).
 	 * `debugHeat` tints tiles amber by an arbitrary 0..1 value (e.g. the CPU's stealth
 	 * suspicion / fog belief); `debugFocus` rings a single highlighted tile;

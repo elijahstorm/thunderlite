@@ -87,6 +87,12 @@
 			context.restore()
 		}
 
+	// Optional pass run once per repaint, after every tile is painted. Lets a
+	// painter draw overlays that must sit on top of the finished grid (e.g. a
+	// unit outline that bleeds into neighbouring tiles which would otherwise
+	// paint over it).
+	export let afterPaint: ((context: CanvasRenderingContext2D) => void) | undefined = undefined
+
 	// Half of the leftover space on each axis when the content is smaller than the
 	// viewport. Larger-than-viewport content yields 0, so panning is unaffected.
 	const centerOffset = (zoom: number): [number, number] => {
@@ -129,6 +135,7 @@
 			context.clearRect(0, 0, content.width, content.height)
 			const [cx, cy] = centerOffset(zoom)
 			drawTiles(left - cx, top - cy, zoom)
+			afterPaint?.(context)
 		}
 		scroller = MakeScroller(renderCentered, {
 			bouncing: false,

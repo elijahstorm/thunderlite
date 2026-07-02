@@ -18,6 +18,19 @@ type ActiveObject = { state: number; type: number; team?: number }
 
 const spriteSize = 60
 
+// Draws that must land on top of the *finished* grid rather than just their own
+// tile. The threat-source outline ring hugs the unit and so bleeds a few pixels
+// past the tile edge; because tiles paint left→right / top→bottom, the right and
+// bottom neighbours would paint their ground straight over that overhang and clip
+// the ring. So the ring is queued here during the tile pass and stamped by
+// `flushDeferredOverlays` once every tile is down. Each queued closure carries its
+// own tile translate and canvas, so a board flushes only what it queued.
+const deferredOverlays: Array<() => void> = []
+export const flushDeferredOverlays = (): void => {
+	for (const draw of deferredOverlays) draw()
+	deferredOverlays.length = 0
+}
+
 export type VisibilityProvider = () => {
 	visible: Set<number>
 	team: number
@@ -145,8 +158,19 @@ export const paint =
 			(map.threatUnitTiles?.has(tile) ?? false) && !hideIdleUnit && unitAlpha > 0.01
 		const threatSpriteFrame = unitAnimates ? (paused ? 0 : get(animationFrame)) : 0
 		if (isThreatSource && unitAtTile) {
-			// Red outline ring, drawn under the sprite so only the offset ring shows.
-			render.threatOutline(unitAtTile, renderData.unit, threatSpriteFrame, true)
+			// The outline ring bleeds past this tile's right/bottom edge, so drawing it
+			// now would let the following tiles paint over it. Defer it to the post-grid
+			// pass, captured with this tile's translate, and draw it as a ring on top of
+			// the finished sprite (see unitThreatOutline). `threatSpriteFrame` is captured
+			// so the ring stays pixel-locked to the frame the sprite was drawn at.
+			const outlineUnit = unitAtTile
+			const outlineFrame = threatSpriteFrame
+			deferredOverlays.push(() => {
+				context.save()
+				context.translate(left, top)
+				render.threatOutline(outlineUnit, renderData.unit, outlineFrame, true)
+				context.restore()
+			})
 		}
 		if (!hideIdleUnit && unitAlpha > 0.01) {
 			const drawUnit = unitAnimates ? render.conditionally : render.conditionallyStatic
@@ -230,6 +254,18 @@ export const paint =
 			}
 		}
 
+		// Reinforcement telegraph: a ghost of the unit the script will drop here on
+		// the owning team's next turn. Shown only to that team (their own intel, so
+		// it draws after the fog veil and stays visible even through fog); the real
+		// spawn still fires from the script. Never drawn for a spectator (localTeam
+		// < 0) — it's private planning info, not a public marker.
+		if (localTeam >= 0) {
+			const telegraph = map.scheduledSpawns?.find(
+				(s) => s.tile === tile && s.team === localTeam
+			)
+			if (telegraph) render.spawnGhost(telegraph.unitType, telegraph.team, renderData.unit)
+		}
+
 		// Selection idle-marker for actionable units AND actable buildings (e.g. a
 		// Warfactory that can still produce). Only shown when the local viewer is
 		// also the team currently in control — i.e. it tracks who has the mouse, not
@@ -301,6 +337,7 @@ const contextProvider = (
 	// Frame-0 variant for units that must not idle-animate (spent or non-active team).
 	conditionallyStatic: conditionally(width, height, 0, scale)(context),
 	carryBadge: carryBadge(width, height)(context),
+	spawnGhost: spawnGhost(width, height, frame, scale)(context),
 	highlights: highlights(width, height, frame)(context),
 	threat: threatHighlight(width, height, frame)(context),
 	threatOutline: unitThreatOutline(width, height, frame, scale)(context),
@@ -328,6 +365,8 @@ const contextProvider = (
 // the source and its reach read as one thing.
 const SILHOUETTE_PAD = 4
 let silhouetteScratch: HTMLCanvasElement | null = null
+let ringScratch: HTMLCanvasElement | null = null
+let ghostRingScratch: HTMLCanvasElement | null = null
 
 // Recolour a unit sprite frame to a flat colour on a padded scratch canvas, using
 // the exact source/destination math as `renderObject` so the silhouette lands
@@ -379,8 +418,13 @@ const tintedUnitSilhouette = (
 	return c
 }
 
-// Crisp red outline ring around the unit's silhouette. Drawn BEFORE the real
-// sprite so the sprite covers the centre, leaving only the offset ring showing.
+// Crisp red outline ring hugging the unit's silhouette. Because this is deferred
+// to the post-grid pass (so the ring isn't clipped by neighbouring tiles, see
+// `deferredOverlays`), it's drawn ON TOP of the finished sprite rather than under
+// it — so instead of stamping filled silhouettes and letting the sprite mask the
+// centre, we build a proper ring: dilate the silhouette in 8 directions, then
+// punch the original silhouette back out. That leaves only the outer band, which
+// lands on the sprite's edge without painting over its body.
 // `spriteFrame` must match the frame the sprite itself is drawn at (0 for units
 // that don't idle-animate) or the outline drifts off an animating sprite.
 const unitThreatOutline =
@@ -404,7 +448,6 @@ const unitThreatOutline =
 			'rgb(239, 68, 68)'
 		)
 		if (!sil) return
-		const pulse = (Math.sin(animFrame * 0.35) + 1) / 2
 		const t = Math.max(1.5, width / 22) // outline thickness in canvas px
 		const offsets: Array<[number, number]> = [
 			[-t, 0],
@@ -416,11 +459,31 @@ const unitThreatOutline =
 			[-t, t],
 			[t, t],
 		]
+		// Build the ring on a scratch the same size as the silhouette. The silhouette's
+		// SILHOUETTE_PAD margin absorbs the offsets, so the dilated shape never clips at
+		// the scratch edge.
+		if (!ringScratch) {
+			ringScratch = context.canvas.ownerDocument.createElement('canvas')
+		}
+		const r = ringScratch
+		if (r.width !== sil.width) r.width = sil.width
+		if (r.height !== sil.height) r.height = sil.height
+		const rctx = r.getContext('2d')
+		if (!rctx) return
+		rctx.clearRect(0, 0, r.width, r.height)
+		rctx.globalCompositeOperation = 'source-over'
+		for (const [dx, dy] of offsets) {
+			rctx.drawImage(sil, dx, dy)
+		}
+		// Subtract the un-offset silhouette to leave only the outer ring.
+		rctx.globalCompositeOperation = 'destination-out'
+		rctx.drawImage(sil, 0, 0)
+		rctx.globalCompositeOperation = 'source-over'
+
+		const pulse = (Math.sin(animFrame * 0.35) + 1) / 2
 		context.save()
 		context.globalAlpha = 0.85 + pulse * 0.15
-		for (const [dx, dy] of offsets) {
-			context.drawImage(sil, -SILHOUETTE_PAD + dx, -SILHOUETTE_PAD + dy)
-		}
+		context.drawImage(r, -SILHOUETTE_PAD, -SILHOUETTE_PAD)
 		context.restore()
 	}
 
@@ -782,6 +845,86 @@ const carryBadge =
 			badgeW,
 			badgeH
 		)
+		context.restore()
+	}
+
+// Reinforcement telegraph: a translucent "ghost" of the unit a script will drop
+// on this tile on the owning team's next turn, ringed in a bright cyan outline
+// so it reads as an *incoming arrival* — deliberately unlike the solid dark
+// plate of a carried-passenger badge and unlike a real unit standing here. The
+// body pulses in alpha and the ring breathes with the shared frame counter. Only
+// ever drawn to the team that owns the spawn (see the paint loop), so it doubles
+// as private intel: keep the tile clear or the drop is forfeited.
+const SPAWN_GHOST_COLOR = 'rgb(56, 189, 248)' // sky-400
+const spawnGhost =
+	(width: number, height: number, frame: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(type: number, team: number, renderer: (type: number) => ObjectSpriteRenderer | null) => {
+		const render = renderer(type)
+		const sprite = render?.sprite?.[team ?? 0]
+		if (!sprite) return
+		const pulse = (Math.sin(frame * 0.3) + 1) / 2
+
+		// Faint unit body (frame 0, team palette) so the owner recognises what's
+		// coming, kept translucent enough that it never reads as a present unit.
+		context.save()
+		context.globalAlpha = 0.28 + pulse * 0.16
+		context.drawImage(
+			sprite,
+			0,
+			0,
+			spriteSize + render!.xOffset,
+			spriteSize + render!.yOffset,
+			-(render!.xOffset / scale),
+			-(render!.yOffset / scale),
+			width + render!.xOffset / scale,
+			height + render!.yOffset / scale
+		)
+		context.restore()
+
+		// Bright outline hugging the unit's silhouette. Built exactly like the threat
+		// ring (unitThreatOutline): dilate a flat-colour silhouette in 8 directions,
+		// then punch the original back out to leave only the outer band.
+		const sil = tintedUnitSilhouette(
+			context,
+			{ type, team, state: 0 },
+			renderer,
+			0,
+			scale,
+			width,
+			height,
+			SPAWN_GHOST_COLOR
+		)
+		if (!sil) return
+		const t = Math.max(1.5, width / 20)
+		const offsets: Array<[number, number]> = [
+			[-t, 0],
+			[t, 0],
+			[0, -t],
+			[0, t],
+			[-t, -t],
+			[t, -t],
+			[-t, t],
+			[t, t],
+		]
+		if (!ghostRingScratch) {
+			ghostRingScratch = context.canvas.ownerDocument.createElement('canvas')
+		}
+		const r = ghostRingScratch
+		if (r.width !== sil.width) r.width = sil.width
+		if (r.height !== sil.height) r.height = sil.height
+		const rctx = r.getContext('2d')
+		if (!rctx) return
+		rctx.clearRect(0, 0, r.width, r.height)
+		rctx.globalCompositeOperation = 'source-over'
+		for (const [dx, dy] of offsets) rctx.drawImage(sil, dx, dy)
+		rctx.globalCompositeOperation = 'destination-out'
+		rctx.drawImage(sil, 0, 0)
+		rctx.globalCompositeOperation = 'source-over'
+
+		context.save()
+		context.globalAlpha = 0.7 + pulse * 0.3
+		context.drawImage(r, -SILHOUETTE_PAD, -SILHOUETTE_PAD)
 		context.restore()
 	}
 

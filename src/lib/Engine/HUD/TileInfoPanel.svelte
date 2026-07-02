@@ -7,6 +7,8 @@
 	import ModifierBadges from './ModifierBadges.svelte'
 
 	export let map: MapObject | undefined = undefined
+	/** The viewing team — a reinforcement telegraph is only ever shown to its owner. */
+	export let localTeam: number = 0
 
 	$: tile = $focusedTile
 	$: pinned = $selectedTile !== null
@@ -18,6 +20,11 @@
 	$: unitInfo = unit ? unitData[unit.type] : null
 	$: unitHpMax = unitInfo?.health ?? 0
 	$: unitHp = unit?.health ?? unitHpMax
+	// Only the owning team sees its own scripted reinforcement (matches the ghost marker).
+	$: telegraph =
+		map && tile != null && localTeam >= 0
+			? (map.scheduledSpawns?.find((s) => s.tile === tile && s.team === localTeam) ?? null)
+			: null
 </script>
 
 <div
@@ -69,7 +76,15 @@
 			</div>
 		{/if}
 
-		{#if !building && !unit}
+		{#if telegraph}
+			<div class="mb-1 border-t border-white/20 pt-2" data-testid="tile-info-reinforcement">
+				<div class="font-bold text-sky-300">Reinforcement inbound</div>
+				<div class="opacity-80">{telegraph.unitName} arrives next turn</div>
+				<div class="opacity-60 text-[11px]">Keep this tile clear or the drop is forfeited.</div>
+			</div>
+		{/if}
+
+		{#if !building && !unit && !telegraph}
 			<div class="opacity-60 text-[11px]">Empty tile</div>
 		{/if}
 	{/if}
