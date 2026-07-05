@@ -30,9 +30,11 @@
 	<meta property="twitter:image" content={IMG_URL} />
 	<meta property="twitter:card" content="summary_large_image" />
 
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-	<link href={googleFonts} rel="stylesheet" />
+	{#if googleFonts}
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+		<link href={googleFonts} rel="stylesheet" />
+	{/if}
 </svelte:head>
 
 <slot></slot>

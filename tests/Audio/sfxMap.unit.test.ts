@@ -147,7 +147,7 @@ const recorder = () => {
 		stopEnv: () => {
 			stopped++
 		},
-		setEnvVolume: (v: number) => volumes.push(v),
+		setEnvDuck: (v: number) => volumes.push(v),
 	}
 }
 

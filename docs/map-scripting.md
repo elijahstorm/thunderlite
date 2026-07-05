@@ -80,12 +80,15 @@ of the player's second turn, and so on.
 A `<when>` block fires **once**, the first time its condition becomes true
 (checked at the start of each side-turn). Use it to react to the state of the
 battle rather than the clock — for example, springing a second phase once the
-enemy's first wave is destroyed, or ending the match the moment the player loses
-a key unit. The condition counts units:
+enemy's first wave is destroyed, ending the match the moment the player loses
+a key unit, or acknowledging a capture the moment a team takes a building. The
+condition counts a team's units or its owned buildings:
 
 ```
-team <N> units <op> <K>                      whole-team count
-team <N> units "Name"[,"Name"…] <op> <K>     count of just those unit types
+team <N> units <op> <K>                          whole-team unit count
+team <N> units "Name"[,"Name"…] <op> <K>         count of just those unit types
+team <N> buildings <op> <K>                      count of owned buildings
+team <N> buildings "Name"[,"Name"…] <op> <K>     count of just those buildings
 ```
 
 `<op>` is one of `< <= == >= >`. Examples:
@@ -100,6 +103,10 @@ team <N> units "Name"[,"Name"…] <op> <K>     count of just those unit types
 <when team 0 units "Strike Commando","Heavy Commando" == 0>
   talk Vance: "Both commandos are gone. We can't take the objective."
   defeat                           # force a loss (see below)
+</when>
+
+<when team 0 buildings "Air Control" >= 1>
+  talk Vance: "The airfield is ours. The factory can build aircraft now."
 </when>
 ```
 
@@ -284,8 +291,15 @@ terrain: "Mountain",3,4
 weather: "Weather Name",x,y
 ```
 
-Sets the weather/sky at `x,y` (e.g. `"Cloud"`, `"Storm"`). Weather affects air
-unit concealment and movement drag.
+Sets the weather/sky at `x,y`. Weather affects air unit concealment, flight
+cost, and end-of-turn damage. Available types:
+
+- `"Cloud"` — hides aircraft, no cost.
+- `"Storm"` — hides aircraft, slows flight, 10 damage/turn to aircraft inside
+  (Storm Riders are immune to both the damage and the slow).
+- `"Turbulence"` — slows flight hard (cost 3), no concealment, no damage.
+- `"Ash Plume"` — volcanic ash: hides aircraft and damages them like a storm.
+- `"Jetstream"` — fast air (cost 0.5): aircraft riding it fly twice as far.
 
 ```
 weather: "Storm",6,2

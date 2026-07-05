@@ -183,6 +183,10 @@ export const highlightActionsList = (map: MapObject, highlights: TileHighlight[]
 	highlights.map((tile) => {
 		map.highlights[tile.tile] = tile
 	})
+	// The AoE blast preview is hover-driven off the current selection; a selection
+	// reset (deselect, or committing the shot) must drop it too, or the last-hovered
+	// footprint lingers painted over the board.
+	map.splashPreview = undefined
 }
 
 // Resolve the actionable entry for a tile. Firing-shadow tiles (ranged units)
@@ -204,7 +208,13 @@ export const generateActionsList = (
 	unit: UnitObject,
 	threat?: ReadonlyMap<number, number>
 ) => {
-	const tiles = generateMovementList(map, tile, unit, concealedEnemyTiles(map, unit.team))
+	// Concealment is a full-board scan, so compute it ONCE and thread it into every
+	// movement/attack query below. A direct unit re-derives its attack list from each
+	// reachable tile; letting each of those recompute concealment turned selection
+	// into O(reachable × map tiles) — the stall behind "clicking a unit lags before
+	// the range paints" on big boards (and the same list is rebuilt on every hover).
+	const concealed = concealedEnemyTiles(map, unit.team)
+	const tiles = generateMovementList(map, tile, unit, concealed)
 
 	if (unitData[unit.type].range[0] !== 1) {
 		// Indirect units can't move-and-fire, so every shot is launched from `tile`.
@@ -213,25 +223,39 @@ export const generateActionsList = (
 		return [
 			...convertToShadow(shadowedAttackTiles(map, tile, unit)),
 			...convertToHighlightable(map, tiles, highlightTypes.move, { threat, origin: tile, unit }),
-			...convertToHighlightable(map, generateAttackList(map, tile, unit), highlightTypes.attack, {
-				unit,
-				attackerTile: tile,
-			}),
+			...convertToHighlightable(
+				map,
+				generateAttackList(map, tile, unit, concealed),
+				highlightTypes.attack,
+				{
+					unit,
+					attackerTile: tile,
+				}
+			),
 		]
 	}
 
 	// Direct units close to point-blank, so each reachable tile is also a firing
 	// position — score each shot from the tile it would actually be launched from.
-	return tiles.reduce(
-		(highlights, from) => [
-			...highlights,
-			...convertToHighlightable(map, generateAttackList(map, from, unit), highlightTypes.attack, {
+	// flatMap (not a spread-in-reduce) keeps this linear rather than rebuilding the
+	// growing accumulator array on every reachable tile.
+	const moveHighlights = convertToHighlightable(map, tiles, highlightTypes.move, {
+		threat,
+		origin: tile,
+		unit,
+	})
+	const attackHighlights = tiles.flatMap((from) =>
+		convertToHighlightable(
+			map,
+			generateAttackList(map, from, unit, concealed),
+			highlightTypes.attack,
+			{
 				unit,
 				attackerTile: from,
-			}),
-		],
-		convertToHighlightable(map, tiles, highlightTypes.move, { threat, origin: tile, unit })
+			}
+		)
 	)
+	return [...moveHighlights, ...attackHighlights]
 }
 
 // Read-only preview of any unit's reach: green where it can move, red across the

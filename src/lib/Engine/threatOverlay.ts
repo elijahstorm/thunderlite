@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store'
 import { unitThreatTiles } from './Interactor/Pathing/threat'
 import { viewerVisibility } from './fogState'
-import { isUnitStealthed } from './visibility'
+import { isUnitStealthed, unitSeenByViewer } from './visibility'
 
 // The local player's team — the vantage point the threat overlay is drawn from.
 // "Enemy" always means "not on this team", regardless of whose turn it currently
@@ -30,7 +30,8 @@ export const visibleEnemyUnits = (map: MapObject): UnitObject[] => {
 	for (let i = 0; i < units.length; i++) {
 		const u = units[i]
 		if (!u || u.team === team) continue
-		if (fog && !fog.visible.has(i)) continue
+		// Per-unit fog check: an air enemy above canopy/ridge fog is still seen.
+		if (!unitSeenByViewer(fog, i, u)) continue
 		// A stealthed/cloaked enemy must never appear in the overlay — showing its reach
 		// would betray that it exists and where it can strike. (Holds with fog off too.)
 		if (isUnitStealthed(map, i, u)) continue
@@ -76,7 +77,7 @@ const liveShownUnits = (map: MapObject, shown: Set<UnitObject>): Array<{ unit: U
 	for (let tile = 0; tile < units.length; tile++) {
 		const unit = units[tile]
 		if (!unit || !shown.has(unit) || unit.team === team) continue
-		if (fog && !fog.visible.has(tile)) continue
+		if (!unitSeenByViewer(fog, tile, unit)) continue
 		// Skip a unit that's slipped into stealth/cloak so a hidden enemy's reach is
 		// never drawn — the overlay self-heals without an explicit clear.
 		if (isUnitStealthed(map, tile, unit)) continue

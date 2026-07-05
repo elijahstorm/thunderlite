@@ -1,27 +1,241 @@
 <start>
-move: 12,1
-talk Kael: "So it comes down to this coast. Fitting enough.", "My Warmachine, my Annihilator, my fleet: everything I have against everything you've become."
-move: 13,10
-talk Kael: "My warships will shell you from the water while my armor presses you flat. I don't see your answer to that."
-move: 2,7
-talk Vance: "There's always an answer, Reyes. Everything we've learned comes together here: matchups, terrain, range, the economy, the air.", "Take his Warmachine or capture his Command Center and Kael falls. Mind his ships, hold your line, and see it through."
-talk Reyes: "This is the last of it, Vance. Let's bring it to an end."
+funds: 0,1200
+color Vance: #38bdf8
+color Reyes: #4ade80
+color Kael: #ef4444
+move: 1,10
+talk Vance: "This is the coast, Reyes. The end of the map and the end of the war. Kael has nowhere left to run, so he stopped running and dug in.", "Everything you have learned since that first ridge, you use here. All of it."
+move: 4,1
+hl: 4,1
+hl: 17,1
+hl: 18,13
+talk Vance: "Look at what he built. Not one Warmachine. Three.", "One in the crags to the north-west. One walled up to the north-east. And one out on that island in the bay."
+move: 17,1
+talk Kael: "Three engines, Reyes. Three fortresses. While you break one, the other two pour out steel. I do not run out. I never run out."
+move: 18,13
+talk Vance: "He is not wrong about the arithmetic. Kill all three and he is finished, but he holds no command post now. Those machines are the last of him. Leave even one standing and he rebuilds.", "So we do not trade blows. We take them apart, one fortress at a time, and we do not stop."
+move: 4,3
+talk Vance: "The two land keeps are mountain-ringed, one gate each, just like his old stronghold. Armor goes through the gate or not at all. Boots go over the crags. Guns work them from the ridges."
+move: 18,14
+talk Vance: "The island is another matter. No road reaches it. You take it from the sea, from the air, or you send that Tidewalker wading across the shallows. Your shipyard can put a real navy in the water if you feed it."
+unhl: 4,1
+unhl: 17,1
+unhl: 18,13
+move: 20,16
+talk Kael: "My fleet owns that bay. My Cruiser will shell your beach flat before a single boot touches the sand. Come and drown."
+move: 11,0
+talk Vance: "Mind the sky, too. The jetstream over the north field will fling an aircraft clear across the map. The storm on the coast hides his planes and burns yours. His Petrels ride it untouched, so a Kestrel Sentry to drag them out is worth its weight."
+move: 8,8
+talk Vance: "And the towns in the middle are the whole war, Reyes. Take them, hold them, and their coin builds the army that cracks three fortresses at once. Lose that race and his machines outbuild you."
+move: 2,10
+talk Reyes: "Three engines, one at a time, and never stop. I've got it, Vance.", "This is the last hill, Kael. We're taking it."
 </start>
 
 <turn 1,1>
 wait: 1
-move: 10,3
-talk Kael: "Is that all you have? My steel doesn't run out."
-add unit: 1,"Scorpion Tank",10,3
-talk Vance: "Don't let the ships pin you to the shore. Press the Warmachine. Break it and this is over."
+move: 14,12
+talk Kael: "Off the shore. Sink anything that floats toward my island."
+add unit: 1,"Corvette",14,13
+talk Vance: "His fleet is already contesting the coast road. Do not feed the bay piecemeal. Mass your answer, or that Cruiser picks it apart one hull at a time."
 </turn>
 
+<turn 2,0>
+wait: 0.5
+move: 8,7
+talk Vance: "The passes through that spine are the fast lanes between the two land fronts. Whoever holds them fights on two fronts at once. Take them early, Reyes."
+move: 6,4
+talk Vance: "And watch the jetstream. Those readings are unstable, Reyes. That whole highway is going to tear loose and reform somewhere else within a turn. Do not commit a flight to a lane that is about to move out from under it."
+</turn>
+
+<turn 3,0>
+wait: 0.5
+move: 16,9
+talk Vance: "There it goes. The stream ripped free of the north field and reformed to the east, running straight down toward the bay. New highway, new plan."
+clear weather: 2,1
+clear weather: 3,1
+clear weather: 4,1
+clear weather: 5,1
+clear weather: 6,1
+clear weather: 7,1
+clear weather: 8,1
+clear weather: 9,1
+clear weather: 9,2
+clear weather: 9,3
+clear weather: 9,4
+clear weather: 9,5
+clear weather: 9,6
+clear weather: 9,7
+clear weather: 9,8
+clear weather: 10,8
+clear weather: 11,8
+clear weather: 12,8
+weather: "Jetstream",13,7
+weather: "Jetstream",14,7
+weather: "Jetstream",14,8
+weather: "Jetstream",14,9
+weather: "Jetstream",14,10
+weather: "Jetstream",15,10
+weather: "Jetstream",16,10
+weather: "Jetstream",17,10
+weather: "Jetstream",18,10
+weather: "Jetstream",18,11
+weather: "Jetstream",19,11
+weather: "Jetstream",20,11
+talk Vance: "It runs right into the bay now. Ride it and your gunships reach that island in a single pass. But do not get comfortable. It will not hold."
+</turn>
+
+<turn 5,0>
+wait: 0.5
+talk Vance: "Storm shear is chewing the jetstream apart, Reyes. It collapses entirely inside a turn, maybe two. Land your fast flights or lose the tailwind out from under them mid-air."
+</turn>
+
+<turn 6,0>
+wait: 0.5
+move: 16,10
+talk Vance: "And it is gone. Dead air across the whole map, no fast lanes for anyone, us or him. Fly the long way for a while."
+clear weather: 13,7
+clear weather: 14,7
+clear weather: 14,8
+clear weather: 14,9
+clear weather: 14,10
+clear weather: 15,10
+clear weather: 16,10
+clear weather: 17,10
+clear weather: 18,10
+clear weather: 18,11
+clear weather: 19,11
+clear weather: 20,11
+</turn>
+
+<turn 7,0>
+wait: 0.5
+talk Vance: "Pressure is building back up top. The stream snaps back within the turn, on a fresh line down the west field. Be ready to ride it the moment it does."
+</turn>
+
+<turn 8,0>
+wait: 0.5
+move: 6,9
+talk Vance: "There it is, back and cutting a new highway straight down the west field. It is yours to use, Reyes. Move fast while it lasts."
+weather: "Jetstream",2,7
+weather: "Jetstream",3,7
+weather: "Jetstream",4,7
+weather: "Jetstream",5,7
+weather: "Jetstream",6,7
+weather: "Jetstream",7,7
+weather: "Jetstream",8,7
+weather: "Jetstream",9,7
+weather: "Jetstream",9,8
+weather: "Jetstream",9,9
+weather: "Jetstream",9,10
+weather: "Jetstream",9,11
+</turn>
+
+<turn 3,1>
+wait: 1
+move: 10,0
+talk Kael: "Wings up. Ride the stream and the storm and hunt them in the weather."
+add unit: 1,"Raptor Fighter",10,0
+add unit: 1,"Petrel Stormrider",20,13
+weather: "Storm",16,13
+weather: "Storm",15,15
+weather: "Storm",14,16
+weather: "Storm",16,16
+weather: "Storm",21,17
+weather: "Storm",22,17
+talk Vance: "The storm is spreading off the coast and his air is up inside it. Flak and fighters over your fleet, or he strafes your decks blind."
+</turn>
+
+<turn 4,1>
+wait: 1
+move: 4,4
+talk Kael: "Both gates, sortie out. Break their siege lines before they set."
+add unit: 1,"Scorpion Tank",4,5
+add unit: 1,"Scorpion Tank",17,5
+talk Vance: "He is sallying from both land keeps at once. Meet them in the open and make him spend the steel out here, where it is not behind a wall."
+</turn>
+
+<turn 4,0>
+wait: 0.5
+move: 12,3
+talk Vance: "The ash and the storm have closed right over the field, Reyes. We are fighting half-blind from here on. Keep an Outrider or a Kestrel out ahead of your line, or you will roll your armor straight into a gun you never saw coming."
+fog: on
+</turn>
+
+<turn 6,1>
+wait: 1
+move: 14,0
+talk Kael: "More. Always more. The mountain feeds me."
+add unit: 1,"Lance Tank",14,4
+add unit: 1,"Raptor Fighter",14,0
+hurt unit: 14,4,45
+</turn>
+
+<turn 8,1>
+wait: 1
+move: 16,15
+talk Kael: "The bay is a graveyard and I am still building. How long can you keep this up, Reyes?"
+add unit: 1,"Corvette",19,18
+add unit: 1,"Hunter Support",18,17
+</turn>
+
+<when team 1 units "Warmachine" == 2>
+move: 12,1
+talk Kael: "One engine. You cracked ONE, and it cost you half your army. I have two more and a mountain that does not run dry."
+weather: "Ash Plume",10,3
+weather: "Ash Plume",11,4
+weather: "Ash Plume",13,4
+weather: "Ash Plume",14,4
+weather: "Ash Plume",11,5
+weather: "Ash Plume",12,5
+weather: "Ash Plume",13,5
+weather: "Ash Plume",12,6
+weather: "Ash Plume",13,6
+talk Vance: "The volcano's venting hard now, the ash rolling further south with every hour, right down into the field where your armor fights. One fortress down, Reyes. Two to go. Do not let up. His live keeps are already pouring out replacements."
+add unit: 1,"Scorpion Tank",7,4
+add unit: 1,"Annihilator Tank",15,5
+</when>
+
+<when team 1 units "Warmachine" == 1>
+move: 18,13
+talk Kael: "My last engine. Then take it, if you can reach it. Everything I have left, into the water. Drown them ALL."
+weather: "Storm",17,15
+weather: "Storm",18,15
+weather: "Storm",19,15
+weather: "Storm",15,17
+weather: "Storm",20,18
+weather: "Storm",16,18
+add unit: 1,"Battle Cruiser",22,18
+add unit: 1,"Corvette",18,18
+add unit: 1,"Petrel Stormrider",19,17
+talk Vance: "He is throwing the whole fleet across that last machine and the storm has swallowed the bay. This is it, Reyes. One engine between you and the end of the war. Land the assault and finish it."
+</when>
+
+<when team 1 units "Battle Cruiser","Corvette","Hunter Support","U-Boat" == 0>
+move: 18,14
+talk Vance: "The bay is yours. Nothing left on the water to stop a landing. Put your assault on that island and take the last engine apart."
+</when>
+
+<when team 0 buildings "City" >= 5>
+talk Vance: "The whole coast is paying us now. That is the race won, Reyes. Coin into steel faster than his mountain can dig. Bury him in it."
+</when>
+
+<when team 1 units "Annihilator Tank" == 0>
+talk Vance: "Both gatekeepers are scrap. The land keeps stand open. Pour through and put your guns on the machines themselves."
+</when>
+
+<when team 0 units "Strike Commando","Heavy Commando" == 0>
+talk Vance: "Every last boot is gone, Reyes. No one left to walk the crags or take a town. You break his engines with fire alone now, or not at all."
+</when>
+
 <win>
-talk Vance: "It's done. Kael's finished, and the war ends with him.", "You walked in a green recruit and you're leaving a commander, Reyes. Well fought, all of it."
-talk Reyes: "We did it together, Vance. All of us."
+move: 18,13
+talk Vance: "Three engines, silent. The mountain still stands but there is nothing left to feed. It is over, Reyes. Kael is finished, and the war ends on this coast."
+talk Kael: "Three fortresses. Three machines. A whole coast of steel. And a green recruit took it all apart, one piece at a time.", "You were the better commander. I will not pretend otherwise at the end."
+talk Reyes: "It was never one of us against you, Kael. It was all of us. That's why we won.", "It's done, Vance. All of it."
+talk Vance: "It's done. Go home, Commander. You earned the quiet."
 </win>
 
 <lose>
-talk Kael: "This was the end you chose. The coast is mine now, and everything past it."
-talk Vance: "Not yet. Not while we can still stand. Up, Reyes. We try again, and we don't let him have it."
+talk Kael: "Three engines, and you could not break the last of them. The mountain outbuilt you, exactly as I said it would."
+talk Vance: "We spread too thin across three fronts and his machines outbuilt us. Take them one at a time, hold the towns for the coin, and own the bay before you land. Again, Reyes. We do not stop here."
 </lose>

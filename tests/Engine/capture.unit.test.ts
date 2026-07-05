@@ -193,11 +193,11 @@ describe('Capture.Allow_* control flag propagation', () => {
 		map.layers.buildings[1] = building(1, AIR_CONTROL_TYPE)
 		initGameStateFromMap(map)
 
-		expect(controlsOf(0)).toEqual({ ground: true, air: false, sea: false })
-		expect(controlsOf(1)).toEqual({ ground: false, air: true, sea: false })
+		expect(controlsOf(0)).toEqual({ ground: 1, air: 0, sea: 0 })
+		expect(controlsOf(1)).toEqual({ ground: 0, air: 1, sea: 0 })
 	})
 
-	it('capturing Ground Control sets the new owner ground=true; old owner loses it if it was their only one', () => {
+	it('capturing Ground Control grants the new owner ground control; old owner loses it if it was their only one', () => {
 		const map = makeMap()
 		map.layers.units[2] = unit(0, STRIKE_COMMANDO_TYPE, STRIKE_MAX_HP / 2)
 		map.layers.buildings[2] = building(1, GROUND_CONTROL_TYPE, 5)
@@ -205,27 +205,28 @@ describe('Capture.Allow_* control flag propagation', () => {
 		map.layers.buildings[3] = building(1, CITY_TYPE)
 		initGameStateFromMap(map)
 
-		expect(controlsOf(1)?.ground).toBe(true)
-		expect(controlsOf(0)?.ground).toBe(false)
+		expect(controlsOf(1)?.ground).toBe(1)
+		expect(controlsOf(0)?.ground).toBe(0)
 
 		runCaptureFor(map, 2)
 		expect(map.layers.buildings[2]!.team).toBe(0)
-		expect(controlsOf(0)?.ground).toBe(true)
-		expect(controlsOf(1)?.ground).toBe(false)
+		expect(controlsOf(0)?.ground).toBe(1)
+		expect(controlsOf(1)?.ground).toBe(0)
 	})
 
-	it('old owner KEEPS ground=true if they had another Ground Control', () => {
+	it('old owner KEEPS ground control if they had another Ground Control', () => {
 		const map = makeMap()
 		map.layers.units[2] = unit(0, STRIKE_COMMANDO_TYPE, STRIKE_MAX_HP / 2)
 		map.layers.buildings[2] = building(1, GROUND_CONTROL_TYPE, 5)
 		// Second Ground Control still owned by team 1.
 		map.layers.buildings[7] = building(1, GROUND_CONTROL_TYPE)
 		initGameStateFromMap(map)
+		expect(controlsOf(1)?.ground).toBe(2)
 
 		runCaptureFor(map, 2)
 		expect(map.layers.buildings[2]!.team).toBe(0)
-		expect(controlsOf(0)?.ground).toBe(true)
-		expect(controlsOf(1)?.ground).toBe(true)
+		expect(controlsOf(0)?.ground).toBe(1)
+		expect(controlsOf(1)?.ground).toBe(1)
 	})
 
 	it('end-of-turn dispatcher fires Start_Turn.Capture for the new active team only', () => {

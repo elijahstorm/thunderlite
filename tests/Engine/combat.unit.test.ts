@@ -5,6 +5,7 @@ import { canAttackTarget } from '../../src/lib/Engine/modifiers/canAttack'
 import { generateAttackList } from '../../src/lib/Engine/Interactor/Pathing/attack'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
+import { skyData } from '../../src/lib/GameData/sky'
 
 const unitIndex = (name: string): number => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -122,6 +123,107 @@ describe('calculateDamage', () => {
 		expect(onMountain).toBe(18)
 	})
 
+	it('lets a siege attacker (Damage.Siege) punch through terrain cover for full damage', () => {
+		const map = makeMap()
+		map.layers.ground[5] = { type: MOUNTAIN, state: 0 }
+
+		const breaker = unit(unitIndex('Breaker'), 0)
+		const defender = unit(STRIKE_COMMANDO, 1)
+
+		const onRoad = calculateDamage(breaker, defender, { map, defenderTile: 0 })
+		const onMountain = calculateDamage(breaker, defender, { map, defenderTile: 5 })
+
+		// Mountain's 0.4 protection normally cuts damage by 40%, but the Breaker's
+		// shells ignore cover entirely: an entrenched defender takes the full hit.
+		expect(onMountain).toBe(onRoad)
+	})
+
+	it('gives an air defender no terrain protection (it flies above the tile)', () => {
+		const map = makeMap()
+		map.layers.ground[5] = { type: MOUNTAIN, state: 0 }
+
+		const flak = unit(unitIndex('Flak Tank'), 0)
+		const raptor = unit(unitIndex('Raptor Fighter'), 1)
+
+		const onRoad = calculateDamage(flak, raptor, { map, defenderTile: 0 })
+		const onMountain = calculateDamage(flak, raptor, { map, defenderTile: 5 })
+
+		// Mountain's 0.4 protection shields ground units, but never an air unit.
+		expect(onMountain).toBe(onRoad)
+	})
+
+	it('shields an air defender by the SKY layer (weather cover), not the ground', () => {
+		const map = makeMap()
+		// Cloud carries protection 0.2; it only shelters what flies IN it.
+		const CLOUD = skyData.findIndex((s) => s.name === 'Cloud')
+		map.layers.sky[5] = { type: CLOUD, state: 0 }
+
+		const flak = unit(unitIndex('Flak Tank'), 0)
+		const raptor = unit(unitIndex('Raptor Fighter'), 1)
+
+		const clear = calculateDamage(flak, raptor, { map, defenderTile: 0 })
+		const inCloud = calculateDamage(flak, raptor, { map, defenderTile: 5 })
+
+		// Cloud's 0.2 protection → 20% less damage to the air unit sheltering in it.
+		expect(inCloud).toBe(Math.round(clear * 0.8))
+		expect(inCloud).toBeLessThan(clear)
+	})
+
+	it('does not let weather cover shield a GROUND unit standing beneath it', () => {
+		const map = makeMap()
+		const CLOUD = skyData.findIndex((s) => s.name === 'Cloud')
+		map.layers.sky[5] = { type: CLOUD, state: 0 }
+
+		const attacker = unit(STRIKE_COMMANDO, 0)
+		const groundDefender = unit(STRIKE_COMMANDO, 1)
+
+		const clear = calculateDamage(attacker, groundDefender, { map, defenderTile: 0 })
+		const underCloud = calculateDamage(attacker, groundDefender, { map, defenderTile: 5 })
+
+		// The cloud is overhead weather; a ground unit reads the terrain layer only.
+		expect(underCloud).toBe(clear)
+	})
+
+	it('gives an air attacker no high-ground bonus (it flies at its own altitude)', () => {
+		const map = makeMap()
+		map.layers.ground[5] = { type: MOUNTAIN, state: 0 }
+
+		// Raptor (air) can strike a ground unit; from a peak a GROUND attacker would
+		// earn the downhill bonus, but an air one flies level regardless of the tile.
+		const raptorFlat = unit(unitIndex('Raptor Fighter'), 0)
+		const raptorPeak = unit(unitIndex('Raptor Fighter'), 0)
+		const target = unit(STRIKE_COMMANDO, 1)
+
+		const fromFlat = calculateDamage(raptorFlat, target, { map, defenderTile: 0, attackerTile: 1 })
+		const fromPeak = calculateDamage(raptorPeak, target, { map, defenderTile: 0, attackerTile: 5 })
+
+		expect(fromPeak).toBe(fromFlat)
+	})
+
+	it('gives no high-ground bonus when the DEFENDER is airborne', () => {
+		const map = makeMap()
+		map.layers.ground[5] = { type: MOUNTAIN, state: 0 }
+
+		const attackerFlat = unit(HEAVY_COMMANDO, 0)
+		const attackerPeak = unit(HEAVY_COMMANDO, 0)
+		const airTarget = unit(unitIndex('Raptor Fighter'), 1)
+
+		// Firing at an aircraft: the shooter's mountain gives no downhill edge, because
+		// the target isn't down the slope — it's up in the air.
+		const fromFlat = calculateDamage(attackerFlat, airTarget, {
+			map,
+			defenderTile: 0,
+			attackerTile: 1,
+		})
+		const fromPeak = calculateDamage(attackerPeak, airTarget, {
+			map,
+			defenderTile: 0,
+			attackerTile: 5,
+		})
+
+		expect(fromPeak).toBe(fromFlat)
+	})
+
 	it('never returns a negative value', () => {
 		const map = makeMap()
 		// Build a zero-power attacker by sending in a Blockade (power 0).
@@ -156,6 +258,7 @@ describe('calculateDamage', () => {
 const SCORPION = unitIndex('Scorpion Tank')
 const FLAK_TANK = unitIndex('Flak Tank')
 const RAPTOR = unitIndex('Raptor Fighter')
+const CONDOR = unitIndex('Condor Bomber')
 const SPIDER = unitIndex('Spider Tank')
 const MORTAR = unitIndex('Mortar Truck')
 const ROCKET = unitIndex('Rocket Truck')
@@ -166,21 +269,32 @@ const STEALTH_TANK = unitIndex('Stealth Tank')
 const JAMMER = unitIndex('Jammer Truck')
 
 describe('damage multipliers (B2)', () => {
-	it('Damage.Flak — Flak Tank deals 2× damage to a light-armor target', () => {
+	it('Damage.Flak — Flak Tank deals 2× damage to an air target', () => {
 		const map = makeMap()
 		const flak = unit(FLAK_TANK, 0)
 		const raptor = unit(RAPTOR, 1)
 
 		// Flak Tank: power 17, weapon=light, target Raptor armor=light → 1.5× matchup.
-		// Flak modifier multiplier: 2 (raptor armor is light).
+		// Flak modifier multiplier: 2 (Raptor is an air unit).
 		// Damage = round(17 * 1.0 * 1.5 * 1.0 * 2) = 51.
 		expect(calculateDamage(flak, raptor, { map, defenderTile: 0 })).toBe(51)
 	})
 
-	it('Damage.Flak — no bonus against a non-light-armor target', () => {
+	it('Damage.Flak — 2× applies to air units regardless of armor type', () => {
 		const map = makeMap()
 		const flak = unit(FLAK_TANK, 0)
-		const scorpion = unit(SCORPION, 1) // armor=medium
+		const condor = unit(CONDOR, 1) // type=air, armor=medium
+
+		// power 17, weapon=light vs armor=medium → no matchup (base 17).
+		// Flak modifier still doubles because the Condor is airborne.
+		// Damage = round(17 * 1.0 * 1.0 * 1.0 * 2) = 34.
+		expect(calculateDamage(flak, condor, { map, defenderTile: 0 })).toBe(34)
+	})
+
+	it('Damage.Flak — no bonus against a ground target', () => {
+		const map = makeMap()
+		const flak = unit(FLAK_TANK, 0)
+		const scorpion = unit(SCORPION, 1) // type=ground, armor=medium
 
 		const noFlak = calculateDamage(flak, scorpion, { map, defenderTile: 0 })
 		// power 17, weapon=light vs armor=medium → no matchup. base = 17.

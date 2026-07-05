@@ -3,7 +3,7 @@
 	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
 	import GameBoard from '$lib/Map/GameBoard.svelte'
 	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
-	import { occlusionMode, indirectShadowsEnabled } from '$lib/Engine/occlusionState'
+	import { occlusionMode } from '$lib/Engine/occlusionState'
 	import type { OcclusionMode } from '$lib/Engine/lineOfSight'
 	import { losScenes } from '$lib/Dev/losScenes'
 	import { dev } from '$app/environment'
@@ -15,7 +15,6 @@
 
 	let sceneIndex = 0
 	let mode: OcclusionMode = 'viewer-relative'
-	let shadows = true
 	let fog = true
 	let team = 0
 
@@ -29,12 +28,11 @@
 
 	// Engine reads these stores live; set them before the board (re)mounts.
 	$: occlusionMode.set(mode)
-	$: indirectShadowsEnabled.set(shadows)
 
 	// MapRender caches fog visibility, so a settings change wouldn't refresh the
 	// board on its own. Fold every setting into a key and rebuild a fresh map +
 	// remount the whole board whenever it changes — a clean recompute each time.
-	$: key = `${scene.id}|${mode}|${shadows}|${fog}|${team}`
+	$: key = `${scene.id}|${mode}|${fog}|${team}`
 	let map: MapObject
 	let lastKey = ''
 	$: if (key !== lastKey) {
@@ -89,10 +87,6 @@
 
 		<section class="flex flex-col gap-2">
 			<h2 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Rules</h2>
-			<label class="flex items-center gap-2 text-sm">
-				<input type="checkbox" bind:checked={shadows} />
-				Indirect-fire shadows (#4)
-			</label>
 			<label class="flex items-center gap-2 text-sm">
 				<input type="checkbox" bind:checked={fog} />
 				Fog of war

@@ -3,7 +3,7 @@ import { terrainData } from '$lib/GameData/terrain'
 import { markTileActed } from '$lib/Engine/gameState'
 import { beginBuildFade } from '$lib/Engine/buildFade'
 import { walletOf } from '$lib/Engine/wallet'
-import { validTerrain } from '$lib/Engine/Interactor/Pathing/movement'
+import { canPlaceUnit } from '$lib/Engine/Interactor/Pathing/movement'
 
 const adjacencyOffsets = (cols: number) => [-cols, -1, 1, cols]
 
@@ -34,10 +34,10 @@ export const passableAdjacentTiles = (map: MapObject | MapProcesser, tile: numbe
 	})
 
 // Adjacent tiles a *specific* unit type could legally be deployed onto: open (no
-// occupant) and terrain the unit can actually exist on (e.g. a ground unit can't
-// be built onto open water, a ship can't be built onto land). This is the gate
-// the directional build picker paints — every highlighted tile is a tile the
-// chosen unit can stand on.
+// occupant) and terrain the unit can actually occupy (e.g. a ground unit can't
+// be built onto open water, a tank can't be built onto a mountain its treads
+// could never climb). This is the gate the directional build picker paints —
+// every highlighted tile is a tile the chosen unit can stand on.
 export const buildableAdjacentTiles = (
 	map: MapObject | MapProcesser,
 	tile: number,
@@ -47,7 +47,7 @@ export const buildableAdjacentTiles = (
 		if (map.layers.units[t] != null) return false
 		const ground = map.layers.ground[t]
 		if (!ground) return false
-		return validTerrain(ground, { type: unitType } as UnitObject)
+		return canPlaceUnit(ground, { type: unitType } as UnitObject, map.layers.sky[t])
 	})
 
 export type BuildAdjacentResult =

@@ -19,12 +19,13 @@ import { concealedEnemyTiles, isUnitStealthed } from '../visibility'
 import { recordStealthPassthrough } from '../cpuAi/stealthMemory'
 import { canSelectUnit, gameState } from '../gameState'
 import { openBuildMenu, closeBuildMenu } from '../HUD/buildMenuStore'
-import { applyAction } from '../applyAction'
+import { applyAction, type CommitOptions } from '../applyAction'
 import { emitOutgoingAction } from '../outgoingActions'
 import { airLift, findFriendlyTransporters, shipOut } from '../modifiers/transport'
 import { buildAdjacent, buildableAdjacentTiles } from '../modifiers/builder'
 import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction } from '$lib/Audio/sfxMap'
+import { playActionSfx } from '$lib/Audio/playActionSfx'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -61,10 +62,12 @@ export const interactor: Interactor = (interaction) =>
 
 const verifyInteraction = (obj: object) => Object.hasOwn(obj, 'tile') && Object.hasOwn(obj, 'map')
 
-const commit = (map: MapObject, action: SerializedAction): void => {
+const commit = (map: MapObject, action: SerializedAction, opts?: CommitOptions): void => {
 	// `live: true` — locally-initiated action, so fire its SFX. Replayed and
-	// relayed actions go through `applyAction` directly and stay silent.
-	applyAction(map, action, { live: true })
+	// relayed actions go through `applyAction` directly and stay silent. Animated
+	// actions (move / attack) voice their sound at the animation beat and pass
+	// `suppressSfxActions` so the commit doesn't play it a second time.
+	applyAction(map, action, { live: true, ...opts })
 	emitOutgoingAction(action)
 }
 
@@ -118,10 +121,7 @@ const select: Interactor = ({ map, tile }) => {
 		return
 	}
 
-	highlightActionsList(
-		map,
-		generateActionsList(map, tile, unit, computeThreatSeverity(map, unit))
-	)
+	highlightActionsList(map, generateActionsList(map, tile, unit, computeThreatSeverity(map, unit)))
 	interactionSource.set(tile)
 	interactionState.set('choice')
 	map.pathHistory = [tile]
@@ -224,12 +224,15 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	}
 
 	map.layers.units[tile] = null
+	// Footsteps roll *with* the walk, not after it: voice the movement sfx as the
+	// slide starts. The commit below suppresses 'move' so it isn't heard twice.
+	playActionSfx('move', unit)
 	animateRoute(map, unit, tile, finalTile, route).then(() => {
 		map.layers.units[tile] = unit
 		// A stealth unit that slipped through an enemy jammer's radar mid-route is
 		// logged so the watching CPU "remembers" a cloaked threat is about.
 		recordStealthPassthrough(map, route, unit)
-		commit(map, { kind: 'move', from: tile, to: finalTile })
+		commit(map, { kind: 'move', from: tile, to: finalTile }, { suppressSfxActions: ['move'] })
 		// Walked into a concealed enemy mid-route: turn over, skip menu / callback.
 		if (collided) return
 		if (callback) {
@@ -313,7 +316,9 @@ const performAttack = (map: MapObject, attackerTile: number, targetTile: number)
 	if (!attacker || !target) return
 	// The sequencer plays attack → (target bar / explosion) → counter → (attacker
 	// bar / explosion), committing the authoritative result at the end.
-	void animateAttackSequence(map, attackerTile, targetTile, (action) => commit(map, action))
+	void animateAttackSequence(map, attackerTile, targetTile, (action, opts) =>
+		commit(map, action, opts)
+	)
 }
 
 const selectAttackTarget: Interactor = ({ map, tile }) => {

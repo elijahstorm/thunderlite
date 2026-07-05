@@ -1,13 +1,20 @@
-import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { canAttackTarget, isRanged } from '$lib/Engine/modifiers/canAttack'
 import { tileHasModifier } from '$lib/Engine/modifiers/terrainModifier'
 import { extraRangeBonus } from '$lib/Engine/modifiers/extraSight'
 import { concealedEnemyTiles } from '$lib/Engine/visibility'
-import { indirectFireShadowed } from '$lib/Engine/lineOfSight'
-import { indirectShadowsEnabled } from '$lib/Engine/occlusionState'
+import { indirectFireBlocked } from '$lib/Engine/lineOfSight'
 
-export const generateAttackList = (map: MapObject, tile: number, unit: UnitObject) => {
+export const generateAttackList = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	// The set of tiles this unit's team can't perceive. Defaults to computing it,
+	// which is an O(map) scan — the CPU planner passes a per-tick-cached set instead
+	// (see planningContext) so the same concealment isn't rederived for every one of
+	// the hundreds of attack-list queries a single turn makes.
+	precomputedConcealed?: ReadonlySet<number>
+) => {
 	const [start, baseEnd] = unitData[unit.type].range
 	// High ground (Hills, Mountain) lets indirect units reach one tile further.
 	const end = baseEnd + extraRangeBonus(map, tile, unit)
@@ -20,23 +27,22 @@ export const generateAttackList = (map: MapObject, tile: number, unit: UnitObjec
 	// submerged sub / cloaked Stealth Tank can't be targeted until it's revealed).
 	// With fog off and no stealth in play the set is empty and every drawn enemy
 	// stays fair game.
-	const concealed = concealedEnemyTiles(map, unit.team)
+	const concealed = precomputedConcealed ?? concealedEnemyTiles(map, unit.team)
 	if (concealed.size === 0) return targets
 	return targets.filter((target) => !concealed.has(target))
 }
 
-// Tiles inside an indirect unit's firing range (from `tile`) that terrain height
-// or a Trench puts in shadow, so it can't shell them. Pure geometry + height — it
-// ignores whether an enemy is present — because it drives the firing-shadow overlay
-// (#4), which shows the player the dead ground a ridge/trench creates. Empty for
-// direct attackers, which have no firing arc to block.
+// Tiles inside an indirect unit's firing range (from `tile`) that a Trench or an
+// intervening Rampart puts in shadow, so it can't shell them. Pure geometry — it
+// ignores whether an enemy is present — because it drives the firing-shadow overlay,
+// which shows the player the dead ground a Rampart/Trench creates. Empty for direct
+// attackers, which have no firing arc to block.
 export const shadowedAttackTiles = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject
 ): number[] => {
 	if (!isRanged(unit)) return []
-	const shadowsOn = get(indirectShadowsEnabled)
 	const [min, baseMax] = unitData[unit.type].range
 	const max = baseMax + extraRangeBonus(map, tile, unit)
 	const cx = tile % map.cols
@@ -53,7 +59,7 @@ export const shadowedAttackTiles = (
 			const target = y * map.cols + x
 			if (
 				tileHasModifier(map, target, 'Trench') ||
-				(shadowsOn && indirectFireShadowed(map, tile, target))
+				indirectFireBlocked(map, tile, target)
 			)
 				out.push(target)
 		}
@@ -109,19 +115,22 @@ const isAttackable = (map: MapObject, from: number, tile: number | null, unit: U
 // Whether `attacker` firing from `from` can actually draw a bead on whatever sits
 // on `tile`, independent of weapon type-matchups (which `canAttackTarget` handles).
 const canTarget = (map: MapObject, from: number, tile: number, attacker: UnitObject) => {
-	if (isRanged(attacker)) {
+	// Terrain geometry only shelters SURFACE units. An air target hovers above the
+	// canyon lip / ridge line in plain view of an arcing shell, so neither shadow
+	// rule applies to it. (Weather never enters here: cloud cover conceals the air
+	// unit flying IN it via `hidden`/`concealedEnemyTiles`, and it neither hides
+	// nor guards whatever sits on the ground beneath it.)
+	const targetIsAir = unitData[map.layers.units[tile]?.type as number]?.type === 'air'
+	if (isRanged(attacker) && !targetIsAir) {
 		// A Trench tile (the Canyon) sits below the surrounding line of fire: indirect
 		// weapons arc over a unit sheltering there and can't reach it. Direct
 		// attackers, which close to point-blank range, still can.
 		if (tileHasModifier(map, tile, 'Trench')) return false
-		// Higher ground between firer and target throws a firing shadow the shell
-		// can't reach into (idea #4) — the height-based generalisation of Trench.
-		if (get(indirectShadowsEnabled) && indirectFireShadowed(map, from, tile)) return false
+		// A Rampart (Bulwark) standing between firer and target stops the shell — the
+		// target is sheltered behind the wall. A concrete, visible replacement for the
+		// old height-shadow rule; elevation no longer gates fire at all.
+		if (indirectFireBlocked(map, from, tile)) return false
 	}
-	// The sky layer (cloud cover) conceals whatever is beneath it from anything
-	// that isn't itself airborne.
-	if (map.layers.sky[tile] && unitData[map.layers.units[tile]?.type as number]?.type !== 'air')
-		return false
 	return true
 }
 

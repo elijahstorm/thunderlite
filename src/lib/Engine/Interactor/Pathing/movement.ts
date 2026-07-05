@@ -10,78 +10,146 @@ const NO_CONCEALED: ReadonlySet<number> = new Set()
 // can target them as destinations as if no enemy were there, so a blocked path
 // never betrays a hidden unit's position. Defaults to empty — callers that know
 // the full board (e.g. the CPU planner) get the old "every enemy blocks" behavior.
+// Uniform-cost (Dijkstra) flood fill of every tile `unit` can reach from `tile`
+// within its movement budget, settling each tile exactly once.
+//
+// This replaced a recursive descent that expanded all four directions from every
+// tile with NO visited-tracking — an O(4^movement) walk that rebuilt arrays via
+// spreads at each node and only deduped at the end. On a 20x20 board a mid-range
+// walker locked the UI for seconds; the cost is why bigger walk ranges froze
+// longer. The reachable SET here is identical to the old flood fill: terrain drag
+// is non-negative, so if any path reached a tile within budget, its cheapest path
+// (the one Dijkstra settles) does too.
 export const generateMovementList = (
 	map: MapObject,
 	tile: number,
 	unit: UnitObject,
 	concealed: ReadonlySet<number> = NO_CONCEALED
-) => [
-	...new Set([
-		tile,
-		...removeOccupied(map, increment(map, tile, unit, unitData[unit.type].movement, concealed), concealed),
-	]),
-]
+) => {
+	const cols = map.cols
+	const rows = map.rows
+	const budget = unitData[unit.type].movement
+
+	// `best` is a sparse Map, not a full-board array: a Dijkstra flood only ever
+	// touches tiles within `budget` drag of the start, so its footprint is the
+	// reachable area (roughly range²), never the map. The old `new Array(cols*rows)`
+	// + final 0..size scan made every call O(map tiles) — a mid-range walker on a
+	// 300×300 board allocated and swept 90k cells to answer a ~30-tile question,
+	// which is exactly what stalled the movement-range preview and multiplied the
+	// CPU's per-unit cost. Settled tiles are collected as they're first reached, so
+	// we never scan unreached ground.
+	const best = new Map<number, number>()
+	best.set(tile, 0)
+	const heap = new MinHeap()
+	heap.push(tile, 0)
+
+	while (heap.size > 0) {
+		const { node: cur, cost } = heap.pop()
+		// Lazily-deleted stale entry: a cheaper route to `cur` was found after this
+		// one was queued, so skip re-expanding from the outdated cost.
+		if (cost > (best.get(cur) ?? Infinity)) continue
+
+		const cx = cur % cols
+		const cy = (cur - cx) / cols
+		for (let dir = 0; dir < 4; dir++) {
+			let next: number
+			// In-bounds neighbour with no grid wrap-around (a left step from column 0
+			// must not land on the previous row's last column).
+			if (dir === 0) {
+				if (cx + 1 >= cols) continue
+				next = cur + 1
+			} else if (dir === 1) {
+				if (cx === 0) continue
+				next = cur - 1
+			} else if (dir === 2) {
+				if (cy === 0) continue
+				next = cur - cols
+			} else {
+				if (cy + 1 >= rows) continue
+				next = cur + cols
+			}
+
+			if (!validTerrain(map.layers.ground[next], unit)) continue
+			if (!notBlocked(map, next, unit, concealed)) continue
+			if (!notJammed(map, next, unit)) continue
+
+			const nc = cost + drag(unit, map.layers.ground[next], map.layers.sky[next])
+			if (nc > budget) continue
+			if (nc < (best.get(next) ?? Infinity)) {
+				best.set(next, nc)
+				heap.push(next, nc)
+			}
+		}
+	}
+
+	// The start tile is always included (the unit stands there). Every other
+	// reachable tile passes through removeOccupied: you can path THROUGH a friendly
+	// or concealed tile but can't stop on one a visible unit occupies. Sorted
+	// ascending to preserve the old array-scan ordering, so any downstream tie-break
+	// (e.g. the CPU picking the first of several equal-score destinations) is
+	// unchanged.
+	const reachable = [...best.keys()].sort((a, b) => a - b)
+	return [...new Set([tile, ...removeOccupied(map, reachable, concealed)])]
+}
 
 const removeOccupied = (map: MapObject, tiles: number[], concealed: ReadonlySet<number>) =>
 	tiles.filter((tile) => !map.layers.units[tile] || concealed.has(tile))
 
-const increment: (
-	map: MapObject,
-	tile: number,
-	unit: UnitObject,
-	movement: number,
-	concealed: ReadonlySet<number>
-) => number[] = (map, tile, unit, movement, concealed) => [
-	...move(map, tile, unit, movement, 'right', concealed),
-	...move(map, tile, unit, movement, 'left', concealed),
-	...move(map, tile, unit, movement, 'up', concealed),
-	...move(map, tile, unit, movement, 'down', concealed),
-]
+// Binary min-heap over (tile, cost) — the priority queue for the Dijkstra flood
+// fill above. Parallel arrays avoid per-node object allocation on the hot path.
+class MinHeap {
+	private nodes: number[] = []
+	private costs: number[] = []
 
-const move = (
-	map: MapObject,
-	tile: number,
-	unit: UnitObject,
-	movement: number,
-	direction: keyof typeof directionDecision,
-	concealed: ReadonlySet<number>
-) =>
-	addWalkableTiles(map, updateTileDecision[direction](map, tile), unit, movement, direction, concealed)
+	get size(): number {
+		return this.nodes.length
+	}
 
-const addWalkableTiles = (
-	map: MapObject,
-	tile: number,
-	unit: UnitObject,
-	movement: number,
-	direction: keyof typeof directionDecision,
-	concealed: ReadonlySet<number>
-) =>
-	isWalkable(map, tile, unit, movement, direction, concealed)
-		? [
-				tile,
-				...increment(
-					map,
-					tile,
-					unit,
-					movement - drag(unit, map.layers.ground[tile], map.layers.sky[tile]),
-					concealed
-				),
-			]
-		: []
+	push(node: number, cost: number): void {
+		this.nodes.push(node)
+		this.costs.push(cost)
+		let i = this.nodes.length - 1
+		while (i > 0) {
+			const parent = (i - 1) >> 1
+			if (this.costs[parent] <= this.costs[i]) break
+			this.swap(i, parent)
+			i = parent
+		}
+	}
 
-const isWalkable = (
-	map: MapObject,
-	tile: number,
-	unit: UnitObject,
-	movement: number,
-	direction: keyof typeof directionDecision,
-	concealed: ReadonlySet<number>
-) =>
-	directionDecision[direction](map, tile) &&
-	movement >= drag(unit, map.layers.ground[tile], map.layers.sky[tile]) &&
-	notBlocked(map, tile, unit, concealed) &&
-	notJammed(map, tile, unit) &&
-	validTerrain(map.layers.ground[tile], unit)
+	pop(): { node: number; cost: number } {
+		const node = this.nodes[0]
+		const cost = this.costs[0]
+		const lastNode = this.nodes.pop() as number
+		const lastCost = this.costs.pop() as number
+		const n = this.nodes.length
+		if (n > 0) {
+			this.nodes[0] = lastNode
+			this.costs[0] = lastCost
+			let i = 0
+			for (;;) {
+				const l = i * 2 + 1
+				const r = l + 1
+				let smallest = i
+				if (l < n && this.costs[l] < this.costs[smallest]) smallest = l
+				if (r < n && this.costs[r] < this.costs[smallest]) smallest = r
+				if (smallest === i) break
+				this.swap(i, smallest)
+				i = smallest
+			}
+		}
+		return { node, cost }
+	}
+
+	private swap(a: number, b: number): void {
+		const tn = this.nodes[a]
+		this.nodes[a] = this.nodes[b]
+		this.nodes[b] = tn
+		const tc = this.costs[a]
+		this.costs[a] = this.costs[b]
+		this.costs[b] = tc
+	}
+}
 
 const notJammed = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 	if (unitData[unit.type].type !== 'air') return true
@@ -92,8 +160,15 @@ const IMPASSABLE = 9999
 export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | null) => {
 	const u = unitData[unit.type]
 	const t = terrainData[terrain.type]
-	if (u.type === 'air')
-		return sky && skyData[sky.type]?.modifiers.includes('treacherous') ? skyData[sky.type].drag : 1
+	// Air units answer to the SKY layer, not the ground: every weather carries its
+	// own flight cost (Turbulence 3, Jetstream 0.5, open sky 1). A Storm_Rider
+	// ignores the drag of treacherous weather only — ordinary wind still applies.
+	if (u.type === 'air') {
+		const weather = sky ? skyData[sky.type] : undefined
+		if (!weather) return 1
+		if (weather.modifiers.includes('treacherous') && u.modifiers.includes('Storm_Rider')) return 1
+		return weather.drag
+	}
 	// Sure-footed walkers (Strider) treat every passable tile the same — no rough,
 	// slippery or rugged penalty and no terrain-drag scaling. They climb mountains
 	// as easily as crossing a road; ocean is still gated off by validTerrain.
@@ -111,7 +186,7 @@ export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | 
 	return (
 		// Shallow water (Shore) bottoms out a deep-draft warship; a High Bridge spans
 		// deep water, so it isn't Shallow and ships pass freely beneath it.
-		(t.modifiers.includes('Shallow') && u.movementType === 'warship') ||
+		((t.modifiers.includes('Shallow') && u.movementType === 'warship') ||
 		(t.details === 'rugged' && (u.movementType === 'wheel' || u.movementType === 'tank'))
 			? IMPASSABLE
 			: t.details === 'rough' && u.movementType === 'boat'
@@ -119,8 +194,8 @@ export const drag = (unit: UnitObject, terrain: GroundObject, sky?: SkyObject | 
 				: (t.details === 'slippery' && u.movementType === 'foot') ||
 					  (t.details === 'dirty' && u.movementType === 'wheel')
 					? 2
-					: 1
-	) * t.drag
+					: 1) * t.drag
+	)
 }
 
 const notBlocked = (
@@ -128,10 +203,7 @@ const notBlocked = (
 	tile: number,
 	unit: UnitObject,
 	concealed: ReadonlySet<number>
-) =>
-	!map.layers.units[tile] ||
-	map.layers.units[tile]?.team === unit.team ||
-	concealed.has(tile)
+) => !map.layers.units[tile] || map.layers.units[tile]?.team === unit.team || concealed.has(tile)
 
 // Stops `route` at the first tile occupied by an enemy of `team`, returning the
 // route up to (but not including) that tile and flagging the collision. Pathing
@@ -194,17 +266,3 @@ export const canPlaceUnit = (terrain: GroundObject, unit: UnitObject, sky?: SkyO
 	// cost means it could never stand there, so it can't be placed there either.
 	return drag(unit, terrain, sky ?? undefined) < 100
 }
-
-const updateTileDecision = {
-	right: (map: MapObject, tile: number) => tile + 1,
-	left: (map: MapObject, tile: number) => tile - 1,
-	up: (map: MapObject, tile: number) => tile - map.cols,
-	down: (map: MapObject, tile: number) => tile + map.cols,
-} as const
-
-const directionDecision = {
-	right: (map: MapObject, tile: number) => tile % map.cols !== 0,
-	left: (map: MapObject, tile: number) => (tile + 1) % map.cols !== 0,
-	up: (map: MapObject, tile: number) => tile > 0,
-	down: (map: MapObject, tile: number) => tile < map.cols * map.rows,
-} as const

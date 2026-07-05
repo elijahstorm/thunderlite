@@ -3,12 +3,13 @@ import { buildingData } from '$lib/GameData/building'
 import { previewDamage, canCounterAttack } from '../combat'
 import { isStealthUnit, hasRadarField } from '../visibility'
 import { hasAdjacentEnemy, adjacentTiles } from '../modifiers/cloak'
-import { hasModifier } from '../modifiers/canAttack'
+import { canAttackTarget, hasModifier } from '../modifiers/canAttack'
 import { computeBehindTile } from '../modifiers/lance'
 import { tilesInRange } from '../modifiers/radar'
 import { strongestSuspicion } from './stealthMemory'
 import { phantomThreatAt, exploreValue } from './fogMemory'
 import { NEUTRAL_TEAM } from '../gameState'
+import { planningUnits, planningBuildings } from './planningContext'
 import {
 	unitValue,
 	terrainProtection,
@@ -52,6 +53,9 @@ const scoreLancePassthrough = (
 	if (behind === null) return 0
 	const victim = map.layers.units[behind]
 	if (!victim) return 0
+	// The shot overflies unit types the lance can't target (see applyLancePassthrough)
+	// — no value in an untargetable enemy behind, no fear of an untargetable friendly.
+	if (!canAttackTarget(attacker, victim)) return 0
 	const stats = unitData[victim.type]
 	if (!stats) return 0
 
@@ -70,6 +74,51 @@ const scoreLancePassthrough = (
 	// Same team behind the target → friendly fire: dock the score by the same
 	// amount the hit would have been worth against an enemy.
 	return victim.team === attacker.team ? -value : value
+}
+
+// A splash attacker (Scorcher, Albatross Gunship, Breaker) also lands half-strength
+// hits on every tile adjacent to its primary target (see applyAction's Attack.Splash).
+// The wash is indiscriminate — it catches friendlies as well as foes — so this both
+// rewards a shot ringed by enemies AND docks one that would scorch the CPU's own
+// units, exactly like the Lance passthrough scoring. previewDamage folds in the
+// attacker's own modifiers, so a Breaker's siege shells ignore the splashed units'
+// cover here as they will in combat. Returns the net value: positive for enemies
+// caught, negative for friendlies caught; 0 when the unit can't splash or stands alone.
+const SPLASH_KILL_BONUS = 15
+const SPLASH_MULTIPLIER = 0.5
+
+const scoreSplashDamage = (
+	map: MapObject,
+	attacker: UnitObject,
+	attackerTile: number,
+	targetTile: number
+): number => {
+	if (!hasModifier(attacker, 'Attack.Splash')) return 0
+	let total = 0
+	for (const adj of adjacentTiles(map, targetTile)) {
+		// The attacker never splashes itself, even firing point-blank (Scorcher melee).
+		if (adj === attackerTile) continue
+		const splashed = map.layers.units[adj]
+		if (!splashed) continue
+		if (!canAttackTarget(attacker, splashed)) continue
+		const stats = unitData[splashed.type]
+		if (!stats) continue
+		const max = stats.health || 1
+		const current = splashed.health ?? max
+		const damage =
+			previewDamage(attacker, splashed, {
+				map,
+				defenderTile: adj,
+				attackerTile,
+				role: 'attack',
+			}) * SPLASH_MULTIPLIER
+		const vv = unitValue(splashed)
+		const value = damage >= current ? vv + SPLASH_KILL_BONUS : damage * VALUE_PER_HP * vv
+		// Same team caught in the wash → friendly fire: dock the score by what the
+		// hit would have been worth against an enemy (mirrors scoreLancePassthrough).
+		total += splashed.team === attacker.team ? -value : value
+	}
+	return total
 }
 
 // A Vulture Drone that lands a kill is freed to move and act again this turn
@@ -137,6 +186,7 @@ export const scoreAttack = (
 	// tile behind the target (bonus for an enemy, penalty for a friendly), and a
 	// Vulture Drone's free follow-up action when the shot kills.
 	score += scoreLancePassthrough(map, attacker, attackerTile, defenderTile)
+	score += scoreSplashDamage(map, attacker, attackerTile, defenderTile)
 	score += scoreVultureKill(attacker, killsTarget)
 
 	return { damage, score, killsTarget, returnDamage }
@@ -325,12 +375,16 @@ const DEFEND_RANGE = 4
 // the building costs and how imminent the threat is. The 1/(1+dist) falloff means the
 // *nearest* unit answers rather than the whole army collapsing home.
 const homeDefenseBonus = (map: MapObject, tile: number, cpuTeam: number): number => {
-	const buildings = map.layers.buildings
-	const units = map.layers.units
+	// Both loops walk compact lists (via planningContext) rather than the
+	// tile-indexed layer arrays — this nested scan used to be O(map tiles²) per
+	// candidate tile, which alone made big boards crawl. The capture-capable enemy
+	// list is invariant across a candidate scan, so it's derived once here.
+	const captors = planningUnits(map).filter(
+		({ unit }) => unit.team !== cpuTeam && hasModifier(unit, 'Start_Turn.Capture')
+	)
 	let best = 0
-	for (let i = 0; i < buildings.length; i++) {
-		const b = buildings[i]
-		if (!b || b.team !== cpuTeam) continue
+	for (const { tile: i, building: b } of planningBuildings(map)) {
+		if (b.team !== cpuTeam) continue
 		const data = buildingData[b.type]
 		if (!data) continue
 		const insta = data.modifiers.includes('Capture.Insta_Lose')
@@ -338,10 +392,7 @@ const homeDefenseBonus = (map: MapObject, tile: number, cpuTeam: number): number
 		if (importance <= 0) continue
 		// Nearest enemy that can actually capture this building.
 		let de = Infinity
-		for (let j = 0; j < units.length; j++) {
-			const e = units[j]
-			if (!e || e.team === cpuTeam) continue
-			if (!hasModifier(e, 'Start_Turn.Capture')) continue
+		for (const { tile: j } of captors) {
 			const d = manhattan(map, j, i)
 			if (d < de) de = d
 		}
@@ -426,7 +477,7 @@ export const scorePositionBonus = (
 	lurking: number = 0,
 	ignoreThreatTile?: number
 ): number => {
-	const cover = terrainProtection(map, tile) * unitValue(unit) * 0.05
+	const cover = terrainProtection(map, tile, unit) * unitValue(unit) * 0.05
 	const threat = expectedLossAt(map, tile, unit, cpuTeam, concealed, ignoreThreatTile)
 	const objectiveDist = closestObjectiveDistance(map, tile, cpuTeam)
 	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
@@ -464,7 +515,17 @@ export const scorePositionBonus = (
 	// unless the positive terms above make holding worth the sacrifice.
 	const reinforcement = scoreReinforcementTile(map, tile, cpuTeam)
 	return (
-		cover - threat + advance + defense + stealth - caution + hunt - phantom + explore + block - reinforcement
+		cover -
+		threat +
+		advance +
+		defense +
+		stealth -
+		caution +
+		hunt -
+		phantom +
+		explore +
+		block -
+		reinforcement
 	)
 }
 
@@ -484,10 +545,11 @@ export const scoreBuilderPosition = (
 	wallet: number,
 	concealed?: ReadonlySet<number>
 ): number => {
-	const cover = terrainProtection(map, tile) * unitValue(unit) * 0.05
+	const cover = terrainProtection(map, tile, unit) * unitValue(unit) * 0.05
 	// Losing this unit loses the game, so weight incoming damage far above a normal
 	// unit's threat term (×5) — a threatened tile is all but disqualifying.
-	const danger = threatToTile(map, tile, unit, cpuTeam, concealed) * VALUE_PER_HP * unitValue(unit) * 5
+	const danger =
+		threatToTile(map, tile, unit, cpuTeam, concealed) * VALUE_PER_HP * unitValue(unit) * 5
 	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
 	// Inverse of a combat unit's "advance": reward keeping distance from the enemy.
 	const safety = enemyDist > 0 ? Math.min(enemyDist, 8) * 2 : 0

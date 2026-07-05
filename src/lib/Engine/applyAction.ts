@@ -3,8 +3,9 @@ import { unitData } from '$lib/GameData/unit'
 import { calculateDamage, canCounterAttack } from './combat'
 import { gameState, markTileActed } from './gameState'
 import { runModifiers } from './modifiers'
-import { adjacentTiles, hasAdjacentEnemy, revealCloakedAdjacentTo } from './modifiers/cloak'
+import { hasAdjacentEnemy, revealCloakedAdjacentTo } from './modifiers/cloak'
 import { applyLancePassthrough } from './modifiers/lance'
+import { splashTargetTiles, SPLASH_DAMAGE_SCALE } from './modifiers/splash'
 import { burnForestAround } from './modifiers/burn'
 import { applyVultureKill } from './modifiers/vulture'
 import { mine } from './modifiers/miner'
@@ -19,7 +20,7 @@ import { applyWinConditions } from './winConditions'
 import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction, type SfxAction, type SfxUnitRef } from '$lib/Audio/sfxMap'
 import { recordMatchStat, type StatEvent } from './matchStats'
-import { isStealthUnit } from './visibility'
+import { concealsSelfAt, isStealthUnit } from './visibility'
 import {
 	recordStealthBuild,
 	recordStealthDeath,
@@ -44,17 +45,57 @@ export interface ApplyActionOptions {
 	playSfx?: (id: string) => void
 	/** Injectable stat sink (testing). Defaults to the shared match-stats tracker. */
 	recordStat?: (event: StatEvent) => void
+	/**
+	 * SFX actions already voiced at their animation beat (weapon crack on the
+	 * swing, footstep at walk start), so this commit stays silent for them and
+	 * the sound isn't played twice. See `playActionSfx`.
+	 */
+	suppressSfxActions?: SfxAction[]
+	/**
+	 * Tiles whose death (explosion) sfx was already voiced on its blast beat, so
+	 * this commit stays silent for those units. Deaths *not* listed here (e.g. a
+	 * splash / burn kill the animator never predicted) still sound. See
+	 * `animateAttackSequence`.
+	 */
+	preVoicedDeathTiles?: number[]
+	/**
+	 * Skip the Attack.Burn terrain swap. The animated commit path sets this so each
+	 * scorched tile's forest→charred change can be deferred to its burn-materialize
+	 * reveal (so it swaps under cover instead of popping); the instant path
+	 * (headless / replay / CPU-direct) leaves it off and scorches at commit. See
+	 * `animateAttackSequence`.
+	 */
+	deferBurn?: boolean
 }
 
-/** Emits the resolved sfx for an action, or does nothing for replay/headless. */
-type SfxEmit = (action: SfxAction, unit?: SfxUnitRef | null) => void
+/**
+ * The subset of options a live animated commit forwards from the sequencer: sfx
+ * already voiced on the animation beat, tiles whose death was pre-voiced, and
+ * whether the burn terrain swap is deferred to its reveal. Shared so the human,
+ * CPU and remote commit callbacks stay in lockstep.
+ */
+export type CommitOptions = Pick<
+	ApplyActionOptions,
+	'suppressSfxActions' | 'preVoicedDeathTiles' | 'deferBurn'
+>
+
+/**
+ * Emits the resolved sfx for an action, or does nothing for replay/headless.
+ * The optional `tile` lets a death be suppressed per-tile when its explosion was
+ * already voiced on the blast beat (see `preVoicedDeathTiles`).
+ */
+type SfxEmit = (action: SfxAction, unit?: SfxUnitRef | null, tile?: number) => void
 
 const NO_SFX: SfxEmit = () => {}
 
 const makeSfxEmit = (opts: ApplyActionOptions): SfxEmit => {
 	if (!opts.live) return NO_SFX
+	const suppressed = new Set(opts.suppressSfxActions ?? [])
+	const deathVoiced = new Set(opts.preVoicedDeathTiles ?? [])
 	const sink = opts.playSfx ?? ((id: string) => audioEngine.playSfx(id))
-	return (action, unit) => {
+	return (action, unit, tile) => {
+		if (suppressed.has(action)) return
+		if (action === 'death' && tile !== undefined && deathVoiced.has(tile)) return
 		const id = sfxForAction(action, unit)
 		if (id) sink(id)
 	}
@@ -106,7 +147,7 @@ const reduceHealth = (
 		resetCaptureProgress(map.layers.buildings[tile], target.team)
 		// A witnessed stealth-unit death trims the CPU's remembered tally for that team.
 		if (isStealthUnit(target)) recordStealthDeath(map, tile, target.team)
-		fx('death', target)
+		fx('death', target, tile)
 		stat({ kind: 'loss', team: target.team })
 		runModifiers(target, 'Death', {
 			kind: 'unit',
@@ -147,6 +188,11 @@ const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: 
 	// moment it reaches safety — same reveal-when-adjacent rule the End_Turn handler uses.
 	// Ordered after recordPerceivedStealth so the watcher still pins where it went.
 	if (isStealthUnit(unit)) unit.hidden = !hasAdjacentEnemy(map, to, unit.team)
+	// A unit concealed some other way (air cover from weather) surfaces once it moves
+	// somewhere nothing conceals it — otherwise its stale `hidden` flag would trail it
+	// into the open, leaving it invisible until an enemy closes to point-blank. We only
+	// clear here: gaining fresh cover stays deferred to end of turn.
+	else if (unit.hidden && !concealsSelfAt(map, to, unit)) unit.hidden = false
 	markTileActed(to)
 }
 
@@ -155,7 +201,10 @@ const applyAttack = (
 	from: number,
 	to: number,
 	fx: SfxEmit,
-	stat: StatEmit
+	stat: StatEmit,
+	// When true, leave the burn terrain swap to the caller (the animated sequencer
+	// scorches each tile under its materialize reveal); otherwise scorch now.
+	deferBurn = false
 ): void => {
 	const attacker = map.layers.units[from]
 	const target = map.layers.units[to]
@@ -175,16 +224,16 @@ const applyAttack = (
 
 	// Scorcher's flame washes over everything around the target (Attack.Splash) and
 	// scorches any forest it touches (Attack.Burn). Both run on the opening blow only
-	// (like Lance), never on a counter, and splash lands at half strength.
-	if (hasModifier(attacker, 'Attack.Splash')) {
-		for (const adj of adjacentTiles(map as MapObject, to)) {
-			const splashed = map.layers.units[adj]
-			if (splashed && splashed.team !== attacker.team) {
-				reduceHealth(map, attacker, splashed, adj, from, 'attack', fx, stat, 0.5)
-			}
+	// (like Lance), never on a counter, and splash lands at half strength. The wash
+	// only catches unit types the attacker could aim at directly (canAttackTarget) —
+	// a ground-bound flame passes harmlessly under an air unit beside the target.
+	for (const adj of splashTargetTiles(map, from, to)) {
+		const splashed = map.layers.units[adj]
+		if (splashed) {
+			reduceHealth(map, attacker, splashed, adj, from, 'attack', fx, stat, SPLASH_DAMAGE_SCALE)
 		}
 	}
-	if (hasModifier(attacker, 'Attack.Burn')) burnForestAround(map, to)
+	if (hasModifier(attacker, 'Attack.Burn') && !deferBurn) burnForestAround(map, to)
 
 	let attackerDied = false
 	if (
@@ -232,7 +281,7 @@ export const applyAction = (
 			return
 		}
 		case 'attack': {
-			applyAttack(map, action.from, action.to, fx, stat)
+			applyAttack(map, action.from, action.to, fx, stat, opts.deferBurn ?? false)
 			return
 		}
 		case 'capture': {

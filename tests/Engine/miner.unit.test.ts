@@ -2,7 +2,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
 import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
-import { mine, canMineAt, MINE_REWARD } from '../../src/lib/Engine/modifiers/miner'
+import {
+	mine,
+	canMineAt,
+	mineReachableTerrainTypes,
+	MINE_REWARD,
+} from '../../src/lib/Engine/modifiers/miner'
 import { WARMACHINE_WALLET, walletOf } from '../../src/lib/Engine/wallet'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
@@ -49,6 +54,20 @@ describe('miner.canMineAt', () => {
 		expect(canMineAt(map, 1)).toBe(true)
 		expect(canMineAt(map, 2)).toBe(false) // Depleted is terminal — no funds left
 		expect(canMineAt(map, 3)).toBe(false)
+	})
+})
+
+describe('miner.mineReachableTerrainTypes', () => {
+	it('follows the transition chain to its end so mined-into tiers get sprites preloaded', () => {
+		// Enriched reaches both lower tiers; Ore reaches only Depleted.
+		expect(new Set(mineReachableTerrainTypes([ENRICHED_ORE]))).toEqual(
+			new Set([ORE_DEPOSIT, DEPLETED_ORE])
+		)
+		expect(mineReachableTerrainTypes([ORE_DEPOSIT])).toEqual([DEPLETED_ORE])
+	})
+
+	it('returns nothing for terminal or non-mineable terrain', () => {
+		expect(mineReachableTerrainTypes([DEPLETED_ORE, PLAINS])).toEqual([])
 	})
 })
 

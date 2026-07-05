@@ -72,7 +72,12 @@ export const campaignLevels: readonly CampaignLevel[] = [
 		title: 'Rolling Thunder',
 		blurb: 'Indirect fire and range',
 	},
-	{ id: '08-storm-front', order: 8, title: 'Storm Front', blurb: 'Weather slows the advance' },
+	{
+		id: '08-storm-front',
+		order: 8,
+		title: 'Storm Front',
+		blurb: 'Air power and the rolling storm front',
+	},
 	{
 		id: '09-the-stronghold',
 		order: 9,
@@ -83,7 +88,7 @@ export const campaignLevels: readonly CampaignLevel[] = [
 		id: '10-final-standoff',
 		order: 10,
 		title: 'Final Standoff',
-		blurb: 'Everything you have learned',
+		blurb: 'Three Warmachines, three fronts, one last coast',
 	},
 ] as const
 

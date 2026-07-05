@@ -2,7 +2,7 @@ import { imageLazyLoader } from '$lib/Sprites/imageLazyLoader'
 import type { modifierData } from './modifier'
 
 type TerrainData = ObjectAssetMeta & {
-	connector: 0 | 1 | 2 | 3 | 4
+	connector: 0 | 1 | 2 | 3 | 4 | 5
 	// Sprite column to show in the map-editor palette. Autotiled terrains (border
 	// connector) render their state-0 frame as open water, so Shore would look
 	// identical to Sea in the palette. Point it at a coastline frame instead.
@@ -307,6 +307,49 @@ export const terrainData: TerrainData[] = [
 		height: 20,
 		drag: 1,
 		modifiers: ['Amphibious'],
+	},
+	{
+		url: '/game/play/terrain/rampart.png',
+		frames: 1,
+		xOffset: 0,
+		yOffset: 0,
+		connector: 0,
+		name: 'Rampart',
+		description: 'A solid wall. Impassable, and indirect fire cannot reach past it.',
+		details: 'impassable',
+		ocean: false,
+		protection: 0,
+		damage: 0,
+		height: 30,
+		drag: 1,
+		modifiers: ['Bulwark'],
+	},
+	// Left behind when a Scorcher burns Forest away (see modifiers/burn.ts). Charred
+	// stumps and ash — visually the forest that was, not a toxic wasteland. The
+	// canopy that concealed and sheltered units is gone, so it grants almost no cover
+	// and no concealment, but it isn't poisoned ground, so it costs no health to hold.
+	// APPEND-ONLY: terrain is stored by index in saved maps, so this must stay last.
+	{
+		url: '/game/play/terrain/scorched.png',
+		frames: 1,
+		xOffset: 0,
+		yOffset: 0,
+		// connector 5 (type-border): the burn scar autotiles against other Charred
+		// Forest tiles using the Sea's border-plus-inner-corner scheme (matched on
+		// terrain type instead of the ocean flag), so concave junctions between arms of
+		// a scar fill cleanly instead of leaving jagged notches. 20-frame sheet: 16
+		// border-base states + 4 inner-corner overlays (see spriteConnector / paint).
+		connector: 5,
+		name: 'Charred Forest',
+		description:
+			'Burnt-out woodland — charred stumps and ash. Almost no cover, and no concealment.',
+		details: 'rough',
+		ocean: false,
+		protection: 0.1,
+		damage: 0,
+		height: 1,
+		drag: 2,
+		modifiers: [],
 	},
 ]
 

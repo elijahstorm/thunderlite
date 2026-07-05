@@ -3,7 +3,8 @@
 	import { addToast } from 'as-toast'
 	import { gameState } from '../gameState'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
-	import { buildableUnits, spawnBuiltUnit, type BuildableUnit } from '../build'
+	import { buildableUnits, canDeployFromFactory, spawnBuiltUnit, type BuildableUnit } from '../build'
+	import { buildableAdjacentTiles } from '../modifiers/builder'
 	import { beginBuildPlacement } from '../Interactor/interactor'
 	import { walletOf } from '../wallet'
 	import { buildMenuState, closeBuildMenu } from './buildMenuStore'
@@ -28,9 +29,21 @@
 			: null
 	$: isBuilder = menu.mode === 'builder'
 	$: budget = isBuilder ? (builderUnit ? walletOf(builderUnit) : 0) : (currentPlayer?.money ?? 0)
+	// Whether a chosen unit type actually has somewhere to land: for a Warmachine
+	// that's any legal adjacent tile; for a factory it's the factory tile itself
+	// (so a ship needs a Shore factory, and an occupied factory can't build).
+	$: hasSpaceFor = (type: number): boolean => {
+		if (!map || menu.buildingTile == null) return false
+		return isBuilder
+			? buildableAdjacentTiles(map, menu.buildingTile, type).length > 0
+			: canDeployFromFactory(map, menu.buildingTile, type)
+	}
 	$: entries =
 		menu.open && currentPlayer
-			? buildableUnits(currentPlayer, isBuilder ? { budget, ignoreControls: true } : {})
+			? buildableUnits(
+					currentPlayer,
+					isBuilder ? { budget, ignoreControls: true, hasSpaceFor } : { hasSpaceFor }
+				)
 			: []
 
 	const typeOrder = ['ground', 'air', 'sea'] as const
@@ -142,8 +155,12 @@
 									title={!entry.controlled
 										? `Requires ${entry.data.type} control`
 										: !entry.affordable
-											? `Need $${entry.data.cost}`
-											: entry.data.name}
+											? `Need $${entry.cost}`
+											: !entry.hasSpace
+												? entry.data.type === 'sea'
+													? 'Needs a shore factory to launch'
+													: 'No room to deploy'
+												: entry.data.name}
 									on:click={() => handleSelect(entry)}
 									on:mouseenter={() => (hoveredType = entry.type)}
 									on:mouseleave={() => {
@@ -167,7 +184,9 @@
 									<div class="flex flex-col">
 										<span>{entry.data.name}</span>
 										<span class="text-xs opacity-75">
-											${entry.data.cost}{#if !entry.controlled}
+											${entry.cost}{#if entry.cost < entry.data.cost}
+												<span class="ml-1 line-through opacity-60">${entry.data.cost}</span>
+											{/if}{#if !entry.controlled}
 												<span class="ml-1 uppercase">· locked</span>
 											{/if}
 										</span>

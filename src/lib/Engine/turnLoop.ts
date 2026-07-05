@@ -83,6 +83,10 @@ export const applyTerrainEndOfTurnDamage = (
 		const unit = map.layers.units[tile]
 		if (!unit) continue
 		if (unit.team !== team) continue
+		// Hostile ground (Wasteland cinders, Rock Formation) only chips what actually
+		// rests ON it — an air unit hovers above and takes nothing. Its own end-of-turn
+		// hazard is the sky layer (applySkyEndOfTurnDamage).
+		if (unitData[unit.type]?.type === 'air') continue
 		const ground = map.layers.ground[tile]
 		if (!ground) continue
 		const damage = terrainData[ground.type]?.damage ?? 0
@@ -115,6 +119,7 @@ export const applySkyEndOfTurnDamage = (
 		const sky = map.layers.sky[tile]
 		if (!sky) continue
 		if (!skyData[sky.type]?.modifiers.includes('treacherous')) continue
+		if (unitData[unit.type]?.modifiers.includes('Storm_Rider')) continue
 		const maxHealth = unitData[unit.type]?.health ?? 0
 		const current = unit.health ?? maxHealth
 		const next = Math.max(0, current - STORM_DAMAGE)

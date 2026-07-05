@@ -1,25 +1,7 @@
-import { browser } from '$app/environment'
-import { get } from 'svelte/store'
 import { interactor } from '$lib/Engine/Interactor/interactor'
 import { applyAction } from '$lib/Engine/applyAction'
 import { emitOutgoingAction } from '$lib/Engine/outgoingActions'
 import { dispatchSerializedAction, normalizeAction } from '$lib/Engine/Interactor/serializedAction'
-
-export const socketOpened = (socket: WebSocket, callback?: VoidFunction) => () => {
-	if (browser) {
-		import('$lib/dontcode/client').then((session) => {
-			const auth = get(session.userAuth)
-			if (auth) {
-				socket.send(`auth:${auth}`)
-			}
-		})
-	}
-	if (callback) {
-		callback()
-	}
-}
-
-export const socketClosed = (callback?: VoidFunction) => () => callback && callback()
 
 export const socketMessage =
 	(getMap: () => MapObject | undefined, render: (now: number) => void) =>

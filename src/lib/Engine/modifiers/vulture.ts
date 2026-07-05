@@ -1,8 +1,5 @@
-import { get } from 'svelte/store'
 import { gameState } from '../gameState'
 import { hasModifier } from './canAttack'
-
-const vultureBonusTurn = new WeakMap<UnitObject, number>()
 
 const unmarkTileActed = (tile: number): void => {
 	gameState.update((state) => {
@@ -13,11 +10,11 @@ const unmarkTileActed = (tile: number): void => {
 	})
 }
 
+// Chainable by design: every kill refunds the whole action, so a Vulture can keep
+// sweeping as long as each attack destroys its target. Self-terminating (a refresh
+// costs an enemy unit) and self-balancing (its low power only finishes wounded prey).
 export const applyVultureKill = (attacker: UnitObject, attackerTile: number): boolean => {
 	if (!hasModifier(attacker, 'End_Turn.Vulture')) return false
-	const turn = get(gameState).turnNumber
-	if (vultureBonusTurn.get(attacker) === turn) return false
-	vultureBonusTurn.set(attacker, turn)
 	unmarkTileActed(attackerTile)
 	return true
 }

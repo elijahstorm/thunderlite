@@ -33,8 +33,7 @@ const makeRecorder = (): { ops: Op[]; iface: CampaignInterface } => {
 		clearWeather: (x, y) => void ops.push(['clearWeather', x, y]),
 		fog: (on) => void ops.push(['fog', on]),
 		funds: (team, amount) => void ops.push(['funds', team, amount]),
-		addBuilding: (team, building, x, y) =>
-			void ops.push(['addBuilding', team, building, x, y]),
+		addBuilding: (team, building, x, y) => void ops.push(['addBuilding', team, building, x, y]),
 		removeBuilding: (x, y) => void ops.push(['removeBuilding', x, y]),
 		ownBuilding: (team, x, y) => void ops.push(['ownBuilding', team, x, y]),
 		defeat: () => void ops.push(['defeat']),
@@ -102,13 +101,19 @@ describe('runCutsceneEvents', () => {
 
 	it('dispatches a color command to setSpeakerColor', async () => {
 		const { ops, iface } = makeRecorder()
-		await runCutsceneEvents(parseCutsceneScript('<start>\ncolor Kael: #ef4444\n</start>').start, iface)
+		await runCutsceneEvents(
+			parseCutsceneScript('<start>\ncolor Kael: #ef4444\n</start>').start,
+			iface
+		)
 		expect(ops).toEqual([['setSpeakerColor', 'Kael', '#ef4444']])
 	})
 
 	it('dispatches hurt to the interface with its health argument', async () => {
 		const { ops, iface } = makeRecorder()
-		await runCutsceneEvents(parseCutsceneScript('<start>\nhurt unit: 13,2,20\n</start>').start, iface)
+		await runCutsceneEvents(
+			parseCutsceneScript('<start>\nhurt unit: 13,2,20\n</start>').start,
+			iface
+		)
 		expect(ops).toEqual([['hurt', 13, 2, 20]])
 	})
 
@@ -296,8 +301,11 @@ describe('createCampaignRunner', () => {
 describe('<when> conditional triggers', () => {
 	const STRIKE = unitData.findIndex((u) => u.name === 'Strike Commando')
 	const SCORPION = unitData.findIndex((u) => u.name === 'Scorpion Tank')
-	// A 4-tile map carrying just the unit layer the conditions read.
-	const mapWith = (units: ({ team: number; type: number } | null)[]) => ({ layers: { units } })
+	// A tiny map carrying just the layers the conditions read.
+	const mapWith = (
+		units: ({ team: number; type: number } | null)[],
+		buildings: ({ team: number; type: number } | null)[] = []
+	) => ({ layers: { units, buildings } })
 
 	const SCRIPT = `
 <when team 1 units <= 1>
@@ -316,7 +324,11 @@ defeat
 		const runner = createCampaignRunner(parseCutsceneScript(SCRIPT), iface)
 
 		// Two team-1 units present → "team 1 units <= 1" does not hold yet.
-		const two = mapWith([{ team: 1, type: SCORPION }, { team: 1, type: SCORPION }, { team: 0, type: STRIKE }])
+		const two = mapWith([
+			{ team: 1, type: SCORPION },
+			{ team: 1, type: SCORPION },
+			{ team: 0, type: STRIKE },
+		])
 		expect(runner.hasPendingConditions(two)).toBe(false)
 		await runner.checkConditions(two)
 		expect(ops).toEqual([])
@@ -346,8 +358,57 @@ defeat
 		expect(runner.hasPendingConditions(alive)).toBe(false)
 
 		// No team-0 Strike Commando left (team 1 still has two) → only defeat fires.
-		const dead = mapWith([{ team: 1, type: SCORPION }, { team: 1, type: SCORPION }])
+		const dead = mapWith([
+			{ team: 1, type: SCORPION },
+			{ team: 1, type: SCORPION },
+		])
 		await runner.checkConditions(dead)
 		expect(ops).toContainEqual(['defeat'])
+	})
+
+	it('fires a buildings-ownership condition when the team captures the named building', async () => {
+		const { buildingData } = await import('../../src/lib/GameData/building')
+		const AIR = buildingData.findIndex((b) => b.name === 'Air Control')
+		const CITY = buildingData.findIndex((b) => b.name === 'City')
+		const { ops, iface } = makeRecorder()
+		const runner = createCampaignRunner(
+			parseCutsceneScript(`
+<when team 0 buildings "Air Control" >= 1>
+talk Vance: "The strip is ours."
+</when>
+`),
+			iface
+		)
+
+		// Neutral strip (team 4) + own city → condition does not hold.
+		const neutral = mapWith(
+			[],
+			[
+				{ team: 4, type: AIR },
+				{ team: 0, type: CITY },
+			]
+		)
+		expect(runner.hasPendingConditions(neutral)).toBe(false)
+		await runner.checkConditions(neutral)
+		expect(ops).toEqual([])
+
+		// Strip captured by team 0 → fires once.
+		const captured = mapWith(
+			[],
+			[
+				{ team: 0, type: AIR },
+				{ team: 0, type: CITY },
+			]
+		)
+		expect(runner.hasPendingConditions(captured)).toBe(true)
+		await runner.checkConditions(captured)
+		await runner.checkConditions(captured)
+		expect(ops).toEqual([['talk', 'Vance', ['The strip is ours.']]])
+	})
+
+	it('rejects a buildings condition naming an unknown building', () => {
+		expect(() =>
+			parseCutsceneScript('<when team 0 buildings "Airfield" >= 1>\ndefeat\n</when>')
+		).toThrow(/unknown building/)
 	})
 })

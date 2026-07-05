@@ -27,6 +27,23 @@ const mineTransitions: Record<number, number> = {
 export const isMineableTerrainType = (terrainType: number): boolean =>
 	Object.prototype.hasOwnProperty.call(mineTransitions, terrainType)
 
+// Every terrain type mining can eventually turn the given types into, following
+// the transition chain to its end (Enriched reaches both Ore and Depleted).
+// Sprite preload unions this in: a mined tile swaps its ground type mid-match,
+// and if the result tier wasn't on the starting map its sheet was never loaded,
+// leaving the tile blank.
+export const mineReachableTerrainTypes = (terrainTypes: number[]): number[] => {
+	const reachable = new Set<number>()
+	for (const start of terrainTypes) {
+		let type = start
+		while (mineTransitions[type] !== undefined && !reachable.has(mineTransitions[type])) {
+			type = mineTransitions[type]
+			reachable.add(type)
+		}
+	}
+	return [...reachable]
+}
+
 export const canMineAt = (map: MapObject | MapProcesser, tile: number): boolean => {
 	const ground = map.layers.ground[tile]
 	if (!ground) return false

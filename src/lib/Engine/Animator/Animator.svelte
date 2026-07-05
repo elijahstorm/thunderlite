@@ -11,7 +11,7 @@
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { viewerVisibility } from '$lib/Engine/fogState'
 	import { viewerTeam } from '$lib/Engine/threatOverlay'
-	import { isUnitStealthed } from '$lib/Engine/visibility'
+	import { isUnitStealthed, unitSeenByViewer } from '$lib/Engine/visibility'
 	import { fly } from 'svelte/transition'
 	import { linear } from 'svelte/easing'
 
@@ -46,7 +46,10 @@
 		if (route === null) return false
 		const tile = route.route[step]
 		if (route.unit.team === team) return true
-		if (fog !== null && !fog.visible.has(tile)) return false
+		// Per-unit fog check: an airborne enemy stays visible stepping over a
+		// canopy-dark forest or behind a ridge (unitSeenByViewer widens to the air
+		// reach) — only ground units blink out on those tiles.
+		if (!unitSeenByViewer(fog, tile, route.unit)) return false
 		return !isUnitStealthed(route.map, tile, route.unit)
 	}
 

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte'
-	import { socketClosed, socketOpened } from './socket'
 	import { writable } from 'svelte/store'
-	import { PUBLIC_SOCKET_CONNECTION } from '$env/static/public'
 	import { browser } from '$app/environment'
+	import { userAuth } from '$lib/dontcode/client'
+	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import { fly } from 'svelte/transition'
 
 	type SocketMessage = {
@@ -12,62 +12,82 @@
 		target: string
 	}
 
+	// Chat rides the DontCode realtime service on one shared broadcast channel,
+	// mirroring the retired standalone chat-server (which broadcast every
+	// message to every connected client and let ChatList/ChatRoom filter by
+	// source/target). The connection token is minted by /api/realtime, so only
+	// signed-in users can join.
+	const CHAT_CHANNEL = 'chat:global'
+
 	const socketMessages = writable<
 		(SocketMessage & {
 			created_at: Date
 			read_at: Date | null
 		})[]
 	>([])
-	const connectionTimeout = writable<ReturnType<typeof setTimeout> | null>()
 	const refreshTimeout = writable<ReturnType<typeof setTimeout> | null>()
-	const TIMEOUT = 1000
-	let socket = writable<WebSocket | null>(null)
+	let conn: RealtimeConnection | null = null
+	let unsubscribeAuth: (() => void) | null = null
 	let error = false
+	/** undefined until a connection succeeds or fails; drives the offline pill. */
 	let opened: boolean | undefined = undefined
+	/** Realtime is not served here (e.g. local mock gateway) — disable chat quietly. */
+	let unavailable = false
 
-	const populate = (props: SocketMessage) => $socket && $socket.send(JSON.stringify(props))
+	const populate = (props: SocketMessage) => conn?.publish(CHAT_CHANNEL, props)
 
-	const create = () => {
-		if (!browser) return null
-		if (!PUBLIC_SOCKET_CONNECTION) return null
-		const socket = new WebSocket(PUBLIC_SOCKET_CONNECTION)
-		socket.onopen = socketOpened(socket, () => (opened = true))
-		socket.onclose = socketClosed(() => (opened = false))
-		socket.onmessage = (evt: MessageEvent<string>) => {
-			const data = JSON.parse(evt.data) as SocketMessage | undefined
-			if (!data?.message) return
-			$socketMessages = [
-				...$socketMessages,
-				{
-					...data,
-					created_at: new Date(),
-					read_at: null,
-				},
-			]
-		}
-		return socket
+	const onChatMessage = (incoming: RealtimeMessage) => {
+		const data = incoming.payload as SocketMessage | undefined
+		if (!data?.message) return
+		// The sender already rendered its own message locally (see ChatRoom);
+		// drop the copy if the service echoes publishes back to their origin.
+		if (data.source && data.source === currentAuth) return
+		$socketMessages = [
+			...$socketMessages,
+			{
+				...data,
+				created_at: new Date(),
+				read_at: null,
+			},
+		]
 	}
 
-	const connect = () => {
-		if (!window['WebSocket']) {
-			$connectionTimeout = null
-			return
+	let currentAuth: string | null = null
+
+	const connect = async () => {
+		if (conn || unavailable) return
+		const attempt = new RealtimeConnection({
+			channels: [CHAT_CHANNEL],
+			onStatus: (connected) => (opened = connected),
+		})
+		attempt.subscribe(CHAT_CHANNEL, onChatMessage)
+		try {
+			await attempt.open()
+			conn = attempt
+		} catch {
+			// First open never succeeded: realtime isn't reachable from this
+			// environment, so don't nag with the offline pill or retry forever.
+			attempt.close()
+			unavailable = true
+			opened = undefined
 		}
-		if (!PUBLIC_SOCKET_CONNECTION) {
-			$connectionTimeout = null
-			return
-		}
-		if (!$socket || (typeof opened !== 'undefined' && !opened)) {
-			socket.set(create())
-		}
-		$connectionTimeout = setTimeout(connect, TIMEOUT)
+	}
+
+	const disconnect = () => {
+		conn?.close()
+		conn = null
+		opened = undefined
 	}
 
 	onMount(() => {
-		if (!PUBLIC_SOCKET_CONNECTION) return
-		if (!$connectionTimeout) {
-			$connectionTimeout = setTimeout(connect, TIMEOUT)
-		}
+		if (!browser) return
+		// Chat exists only for signed-in users (the token mint requires a
+		// session); follow the auth store so login/logout flips the connection.
+		unsubscribeAuth = userAuth.subscribe((auth) => {
+			currentAuth = auth
+			if (auth) void connect()
+			else disconnect()
+		})
 		const updateTime = () => {
 			$socketMessages = [...$socketMessages]
 			$refreshTimeout = setTimeout(updateTime, 50 * 10)
@@ -76,11 +96,8 @@
 	})
 
 	onDestroy(() => {
-		$socket?.close()
-		if ($connectionTimeout) {
-			clearTimeout($connectionTimeout)
-		}
-		$connectionTimeout = null
+		disconnect()
+		if (unsubscribeAuth) unsubscribeAuth()
 		if ($refreshTimeout) {
 			clearTimeout($refreshTimeout)
 		}
@@ -93,7 +110,7 @@
 {:else}
 	<slot {populate} {socketMessages}></slot>
 
-	{#if !opened && PUBLIC_SOCKET_CONNECTION}
+	{#if opened === false}
 		<div class="fixed bottom-0 group" in:fly={{ y: -20 }} out:fly={{ y: -20 }}>
 			<div
 				class="relative flex items-end truncate text-clip text-white text-sm font-bold px-4 py-3 transition-all delay-300 duration-700 ease-out overflow-clip w-10 group-hover:w-full"

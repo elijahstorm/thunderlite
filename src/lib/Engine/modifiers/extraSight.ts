@@ -1,4 +1,5 @@
 import { terrainData } from '$lib/GameData/terrain'
+import { unitData } from '$lib/GameData/unit'
 import { isRanged } from './canAttack'
 import { heightTier } from './height'
 
@@ -18,7 +19,9 @@ export const extraSightBonus = (map: Pick<MapObject, 'layers'>, tile: number): n
 // Extra attack range granted by high ground. Like the sight bonus this hangs off
 // the `Extra_Sight` terrain modifier (Hills, Mountain): a longer sightline lets an
 // indirect weapon arc one tile further. Only ranged units benefit — a direct unit's
-// reach is fixed at point-blank, so it gains nothing from elevation.
+// reach is fixed at point-blank, so it gains nothing from elevation. Air units gain
+// nothing either: they fly at their own altitude, so the ground beneath them never
+// changes their firing arc.
 export const extraRangeBonus = (
 	map: Pick<MapObject, 'layers'>,
 	tile: number,
@@ -28,6 +31,7 @@ export const extraRangeBonus = (
 	if (!ground) return 0
 	const terrain = terrainData[ground.type]
 	if (!terrain || !terrain.modifiers.includes('Extra_Sight')) return 0
+	if (unitData[unit.type]?.type === 'air') return 0
 
 	return isRanged(unit) ? 1 : 0
 }

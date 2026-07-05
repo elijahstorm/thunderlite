@@ -1,4 +1,5 @@
 import { unitData } from '$lib/GameData/unit'
+import { skyData } from '$lib/GameData/sky'
 import { terrainData } from '$lib/GameData/terrain'
 import { generateAttackList } from './Interactor/Pathing/attack'
 import { canAttackTarget, hasModifier, isRanged } from './modifiers/canAttack'
@@ -65,6 +66,23 @@ const auraMitigation = (
 	return 1
 }
 
+// The defensive cover a unit standing (or hovering) on `tile` enjoys, drawn from
+// the layer its domain lives in: ground/sea units answer to the terrain layer,
+// air units to the sky layer. Exported so the AI's positioning "cover" term and
+// any preview UI price cover from the same single source combat does.
+export const coverProtection = (
+	map: Pick<MapObject, 'layers'>,
+	tile: number,
+	domain: 'ground' | 'air' | 'sea'
+): number => {
+	if (domain === 'air') {
+		const sky = map.layers.sky[tile]
+		return sky ? (skyData[sky.type]?.protection ?? 0) : 0
+	}
+	const ground = map.layers.ground[tile]
+	return ground ? (terrainData[ground.type]?.protection ?? 0) : 0
+}
+
 const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatContext): number => {
 	const attackerStats = unitData[attacker.type]
 	const defenderStats = unitData[defender.type]
@@ -77,8 +95,16 @@ const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatCo
 	const baseDamage = attackerStats.power * hpRatio
 	const matchupBonus = attackerStats.weaponType === defenderStats.armorType ? 1.5 : 1.0
 
-	const ground = ctx.map.layers.ground[ctx.defenderTile]
-	const protection = ground ? (terrainData[ground.type]?.protection ?? 0) : 0
+	// Cover comes from the layer the defender actually occupies. Ground terrain
+	// can't shelter what flies above it, and weather can't shelter what crawls
+	// beneath it: a surface unit reads the ground tile's protection, an air
+	// defender reads the SKY tile's (cloud / storm cover) instead.
+	// A siege attacker (Breaker) arcs its shells past cover: entrenched defenders
+	// forfeit every point of terrain protection and eat the full hit. Splashed
+	// neighbours lose their cover too, since each splash tile runs this same path.
+	const protection = hasModifier(attacker, 'Damage.Siege')
+		? 0
+		: coverProtection(ctx.map, ctx.defenderTile, defenderStats.type)
 	const terrainGuard = 1 - protection
 
 	// Is the attacker concealed from the tile it fires on? Adjacency and radar both
@@ -98,8 +124,12 @@ const computeDamage = (attacker: UnitObject, defender: UnitObject, ctx: CombatCo
 		attackerConcealed,
 	})
 
+	// High ground is a TERRAIN advantage, so it needs both feet on terrain: an air
+	// unit flies at its own altitude regardless of the tile it overflies, so it
+	// neither gains a downhill bonus from a mountain beneath it nor concedes one
+	// to a hilltop gun shooting up at it.
 	const highGround =
-		ctx.attackerTile != null
+		ctx.attackerTile != null && attackerStats.type !== 'air' && defenderStats.type !== 'air'
 			? highGroundBonus(
 					ctx.map,
 					ctx.attackerTile,

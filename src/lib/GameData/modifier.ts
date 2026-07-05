@@ -36,8 +36,12 @@ export type ModifierRecord = {
 export const modifierData = {
 	hidden: { phase: 'Properties' },
 	treacherous: { phase: 'Properties' },
+	// Petrel Stormrider: treacherous sky (Storm) neither damages it (turnLoop's
+	// applySkyEndOfTurnDamage) nor slows its flight (movement.ts drag).
+	Storm_Rider: { phase: 'Properties' },
 	Extra_Sight: { phase: 'Properties' },
 	Trench: { phase: 'Properties' },
+	Bulwark: { phase: 'Properties' },
 	Conceals: { phase: 'Properties' },
 	Amphibious: { phase: 'Properties' },
 	Shallow: { phase: 'Properties' },
@@ -74,6 +78,10 @@ export const modifierData = {
 	'Self_Action.Ship_Out': { phase: 'Self_Action' },
 	// Strider: amplified high-ground damage (checked in combat.ts:highGroundBonus).
 	'Damage.Highground': { phase: 'Damage' },
+	// Breaker: siege gun — its shells ignore the defender's terrain cover entirely,
+	// so entrenched foes take full damage (checked in combat.ts:computeDamage). Applies
+	// to splash hits too, since every hit routes through the same damage path.
+	'Damage.Siege': { phase: 'Damage' },
 	// Aegis: protective field — adjacent friendlies take less damage (combat.ts).
 	'Damage.Aegis': { phase: 'Damage' },
 	// Scorcher: flame splash to tiles around the target, and burns forest cover

@@ -20,7 +20,15 @@ type GroundObject = ObjectType &
 		// (one frame) can't express. Recomputed alongside `state`; see spriteConnector.
 		corners?: number[]
 	}
-type SkyObject = ObjectType & AnimatedObject
+type SkyObject = ObjectType &
+	AnimatedObject & {
+		// Transient render hint for directional weather (the Jetstream): when true the
+		// tile plays its animation loop backwards, flipping the flow 180°. Autotiling
+		// picks the SHAPE; this picks which way the current runs through it, so a
+		// highway flows one continuous direction instead of each end/turn animating
+		// against its neighbours. Recomputed alongside `state`; see spriteConnector.
+		flowReversed?: boolean
+	}
 type UnitObject = ObjectType &
 	AnimatedObject &
 	TeamObject & {
@@ -64,9 +72,9 @@ type HighlightMeta = {
 	/** True when a movement tile sits inside an enemy's attack reach. Raises the
 	 * move tile's advice badge to the danger ("bad") severity. */
 	threatened?: boolean
-	/** True for a tile inside an indirect unit's geometric range that terrain
-	 * height (or a Trench) puts in firing shadow — drawn with the shadow overlay
-	 * but not actually targetable. See shadowedAttackTiles / paint highlights. */
+	/** True for a tile inside an indirect unit's geometric range that a Trench or an
+	 * intervening Rampart (Bulwark) puts in firing shadow — drawn with the shadow
+	 * overlay but not actually targetable. See shadowedAttackTiles / paint highlights. */
 	shadowed?: boolean
 	/** True for the selected unit's *own* tile. It's a member of the movement list
 	 * (a unit can always "stay put") but shouldn't read as a green move target —
@@ -139,6 +147,12 @@ type MapObject = MapSettings & {
 	route: (Route | undefined)[]
 	highlights: (TileHighlight | undefined)[]
 	pathHistory?: number[]
+	/** Tiles that would take a *secondary* hit if the currently-hovered attack were
+	 * committed — a splash attacker's wash and a lance's passthrough tile. Recomputed
+	 * on every hover in `MapRender` (see `aoePreview.ts`) and painted as a red impact
+	 * marker so the player sees the blast footprint before clicking. Cleared whenever
+	 * the selection resets (`highlightActionsList`). */
+	splashPreview?: Set<number>
 	pointers?: Set<number>
 	/** Tiles painted by the persistent enemy-threat overlay (every reach tile of
 	 * the enemy units the player has toggled on). Recomputed in `MapRender` from

@@ -1,7 +1,12 @@
 import { get } from 'svelte/store'
 import { rendererStore } from '$lib/Sprites/spriteStore'
 import { paint } from '$lib/Engine/paint'
-import { connectionDecision, cornerDecision } from '$lib/Sprites/spriteConnector'
+import {
+	connectionDecision,
+	cornerDecision,
+	skyConnectionDecision,
+	skyFlowReversed,
+} from '$lib/Sprites/spriteConnector'
 
 // Longest side of the generated thumbnail, and the per-tile size clamp that keeps
 // small maps crisp and large maps from ballooning the PNG.
@@ -58,6 +63,11 @@ export const renderMapThumbnail = (map: MapObject): string | null => {
 	map.layers.ground.forEach((object, index) => {
 		object.state = connectionDecision(object)(map, index)
 		object.corners = cornerDecision(object)(map, index)
+	})
+	map.layers.sky.forEach((object, index) => {
+		if (!object) return
+		object.state = skyConnectionDecision(object)(map, index)
+		object.flowReversed = skyFlowReversed(object)(map, index)
 	})
 
 	// paused=true → static frame 0; no fog; localTeam 0; editor=true → no idle

@@ -37,7 +37,8 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 0,
 		name: 'Ground Control',
-		description: 'It enables you to build ground units.',
+		description:
+			'It enables you to build ground units. Each extra one you hold cuts ground unit prices by 10%.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,
@@ -52,7 +53,8 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 17,
 		name: 'Air Control',
-		description: 'It enables you to build air units.',
+		description:
+			'It enables you to build air units. Each extra one you hold cuts air unit prices by 10%.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,
@@ -67,7 +69,8 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 15,
 		name: 'Sea Control',
-		description: 'It enables you to build sea units.',
+		description:
+			'It enables you to build sea units. Each extra one you hold cuts sea unit prices by 10%.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,

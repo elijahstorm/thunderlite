@@ -5,7 +5,7 @@ import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { gameState } from './gameState'
 import { interactionSource } from './Interactor/interactionState'
 import { computeFogMask, drawFog, observeFog, observeUnitFade } from './fogRender'
-import { isUnitStealthed } from './visibility'
+import { isUnitStealthed, unitSeenByViewer, type ViewerFog } from './visibility'
 import { isWalletUnit, walletOf } from './wallet'
 import { observeMaterialize, drawMaterialize } from './materialize'
 import { observeBuildFade } from './buildFade'
@@ -31,10 +31,7 @@ export const flushDeferredOverlays = (): void => {
 	deferredOverlays.length = 0
 }
 
-export type VisibilityProvider = () => {
-	visible: Set<number>
-	team: number
-} | null
+export type VisibilityProvider = () => ViewerFog | null
 
 export const paint =
 	(
@@ -77,11 +74,21 @@ export const paint =
 		// tile. Once the cover starts fading out (`covered` flips false) the unit is
 		// drawn again, so it's revealed by the glow dissolving rather than popping in.
 		const spawning = materialize?.kind === 'spawn' && materialize.covered
+		// Per-UNIT, not per-tile: an air unit above a canopy-dark forest or behind a
+		// ridge is still spotted (unitSeenByViewer widens the check to the air reach),
+		// so its sprite draws over the fog-veiled tile instead of vanishing with it.
 		const hideEnemyUnit =
-			!tileVisible && unitAtTile !== null && fog !== null && unitAtTile.team !== fog.team
+			unitAtTile !== null &&
+			fog !== null &&
+			unitAtTile.team !== fog.team &&
+			!unitSeenByViewer(fog, tile, unitAtTile)
 		// A unit mid attack-animation stays on the map for fog-of-war sight, but its
 		// idle sprite is suppressed here so only the attack overlay is drawn.
 		const hideIdleUnit = hideEnemyUnit || spawning || (unitAtTile?.animating ?? false)
+		// A spotted air unit parked over a fog-dark tile (canopy/ridge below it) is
+		// painted normally — but the fog veil draws after it and would bury the
+		// sprite. Lift the veil on that tile while the aircraft holds it.
+		const airborneReveal = unitAtTile !== null && fog !== null && !tileVisible && !hideEnemyUnit
 		const state = get(gameState)
 		const unitActed =
 			unitAtTile !== null && unitAtTile.team === state.currentTeam && state.actedTiles.has(tile)
@@ -112,7 +119,9 @@ export const paint =
 		// standing on the tile, which reads as the unit dissolving rather than the
 		// ground beneath it rebuilding. (The spawn cover is drawn later, up at the
 		// unit layer, since it stands in for the hidden unit itself.)
-		if (materialize?.kind === 'terrain') {
+		// Terrain reshapes and burn scars both rebuild the ground, so both draw here
+		// under the units; only the spawn cover is deferred to the unit layer.
+		if (materialize && materialize.kind !== 'spawn') {
 			drawMaterialize(context, width, height, materialize.progress, materialize.kind)
 		}
 		// Persistent enemy-threat overlay, drawn under the active selection
@@ -169,6 +178,17 @@ export const paint =
 				context.save()
 				context.translate(left, top)
 				render.threatOutline(outlineUnit, renderData.unit, outlineFrame, true)
+				context.restore()
+			})
+		}
+		// AoE blast preview (hover): the splash/lance footprint of the shot the player
+		// is lining up. Deferred so the red impact marker reads ON TOP of the victim
+		// units standing on those tiles rather than being buried under their sprites.
+		if (tileVisible && (map.splashPreview?.has(tile) ?? false)) {
+			deferredOverlays.push(() => {
+				context.save()
+				context.translate(left, top)
+				render.splashPreview()
 				context.restore()
 			})
 		}
@@ -247,7 +267,7 @@ export const paint =
 		// over a few frames. The overlay crumbles organically wherever a covered
 		// tile abuts a seen one, and stays solid in the fogged interior.
 		if (fog) {
-			const fogValue = observeFog(tile, tileVisible ? 0 : 1)
+			const fogValue = observeFog(tile, tileVisible || airborneReveal ? 0 : 1)
 			if (fogValue > 0.002) {
 				const fogMask = computeFogMask(fog.visible, row, col, map.rows, map.cols)
 				drawFog(context, width, height, fogMask, fogValue)
@@ -260,9 +280,7 @@ export const paint =
 		// spawn still fires from the script. Never drawn for a spectator (localTeam
 		// < 0) — it's private planning info, not a public marker.
 		if (localTeam >= 0) {
-			const telegraph = map.scheduledSpawns?.find(
-				(s) => s.tile === tile && s.team === localTeam
-			)
+			const telegraph = map.scheduledSpawns?.find((s) => s.tile === tile && s.team === localTeam)
 			if (telegraph) render.spawnGhost(telegraph.unitType, telegraph.team, renderData.unit)
 		}
 
@@ -339,6 +357,7 @@ const contextProvider = (
 	carryBadge: carryBadge(width, height)(context),
 	spawnGhost: spawnGhost(width, height, frame, scale)(context),
 	highlights: highlights(width, height, frame)(context),
+	splashPreview: splashPreviewMarker(width, height, frame)(context),
 	threat: threatHighlight(width, height, frame)(context),
 	threatOutline: unitThreatOutline(width, height, frame, scale)(context),
 	threatTint: unitThreatTint(width, height, frame, scale)(context),
@@ -620,14 +639,7 @@ const PLATE_BEVEL = 'rgba(160, 172, 190, 0.7)'
 
 const drawRivet = (context: CanvasRenderingContext2D, cx: number, cy: number, r: number) => {
 	// Lit from the top-left so a row of rivets reads as raised studs.
-	const gradient = context.createRadialGradient(
-		cx - r * 0.35,
-		cy - r * 0.35,
-		r * 0.1,
-		cx,
-		cy,
-		r
-	)
+	const gradient = context.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r)
 	gradient.addColorStop(0, '#9aa6b6')
 	gradient.addColorStop(0.55, '#5c6675')
 	gradient.addColorStop(1, '#20262f')
@@ -725,10 +737,17 @@ const renderObject =
 		// undefined — skip this object so we don't throw; it paints next frame.
 		const sprite = render?.sprite?.[object.team ?? 0]
 		if (!sprite) return
+		// Directional weather (a Jetstream tile flagged `flowReversed`) plays its
+		// seamless loop backwards, flipping the flow 180° with no extra art — so a
+		// source cap streams outward and a turn runs downstream, matching neighbours.
+		const step = frame % render.frames
+		const row = (object as { flowReversed?: boolean }).flowReversed
+			? render.frames - 1 - step
+			: step
 		context.drawImage(
 			sprite,
 			object.state * (spriteSize + render.xOffset),
-			(frame % render.frames) * (spriteSize + render.yOffset),
+			row * (spriteSize + render.yOffset),
 			spriteSize + render.xOffset,
 			spriteSize + render.yOffset,
 			-(render.xOffset / scale),
@@ -768,7 +787,11 @@ const corners =
 		const list = object.corners
 		if (!list || list.length === 0) return
 		const render = renderer(object.type)
-		const sprite = render.sprite[0]
+		// Like renderObject: the sprite loads asynchronously, so on the first paint
+		// after a reload `render.sprite` can still be undefined — skip and paint the
+		// corner overlays next frame instead of throwing. Coastlines with land
+		// poking diagonally into water are the tiles that reach here.
+		const sprite = render?.sprite?.[0]
 		if (!sprite) return
 		const half = spriteSize / 2
 		const sourceY = (frame % render.frames) * (spriteSize + render.yOffset)
@@ -816,10 +839,15 @@ const CARRY_BADGE_SCALE = 0.3
 const carryBadge =
 	(width: number, height: number) =>
 	(context: CanvasRenderingContext2D) =>
-	(passenger: { type: number; team?: number }, renderer: (type: number) => ObjectSpriteRenderer | null) => {
+	(
+		passenger: { type: number; team?: number },
+		renderer: (type: number) => ObjectSpriteRenderer | null
+	) => {
 		const render = renderer(passenger.type)
 		if (!render) return
-		const sprite = render.sprite[passenger.team ?? 0]
+		// `sprite` is attached asynchronously by imageLazyLoader; a map that STARTS
+		// with a loaded transport paints before it exists. Skip until it arrives.
+		const sprite = render.sprite?.[passenger.team ?? 0]
 		if (!sprite) return
 
 		const badgeW = width * CARRY_BADGE_SCALE
@@ -856,6 +884,10 @@ const carryBadge =
 // ever drawn to the team that owns the spawn (see the paint loop), so it doubles
 // as private intel: keep the tile clear or the drop is forfeited.
 const SPAWN_GHOST_COLOR = 'rgb(56, 189, 248)' // sky-400
+// Drawn smaller than a real unit and centred, so a same-type unit already standing
+// on the tile (identical sprite + facing) can't visually merge with the ghost — the
+// size gap reads as "arriving, not here yet".
+const SPAWN_GHOST_SCALE = 0.7
 const spawnGhost =
 	(width: number, height: number, frame: number, scale: number) =>
 	(context: CanvasRenderingContext2D) =>
@@ -864,6 +896,14 @@ const spawnGhost =
 		const sprite = render?.sprite?.[team ?? 0]
 		if (!sprite) return
 		const pulse = (Math.sin(frame * 0.3) + 1) / 2
+
+		// Shrink everything below about the tile centre so the ghost sits inset from a
+		// real unit's footprint. All the inner save/restores nest under this transform,
+		// so every early return past here must restore it first.
+		context.save()
+		context.translate(width / 2, height / 2)
+		context.scale(SPAWN_GHOST_SCALE, SPAWN_GHOST_SCALE)
+		context.translate(-width / 2, -height / 2)
 
 		// Faint unit body (frame 0, team palette) so the owner recognises what's
 		// coming, kept translucent enough that it never reads as a present unit.
@@ -895,7 +935,10 @@ const spawnGhost =
 			height,
 			SPAWN_GHOST_COLOR
 		)
-		if (!sil) return
+		if (!sil) {
+			context.restore()
+			return
+		}
 		const t = Math.max(1.5, width / 20)
 		const offsets: Array<[number, number]> = [
 			[-t, 0],
@@ -914,7 +957,10 @@ const spawnGhost =
 		if (r.width !== sil.width) r.width = sil.width
 		if (r.height !== sil.height) r.height = sil.height
 		const rctx = r.getContext('2d')
-		if (!rctx) return
+		if (!rctx) {
+			context.restore()
+			return
+		}
 		rctx.clearRect(0, 0, r.width, r.height)
 		rctx.globalCompositeOperation = 'source-over'
 		for (const [dx, dy] of offsets) rctx.drawImage(sil, dx, dy)
@@ -926,6 +972,8 @@ const spawnGhost =
 		context.globalAlpha = 0.7 + pulse * 0.3
 		context.drawImage(r, -SILHOUETTE_PAD, -SILHOUETTE_PAD)
 		context.restore()
+
+		context.restore() // pop the ghost-scale transform
 	}
 
 // Vertical sprite-strip overlay for a single tile (tile-select, tile-pointer).
@@ -1144,6 +1192,58 @@ const drawAttackHighlight = (
 
 	context.restore()
 }
+
+// AoE blast preview marker (hover). Drawn ON TOP of whatever unit stands on the
+// tile, so it must be a light wash the sprite still reads through plus a bold
+// pulsing "impact" reticle — concentric red rings around a crosshair — so the
+// player sees exactly which extra tiles a splash/lance shot will catch. Its ring
+// shape reads as "this square gets hit", distinct from the diagonal hatch of the
+// unit's plain attack reach and the counter-hatch of the enemy-threat overlay.
+const splashPreviewMarker =
+	(width: number, height: number, frame: number) => (context: CanvasRenderingContext2D) => () => {
+		const pulse = (Math.sin(frame * 0.35) + 1) / 2
+		const cx = width / 2
+		const cy = height / 2
+		const unit = Math.min(width, height)
+
+		context.save()
+
+		// Light red wash so the tile reads as caught in the blast without hiding the
+		// victim sprite the marker sits over.
+		context.fillStyle = `rgba(239, 68, 68, ${0.12 + pulse * 0.1})`
+		context.fillRect(0, 0, width, height)
+
+		// Outward-pulsing impact ring.
+		context.lineWidth = 2
+		context.strokeStyle = `rgba(254, 202, 202, ${0.78 + pulse * 0.2})`
+		context.beginPath()
+		context.arc(cx, cy, unit * 0.3 + pulse * (unit * 0.08), 0, Math.PI * 2)
+		context.stroke()
+
+		// Steady inner ring for a target-locked feel.
+		context.strokeStyle = `rgba(239, 68, 68, ${0.55 + pulse * 0.2})`
+		context.beginPath()
+		context.arc(cx, cy, unit * 0.16, 0, Math.PI * 2)
+		context.stroke()
+
+		// Crosshair ticks at the four edges, pointing in at the impact.
+		const reach = unit * 0.44
+		const inner = unit * 0.32
+		context.strokeStyle = `rgba(254, 202, 202, ${0.85 + pulse * 0.1})`
+		context.lineWidth = 2
+		context.beginPath()
+		context.moveTo(cx, cy - reach)
+		context.lineTo(cx, cy - inner)
+		context.moveTo(cx, cy + reach)
+		context.lineTo(cx, cy + inner)
+		context.moveTo(cx - reach, cy)
+		context.lineTo(cx - inner, cy)
+		context.moveTo(cx + reach, cy)
+		context.lineTo(cx + inner, cy)
+		context.stroke()
+
+		context.restore()
+	}
 
 // Persistent enemy-threat overlay. Deliberately distinct from the active attack
 // highlight: a deeper crimson wash, a *counter*-diagonal hatch (the attack hatch

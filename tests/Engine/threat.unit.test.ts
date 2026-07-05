@@ -2,7 +2,11 @@
 import { describe, it, expect } from 'vitest'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
-import { computeThreatTiles, unitThreatTiles } from '../../src/lib/Engine/Interactor/Pathing/threat'
+import {
+	computeThreatSeverity,
+	computeThreatTiles,
+	unitThreatTiles,
+} from '../../src/lib/Engine/Interactor/Pathing/threat'
 import { generateActionsList, generatePreviewList } from '../../src/lib/Layers/tileHighlighter'
 import { viewerVisibility } from '../../src/lib/Engine/fogState'
 
@@ -19,6 +23,9 @@ const terrainIndex = (name: string) => {
 
 const STRIKE_COMMANDO = unitIndex('Strike Commando') // direct, range [1,1], power > 0
 const TRANSPORTER = unitIndex('Transporter') // power 0 — cannot threaten
+const SCORPION_TANK = unitIndex('Scorpion Tank') // ground gun, no Air_Raid — can't touch air
+const FLAK_TANK = unitIndex('Flak Tank') // ground, Can_Attack.Air_Raid — the anti-air answer
+const RAPTOR_FIGHTER = unitIndex('Raptor Fighter') // air unit
 const PLAINS = terrainIndex('Plains')
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
@@ -77,6 +84,23 @@ describe('threat computation', () => {
 		map.layers.units[xy(cols, 5, 5)] = unit(STRIKE_COMMANDO, 0)
 
 		expect(computeThreatTiles(map, 0).size).toBe(0)
+	})
+
+	it('move advice ignores enemies that cannot legally target the moving unit', () => {
+		const cols = 15
+		const map = makeMap(cols, 15)
+		const mover = unit(RAPTOR_FIGHTER, 0)
+		// A ground tank with no Air_Raid modifier: whatever its reach, it can never
+		// actually shoot the fighter, so no tile should carry a move warning.
+		map.layers.units[xy(cols, 7, 7)] = unit(SCORPION_TANK, 1)
+
+		expect(computeThreatSeverity(map, mover).size).toBe(0)
+
+		// Swap in a Flak Tank (Can_Attack.Air_Raid) and the warnings come back.
+		map.layers.units[xy(cols, 7, 7)] = unit(FLAK_TANK, 1)
+		const flak = computeThreatSeverity(map, mover)
+		expect(flak.size).toBeGreaterThan(0)
+		expect(flak.get(xy(cols, 8, 7))).toBeGreaterThan(0)
 	})
 
 	it('skips enemies the local viewer cannot see in fog of war', () => {

@@ -41,6 +41,10 @@ export function envForWeather(weather: WeatherId | null | undefined): string | n
 const SKY_WEATHER_AUDIO: Record<string, WeatherId> = {
 	Cloud: 'rain',
 	Storm: 'rain',
+	// Wind-driven weathers read as the dry desert-wind ambience.
+	Turbulence: 'desert',
+	'Ash Plume': 'desert',
+	Jetstream: 'desert',
 }
 
 /**
@@ -64,7 +68,7 @@ export function weatherForMap(map: Pick<MapObject, 'layers'> | null | undefined)
 	return found
 }
 
-/** Default ducked `env` gain so weather ambience sits under the music bed. */
+/** Default env duck multiplier so weather ambience sits under the music bed. */
 export const WEATHER_DUCK = 0.4
 
 export interface WeatherAudioOptions {
@@ -72,9 +76,12 @@ export interface WeatherAudioOptions {
 	playEnv?: (track: string, opts?: PlaySingleOptions) => void
 	/** Stop the env loop. Defaults to the shared audio engine. */
 	stopEnv?: () => void
-	/** Set the env channel volume (used to duck). Defaults to the audio engine. */
-	setEnvVolume?: (volume: number) => void
-	/** Ducked env gain applied while weather plays. Defaults to `WEATHER_DUCK`. */
+	/**
+	 * Apply the env duck multiplier. Composes with (does not overwrite) the
+	 * player's env volume. Defaults to the audio engine.
+	 */
+	setEnvDuck?: (multiplier: number) => void
+	/** Duck multiplier applied while weather plays. Defaults to `WEATHER_DUCK`. */
 	duckVolume?: number
 }
 
@@ -86,7 +93,7 @@ export interface WeatherAudioOptions {
 export class WeatherAudio {
 	private readonly playEnv: (track: string, opts?: PlaySingleOptions) => void
 	private readonly stopEnv: () => void
-	private readonly setEnvVolume: (volume: number) => void
+	private readonly setEnvDuck: (multiplier: number) => void
 	private readonly duckVolume: number
 
 	private current: WeatherId | null = null
@@ -94,7 +101,7 @@ export class WeatherAudio {
 	constructor(opts: WeatherAudioOptions = {}) {
 		this.playEnv = opts.playEnv ?? ((track, o) => audioEngine.playEnv(track, o))
 		this.stopEnv = opts.stopEnv ?? (() => audioEngine.stopEnv())
-		this.setEnvVolume = opts.setEnvVolume ?? ((v) => audioEngine.setChannelVolume('env', v))
+		this.setEnvDuck = opts.setEnvDuck ?? ((v) => audioEngine.setEnvDuck(v))
 		this.duckVolume = opts.duckVolume ?? WEATHER_DUCK
 	}
 
@@ -113,8 +120,9 @@ export class WeatherAudio {
 			this.stopEnv()
 			return
 		}
-		// Duck the env channel so the loop stays beneath the music.
-		this.setEnvVolume(this.duckVolume)
+		// Duck the env channel so the loop stays beneath the music, without
+		// clobbering the player's own env volume preference.
+		this.setEnvDuck(this.duckVolume)
 		this.playEnv(track, { loop: true })
 	}
 

@@ -4,11 +4,19 @@ import {
 	animateAttack,
 	animateExplosion,
 	animateHealthBar,
+	animateTileEffect,
 	beginAnimationBeat,
 	endAnimationBeat,
+	repaintSignal,
 } from './Animator/animator'
-import { hasModifier } from './modifiers/canAttack'
+import { SECONDARY_EFFECT_ANIMATION } from '$lib/GameData/animation'
+import { canAttackTarget, hasModifier } from './modifiers/canAttack'
 import { computeBehindTile } from './modifiers/lance'
+import { splashTargetTiles, splashEffectFor, SPLASH_DAMAGE_SCALE } from './modifiers/splash'
+import { burnableForestTiles, scorchTile } from './modifiers/burn'
+import { beginMaterialize } from './materialize'
+import { playActionSfx } from '$lib/Audio/playActionSfx'
+import type { CommitOptions } from './applyAction'
 import type { SerializedAction } from './Interactor/serializedAction'
 
 /**
@@ -34,7 +42,7 @@ export const animateAttackSequence = async (
 	map: MapObject,
 	attackerTile: number,
 	targetTile: number,
-	commit: (action: SerializedAction) => void
+	commit: (action: SerializedAction, opts?: CommitOptions) => void
 ): Promise<void> => {
 	const action: SerializedAction = { kind: 'attack', from: attackerTile, to: targetTile }
 	const attacker = map.layers.units[attackerTile]
@@ -90,7 +98,10 @@ export const animateAttackSequence = async (
 	const behindTile = hasModifier(attacker, 'Attack.Lance')
 		? computeBehindTile(map, attackerTile, targetTile)
 		: null
-	const passthrough = behindTile !== null ? map.layers.units[behindTile] : null
+	// A behind unit the lance can't target (e.g. an air unit) is missed entirely by
+	// the commit (`applyLancePassthrough`), so predict no hit for it either.
+	const behindUnit = behindTile !== null ? map.layers.units[behindTile] : null
+	const passthrough = behindUnit && canAttackTarget(attacker, behindUnit) ? behindUnit : null
 	const passthroughMax = passthrough ? (unitData[passthrough.type]?.health ?? 0) : 0
 	const passthroughHealthBefore = passthrough ? (passthrough.health ?? passthroughMax) : 0
 	const passthroughDamage =
@@ -105,10 +116,42 @@ export const animateAttackSequence = async (
 	const passthroughHealthAfter = Math.max(0, passthroughHealthBefore - passthroughDamage)
 	const passthroughWillDie = !!passthrough && passthroughHealthAfter <= 0
 
+	// A splash attacker (Scorcher / Breaker / Gunship) washes its neighbours for a
+	// fraction of the blow on the same opening beat. Predict each against the same
+	// pre-combat state `applyAttack` will — its splash also lands before the counter,
+	// off the attacker's current health — so the splashed bars ease to exactly the
+	// values the commit writes instead of snapping. Its flavor (fire vs shrapnel)
+	// decides which effect we throw on each tile.
+	const splashEffect = SECONDARY_EFFECT_ANIMATION[splashEffectFor(attacker)]
+	const splashHits = splashTargetTiles(map, attackerTile, targetTile).map((tile) => {
+		const unit = map.layers.units[tile]!
+		const max = unitData[unit.type]?.health ?? 0
+		const before = unit.health ?? max
+		const damage = Math.round(
+			calculateDamage(attacker, unit, {
+				map,
+				defenderTile: tile,
+				attackerTile,
+				role: 'attack',
+			}) * SPLASH_DAMAGE_SCALE
+		)
+		const after = Math.max(0, before - damage)
+		return { tile, unit, before, after, willDie: after <= 0 }
+	})
+
+	// A burning attacker (Scorcher) scorches the forest on and around its target.
+	// That's a terrain change, animated as a burn-materialize per tile (below) rather
+	// than a health hit. Captured now, while the tiles are still forest, so the swap
+	// can be deferred to each tile's reveal instead of popping at commit.
+	const scorchTiles = hasModifier(attacker, 'Attack.Burn')
+		? burnableForestTiles(map, targetTile)
+		: []
+
 	// Freeze every involved bar at its pre-combat value; we release them step by step.
 	attacker.displayHealth = attackerHealthBefore
 	target.displayHealth = targetHealthBefore
 	if (passthrough) passthrough.displayHealth = passthroughHealthBefore
+	for (const h of splashHits) h.unit.displayHealth = h.before
 
 	// Hold the board "busy" for the whole exchange — its quiet gaps (between the
 	// strike, the bar ease, and the counter) leave `animations` momentarily empty,
@@ -117,8 +160,28 @@ export const animateAttackSequence = async (
 	// while the counter is still playing.
 	beginAnimationBeat()
 	try {
-		// 1. The attacker swings.
+		// 1. The attacker swings — crack the weapon sfx *now*, on the swing, rather
+		//    than letting the post-sequence commit voice it seconds later. The commit
+		//    suppresses 'attack' (see the call sites) so it isn't heard twice.
+		playActionSfx('attack', attacker)
 		await animateAttack(map, attacker, attackerTile, targetTile)
+
+		// Scorched forest chars in under its own fire: a burn-materialize on each tile
+		// runs concurrently with the strike, deferring the real forest→charred swap to
+		// its reveal (so the tile changes under cover, never popping). The commit is
+		// told to skip the swap (deferBurn) since these reveals own it now. Bumping
+		// `repaintSignal` on reveal re-runs MapRender's autotile pass *now*, under the
+		// cover — otherwise the fresh Charred Forest tiles keep their default state 0
+		// (the isolated "single tile" frame) until the next repaint after the beat,
+		// which reads as the tiles snapping to their connected borders a moment late.
+		for (const t of scorchTiles) {
+			beginMaterialize(t, 'burn', {
+				onReveal: () => {
+					scorchTile(map, t)
+					repaintSignal.update((n) => n + 1)
+				},
+			})
+		}
 
 		// 2. The target — and, for a lancing attacker, the unit behind it — take the
 		//    hit on the same beat: their bars drain in lockstep (and any explosions
@@ -130,6 +193,9 @@ export const animateAttackSequence = async (
 			// Hide the doomed unit's idle sprite under the blast; the commit below
 			// removes it from the board for good.
 			target.animating = true
+			// Boom on the blast, not after it: the commit suppresses this tile's death
+			// sfx (via `preVoicedDeathTiles`) so it isn't heard twice.
+			playActionSfx('death', target)
 			hits.push(animateExplosion(map, targetTile))
 		} else {
 			// `hold` — park the bar at its new value; the real `health` is only
@@ -139,9 +205,13 @@ export const animateAttackSequence = async (
 		}
 
 		if (passthrough && behindTile !== null) {
+			// The shaft drives on through the tile behind — mark it with a pierce shock
+			// so the passthrough reads as the lance and not a second, unrelated hit.
+			hits.push(animateTileEffect(map, behindTile, SECONDARY_EFFECT_ANIMATION.pierce))
 			if (passthroughWillDie) {
 				passthrough.displayHealth = undefined
 				passthrough.animating = true
+				playActionSfx('death', passthrough)
 				hits.push(animateExplosion(map, behindTile))
 			} else {
 				hits.push(
@@ -150,15 +220,33 @@ export const animateAttackSequence = async (
 			}
 		}
 
+		// Splash neighbours take their share on the same beat: the attack's flavor
+		// effect blooms on each tile while its bar drains (or it explodes if the wash
+		// killed it). Ride the same `hits` array so they play with the primary hit.
+		for (const h of splashHits) {
+			hits.push(animateTileEffect(map, h.tile, splashEffect))
+			if (h.willDie) {
+				h.unit.displayHealth = undefined
+				h.unit.animating = true
+				playActionSfx('death', h.unit)
+				hits.push(animateExplosion(map, h.tile))
+			} else {
+				hits.push(animateHealthBar(h.unit, h.before, h.after, true))
+			}
+		}
+
 		await Promise.all(hits)
 
 		// 3 & 4. The survivor returns fire, then the attacker takes the hit.
 		if (willCounter) {
-			// Wheel the counter-attacker to face its foe and swing.
+			// Wheel the counter-attacker to face its foe and swing — its weapon
+			// sounds on this beat, matching the opening swing's timing.
+			playActionSfx('attack', target)
 			await animateAttack(map, target, targetTile, attackerTile)
 			if (attackerWillDie) {
 				attacker.displayHealth = undefined
 				attacker.animating = true
+				playActionSfx('death', attacker)
 				await animateExplosion(map, attackerTile)
 			} else {
 				await animateHealthBar(attacker, attackerHealthBefore, attackerHealthAfter, true)
@@ -172,7 +260,24 @@ export const animateAttackSequence = async (
 		// removes any dead units, and runs death/win modifiers. In `finally` so a
 		// failed animation (e.g. an unloaded attack sprite) can never strand the
 		// action and freeze the turn; the game still advances.
-		commit(action)
+		//
+		// The weapon crack and each blast we animated above are already voiced, so
+		// tell the commit to stay silent for them: 'attack' (both swings) and the
+		// specific tiles whose explosion we played — including the splash kills we
+		// now predict and boom on the blast beat. Any death the sequence never
+		// predicted still isn't listed, so applyAction booms those here.
+		const preVoicedDeathTiles: number[] = []
+		if (targetWillDie) preVoicedDeathTiles.push(targetTile)
+		if (passthroughWillDie && behindTile !== null) preVoicedDeathTiles.push(behindTile)
+		if (attackerWillDie) preVoicedDeathTiles.push(attackerTile)
+		for (const h of splashHits) if (h.willDie) preVoicedDeathTiles.push(h.tile)
+		commit(action, {
+			suppressSfxActions: ['attack'],
+			preVoicedDeathTiles,
+			// The burn-materialize reveals own the forest→charred swap now, so the
+			// commit must not also do it (which would pop the tiles instantly).
+			deferBurn: scorchTiles.length > 0,
+		})
 
 		// The bars now read the committed `health`; drop any leftover display
 		// overrides so they settle on the authoritative value, and clear the
@@ -188,6 +293,12 @@ export const animateAttackSequence = async (
 		if (passthrough && behindTile !== null && map.layers.units[behindTile] === passthrough) {
 			passthrough.displayHealth = undefined
 			passthrough.animating = false
+		}
+		for (const h of splashHits) {
+			if (map.layers.units[h.tile] === h.unit) {
+				h.unit.displayHealth = undefined
+				h.unit.animating = false
+			}
 		}
 
 		// Release the board. This re-arms the auto-end-turn watcher, which now sees

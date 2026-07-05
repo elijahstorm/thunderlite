@@ -26,7 +26,12 @@ const building = (team: number, type = WARFACTORY): BuildingObject => ({ type, s
 const seed = (currentTeam: number, money: number, ground: boolean) => {
 	gameState.set({
 		players: [
-			{ team: currentTeam, money, hasLost: false, controls: { ground, air: false, sea: false } },
+			{
+				team: currentTeam,
+				money,
+				hasLost: false,
+				controls: { ground: ground ? 1 : 0, air: 0, sea: 0 },
+			},
 		],
 		currentTeam,
 		turnNumber: 1,

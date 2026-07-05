@@ -33,6 +33,9 @@ const STEPS = 10 // frames the assemble is quantised to — one cached overlay e
 // carries the longer total: its run includes the fade-out tail (below).
 const SPAWN_MS = 1040
 const TERRAIN_MS = 784
+// A burn scorches in a touch slower than a clean terrain reshape — the fire needs
+// a beat to catch and spread across the tile before the char is revealed.
+const BURN_MS = 900
 
 // The run has three phases, as fractions of the total:
 //   [0, FILL_END]        — the cover fills from nothing to complete.
@@ -45,7 +48,7 @@ const FADE_START = 0.8
 const EDGE_BAND = 0.16 // width (in fill-progress) of the bright leading edge
 const FLASH_MAX = 0.35 // peak alpha of the surge wash as the tile completes
 
-export type MaterializeKind = 'spawn' | 'terrain'
+export type MaterializeKind = 'spawn' | 'terrain' | 'burn'
 
 // Bumped whenever an effect begins so the renderer can kick its repaint pump — the
 // board's normal cadence is the coarse 200ms sprite tick, far too slow for this.
@@ -83,19 +86,28 @@ const cellThreshold = (kind: MaterializeKind, phase: Phase, gx: number, gy: numb
 		return clamp01(d * 0.82 + hash01(gx + 37, gy + 91) * 0.18)
 	}
 	const noise = hash01(gx, gy)
-	if (kind === 'spawn') return noise
+	// spawn warps in and a burn catches alight both as scattered points that fill
+	// in; only a clean terrain reshape sweeps top-down.
+	if (kind !== 'terrain') return noise
 	return clamp01(((gy + 0.5) / FX_RES) * 0.78 + noise * 0.22)
 }
 
 // Cool teal for a spawn (warp-in energy), warm gold for terrain (earth/
 // construction). Each has a near-white "hot" tone for the leading edge so the
 // wavefront glows as fresh pixels arrive.
-const palette = (kind: MaterializeKind) =>
-	kind === 'spawn'
-		? { body: '56, 189, 248', hot: '224, 242, 254' } // sky-400 / sky-100
-		: { body: '202, 138, 4', hot: '254, 240, 138' } // yellow-600 / yellow-200
+const palette = (kind: MaterializeKind) => {
+	if (kind === 'spawn') return { body: '56, 189, 248', hot: '224, 242, 254' } // sky-400 / sky-100
+	// A burn glows like fire (deep ember body, hot orange leading edge) so the char
+	// visibly smoulders in, distinct from the gold of a clean terrain reshape.
+	if (kind === 'burn') return { body: '176, 64, 22', hot: '250, 170, 74' }
+	return { body: '202, 138, 4', hot: '254, 240, 138' } // terrain: yellow-600 / yellow-200
+}
 
-const buildOverlay = (kind: MaterializeKind, phase: Phase, level: number): HTMLCanvasElement | null => {
+const buildOverlay = (
+	kind: MaterializeKind,
+	phase: Phase,
+	level: number
+): HTMLCanvasElement | null => {
 	if (typeof document === 'undefined') return null
 	const canvas = document.createElement('canvas')
 	canvas.width = FX_SIZE
@@ -149,7 +161,11 @@ const cache = new Map<number, HTMLCanvasElement | null>()
 const kindIndex = (kind: MaterializeKind) => (kind === 'spawn' ? 0 : 1)
 const phaseIndex = (phase: Phase) => (phase === 'fill' ? 0 : 1)
 
-const getOverlay = (kind: MaterializeKind, phase: Phase, level: number): HTMLCanvasElement | null => {
+const getOverlay = (
+	kind: MaterializeKind,
+	phase: Phase,
+	level: number
+): HTMLCanvasElement | null => {
 	const key = (kindIndex(kind) * 2 + phaseIndex(phase)) * (STEPS + 1) + level
 	if (!cache.has(key)) cache.set(key, buildOverlay(kind, phase, level))
 	return cache.get(key) ?? null
@@ -213,7 +229,7 @@ export const beginMaterialize = (
 	}
 	active.set(tile, {
 		start: performance.now(),
-		dur: kind === 'spawn' ? SPAWN_MS : TERRAIN_MS,
+		dur: kind === 'spawn' ? SPAWN_MS : kind === 'burn' ? BURN_MS : TERRAIN_MS,
 		kind,
 		onReveal: hooks.onReveal,
 		onDone: hooks.onDone,

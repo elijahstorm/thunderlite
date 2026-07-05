@@ -118,17 +118,26 @@ const descriptions: Partial<Record<ModifierKey, string>> = {
 	treacherous: 'Hazardous terrain that can damage units crossing it.',
 	Extra_Sight: 'Sees further than normal, extending vision range.',
 	Trench: 'Dug-in cover that improves the defense of units standing here.',
+	Bulwark: 'A solid wall. Indirect fire cannot reach a unit sheltered behind it.',
 	Conceals: 'Hides units standing on this tile from enemy sight.',
 	Amphibious: 'Can travel across both land and water.',
 	Shallow: 'Shallow water that some land and naval units can pass through.',
 	Port: 'Lets naval units dock here to resupply and repair.',
-	'Start_Turn.Heal_Team': 'At the owner’s turn start, repairs a friendly unit on this building by 10 HP, or deals 10 damage to an enemy camping it.',
+	Storm_Rider:
+		'Built for the tempest: storm cells neither damage this aircraft nor slow its flight.',
+	'Start_Turn.Heal_Team':
+		'At the owner’s turn start, repairs a friendly unit on this building by 10 HP, or deals 10 damage to an enemy camping it.',
 	'Capture.Insta_Lose': 'If this property is captured, its former owner is instantly defeated.',
-	'Capture.Allow_Ground': 'Capturing this property grants the owner the ability to build ground units.',
-	'Capture.Allow_Air': 'Capturing this property grants the owner the ability to build air units.',
-	'Capture.Allow_Sea': 'Capturing this property grants the owner the ability to build naval units.',
-	'Each_Turn.Supply_Income': 'Pays out income each turn, drawing from its reserves and trickling a reduced amount once drained.',
-	'Start_Turn.Capture': 'Automatically chips away at any enemy property it stands on at the start of each turn. Attacking last turn skips that turn’s capture.',
+	'Capture.Allow_Ground':
+		'Capturing this property grants the owner the ability to build ground units. Each additional one held discounts ground units bought with main funds by 10%, up to 50%.',
+	'Capture.Allow_Air':
+		'Capturing this property grants the owner the ability to build air units. Each additional one held discounts air units bought with main funds by 10%, up to 50%.',
+	'Capture.Allow_Sea':
+		'Capturing this property grants the owner the ability to build naval units. Each additional one held discounts naval units bought with main funds by 10%, up to 50%.',
+	'Each_Turn.Supply_Income':
+		'Pays out income each turn, drawing from its reserves and trickling a reduced amount once drained.',
+	'Start_Turn.Capture':
+		'Automatically chips away at any enemy property it stands on at the start of each turn. Attacking last turn skips that turn’s capture.',
 	'Move.Tracking': 'Reveals adjacent hidden enemies as it moves past them.',
 	'Self_Action.Transport': 'Can load and carry other units.',
 	'Self_Action.Repairable': 'Can be repaired and resupplied at a friendly base.',
@@ -142,21 +151,30 @@ const descriptions: Partial<Record<ModifierKey, string>> = {
 	'Damage.Slow_Attack': 'Hits hard but is sluggish to act.',
 	'Damage.Stealth_Strike': 'Deals bonus damage when attacking from concealment.',
 	'Can_Attack.Counter_Range': 'Can return fire even against attackers striking from range.',
-	'Move.Radar': 'Sweeps the surrounding area as it moves, revealing hidden enemies within its range.',
+	'Move.Radar':
+		'Sweeps the surrounding area as it moves, revealing hidden enemies within its range.',
 	'Idle.Jamming': 'While stationary, jams enemy sensors and stealth nearby.',
 	'Self_Action.Miner': 'Can mine resources from the terrain.',
 	'Self_Action.Builder': 'Can construct structures or fortifications.',
-	'Death.Insta_Lose': 'If this unit is destroyed and its owner has no fallback, that player is instantly defeated.',
+	'Death.Insta_Lose':
+		'If this unit is destroyed and its owner has no fallback, that player is instantly defeated.',
 	'Can_Attack.Ground_Assult': 'Specialized assault that targets ground units.',
 	'Self_Action.Irreparable': 'Cannot be repaired once it takes damage.',
-	'End_Turn.Vulture': 'Scavenges resources from nearby wreckage at the end of the turn.',
+	'End_Turn.Vulture':
+		'Acts again whenever its attack destroys the target, chaining kills as long as each shot finishes its prey.',
 	'Self_Action.Land': 'Can land to deploy or switch modes.',
 	'Self_Action.Ship_Out': 'Can deploy from or board a transport or port.',
-	'Damage.Highground': 'Deals dramatically more damage the higher it stands above its target — devastating from a peak, ordinary on the flat.',
-	'Damage.Aegis': 'Projects a protective field: friendly units standing next to it take less damage.',
-	'Attack.Splash': 'Its attack washes over every tile around the target, dealing splash damage to anything beside it.',
+	'Damage.Highground':
+		'Deals dramatically more damage the higher it stands above its target — devastating from a peak, ordinary on the flat.',
+	'Damage.Aegis':
+		'Projects a protective field: friendly units standing next to it take less damage.',
+	'Damage.Siege':
+		'Arcs its shells straight past terrain cover, so dug-in defenders get no shelter and take the full hit.',
+	'Attack.Splash':
+		'Its attack washes over every tile around the target, dealing splash damage to anything beside it.',
 	'Attack.Burn': 'Sets the struck area alight, scorching forest cover away into burnt wasteland.',
-	'Move.Smoke': 'Trails a concealing smoke screen over itself and the tiles around it as it advances.',
+	'Move.Smoke':
+		'Trails a concealing smoke screen over itself and the tiles around it as it advances.',
 }
 
 export type ModifierDisplay = {

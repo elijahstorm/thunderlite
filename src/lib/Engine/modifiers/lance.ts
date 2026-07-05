@@ -2,7 +2,7 @@ import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { calculateDamage } from '../combat'
 import { gameState } from '../gameState'
-import { hasModifier } from './canAttack'
+import { canAttackTarget, hasModifier } from './canAttack'
 import { resetCaptureProgress } from './capture'
 import { runModifiers } from './index'
 
@@ -41,6 +41,10 @@ export const applyLancePassthrough = (
 
 	const passthrough = map.layers.units[behind]
 	if (!passthrough) return null
+	// The shaft only strikes what the lance could aim at in the first place: a unit
+	// type it can't target (an air unit behind a ground target, say) is simply
+	// overflown — the shot misses it rather than clipping it for full damage.
+	if (!canAttackTarget(attacker, passthrough)) return null
 
 	const damage = calculateDamage(attacker, passthrough, {
 		map,

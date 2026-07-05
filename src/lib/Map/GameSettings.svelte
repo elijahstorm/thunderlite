@@ -15,9 +15,24 @@
 	let open = false
 	let view: 'menu' | 'confirmGiveUp' | 'confirmExit' = 'menu'
 
-	$: muted = $audioSettings.master.muted
+	$: masterMuted = $audioSettings.master.muted
 	$: playing = $gameState.phase === 'playing'
 	$: threatShown = $shownThreatUnits.size > 0
+
+	// Music and SFX are independent channels — expose each so players can, say,
+	// kill the soundtrack while keeping combat feedback. Master rides above both.
+	const soundChannels = [
+		{ key: 'music', label: 'Music', on: 'mdi:music-note', off: 'mdi:music-note-off' },
+		{ key: 'sfx', label: 'Sound FX', on: 'mdi:volume-high', off: 'mdi:volume-off' },
+		{
+			key: 'env',
+			label: 'Weather',
+			on: 'mdi:weather-partly-rainy',
+			off: 'mdi:weather-cloudy',
+		},
+	] as const
+
+	const pct = (v: number) => `${Math.round(v * 100)}%`
 
 	const toggleThreatOverlay = () => {
 		if (map) toggleAllThreats(map)
@@ -32,7 +47,7 @@
 		view = 'menu'
 	}
 
-	const toggleMute = () => audioEngine.setMasterMute(!$audioSettings.master.muted)
+	const toggleMasterMute = () => audioEngine.setMasterMute(!$audioSettings.master.muted)
 
 	const giveUp = () => {
 		if (map && playing) surrender(map, localTeam)
@@ -66,15 +81,51 @@
 				<button
 					type="button"
 					role="menuitem"
-					on:click={toggleMute}
+					on:click={toggleMasterMute}
 					class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
 				>
 					<span class="flex items-center gap-2">
-						<Icon icon={muted ? 'mdi:volume-off' : 'mdi:volume-high'} width="18" height="18" />
+						<Icon
+							icon={masterMuted ? 'mdi:volume-off' : 'mdi:volume-high'}
+							width="18"
+							height="18"
+						/>
 						Sound
 					</span>
-					<span class="text-xs text-white/60">{muted ? 'Muted' : 'On'}</span>
+					<span class="text-xs text-white/60">{masterMuted ? 'Muted' : 'On'}</span>
 				</button>
+
+				{#each soundChannels as ch (ch.key)}
+					{@const settings = $audioSettings[ch.key]}
+					<div class="px-3 py-1.5" class:opacity-40={masterMuted}>
+						<div class="flex items-center justify-between">
+							<button
+								type="button"
+								on:click={() => audioEngine.toggleMute(ch.key)}
+								aria-label={`${ch.label}: ${settings.muted ? 'unmute' : 'mute'}`}
+								class="flex items-center gap-2 rounded-md text-left transition-colors hover:text-white/80"
+							>
+								<Icon icon={settings.muted ? ch.off : ch.on} width="18" height="18" />
+								{ch.label}
+							</button>
+							<span class="text-xs text-white/60">
+								{settings.muted ? 'Muted' : pct(settings.volume)}
+							</span>
+						</div>
+						<input
+							type="range"
+							min="0"
+							max="1"
+							step="0.05"
+							value={settings.volume}
+							aria-label={`${ch.label} volume`}
+							on:input={(e) => audioEngine.setChannelVolume(ch.key, e.currentTarget.valueAsNumber)}
+							class="mt-1.5 h-1.5 w-full cursor-pointer accent-white"
+						/>
+					</div>
+				{/each}
+
+				<div class="my-1 h-px bg-white/10"></div>
 
 				<button
 					type="button"

@@ -11,10 +11,15 @@ import { resetSmoke } from './smokeState'
  */
 export const NEUTRAL_TEAM = 4
 
+/**
+ * How many control buildings of each category the player owns. The first one
+ * unlocks building that unit type; each additional one discounts those units
+ * when bought with the shared player money pool (see `discountedUnitCost`).
+ */
 export type PlayerControls = {
-	ground: boolean
-	air: boolean
-	sea: boolean
+	ground: number
+	air: number
+	sea: number
 }
 
 export type Player = {
@@ -52,7 +57,7 @@ export type Player = {
 	fogCleared?: Record<number, number>
 }
 
-const emptyControls = (): PlayerControls => ({ ground: false, air: false, sea: false })
+const emptyControls = (): PlayerControls => ({ ground: 0, air: 0, sea: 0 })
 
 const controlForModifier = (modifier: string): keyof PlayerControls | null => {
 	if (modifier === 'Capture.Allow_Ground') return 'ground'
@@ -77,7 +82,7 @@ const controlsFromBuildings = (map: MapProcesser | MapObject, team: number): Pla
 	for (const building of map.layers.buildings) {
 		if (!building || building.team !== team) continue
 		for (const grant of buildingGrants(building.type)) {
-			controls[grant] = true
+			controls[grant]++
 		}
 	}
 	return controls

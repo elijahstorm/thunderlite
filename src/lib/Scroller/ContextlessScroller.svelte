@@ -34,11 +34,26 @@
 	let reflow: VoidFunction
 	const render = () => reflow && !scroller?.__isDecelerating && !scroller?.__isTracking && reflow()
 
-	// Matches Scroller's panToTile so this stand-in is swap-compatible in tests.
-	// Headless tests don't measure layout, so a no-op satisfies the type without
-	// changing behaviour.
+	// Mirror Scroller's imperative API so this stand-in is swap-compatible in
+	// tests. Headless tests don't measure layout, so no-ops satisfy the types
+	// without changing behaviour (the route camera simply gets a null viewport).
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	export const panToTile = (_x: number, _y: number, _animate = true): void => {}
+	export const viewport = (): {
+		left: number
+		top: number
+		width: number
+		height: number
+		tileWidth: number
+		tileHeight: number
+	} | null => null
+	/* eslint-disable @typescript-eslint/no-unused-vars */
+	export const scrollToPx = (
+		_left: number,
+		_top: number,
+		_animate = true
+	): { left: number; top: number } | null => null
+	/* eslint-enable @typescript-eslint/no-unused-vars */
 	export let paint =
 		(context: CanvasRenderingContext2D) =>
 		(

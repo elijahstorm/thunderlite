@@ -2,17 +2,18 @@ import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { tileHasModifier } from '$lib/Engine/modifiers/terrainModifier'
 import { extraRangeBonus } from '$lib/Engine/modifiers/extraSight'
-import { indirectFireShadowed } from '$lib/Engine/lineOfSight'
-import { indirectShadowsEnabled } from '$lib/Engine/occlusionState'
+import { indirectFireBlocked } from '$lib/Engine/lineOfSight'
 import { viewerVisibility } from '$lib/Engine/fogState'
+import { unitSeenByViewer } from '$lib/Engine/visibility'
 import { previewDamage } from '$lib/Engine/combat'
+import { canAttackTarget } from '$lib/Engine/modifiers/canAttack'
 import { generateMovementList } from './movement'
 
 // Adds every in-bounds tile whose Manhattan distance from `center` falls within
 // [min, max] to `out` — the geometric reach of a weapon fired from `center`.
 // When `indirect` is set (the firer is a long-range attacker), tiles it can't
 // actually shell are skipped so they don't show as threatened: Trench tiles such
-// as Canyons, and tiles shadowed by higher ground between them and `center`. Mirrors
+// as Canyons, and tiles behind a Rampart (Bulwark) between them and `center`. Mirrors
 // `canTarget` in Pathing/attack.ts.
 const addAttackDiamond = (
 	map: MapObject,
@@ -20,9 +21,15 @@ const addAttackDiamond = (
 	min: number,
 	max: number,
 	out: Set<number>,
-	indirect: boolean
+	indirect: boolean,
+	// The prospective target's domain. Trench and firing-shadow shelter only
+	// SURFACE targets — an air unit hovers above the canyon lip / ridge line in
+	// plain view — so those exclusions are skipped when aiming at 'air'. 'any'
+	// (the generic overlay union, no specific target) keeps the surface default.
+	targetDomain: 'any' | 'ground' | 'air' | 'sea' = 'any'
 ) => {
-	const shadows = indirect && get(indirectShadowsEnabled)
+	const geometryShelters = targetDomain !== 'air'
+	const blocks = indirect && geometryShelters
 	const cx = center % map.cols
 	const cy = Math.floor(center / map.cols)
 	for (let dy = -max; dy <= max; dy++) {
@@ -34,8 +41,8 @@ const addAttackDiamond = (
 			const x = cx + dx
 			if (x < 0 || x >= map.cols) continue
 			const target = y * map.cols + x
-			if (indirect && tileHasModifier(map, target, 'Trench')) continue
-			if (shadows && indirectFireShadowed(map, center, target)) continue
+			if (indirect && geometryShelters && tileHasModifier(map, target, 'Trench')) continue
+			if (blocks && indirectFireBlocked(map, center, target)) continue
 			out.add(target)
 		}
 	}
@@ -45,8 +52,15 @@ const addAttackDiamond = (
 // (min range 1) may move before firing, so their reach is the union of attack
 // diamonds from every tile they can reach. Indirect units can't move-and-fire,
 // so their reach is the diamond from where they already stand. Units that deal
-// no damage (transports, jammers, …) threaten nothing.
-export const unitThreatTiles = (map: MapObject, tile: number, unit: UnitObject): Set<number> => {
+// no damage (transports, jammers, …) threaten nothing. `targetDomain` narrows the
+// reach to a specific prospective victim: pass 'air' when asking "can this reach
+// my aircraft?" so Trench/ridge shelter (surface-only) isn't wrongly subtracted.
+export const unitThreatTiles = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	targetDomain: 'any' | 'ground' | 'air' | 'sea' = 'any'
+): Set<number> => {
 	const out = new Set<number>()
 	const stats = unitData[unit.type]
 	if (!stats || stats.power <= 0) return out
@@ -55,11 +69,11 @@ export const unitThreatTiles = (map: MapObject, tile: number, unit: UnitObject):
 	if (min > 1) {
 		// Indirect / long-range: can't move-and-fire, and can't reach Trench tiles.
 		// High ground extends its reach by one tile (mirrors generateAttackList).
-		addAttackDiamond(map, tile, min, max + extraRangeBonus(map, tile, unit), out, true)
+		addAttackDiamond(map, tile, min, max + extraRangeBonus(map, tile, unit), out, true, targetDomain)
 	} else {
 		// Direct: closes to point-blank, so move first then strike — Trenches included.
 		for (const from of generateMovementList(map, tile, unit)) {
-			addAttackDiamond(map, from, min, max, out, false)
+			addAttackDiamond(map, from, min, max, out, false, targetDomain)
 		}
 	}
 	return out
@@ -76,7 +90,8 @@ export const computeThreatTiles = (map: MapObject, team: number): Set<number> =>
 	for (let i = 0; i < units.length; i++) {
 		const enemy = units[i]
 		if (!enemy || enemy.team === team) continue
-		if (fog && !fog.visible.has(i)) continue
+		// Per-unit fog check: an air enemy above canopy/ridge fog is still seen.
+		if (!unitSeenByViewer(fog, i, enemy)) continue
 		for (const t of unitThreatTiles(map, i, enemy)) out.add(t)
 	}
 	return out
@@ -96,8 +111,14 @@ export const computeThreatSeverity = (map: MapObject, unit: UnitObject): Map<num
 	for (let i = 0; i < units.length; i++) {
 		const enemy = units[i]
 		if (!enemy || enemy.team === unit.team) continue
-		if (fog && !fog.visible.has(i)) continue
-		for (const t of unitThreatTiles(map, i, enemy)) {
+		// Per-unit fog check: an air enemy above canopy/ridge fog is still seen.
+		if (!unitSeenByViewer(fog, i, enemy)) continue
+		// An enemy that can't legally target this unit's class (a ground-only gun
+		// vs an aircraft, a land unit vs a ship) poses it no danger: its reach must
+		// not spill onto this unit's move advice. previewDamage alone won't catch
+		// this — it prices the hit without asking whether the shot is allowed.
+		if (!canAttackTarget(enemy, unit)) continue
+		for (const t of unitThreatTiles(map, i, enemy, unitData[unit.type]?.type ?? 'any')) {
 			const dmg = previewDamage(enemy, unit, {
 				map,
 				defenderTile: t,

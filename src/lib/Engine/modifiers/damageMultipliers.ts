@@ -21,7 +21,7 @@ const handlers: Partial<Record<ModifierKey, MultiplierHandler>> = {
 	'Damage.Slow_Attack': ({ role }) => (role === 'counter' ? 0.85 : 1),
 	'Damage.Flak': ({ defender }) => {
 		const def = unitData[defender.type]
-		return def?.armorType === 'light' ? 2 : 1
+		return def?.type === 'air' ? 2 : 1
 	},
 	// Ambush bonus: a stealth unit that strikes while still concealed doubles its
 	// damage. Only on the opening blow — a counter-attack means the unit is already

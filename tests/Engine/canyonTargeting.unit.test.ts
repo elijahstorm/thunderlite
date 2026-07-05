@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
+import { skyData } from '../../src/lib/GameData/sky'
 import { generateAttackList } from '../../src/lib/Engine/Interactor/Pathing/attack'
 import { unitThreatTiles } from '../../src/lib/Engine/Interactor/Pathing/threat'
 
@@ -18,8 +19,17 @@ const terrainIndex = (name: string) => {
 
 const STRIKE_COMMANDO = unitIndex('Strike Commando') // direct, range [1,1]
 const MORTAR_TRUCK = unitIndex('Mortar Truck') // indirect, range [2,3]
+const SHRIKE = unitIndex('Shrike Interdictor') // indirect AIR, range [2,4], Air_Raid
+const RAPTOR = unitIndex('Raptor Fighter') // air unit
 const PLAINS = terrainIndex('Plains')
 const CANYON = terrainIndex('Canyon')
+
+const skyIndex = (name: string) => {
+	const idx = skyData.findIndex((s) => s.name === name)
+	if (idx < 0) throw new Error(`unknown sky: ${name}`)
+	return idx
+}
+const CLOUD = skyIndex('Cloud')
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
 const unit = (type: number, team = 0): UnitObject => ({
@@ -92,6 +102,53 @@ describe('Canyon (Trench) targeting', () => {
 		expect(targets).toContain(targetTile)
 	})
 
+	it('an indirect attacker CAN shell an AIR unit hovering over a Canyon', () => {
+		// The Shrike Interdictor is a long-range air-capable indirect unit — the Trench
+		// only shelters what sits IN the canyon, so an aircraft above the lip is fair game.
+		const cols = 9
+		const map = makeMap(cols, 9)
+		const attackerTile = xy(cols, 4, 4)
+		const airTarget = xy(cols, 4, 6) // 2 tiles away — inside Shrike's [2,4] range
+
+		map.layers.units[attackerTile] = unit(SHRIKE, 0)
+		map.layers.units[airTarget] = unit(RAPTOR, 1)
+		map.layers.ground[airTarget] = ground(CANYON)
+
+		const targets = generateAttackList(map, attackerTile, map.layers.units[attackerTile]!)
+		expect(targets).toContain(airTarget)
+	})
+
+	it('the same indirect attacker still CANNOT shell a GROUND unit in that Canyon', () => {
+		// Contrast: a surface unit really is sheltered below the line of fire.
+		const cols = 9
+		const map = makeMap(cols, 9)
+		const attackerTile = xy(cols, 4, 4)
+		const groundTarget = xy(cols, 4, 6)
+
+		map.layers.units[attackerTile] = unit(SHRIKE, 0)
+		map.layers.units[groundTarget] = unit(STRIKE_COMMANDO, 1)
+		map.layers.ground[groundTarget] = ground(CANYON)
+
+		const targets = generateAttackList(map, attackerTile, map.layers.units[attackerTile]!)
+		expect(targets).not.toContain(groundTarget)
+	})
+
+	it('weather cover overhead does NOT hide a ground enemy beneath it', () => {
+		// Old rule blocked targeting any non-air unit under a sky tile; cloud cover is
+		// for aircraft flying IN it, not a shield over the ground below.
+		const cols = 9
+		const map = makeMap(cols, 9)
+		const attackerTile = xy(cols, 4, 4)
+		const targetTile = xy(cols, 4, 5) // adjacent — direct range
+
+		map.layers.units[attackerTile] = unit(STRIKE_COMMANDO, 0)
+		map.layers.units[targetTile] = unit(STRIKE_COMMANDO, 1)
+		map.layers.sky[targetTile] = { type: CLOUD, state: 0 }
+
+		const targets = generateAttackList(map, attackerTile, map.layers.units[attackerTile]!)
+		expect(targets).toContain(targetTile)
+	})
+
 	it('a Canyon tile is not flagged as threatened by a long-range unit', () => {
 		const cols = 9
 		const map = makeMap(cols, 9)
@@ -105,5 +162,20 @@ describe('Canyon (Trench) targeting', () => {
 		const threat = unitThreatTiles(map, enemyTile, map.layers.units[enemyTile]!)
 		expect(threat.has(canyonTile)).toBe(false)
 		expect(threat.has(plainsTile)).toBe(true)
+	})
+
+	it('a Canyon tile IS threatened for an air target but not a ground one', () => {
+		// unitThreatTiles narrows to the prospective victim's domain: the Trench
+		// shelters a ground unit standing in the canyon, but not an aircraft above it.
+		const cols = 9
+		const map = makeMap(cols, 9)
+		const enemyTile = xy(cols, 4, 4)
+		const canyonTile = xy(cols, 4, 6) // within the Shrike's [2,4] reach
+		map.layers.units[enemyTile] = unit(SHRIKE, 1)
+		map.layers.ground[canyonTile] = ground(CANYON)
+		const enemy = map.layers.units[enemyTile]!
+
+		expect(unitThreatTiles(map, enemyTile, enemy, 'ground').has(canyonTile)).toBe(false)
+		expect(unitThreatTiles(map, enemyTile, enemy, 'air').has(canyonTile)).toBe(true)
 	})
 })

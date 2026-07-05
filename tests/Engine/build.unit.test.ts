@@ -2,13 +2,17 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
 import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
-import { buildableUnits, spawnBuiltUnit } from '../../src/lib/Engine/build'
+import { buildableUnits, discountedUnitCost, spawnBuiltUnit } from '../../src/lib/Engine/build'
 import { unitData } from '../../src/lib/GameData/unit'
 import { buildingData } from '../../src/lib/GameData/building'
+import { terrainData } from '../../src/lib/GameData/terrain'
 
 const WARFACTORY_TYPE = buildingData.findIndex((b) => b.name === 'Warfactory')
 const SCORPION_TANK_TYPE = unitData.findIndex((u) => u.name === 'Scorpion Tank')
 const RAPTOR_FIGHTER_TYPE = unitData.findIndex((u) => u.name === 'Raptor Fighter')
+const CORVETTE_TYPE = unitData.findIndex((u) => u.name === 'Corvette')
+const MOUNTAIN = terrainData.findIndex((t) => t.name === 'Mountain')
+const SHORE = terrainData.findIndex((t) => t.name === 'Shore')
 
 const makeMap = (overrides: Partial<MapProcesser> = {}): MapProcesser => ({
 	cols: 4,
@@ -28,7 +32,7 @@ describe('buildableUnits', () => {
 	it('marks every entry as non-buildable when no controls are unlocked', () => {
 		const player = {
 			money: 9999,
-			controls: { ground: false, air: false, sea: false },
+			controls: { ground: 0, air: 0, sea: 0 },
 		}
 		const list = buildableUnits(player)
 		expect(list.length).toBeGreaterThan(0)
@@ -41,7 +45,7 @@ describe('buildableUnits', () => {
 	it('marks only ground units as buildable when only ground control is set', () => {
 		const player = {
 			money: 9999,
-			controls: { ground: true, air: false, sea: false },
+			controls: { ground: 1, air: 0, sea: 0 },
 		}
 		const list = buildableUnits(player)
 		expect(list.length).toBeGreaterThan(0)
@@ -59,7 +63,7 @@ describe('buildableUnits', () => {
 	it('marks unaffordable units as not affordable but still in the list', () => {
 		const player = {
 			money: 50,
-			controls: { ground: true, air: false, sea: false },
+			controls: { ground: 1, air: 0, sea: 0 },
 		}
 		const list = buildableUnits(player)
 		for (const entry of list) {
@@ -76,7 +80,7 @@ describe('buildableUnits', () => {
 	it('excludes zero-cost units (Turret, Blockade, Leviathan, Transporter)', () => {
 		const player = {
 			money: 9999,
-			controls: { ground: true, air: true, sea: true },
+			controls: { ground: 1, air: 1, sea: 1 },
 		}
 		const list = buildableUnits(player)
 		for (const entry of list) expect(entry.data.cost).toBeGreaterThan(0)
@@ -99,7 +103,7 @@ describe('buildableUnits', () => {
 	it('shows air units as locked (not buildable) without air control', () => {
 		const groundOnly = {
 			money: 9999,
-			controls: { ground: true, air: false, sea: false },
+			controls: { ground: 1, air: 0, sea: 0 },
 		}
 		const groundList = buildableUnits(groundOnly)
 		const raptor = groundList.find((e) => e.type === RAPTOR_FIGHTER_TYPE)
@@ -109,12 +113,57 @@ describe('buildableUnits', () => {
 
 		const withAir = {
 			money: 9999,
-			controls: { ground: true, air: true, sea: false },
+			controls: { ground: 1, air: 1, sea: 0 },
 		}
 		const withAirList = buildableUnits(withAir)
 		const raptorWithAir = withAirList.find((e) => e.type === RAPTOR_FIGHTER_TYPE)
 		expect(raptorWithAir?.controlled).toBe(true)
 		expect(raptorWithAir?.buildable).toBe(true)
+	})
+})
+
+describe('control building discount', () => {
+	const SCORPION = unitData[SCORPION_TANK_TYPE]
+
+	it('charges full price with a single control building', () => {
+		const player = { controls: { ground: 1, air: 0, sea: 0 } }
+		expect(discountedUnitCost(player, SCORPION)).toBe(SCORPION.cost)
+	})
+
+	it('discounts 10% per extra control building, on the 5-credit grid', () => {
+		const player = { controls: { ground: 2, air: 0, sea: 0 } }
+		// Scorpion Tank is 270; 10% off is 243, which lands on 245.
+		expect(discountedUnitCost(player, SCORPION)).toBe(245)
+		const three = { controls: { ground: 3, air: 0, sea: 0 } }
+		// 20% off 270 is 216, which lands on 215.
+		expect(discountedUnitCost(three, SCORPION)).toBe(215)
+	})
+
+	it('caps the discount at 50%', () => {
+		const player = { controls: { ground: 20, air: 0, sea: 0 } }
+		expect(discountedUnitCost(player, SCORPION)).toBe(SCORPION.cost / 2)
+	})
+
+	it('only discounts the matching unit category', () => {
+		const player = { controls: { ground: 3, air: 1, sea: 0 } }
+		const raptor = unitData[RAPTOR_FIGHTER_TYPE]
+		expect(discountedUnitCost(player, raptor)).toBe(raptor.cost)
+	})
+
+	it('applies to buildableUnits affordability from main money', () => {
+		const player = { money: 245, controls: { ground: 2, air: 0, sea: 0 } }
+		const entry = buildableUnits(player).find((e) => e.type === SCORPION_TANK_TYPE)
+		expect(entry?.cost).toBe(245)
+		expect(entry?.affordable).toBe(true)
+		expect(entry?.buildable).toBe(true)
+	})
+
+	it('never applies on the Warmachine wallet path (ignoreControls)', () => {
+		const player = { money: 0, controls: { ground: 5, air: 5, sea: 5 } }
+		const entry = buildableUnits(player, { budget: 9999, ignoreControls: true }).find(
+			(e) => e.type === SCORPION_TANK_TYPE
+		)
+		expect(entry?.cost).toBe(SCORPION.cost)
 	})
 })
 
@@ -130,7 +179,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, money: 270, controls: { ground: true, air: false, sea: false } } : p
+				p.team === 0 ? { ...p, money: 270, controls: { ground: 1, air: 0, sea: 0 } } : p
 			),
 		}))
 
@@ -145,6 +194,23 @@ describe('spawnBuiltUnit', () => {
 		expect(state.actedTiles.has(5)).toBe(true)
 	})
 
+	it('deducts the discounted price when the player holds extra ground controls', () => {
+		const map = makeMap()
+		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
+		initGameStateFromMap(map)
+		gameState.update((s) => ({
+			...s,
+			players: s.players.map((p) =>
+				// 245 is exactly the two-control price of a 270 Scorpion Tank.
+				p.team === 0 ? { ...p, money: 245, controls: { ground: 2, air: 0, sea: 0 } } : p
+			),
+		}))
+
+		const result = spawnBuiltUnit(map, 5, SCORPION_TANK_TYPE, 0)
+		expect(result.ok).toBe(true)
+		expect(get(gameState).players.find((p) => p.team === 0)?.money).toBe(0)
+	})
+
 	it('refuses to spawn when the player cannot afford the unit', () => {
 		const map = makeMap()
 		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
@@ -152,7 +218,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, money: 10, controls: { ground: true, air: false, sea: false } } : p
+				p.team === 0 ? { ...p, money: 10, controls: { ground: 1, air: 0, sea: 0 } } : p
 			),
 		}))
 
@@ -170,7 +236,7 @@ describe('spawnBuiltUnit', () => {
 			...s,
 			players: s.players.map((p) =>
 				p.team === 0
-					? { ...p, money: 9999, controls: { ground: false, air: false, sea: false } }
+					? { ...p, money: 9999, controls: { ground: 0, air: 0, sea: 0 } }
 					: p
 			),
 		}))
@@ -180,7 +246,10 @@ describe('spawnBuiltUnit', () => {
 		if (!result.ok) expect(result.reason).toBe('not-buildable')
 	})
 
-	it('spawns into an adjacent tile when the building tile is occupied', () => {
+	it('fails with no-space when the factory tile is already occupied', () => {
+		// A factory deploys onto its own tile, so an occupant blocks the build
+		// outright — no spilling onto neighbours, which is what let a coastal factory
+		// churn out extra units without ever being consumed.
 		const map = makeMap()
 		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
 		map.layers.units[5] = { type: 0, state: 0, team: 0 }
@@ -188,29 +257,7 @@ describe('spawnBuiltUnit', () => {
 		gameState.update((s) => ({
 			...s,
 			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, money: 270, controls: { ground: true, air: false, sea: false } } : p
-			),
-		}))
-
-		const result = spawnBuiltUnit(map, 5, SCORPION_TANK_TYPE, 0)
-		expect(result.ok).toBe(true)
-		if (result.ok) {
-			expect([1, 4, 6, 9]).toContain(result.tile)
-			expect(map.layers.units[result.tile]?.type).toBe(SCORPION_TANK_TYPE)
-		}
-	})
-
-	it('fails when neither the building tile nor any adjacent tile is free', () => {
-		const map = makeMap()
-		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
-		for (const t of [5, 1, 4, 6, 9]) {
-			map.layers.units[t] = { type: 0, state: 0, team: 0 }
-		}
-		initGameStateFromMap(map)
-		gameState.update((s) => ({
-			...s,
-			players: s.players.map((p) =>
-				p.team === 0 ? { ...p, money: 270, controls: { ground: true, air: false, sea: false } } : p
+				p.team === 0 ? { ...p, money: 270, controls: { ground: 1, air: 0, sea: 0 } } : p
 			),
 		}))
 
@@ -218,5 +265,60 @@ describe('spawnBuiltUnit', () => {
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.reason).toBe('no-space')
 		expect(get(gameState).players.find((p) => p.team === 0)?.money).toBe(270)
+	})
+
+	it('fails with no-space when the unit could never occupy the factory tile', () => {
+		// A treaded tank can't perch on the mountain the factory sits on.
+		const map = makeMap()
+		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
+		map.layers.ground[5].type = MOUNTAIN
+		initGameStateFromMap(map)
+		gameState.update((s) => ({
+			...s,
+			players: s.players.map((p) =>
+				p.team === 0 ? { ...p, money: 270, controls: { ground: 1, air: 0, sea: 0 } } : p
+			),
+		}))
+
+		const result = spawnBuiltUnit(map, 5, SCORPION_TANK_TYPE, 0)
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.reason).toBe('no-space')
+		expect(get(gameState).players.find((p) => p.team === 0)?.money).toBe(270)
+	})
+
+	it('refuses to build a sea unit from a landlocked factory', () => {
+		const map = makeMap()
+		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
+		initGameStateFromMap(map)
+		gameState.update((s) => ({
+			...s,
+			players: s.players.map((p) =>
+				p.team === 0 ? { ...p, money: 9999, controls: { ground: 0, air: 0, sea: 1 } } : p
+			),
+		}))
+
+		const result = spawnBuiltUnit(map, 5, CORVETTE_TYPE, 0)
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.reason).toBe('no-space')
+		expect(map.layers.units[5]).toBeNull()
+	})
+
+	it('launches a sea unit onto a shore factory tile and consumes the factory', () => {
+		const map = makeMap()
+		map.layers.buildings[5] = building(0, WARFACTORY_TYPE)
+		map.layers.ground[5].type = SHORE
+		initGameStateFromMap(map)
+		gameState.update((s) => ({
+			...s,
+			players: s.players.map((p) =>
+				p.team === 0 ? { ...p, money: 9999, controls: { ground: 0, air: 0, sea: 1 } } : p
+			),
+		}))
+
+		const result = spawnBuiltUnit(map, 5, CORVETTE_TYPE, 0)
+		expect(result.ok).toBe(true)
+		if (result.ok) expect(result.tile).toBe(5)
+		expect(map.layers.units[5]?.type).toBe(CORVETTE_TYPE)
+		expect(get(gameState).actedTiles.has(5)).toBe(true)
 	})
 })

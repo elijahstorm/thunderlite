@@ -1,11 +1,14 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
-import { terrainData } from '$lib/GameData/terrain'
-import { previewDamage } from '../combat'
-import { generateAttackList } from '../Interactor/Pathing/attack'
-import { unitThreatTiles } from '../Interactor/Pathing/threat'
-import { concealedEnemyTiles } from '../visibility'
+import { coverProtection, previewDamage } from '../combat'
 import { isMineableTerrainType } from '../modifiers/miner'
+import {
+	planningUnits,
+	planningBuildings,
+	planningConcealed,
+	planningAttackReach,
+	planningThreatTiles,
+} from './planningContext'
 
 export const unitValue = (unit: UnitObject): number => {
 	const data = unitData[unit.type]
@@ -16,11 +19,12 @@ export const unitValue = (unit: UnitObject): number => {
 	return cost * (hp / max)
 }
 
-export const terrainProtection = (map: MapObject, tile: number): number => {
-	const ground = map.layers.ground[tile]
-	if (!ground) return 0
-	return terrainData[ground.type]?.protection ?? 0
-}
+// Cover as combat prices it (see coverProtection): ground/sea units read the
+// terrain layer, air units read the sky layer — so the CPU hugs forests with
+// tanks and cloud banks with aircraft, and never credits a mountain to a plane.
+// Callers without a unit in hand get the plain ground reading.
+export const terrainProtection = (map: MapObject, tile: number, unit?: UnitObject): number =>
+	coverProtection(map, tile, (unit && unitData[unit.type]?.type) || 'ground')
 
 export const buildingValue = (map: MapObject, tile: number, cpuTeam: number): number => {
 	const building = map.layers.buildings[tile]
@@ -59,17 +63,18 @@ export const threatToTile = (
 	tile: number,
 	defender: UnitObject,
 	cpuTeam: number,
-	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam),
+	concealed: ReadonlySet<number> = planningConcealed(map, cpuTeam),
 	ignoreTile?: number
 ): number => {
 	let totalIncomingHP = 0
-	const units = map.layers.units
-	for (let i = 0; i < units.length; i++) {
+	// Compact unit list + per-tick-cached enemy reach: this used to scan all map
+	// tiles and rebuild each enemy's attack list (and its own concealed set) for
+	// every candidate tile scored.
+	for (const { tile: i, unit: enemy } of planningUnits(map)) {
 		if (i === ignoreTile) continue
-		const enemy = units[i]
-		if (!enemy || enemy.team === cpuTeam) continue
+		if (enemy.team === cpuTeam) continue
 		if (concealed.has(i)) continue
-		const reach = generateAttackList(map, i, enemy)
+		const reach = planningAttackReach(map, i, enemy)
 		if (!reach.includes(tile)) continue
 		const dmg = previewDamage(enemy, defender, {
 			map,
@@ -96,15 +101,16 @@ export const incomingThreatMoveAware = (
 	tile: number,
 	unit: UnitObject,
 	cpuTeam: number,
-	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam)
+	concealed: ReadonlySet<number> = planningConcealed(map, cpuTeam)
 ): number => {
 	let total = 0
-	const units = map.layers.units
-	for (let i = 0; i < units.length; i++) {
-		const enemy = units[i]
-		if (!enemy || enemy.team === cpuTeam) continue
+	const domain = unitData[unit.type]?.type ?? 'any'
+	for (const { tile: i, unit: enemy } of planningUnits(map)) {
+		if (enemy.team === cpuTeam) continue
 		if (concealed.has(i)) continue
-		if (!unitThreatTiles(map, i, enemy).has(tile)) continue
+		// Reach measured against THIS unit's domain — an air unit isn't sheltered by
+		// the Trench/ridge geometry that would hide a ground unit on the same tile.
+		if (!planningThreatTiles(map, i, enemy, domain).has(tile)) continue
 		total += previewDamage(enemy, unit, {
 			map,
 			defenderTile: tile,
@@ -120,29 +126,22 @@ export const incomingThreatMoveAware = (
 // shuts production off entirely, while one of several barely dents their output.
 export const factoryCount = (map: MapObject, team: number): number => {
 	let n = 0
-	for (const b of map.layers.buildings) {
-		if (b && b.team === team && buildingData[b.type]?.actable) n++
+	for (const { building: b } of planningBuildings(map)) {
+		if (b.team === team && buildingData[b.type]?.actable) n++
 	}
 	return n
 }
 
 export const enemyCount = (map: MapObject, cpuTeam: number): number => {
 	let n = 0
-	for (const u of map.layers.units) {
-		if (u && u.team !== cpuTeam) n++
+	for (const { unit: u } of planningUnits(map)) {
+		if (u.team !== cpuTeam) n++
 	}
 	return n
 }
 
-export const teamUnits = (map: MapObject, team: number): { tile: number; unit: UnitObject }[] => {
-	const out: { tile: number; unit: UnitObject }[] = []
-	const units = map.layers.units
-	for (let i = 0; i < units.length; i++) {
-		const u = units[i]
-		if (u && u.team === team) out.push({ tile: i, unit: u })
-	}
-	return out
-}
+export const teamUnits = (map: MapObject, team: number): { tile: number; unit: UnitObject }[] =>
+	planningUnits(map).filter(({ unit }) => unit.team === team)
 
 // Concealed enemies are skipped — the CPU steers toward foes it can actually see,
 // not ones cloaked by fog/stealth (whose positions it shouldn't know).
@@ -150,15 +149,13 @@ export const closestEnemyDistance = (
 	map: MapObject,
 	tile: number,
 	cpuTeam: number,
-	concealed: ReadonlySet<number> = concealedEnemyTiles(map, cpuTeam)
+	concealed: ReadonlySet<number> = planningConcealed(map, cpuTeam)
 ): number => {
 	const col = tile % map.cols
 	const row = Math.floor(tile / map.cols)
 	let best = Infinity
-	const units = map.layers.units
-	for (let i = 0; i < units.length; i++) {
-		const u = units[i]
-		if (!u || u.team === cpuTeam) continue
+	for (const { tile: i, unit: u } of planningUnits(map)) {
+		if (u.team === cpuTeam) continue
 		if (concealed.has(i)) continue
 		const ec = i % map.cols
 		const er = Math.floor(i / map.cols)
@@ -191,10 +188,7 @@ export const closestObjectiveDistance = (map: MapObject, tile: number, cpuTeam: 
 	const col = tile % map.cols
 	const row = Math.floor(tile / map.cols)
 	let best = Infinity
-	const buildings = map.layers.buildings
-	for (let i = 0; i < buildings.length; i++) {
-		const b = buildings[i]
-		if (!b) continue
+	for (const { tile: i, building: b } of planningBuildings(map)) {
 		const data = buildingData[b.type]
 		if (!data || data.stature <= 0) continue
 		if (b.team === cpuTeam) continue

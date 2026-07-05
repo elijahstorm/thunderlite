@@ -113,6 +113,117 @@ export const clearAnimations = () => {
 	clearBuildFade()
 }
 
+// --- Camera follow -----------------------------------------------------------
+// The main board registers a camera so a route animation can keep the moving unit
+// in view: it centres on *another* player's unit as its slide opens (so an AI or
+// online opponent's move cuts to the action), then trails the unit tile-by-tile
+// once it nears the viewport edge. Minimaps and the map editor never register, so
+// at most one camera is live; it's null under tests/headless (no-op).
+export type RouteCamera = {
+	// Committed scroll target (content px), viewport size, and the tile size — or
+	// null while the board isn't mounted.
+	view: () => {
+		left: number
+		top: number
+		width: number
+		height: number
+		tileWidth: number
+		tileHeight: number
+	} | null
+	// Scroll to a content-px position; returns the clamped target actually applied.
+	panTo: (left: number, top: number, animate: boolean) => { left: number; top: number } | null
+	// Can the local viewer currently see `unit` on `tile`? (fog + stealth)
+	sees: (tile: number, unit: UnitObject, map: MapObject) => boolean
+	// Is `unit` controlled by the local viewer? (skip the auto-centre for own units)
+	owns: (unit: UnitObject) => boolean
+}
+
+let routeCamera: RouteCamera | null = null
+export const setRouteCamera = (camera: RouteCamera) => {
+	routeCamera = camera
+}
+// Only clear if the caller is still the registered camera, so a torn-down board
+// can't wipe a fresh board's registration during a hand-off.
+export const clearRouteCamera = (camera: RouteCamera) => {
+	if (routeCamera === camera) routeCamera = null
+}
+
+// How close (in tiles) the moving unit may get to a viewport edge before the
+// camera trails it — one tile per movement beat, matching the slide. Turning away
+// from an edge stops the pan on that axis until the unit heads back toward it, so a
+// zig-zag path doesn't jitter the view.
+const CAMERA_EDGE_PADDING_TILES = 2
+
+const followRouteWithCamera = (map: MapObject, unit: UnitObject, route: number[]) => {
+	const camera = routeCamera
+	if (!camera || route.length === 0) return
+	const cols = map.cols
+
+	// Where we intend the view to sit. Tracked ourselves (seeded from the live
+	// scroll, or the centred position below) so each beat computes from where the
+	// camera is heading rather than a mid-slide interpolation.
+	let target: { left: number; top: number } | null = null
+
+	// Centre another player's unit as its move opens — but only when we can see
+	// where it starts, so a fog- or stealth-hidden mover is never revealed.
+	if (!camera.owns(unit) && camera.sees(route[0], unit, map)) {
+		const view = camera.view()
+		if (view) {
+			const x = route[0] % cols
+			const y = Math.floor(route[0] / cols)
+			const left = (x + 0.5) * view.tileWidth - view.width / 2
+			const top = (y + 0.5) * view.tileHeight - view.height / 2
+			target = camera.panTo(left, top, true)
+		}
+	}
+
+	const stepTo = (step: number) => {
+		const view = camera.view()
+		if (!view) return
+		// Don't chase a unit we can't see this beat (an enemy slipping back into fog).
+		if (!camera.sees(route[step], unit, map)) return
+		if (target === null) target = { left: view.left, top: view.top }
+
+		const tile = route[step]
+		const prev = route[step - 1]
+		const nx = tile % cols
+		const ny = Math.floor(tile / cols)
+		const dx = nx - (prev % cols)
+		const dy = ny - Math.floor(prev / cols)
+		const ux = (nx + 0.5) * view.tileWidth
+		const uy = (ny + 0.5) * view.tileHeight
+		const padX = CAMERA_EDGE_PADDING_TILES * view.tileWidth
+		const padY = CAMERA_EDGE_PADDING_TILES * view.tileHeight
+
+		let left = target.left
+		let top = target.top
+		// Only push toward an edge while the unit is on-screen on that axis: a move
+		// the viewer scrolled away from is never yanked into frame, and a change of
+		// direction simply stops the push until the unit heads that way again.
+		const onScreenX = ux >= target.left && ux <= target.left + view.width
+		const onScreenY = uy >= target.top && uy <= target.top + view.height
+		if (onScreenX) {
+			if (dx > 0 && ux > target.left + view.width - padX) left = ux - (view.width - padX)
+			else if (dx < 0 && ux < target.left + padX) left = ux - padX
+		}
+		if (onScreenY) {
+			if (dy > 0 && uy > target.top + view.height - padY) top = uy - (view.height - padY)
+			else if (dy < 0 && uy < target.top + padY) top = uy - padY
+		}
+		if (left !== target.left || top !== target.top) {
+			target = camera.panTo(left, top, true) ?? { left, top }
+		}
+	}
+
+	// Trail the slide beat-for-beat. Step `n` registers on the board at
+	// `(n - 1) * ANIMATION_TIME` (see startIncrementer), so fire the pan then. These
+	// timers ride the same `schedule` as the slide, so `clearAnimations` cancels
+	// them if the board is torn down mid-move.
+	for (let step = 1; step < route.length; step++) {
+		schedule(() => stepTo(step), (step - 1) * ANIMATION_TIME)
+	}
+}
+
 export const animateRoute = (
 	map: MapObject,
 	unit: UnitObject,
@@ -122,6 +233,7 @@ export const animateRoute = (
 ) =>
 	new Promise<void>((resolve) => {
 		routeAnimation.set({ map, unit, route })
+		followRouteWithCamera(map, unit, route)
 		schedule(
 			() => {
 				unit.state = getDirection(map, route, route.length - 1)
@@ -172,7 +284,12 @@ export const getDirection = (map: MapObject, route: number[], index: number) => 
 export const facingToward = (map: MapObject, from: number, to: number): number => {
 	const orthogonal = directions.findIndex((validator) => validator(map, from, to))
 	if (orthogonal >= 0) return orthogonal
-	return from % map.cols < to % map.cols ? 0 : 2
+	// Distant (ranged) pairings only pose in the 4 cardinals, so snap to the
+	// dominant axis. When there's a horizontal offset, glance left/right toward
+	// the opponent's column; when perfectly aligned vertically, face up/down.
+	const dx = (to % map.cols) - (from % map.cols)
+	if (dx !== 0) return dx > 0 ? 0 : 2
+	return to > from ? 1 : 3
 }
 
 export const animateAttack = (
@@ -228,9 +345,18 @@ export const animateAttack = (
 		}, OVERLAY_ANIMATION_TIME * attackSprite.frames)
 	})
 
-export const animateExplosion = (map: MapObject, source: number) =>
+// Plays a one-shot tile overlay (an entry in `animationData`) on `source`, running
+// through its frames once at the overlay clock and resolving when the last frame
+// has shown. The shared backbone for the death blast and every secondary-hit
+// effect (splash flame/shrapnel, lance pierce, scorched forest) — all single-column
+// sheets seated on the tile the same way.
+export const animateTileEffect = (map: MapObject, source: number, animationIndex: number) =>
 	new Promise<void>((resolve) => {
-		const explosion = animationData[ANIMATION_EXPLOSION]
+		const effect = animationData[animationIndex]
+		if (!effect) {
+			resolve()
+			return
+		}
 		const key = generateKey()
 		animations.update((animations) => [
 			...animations,
@@ -239,13 +365,13 @@ export const animateExplosion = (map: MapObject, source: number) =>
 				tile: source,
 				x: source % map.cols,
 				y: Math.floor(source / map.cols),
-				source: explosion.url,
-				xOffset: explosion.xOffset,
-				yOffset: explosion.yOffset,
-				frames: explosion.frames,
+				source: effect.url,
+				xOffset: effect.xOffset,
+				yOffset: effect.yOffset,
+				frames: effect.frames,
 				state: 0,
-				width: explosion.width,
-				height: explosion.height,
+				width: effect.width,
+				height: effect.height,
 				states: 1,
 				startingFrame: get(overlayFrame),
 			},
@@ -255,9 +381,12 @@ export const animateExplosion = (map: MapObject, source: number) =>
 				removeAnimationByKey(key)
 				resolve()
 			},
-			OVERLAY_ANIMATION_TIME * (explosion.frames - 1)
+			OVERLAY_ANIMATION_TIME * (effect.frames - 1)
 		)
 	})
+
+export const animateExplosion = (map: MapObject, source: number) =>
+	animateTileEffect(map, source, ANIMATION_EXPLOSION)
 
 // Glide a unit's health bar from `from` to `to` with an ease-out, driving a canvas
 // repaint each frame. Used for both damage and healing. The eased value lives on

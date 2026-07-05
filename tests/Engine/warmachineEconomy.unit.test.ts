@@ -64,7 +64,7 @@ const giveControls = (team: number) => {
 	gameState.update((s) => ({
 		...s,
 		players: s.players.map((p) =>
-			p.team === team ? { ...p, controls: { ground: true, air: false, sea: false } } : p
+			p.team === team ? { ...p, controls: { ground: 1, air: 0, sea: 0 } } : p
 		),
 	}))
 }

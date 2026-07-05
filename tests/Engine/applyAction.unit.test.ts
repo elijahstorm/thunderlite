@@ -180,6 +180,98 @@ describe('applyAction determinism', () => {
 		expect(second).toEqual(first)
 	})
 
+	it('splash only washes over unit types the attacker could target directly', () => {
+		const SCORCHER = unitIndex('Scorcher')
+		const RAPTOR_FIGHTER = unitIndex('Raptor Fighter')
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, SCORCHER, 0)
+		placeUnit(map, 13, STRIKE_COMMANDO, 1) // primary target
+		placeUnit(map, 8, RAPTOR_FIGHTER, 1) // air unit beside the target — flame passes under it
+		placeUnit(map, 18, STRIKE_COMMANDO, 1) // ground unit beside the target — catches the wash
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'attack', from: 12, to: 13 })
+
+		const raptorMax = unitData[RAPTOR_FIGHTER].health
+		const groundMax = unitData[STRIKE_COMMANDO].health
+		expect(map.layers.units[8]?.health ?? raptorMax).toBe(raptorMax)
+		expect(map.layers.units[18]?.health ?? groundMax).toBeLessThan(groundMax)
+	})
+
+	it('splash is indiscriminate: it scorches the attacker’s own units caught in the wash', () => {
+		const SCORCHER = unitIndex('Scorcher')
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, SCORCHER, 0)
+		placeUnit(map, 13, STRIKE_COMMANDO, 1) // primary target (enemy)
+		placeUnit(map, 18, STRIKE_COMMANDO, 0) // FRIENDLY ground unit beside the target
+		initGameStateFromMap(map)
+
+		const friendlyMax = unitData[STRIKE_COMMANDO].health
+		applyAction(map, { kind: 'attack', from: 12, to: 13 })
+
+		// The attacker's own adjacent unit takes the wash exactly as an enemy would.
+		expect(map.layers.units[18]?.health ?? friendlyMax).toBeLessThan(friendlyMax)
+	})
+
+	it('splash spares a friendly air unit the ground attacker could never target', () => {
+		const SCORCHER = unitIndex('Scorcher')
+		const RAPTOR_FIGHTER = unitIndex('Raptor Fighter')
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, SCORCHER, 0)
+		placeUnit(map, 13, STRIKE_COMMANDO, 1) // primary target (enemy)
+		placeUnit(map, 8, RAPTOR_FIGHTER, 0) // FRIENDLY air unit beside the target
+		initGameStateFromMap(map)
+
+		const raptorMax = unitData[RAPTOR_FIGHTER].health
+		applyAction(map, { kind: 'attack', from: 12, to: 13 })
+
+		// The flame passes under an ally flyer the same way it passes under an enemy one.
+		expect(map.layers.units[8]?.health ?? raptorMax).toBe(raptorMax)
+	})
+
+	it('Attack.Burn scorches forest at commit, but leaves it for the reveal when deferBurn is set', () => {
+		const SCORCHER = unitIndex('Scorcher')
+		const FOREST = terrainIndex('Forest')
+		const CHARRED = terrainIndex('Charred Forest')
+
+		// Instant path (headless / replay): the commit scorches the struck forest.
+		const instant = makeMap(5, 5)
+		instant.layers.ground[13] = { type: FOREST, state: 0 }
+		placeUnit(instant, 12, SCORCHER, 0)
+		placeUnit(instant, 13, STRIKE_COMMANDO, 1)
+		initGameStateFromMap(instant)
+		applyAction(instant, { kind: 'attack', from: 12, to: 13 })
+		expect(instant.layers.ground[13].type).toBe(CHARRED)
+
+		// Deferred path (animated): the commit leaves the swap to the burn-materialize
+		// reveal, so the tile is still forest right after the commit.
+		const deferred = makeMap(5, 5)
+		deferred.layers.ground[13] = { type: FOREST, state: 0 }
+		placeUnit(deferred, 12, SCORCHER, 0)
+		placeUnit(deferred, 13, STRIKE_COMMANDO, 1)
+		initGameStateFromMap(deferred)
+		applyAction(deferred, { kind: 'attack', from: 12, to: 13 }, { deferBurn: true })
+		expect(deferred.layers.ground[13].type).toBe(FOREST)
+	})
+
+	it('a melee splash attacker never scorches its own tile', () => {
+		// The Scorcher fires point-blank, so its own tile is adjacent to the target.
+		// The wash must skip the firing tile — a unit does not splash itself. The
+		// target is one-shot (1 HP) so it dies and cannot counter, isolating the
+		// splash: any HP the Scorcher loses here could only be self-inflicted.
+		const SCORCHER = unitIndex('Scorcher')
+		const map = makeMap(5, 5)
+		placeUnit(map, 12, SCORCHER, 0)
+		placeUnit(map, 13, STRIKE_COMMANDO, 1, 1)
+		initGameStateFromMap(map)
+
+		const scorcherMax = unitData[SCORCHER].health
+		applyAction(map, { kind: 'attack', from: 12, to: 13 })
+
+		expect(map.layers.units[13]).toBeNull() // target one-shot, so no counter
+		expect(map.layers.units[12]?.health ?? 0).toBe(scorcherMax)
+	})
+
 	it('a stealth attacker that leaves its target alive is revealed (drops its cloak)', () => {
 		const map = makeMap(5, 5)
 		const attackerTile = 12
@@ -197,7 +289,13 @@ describe('applyAction determinism', () => {
 	it('a stealth attacker that kills its target keeps its cloak (no witness)', () => {
 		const map = makeMap(5, 5)
 		const attackerTile = 12
-		const attacker = { type: STEALTH_TANK, state: 0, team: 0, health: unitData[STEALTH_TANK].health, hidden: true }
+		const attacker = {
+			type: STEALTH_TANK,
+			state: 0,
+			team: 0,
+			health: unitData[STEALTH_TANK].health,
+			hidden: true,
+		}
 		map.layers.units[attackerTile] = attacker
 		placeUnit(map, 13, STRIKE_COMMANDO, 1, 1) // 1 HP — one shot kills it
 		initGameStateFromMap(map)

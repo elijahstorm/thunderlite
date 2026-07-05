@@ -16,14 +16,18 @@
  */
 
 import { unitData } from '$lib/GameData/unit'
+import { buildingData } from '$lib/GameData/building'
 import type { CompareOp, CutsceneEvent, CutsceneScript } from './cutsceneTypes'
 
 /** A value that may be produced synchronously or asynchronously. */
 type MaybePromise<T> = T | Promise<T>
 
-/** The minimal map slice `<when>` conditions read: the unit layer's team/type. */
+/** The minimal map slice `<when>` conditions read: each layer's team/type. */
 export interface ConditionMap {
-	layers: { units: ReadonlyArray<{ team: number; type: number } | null> }
+	layers: {
+		units: ReadonlyArray<{ team: number; type: number } | null>
+		buildings: ReadonlyArray<{ team: number; type: number } | null>
+	}
 }
 
 const compareCount = (n: number, op: CompareOp, k: number): boolean =>
@@ -190,22 +194,26 @@ export const createCampaignRunner = (
 	let finished = false
 	const firedTurns = new Set<string>()
 
-	// Resolve each `<when>` block's unit-type names to type indices once, and track
-	// whether it has already fired.
-	const conditions = script.conditions.map((block) => ({
-		...block,
-		typeIdx: block.condition.unitTypes
-			? new Set(block.condition.unitTypes.map((name) => unitData.findIndex((u) => u.name === name)))
-			: null,
-		fired: false,
-	}))
+	// Resolve each `<when>` block's type names to indices on its layer (units or
+	// buildings) once, and track whether it has already fired.
+	const conditions = script.conditions.map((block) => {
+		const table = block.condition.layer === 'buildings' ? buildingData : unitData
+		return {
+			...block,
+			typeIdx: block.condition.typeNames
+				? new Set(block.condition.typeNames.map((name) => table.findIndex((e) => e.name === name)))
+				: null,
+			fired: false,
+		}
+	})
 
 	type ResolvedCondition = (typeof conditions)[number]
 	const holds = (c: ResolvedCondition, map: ConditionMap): boolean => {
 		let n = 0
-		for (const u of map.layers.units) {
-			if (!u || u.team !== c.condition.team) continue
-			if (c.typeIdx && !c.typeIdx.has(u.type)) continue
+		const layer = c.condition.layer === 'buildings' ? map.layers.buildings : map.layers.units
+		for (const entry of layer) {
+			if (!entry || entry.team !== c.condition.team) continue
+			if (c.typeIdx && !c.typeIdx.has(entry.type)) continue
 			n++
 		}
 		return compareCount(n, c.condition.op, c.condition.count)
@@ -231,8 +239,7 @@ export const createCampaignRunner = (
 			await runCutsceneEvents(localPlayerWon(outcome) ? script.win : script.lose, iface)
 		},
 		hasFinished: () => finished,
-		hasPendingConditions: (map) =>
-			!finished && conditions.some((c) => !c.fired && holds(c, map)),
+		hasPendingConditions: (map) => !finished && conditions.some((c) => !c.fired && holds(c, map)),
 		checkConditions: async (map) => {
 			if (finished) return
 			for (const c of conditions) {

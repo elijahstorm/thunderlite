@@ -32,8 +32,8 @@ const unit = (team: number, type = 0): UnitObject =>
 const seedCpuTurn = () => {
 	gameState.set({
 		players: [
-			{ team: 0, money: 0, hasLost: false, controls: { ground: false, air: false, sea: false } },
-			{ team: 1, money: 0, hasLost: false, controls: { ground: false, air: false, sea: false } },
+			{ team: 0, money: 0, hasLost: false, controls: { ground: 0, air: 0, sea: 0 } },
+			{ team: 1, money: 0, hasLost: false, controls: { ground: 0, air: 0, sea: 0 } },
 		],
 		currentTeam: 1,
 		turnNumber: 1,

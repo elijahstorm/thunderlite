@@ -202,7 +202,10 @@ describe('transport — load and unload', () => {
 		const rescuedMax = unitData[STRIKE_COMMANDO].health
 		const transportMax = unitData[TRANSPORTER_TYPE].health
 
-		const rescued = unit(STRIKE_COMMANDO, 0, rescuedMax)
+		// Embark the passenger already hurt, so we can prove its exact HP survives the
+		// round trip rather than being recomputed from the carrier's scaled bar.
+		const embarkHP = Math.max(1, Math.round(rescuedMax * 0.6))
+		const rescued = unit(STRIKE_COMMANDO, 0, embarkHP)
 		const transport = unit(TRANSPORTER_TYPE, 0, Math.round(transportMax / 2))
 		transport.rescuedUnit = rescued
 		map.layers.units[transTile] = transport
@@ -212,12 +215,10 @@ describe('transport — load and unload', () => {
 		const landed = map.layers.units[transTile]
 		expect(landed).toBe(rescued)
 		expect(landed?.team).toBe(0)
-		// transport at ~50% HP → rescued unit reduced proportionally
-		const expectedHP = Math.max(
-			1,
-			Math.round((rescuedMax * Math.round(transportMax / 2)) / transportMax)
-		)
-		expect(landed?.health).toBe(expectedHP)
+		// The passenger is stored intact on load, so unload restores the exact HP it
+		// embarked with (landUnload deliberately avoids re-deriving from the carrier's
+		// scaled bar, which would drift the ratio through double rounding).
+		expect(landed?.health).toBe(embarkHP)
 	})
 
 	it('Land: refuses any destination other than the transport own tile', () => {

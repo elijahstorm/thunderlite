@@ -9,6 +9,7 @@
 		rules: 'bg-amber-500/20 text-amber-300',
 		movement: 'bg-teal-500/20 text-teal-300',
 		stealth: 'bg-violet-500/20 text-violet-300',
+		perf: 'bg-fuchsia-500/20 text-fuchsia-300',
 	}
 </script>
 

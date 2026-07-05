@@ -2,7 +2,7 @@ import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { gameState } from '../gameState'
-import { buildableUnits, type BuildableUnitsOptions } from '../build'
+import { buildableUnits, canDeployFromFactory, type BuildableUnitsOptions } from '../build'
 import { previewDamage } from '../combat'
 import { unitTypeHasRadar, hasRadarField } from '../visibility'
 import { lurkingStealthCount } from './stealthMemory'
@@ -97,6 +97,9 @@ const counterEffectiveness = (
 
 const scoreBuildChoice = (
 	unitType: number,
+	// Effective price from the funding source (control discounts applied), so a
+	// discounted category correctly looks cheaper to the planner.
+	effectiveCost: number,
 	mix: ArmyMix,
 	ownCaptureCount: number,
 	enemyAirThreat: boolean,
@@ -105,7 +108,7 @@ const scoreBuildChoice = (
 ): number => {
 	const data = unitData[unitType]
 	if (!data) return -Infinity
-	const cost = data.cost > 0 ? data.cost : 1
+	const cost = effectiveCost > 0 ? effectiveCost : 1
 
 	let score = 100 + (data.power + data.health) * 0.4
 
@@ -173,6 +176,7 @@ export const rankBuildableTypes = (
 			type: c.type,
 			score: scoreBuildChoice(
 				c.type,
+				c.cost,
 				mix,
 				ownCaptureCount,
 				enemyAirThreat,
@@ -202,8 +206,14 @@ export const pickBuildOnce = (map: MapObject, cpuTeam: number): SerializedAction
 	if (!player) return null
 	if (player.money <= 0) return null
 
-	const best = bestBuildableType(map, cpuTeam)
-	if (!best) return null
-
-	return { kind: 'build', building: producers[0], unitType: best.type }
+	// A factory deploys onto its own tile, so a ship can only come from a coastal
+	// (Shore) factory. Walk the ranked wish-list and pick the best type that some
+	// idle producer can physically launch — skipping, say, a top-ranked warship
+	// when every free factory is landlocked, rather than emitting a build that
+	// no-ops on apply.
+	for (const { type } of rankBuildableTypes(map, cpuTeam)) {
+		const producer = producers.find((p) => canDeployFromFactory(map, p, type))
+		if (producer !== undefined) return { kind: 'build', building: producer, unitType: type }
+	}
+	return null
 }

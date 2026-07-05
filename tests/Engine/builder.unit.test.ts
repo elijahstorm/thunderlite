@@ -2,7 +2,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { get } from 'svelte/store'
 import { gameState, resetGameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
-import { buildAdjacent, passableAdjacentTiles } from '../../src/lib/Engine/modifiers/builder'
+import {
+	buildAdjacent,
+	buildableAdjacentTiles,
+	passableAdjacentTiles,
+} from '../../src/lib/Engine/modifiers/builder'
 import { WARMACHINE_WALLET, walletOf } from '../../src/lib/Engine/wallet'
 import {
 	instaLose,
@@ -15,10 +19,12 @@ import { terrainData } from '../../src/lib/GameData/terrain'
 
 const WARMACHINE_TYPE = unitData.findIndex((u) => u.name === 'Warmachine')
 const SCORPION_TANK_TYPE = unitData.findIndex((u) => u.name === 'Scorpion Tank')
+const FLAK_TANK_TYPE = unitData.findIndex((u) => u.name === 'Flak Tank')
 const STRIKE_COMMANDO_TYPE = unitData.findIndex((u) => u.name === 'Strike Commando')
 const RAPTOR_FIGHTER_TYPE = unitData.findIndex((u) => u.name === 'Raptor Fighter')
 const COMMAND_CENTER_TYPE = buildingData.findIndex((b) => b.name === 'Command Center')
 const PLAINS = terrainData.findIndex((t) => t.name === 'Plains')
+const MOUNTAIN = terrainData.findIndex((t) => t.name === 'Mountain')
 const VOLCANO = terrainData.findIndex((t) => t.name === 'Volcano')
 
 const makeMap = (overrides: Partial<MapProcesser> = {}): MapProcesser => ({
@@ -56,9 +62,9 @@ const giveMoneyAndControls = (
 						...p,
 						money,
 						controls: {
-							ground: controls.ground ?? false,
-							air: controls.air ?? false,
-							sea: controls.sea ?? false,
+							ground: controls.ground ? 1 : 0,
+							air: controls.air ? 1 : 0,
+							sea: controls.sea ? 1 : 0,
 						},
 					}
 				: p
@@ -162,6 +168,40 @@ describe('builder.buildAdjacent', () => {
 		const result = buildAdjacent(map, 5, SCORPION_TANK_TYPE, 0)
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.reason).toBe('no-space')
+	})
+
+	it('never deploys a tank onto a mountain, even as a preferred destination', () => {
+		const map = makeMap()
+		map.layers.units[5] = warmachine(0)
+		map.layers.ground[9].type = MOUNTAIN
+		initGameStateFromMap(map)
+
+		// Tile picker must not offer the mountain for a treaded unit.
+		expect(buildableAdjacentTiles(map, 5, FLAK_TANK_TYPE)).not.toContain(9)
+
+		// Asking for it directly falls back to a legal tile instead.
+		const result = buildAdjacent(map, 5, FLAK_TANK_TYPE, 0, 9)
+		expect(result.ok).toBe(true)
+		if (result.ok) expect([1, 4, 6]).toContain(result.tile)
+	})
+
+	it('rejects with no-space when the only open tile is impassable to the unit', () => {
+		const map = makeMap()
+		map.layers.units[5] = warmachine(0)
+		map.layers.units[1] = warmachine(0)
+		map.layers.units[4] = warmachine(0)
+		map.layers.units[6] = warmachine(0)
+		map.layers.ground[9].type = MOUNTAIN
+		initGameStateFromMap(map)
+
+		const result = buildAdjacent(map, 5, FLAK_TANK_TYPE, 0)
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.reason).toBe('no-space')
+		expect(map.layers.units[9]).toBeNull()
+
+		// The same mountain is fine for units that can actually climb it.
+		expect(buildableAdjacentTiles(map, 5, STRIKE_COMMANDO_TYPE)).toContain(9)
+		expect(buildableAdjacentTiles(map, 5, RAPTOR_FIGHTER_TYPE)).toContain(9)
 	})
 
 	it('rejects when destination tile is not a valid adjacent and falls back to nothing if it had to', () => {

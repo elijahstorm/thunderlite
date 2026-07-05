@@ -1,26 +1,388 @@
 <start>
-move: 1,8
-talk Vance: "A storm's rolling in over these mountains. The rain turns the ground to mud and slows the troops to a crawl.", "Plan shorter moves, Reyes. You won't cover as much ground as you'd like."
-move: 11,1
-talk Kael: "The weather favors me today. Struggle through the mud while my fighters hold the sky."
-move: 3,9
-talk Vance: "He's got air support. Keep your own Raptor close to answer it, and keep advancing. We can't wait out the storm."
-talk Reyes: "Then we push through it. Forward."
+funds: 0,400
+funds: 1,300
+move: 8,11
+talk Vance: "Past the wall at last, Reyes. Now look up. That black line over the peaks is a storm front, and it is rolling south across the whole valley."
+talk Vance: "A storm cell batters any aircraft caught inside it, but it also hides them from every eye. The white cloud banks on the flanks hide without the beating. Weather is terrain up there. Fly it like ground."
+move: 3,1
+talk Kael: "You crawled over my wall just to die under my sky, Reyes. Every runway I own is warming its engines, and the storm rides with me."
+move: 8,6
+talk Vance: "There. Twin airstrips on the central plateau, abandoned when the front rolled in. Take one and our Warfactory can put wings in the air: Raptors, gunships, even Kestrel Sentries whose radar pulls hidden planes out of the weather.", "He already owns the sky, so those strips mean nothing to him beyond keeping them from us."
+move: 8,1
+talk Vance: "His gun tower covers the north road and that crossroads town. Until it falls, keep your people off the northern stretch."
+move: 10,10
+talk Vance: "We salvaged you a Vulture drone. If its strike finishes the target, it flies again the same turn."
+move: 8,10
+talk Vance: "And the Transporter already has a commando strapped in. It is a one way glider: fly it out, set him down, and he starts capturing where he lands. Spend it well."
+move: 10,4
+talk Vance: "And mind that cell by the pass. Something new of his is riding inside the weather without a scratch. Once you hold a strip, a Kestrel Sentry can drag it into the open."
+talk Reyes: "Then we race the front. Strips first, sky second, his capital last. Wings up."
 </start>
 
-<turn 0,1>
+<turn 2,1>
 wait: 1
-move: 11,3
-talk Kael: "More armor down the pass. Let the storm do half the work."
-add unit: 1,"Scorpion Tank",11,3
-talk Vance: "Short moves, firm ground where you can find it. Don't overextend in the mud."
+move: 5,0
+talk Kael: "Petrels, up. Ride the squall and pick their bones in the rain."
+add unit: 1,"Petrel Stormrider",5,0
+add unit: 1,"Raptor Fighter",11,0
 </turn>
 
+<turn 3,0>
+wait: 0.5
+move: 8,5
+clear weather: 0,3
+clear weather: 1,3
+clear weather: 2,3
+clear weather: 3,3
+clear weather: 4,3
+clear weather: 5,3
+clear weather: 6,3
+clear weather: 7,3
+clear weather: 8,3
+clear weather: 9,3
+clear weather: 10,3
+clear weather: 11,3
+clear weather: 12,3
+clear weather: 13,3
+clear weather: 14,3
+clear weather: 15,3
+clear weather: 16,3
+clear weather: 0,4
+clear weather: 1,4
+clear weather: 2,4
+clear weather: 3,4
+clear weather: 4,4
+clear weather: 5,4
+clear weather: 6,4
+clear weather: 7,4
+clear weather: 8,4
+clear weather: 9,4
+clear weather: 10,4
+clear weather: 11,4
+clear weather: 12,4
+clear weather: 13,4
+clear weather: 14,4
+clear weather: 15,4
+clear weather: 16,4
+weather: "Storm",0,5
+weather: "Storm",1,5
+weather: "Storm",2,5
+weather: "Storm",3,5
+weather: "Storm",4,5
+weather: "Storm",5,5
+weather: "Storm",6,5
+weather: "Storm",7,5
+weather: "Storm",8,5
+weather: "Storm",9,5
+weather: "Storm",10,5
+weather: "Storm",11,5
+weather: "Storm",12,5
+weather: "Storm",13,5
+weather: "Storm",14,5
+weather: "Storm",15,5
+weather: "Storm",16,5
+weather: "Storm",0,6
+weather: "Storm",1,6
+weather: "Storm",2,6
+weather: "Storm",3,6
+weather: "Storm",4,6
+weather: "Storm",5,6
+weather: "Storm",6,6
+weather: "Storm",7,6
+weather: "Storm",8,6
+weather: "Storm",9,6
+weather: "Storm",10,6
+weather: "Storm",11,6
+weather: "Storm",12,6
+weather: "Storm",13,6
+weather: "Storm",14,6
+weather: "Storm",15,6
+weather: "Storm",16,6
+talk Vance: "The front is moving. It will sweep the plateau next, then our side of the valley. Time your flights around it, or hide inside it and take the beating."
+</turn>
+
+<turn 4,1>
+wait: 1
+move: 8,2
+talk Kael: "Those strips are mine, Reyes. I am taking them back."
+add unit: 1,"Strike Commando",8,2
+</turn>
+
+<turn 5,1>
+wait: 1
+move: 7,0
+talk Kael: "Condors away. Flatten their little firebase."
+add unit: 1,"Condor Bomber",7,0
+add unit: 1,"Raptor Fighter",9,0
+talk Vance: "Bombers inbound. A Condor cannot answer a Raptor, and Flak shreds anything on wings. Meet them before they reach the base."
+</turn>
+
+<turn 6,0>
+wait: 0.5
+move: 8,7
+clear weather: 0,5
+clear weather: 1,5
+clear weather: 2,5
+clear weather: 3,5
+clear weather: 4,5
+clear weather: 5,5
+clear weather: 6,5
+clear weather: 7,5
+clear weather: 8,5
+clear weather: 9,5
+clear weather: 10,5
+clear weather: 11,5
+clear weather: 12,5
+clear weather: 13,5
+clear weather: 14,5
+clear weather: 15,5
+clear weather: 16,5
+clear weather: 0,6
+clear weather: 1,6
+clear weather: 2,6
+clear weather: 3,6
+clear weather: 4,6
+clear weather: 5,6
+clear weather: 6,6
+clear weather: 7,6
+clear weather: 8,6
+clear weather: 9,6
+clear weather: 10,6
+clear weather: 11,6
+clear weather: 12,6
+clear weather: 13,6
+clear weather: 14,6
+clear weather: 15,6
+clear weather: 16,6
+weather: "Storm",0,7
+weather: "Storm",1,7
+weather: "Storm",2,7
+weather: "Storm",3,7
+weather: "Storm",4,7
+weather: "Storm",5,7
+weather: "Storm",6,7
+weather: "Storm",7,7
+weather: "Storm",8,7
+weather: "Storm",9,7
+weather: "Storm",10,7
+weather: "Storm",11,7
+weather: "Storm",12,7
+weather: "Storm",13,7
+weather: "Storm",14,7
+weather: "Storm",15,7
+weather: "Storm",16,7
+weather: "Storm",0,8
+weather: "Storm",1,8
+weather: "Storm",2,8
+weather: "Storm",3,8
+weather: "Storm",4,8
+weather: "Storm",5,8
+weather: "Storm",6,8
+weather: "Storm",7,8
+weather: "Storm",8,8
+weather: "Storm",9,8
+weather: "Storm",10,8
+weather: "Storm",11,8
+weather: "Storm",12,8
+weather: "Storm",13,8
+weather: "Storm",14,8
+weather: "Storm",15,8
+weather: "Storm",16,8
+weather: "Cloud",1,5
+weather: "Cloud",2,5
+weather: "Cloud",14,5
+weather: "Cloud",7,5
+weather: "Cloud",1,6
+weather: "Cloud",2,6
+weather: "Cloud",14,6
+weather: "Cloud",15,6
+weather: "Cloud",4,6
+talk Vance: "The front is over our half of the field now. The plateau flies clear."
+</turn>
+
+<turn 8,1>
+wait: 1
+move: 7,0
+talk Kael: "Albatross flight, off the deck. Wash their ground crews off the map."
+add unit: 1,"Albatross Gunship",7,0
+add unit: 1,"Petrel Stormrider",9,0
+talk Vance: "Gunships. That barrage splashes over everything beside its mark. Spread your ground forces out and hit them in the air, where they answer to Raptors and Flak."
+</turn>
+
+<turn 9,0>
+wait: 0.5
+move: 8,9
+clear weather: 0,7
+clear weather: 1,7
+clear weather: 2,7
+clear weather: 3,7
+clear weather: 4,7
+clear weather: 5,7
+clear weather: 6,7
+clear weather: 7,7
+clear weather: 8,7
+clear weather: 9,7
+clear weather: 10,7
+clear weather: 11,7
+clear weather: 12,7
+clear weather: 13,7
+clear weather: 14,7
+clear weather: 15,7
+clear weather: 16,7
+clear weather: 0,8
+clear weather: 1,8
+clear weather: 2,8
+clear weather: 3,8
+clear weather: 4,8
+clear weather: 5,8
+clear weather: 6,8
+clear weather: 7,8
+clear weather: 8,8
+clear weather: 9,8
+clear weather: 10,8
+clear weather: 11,8
+clear weather: 12,8
+clear weather: 13,8
+clear weather: 14,8
+clear weather: 15,8
+clear weather: 16,8
+weather: "Storm",0,9
+weather: "Storm",1,9
+weather: "Storm",2,9
+weather: "Storm",3,9
+weather: "Storm",4,9
+weather: "Storm",5,9
+weather: "Storm",6,9
+weather: "Storm",7,9
+weather: "Storm",8,9
+weather: "Storm",9,9
+weather: "Storm",10,9
+weather: "Storm",11,9
+weather: "Storm",12,9
+weather: "Storm",13,9
+weather: "Storm",14,9
+weather: "Storm",15,9
+weather: "Storm",16,9
+weather: "Storm",0,10
+weather: "Storm",1,10
+weather: "Storm",2,10
+weather: "Storm",3,10
+weather: "Storm",4,10
+weather: "Storm",5,10
+weather: "Storm",6,10
+weather: "Storm",7,10
+weather: "Storm",8,10
+weather: "Storm",9,10
+weather: "Storm",10,10
+weather: "Storm",11,10
+weather: "Storm",12,10
+weather: "Storm",13,10
+weather: "Storm",14,10
+weather: "Storm",15,10
+weather: "Storm",16,10
+weather: "Cloud",2,7
+weather: "Cloud",14,7
+weather: "Cloud",15,7
+weather: "Cloud",12,7
+weather: "Cloud",7,7
+weather: "Cloud",5,8
+weather: "Cloud",11,8
+talk Vance: "Last leg of the front, right over our heads. Keep your wings out of the black or eat the damage. It passes after this."
+</turn>
+
+<turn 11,1>
+wait: 1
+move: 7,0
+talk Kael: "Everything that flies, on them. Now."
+add unit: 1,"Vulture Drone",5,0
+add unit: 1,"Condor Bomber",7,0
+add unit: 1,"Raptor Fighter",9,0
+</turn>
+
+<turn 12,0>
+wait: 0.5
+move: 8,6
+clear weather: 0,9
+clear weather: 1,9
+clear weather: 2,9
+clear weather: 3,9
+clear weather: 4,9
+clear weather: 5,9
+clear weather: 6,9
+clear weather: 7,9
+clear weather: 8,9
+clear weather: 9,9
+clear weather: 10,9
+clear weather: 11,9
+clear weather: 12,9
+clear weather: 13,9
+clear weather: 14,9
+clear weather: 15,9
+clear weather: 16,9
+clear weather: 0,10
+clear weather: 1,10
+clear weather: 2,10
+clear weather: 3,10
+clear weather: 4,10
+clear weather: 5,10
+clear weather: 6,10
+clear weather: 7,10
+clear weather: 8,10
+clear weather: 9,10
+clear weather: 10,10
+clear weather: 11,10
+clear weather: 12,10
+clear weather: 13,10
+clear weather: 14,10
+clear weather: 15,10
+clear weather: 16,10
+weather: "Cloud",6,10
+talk Vance: "The storm is through. No more cover and no more beating, for either side. Whoever owns the sky now owns the valley."
+</turn>
+
+<when team 0 buildings "Air Control" >= 1>
+move: 8,6
+talk Vance: "The strip is ours, Reyes. Fuel lines are open and the Warfactory is cleared for aircraft. Put wings on the line and answer him in his own element."
+</when>
+
+<when team 0 buildings "Air Control" >= 2>
+talk Vance: "Both strips flying our colors. Every runway in this valley now feeds our war, and his air force just became a spent resource."
+</when>
+
+<when team 1 buildings "Air Control" >= 2>
+move: 8,6
+talk Kael: "One of your precious strips, back under my flag. You get nothing from this valley."
+talk Vance: "He has flipped a strip. It adds nothing to his air force, but it is one less path to ours. Take it back, whatever it costs."
+</when>
+
+<when team 0 buildings "City" >= 3>
+talk Vance: "The crossroads town is paying us now. That coin keeps the factory lines moving through the worst of the front."
+</when>
+
+<when team 1 units "Turret" == 0>
+move: 8,1
+talk Vance: "The gun tower is down. The north road and the crossroads town are yours to work, and his gate stands open for your armor."
+</when>
+
+<when team 0 units "Vulture Drone" == 0>
+talk Vance: "The Vulture is gone. Hold the sky with what still flies. If you hold a strip, the factory can build you another."
+</when>
+
+<when team 0 units "Strike Commando","Heavy Commando" == 0>
+talk Vance: "We are out of boots, Reyes. Nothing left to capture with, so the strips and his capital are beyond us. Break his air force instead, every last wing of it."
+</when>
+
+<when team 1 units "Raptor Fighter","Condor Bomber","Vulture Drone","Petrel Stormrider","Albatross Gunship" == 0>
+move: 3,1
+talk Vance: "His sky is empty. Whatever he builds now dies alone. Put your commandos on his capital and end this."
+</when>
+
 <win>
-talk Vance: "Through the worst of it and still moving. Weather slows an army; it doesn't have to stop one.", "Kael's fortress is close now."
+talk Vance: "The front weathered and his air force scattered across the valley floor. That was a storm war, Reyes, and you fought it better than he did."
+talk Vance: "Two fortresses left. He knows we are coming now."
 </win>
 
 <lose>
-talk Kael: "Bogged down and beaten. The storm was always going to decide this."
-talk Vance: "We pushed too far into the mud. Pace the advance with the terrain next time."
+talk Kael: "My sky. My storm. My valley. You never stood a chance down in the mud, Reyes."
+talk Vance: "We lost the air, and everything under it followed. Take an airstrip early, keep Flak over the base, and never park a wing in the front's path. Again."
 </lose>

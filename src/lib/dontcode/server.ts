@@ -13,6 +13,12 @@
  * (e.g. `db.find(table, opts)` and the `insertIgnoreConflict`/`upsert`
  * idempotency helpers, which sit on top of the SDK's primitives).
  *
+ * Since SDK 0.2.3 the platform also provides a KV cache (`kv`) and realtime
+ * pub/sub (`realtime`), both exposed below. Neither is served by the local
+ * mock gateway (`pnpm mock`) yet — against the mock, cache reads come back as
+ * misses and realtime calls fail; callers are expected to degrade gracefully
+ * (defaults for KV-backed config, HTTP polling for game sync).
+ *
  * Env:
  *   DONTCODE_API_URL  — base URL of the DontCode backend (no trailing slash)
  *   DONTCODE_API_KEY  — this project's API key (dc_…)
@@ -248,5 +254,107 @@ export const storage = {
 		await client().storage.public.upload(path, data, contentType)
 		const { url } = await client().storage.public.getUrl(path)
 		return { key: path, url }
+	},
+}
+
+// ── KV cache ────────────────────────────────────────────────────────────────
+// Ephemeral key-value state with optional TTL expiry. Keys are namespaced to
+// this project by the gateway. This is a cache, not a database: values may be
+// evicted and are not durable, so anything that must survive belongs in `db`.
+// A miss reads back as `null` (`get`/`hgetAll`) or `[]` (`sMembers`).
+
+export interface KvSetOptions {
+	/** Time-to-live in seconds. Omit for no expiry. */
+	ttl?: number
+	/** Only set if the key does not already exist (atomic lock/claim). */
+	nx?: boolean
+}
+
+export const kv = {
+	get<T = unknown>(key: string): Promise<T | null> {
+		return client().cache.get<T>(key)
+	},
+
+	/** Returns `false` when `nx` is set and the key already existed. */
+	set(key: string, value: unknown, options: KvSetOptions = {}): Promise<boolean> {
+		return client().cache.set(key, value, options)
+	},
+
+	del(key: string): Promise<boolean> {
+		return client().cache.del(key)
+	},
+
+	/** Set or clear (`null`) the TTL on an existing key. `false` if absent. */
+	expire(key: string, ttl: number | null): Promise<boolean> {
+		return client().cache.expire(key, ttl)
+	},
+
+	hset(key: string, fields: Record<string, unknown>): Promise<number> {
+		return client().cache.hset(key, fields)
+	},
+
+	hgetAll<T = Record<string, unknown>>(key: string): Promise<T | null> {
+		return client().cache.hgetAll<T>(key)
+	},
+
+	sAdd(key: string, ...members: string[]): Promise<number> {
+		return client().cache.sAdd(key, ...members)
+	},
+
+	sMembers(key: string): Promise<string[]> {
+		return client().cache.sMembers(key)
+	},
+
+	sRem(key: string, ...members: string[]): Promise<number> {
+		return client().cache.sRem(key, ...members)
+	},
+}
+
+// ── Realtime ────────────────────────────────────────────────────────────────
+// Server-side control plane for realtime pub/sub. The browser never holds the
+// project API key: we mint a short-lived, channel-scoped connection token here
+// (see /api/realtime) and the browser opens the WebSocket itself with it.
+// Delivery is fire-and-forget — no history/replay — so the game event log in
+// `db` stays the source of truth and clients reconcile by polling it.
+
+export interface RealtimeToken {
+	token: string
+	/** WebSocket URL; the browser connects to `${url}?token=${token}`. */
+	url: string
+}
+
+export const realtime = {
+	/** Mint a connection token scoped to `channels` for one browser session. */
+	mintToken(input: {
+		channels: string[]
+		identity?: string
+		ttl?: number
+	}): Promise<RealtimeToken> {
+		return client().realtime.mintToken(input)
+	},
+
+	/** Publish to a channel. Returns how many subscribers it reached. */
+	publish(channel: string, payload: unknown): Promise<number> {
+		return client().realtime.publish(channel, payload)
+	},
+
+	/**
+	 * Publish where delivery is best-effort and the caller must not fail with
+	 * it (e.g. after a move is durably recorded — subscribers reconcile via
+	 * polling if the push never lands). Resolves once the attempt settles so
+	 * serverless runtimes don't cut off an in-flight request.
+	 */
+	async tryPublish(channel: string, payload: unknown): Promise<void> {
+		try {
+			await client().realtime.publish(channel, payload)
+		} catch {
+			// Swallowed by design: the mock gateway has no realtime, and a
+			// hosted-gateway hiccup only delays sync until the next poll.
+		}
+	},
+
+	/** Who is currently connected to a channel. */
+	presence(channel: string): Promise<{ id: string; identity?: string }[]> {
+		return client().realtime.presence(channel)
 	},
 }

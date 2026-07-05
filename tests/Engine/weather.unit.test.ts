@@ -172,7 +172,7 @@ describe('Storm drag reduces air movement', () => {
 		expect(reach.length).toBeLessThan(reachNoStorm.length)
 	})
 
-	it('does not affect movement for cloud (drag is only treacherous)', () => {
+	it('does not affect movement for cloud (drag 1: pure concealment)', () => {
 		const map = makeMap(10, 1)
 		const start = 0
 		map.layers.sky[4] = sky(CLOUD)
@@ -186,5 +186,56 @@ describe('Storm drag reduces air movement', () => {
 		const reachNoSky = generateMovementList(baseline, start, baseline.layers.units[start]!)
 
 		expect(reachWithCloud.length).toBe(reachNoSky.length)
+	})
+})
+
+describe('new weather types', () => {
+	const TURBULENCE = skyIndex('Turbulence')
+	const ASH_PLUME = skyIndex('Ash Plume')
+	const JETSTREAM = skyIndex('Jetstream')
+	const PETREL = unitIndex('Petrel Stormrider')
+
+	const reachOnRow = (skyType: number | null, unitType: number) => {
+		const map = makeMap(12, 1)
+		if (skyType != null) for (let x = 1; x < 12; x++) map.layers.sky[x] = sky(skyType)
+		const u = unit(unitType, 0)
+		map.layers.units[0] = u
+		return generateMovementList(map, 0, u).length
+	}
+
+	it('Turbulence slows flight without hiding or damaging', () => {
+		expect(reachOnRow(TURBULENCE, RAPTOR_FIGHTER)).toBeLessThan(reachOnRow(null, RAPTOR_FIGHTER))
+		const map = makeMap(3, 1)
+		map.layers.sky[1] = sky(TURBULENCE)
+		map.layers.units[1] = unit(RAPTOR_FIGHTER, 0)
+		expect(isAirHiddenBySky(map, 1, map.layers.units[1]!)).toBe(false)
+		expect(applySkyEndOfTurnDamage(map, 0).length).toBe(0)
+	})
+
+	it('Jetstream extends flight range (drag 0.5)', () => {
+		expect(reachOnRow(JETSTREAM, RAPTOR_FIGHTER)).toBeGreaterThan(reachOnRow(null, RAPTOR_FIGHTER))
+	})
+
+	it('Ash Plume hides and damages like a storm', () => {
+		const map = makeMap(3, 1)
+		map.layers.sky[1] = sky(ASH_PLUME)
+		const r = unit(RAPTOR_FIGHTER, 0)
+		r.health = 50
+		map.layers.units[1] = r
+		expect(isAirHiddenBySky(map, 1, r)).toBe(true)
+		applySkyEndOfTurnDamage(map, 0)
+		expect(r.health).toBe(50 - STORM_DAMAGE)
+	})
+
+	it('Storm_Rider ignores treacherous drag and damage but not Turbulence', () => {
+		const map = makeMap(3, 1)
+		map.layers.sky[1] = sky(STORM)
+		const p = unit(PETREL, 0)
+		p.health = 45
+		map.layers.units[1] = p
+		expect(applySkyEndOfTurnDamage(map, 0).length).toBe(0)
+		expect(p.health).toBe(45)
+		expect(reachOnRow(STORM, PETREL)).toBe(reachOnRow(null, PETREL))
+		expect(reachOnRow(TURBULENCE, PETREL)).toBeLessThan(reachOnRow(null, PETREL))
 	})
 })

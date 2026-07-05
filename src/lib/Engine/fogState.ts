@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store'
+import type { ViewerFog } from './visibility'
 
 // True only when the current board is being rendered with fog of war enabled.
 // Engine code (attack list, threat reach, AI) consults this so that the action
@@ -10,5 +11,6 @@ export const fogOfWarEnabled = writable<boolean>(false)
 // cached visibility computation. Null means fog is off (everything visible).
 // The DOM Animator overlay reads this to suppress walking/attacking/explosion
 // animations on tiles the viewer can't see — otherwise an enemy step through
-// fog would still flash its sprite above the dimmed canvas tile.
-export const viewerVisibility = writable<{ visible: Set<number>; team: number } | null>(null)
+// fog would still flash its sprite above the dimmed canvas tile. Carries both
+// the ground reach and the wider air reach (see `unitSeenByViewer`).
+export const viewerVisibility = writable<ViewerFog | null>(null)

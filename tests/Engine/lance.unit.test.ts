@@ -19,6 +19,7 @@ const terrainIndex = (name: string) => {
 
 const LANCE_TANK = unitIndex('Lance Tank')
 const STRIKE_COMMANDO = unitIndex('Strike Commando')
+const RAPTOR_FIGHTER = unitIndex('Raptor Fighter')
 const PLAINS = terrainIndex('Plains')
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
@@ -176,6 +177,27 @@ describe('Lance — attack passes through to the tile behind the target', () => 
 			const result = applyLancePassthrough(map, attackerTile, targetTile)
 			expect(result).toBeNull()
 			expect(passthrough.health).toBe(initialHealth)
+		})
+
+		it('misses a behind unit the lance cannot target (air unit overflown)', () => {
+			// Lance Tank has no Can_Attack.Air_Raid, so the shaft passes harmlessly
+			// under an air unit lined up behind its ground target.
+			const map = makeMap(5, 5)
+			const attackerTile = tileXY(5, 1, 2)
+			const targetTile = tileXY(5, 2, 2)
+			const behindTile = tileXY(5, 3, 2)
+
+			map.layers.units[attackerTile] = unit(LANCE_TANK, 0)
+			map.layers.units[targetTile] = unit(STRIKE_COMMANDO, 1)
+			const flyer = unit(RAPTOR_FIGHTER, 1)
+			const initialHealth = flyer.health!
+			map.layers.units[behindTile] = flyer
+
+			const result = applyLancePassthrough(map, attackerTile, targetTile)
+
+			expect(result).toBeNull()
+			expect(flyer.health).toBe(initialHealth)
+			expect(map.layers.units[behindTile]).toBe(flyer)
 		})
 
 		it('does not recursively trigger a second passthrough', () => {

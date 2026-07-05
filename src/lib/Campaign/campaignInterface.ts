@@ -18,7 +18,7 @@ import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { skyData } from '$lib/GameData/sky'
 import { gameState, refreshControlsFromMap } from '$lib/Engine/gameState'
-import { repaintSignal } from '$lib/Engine/Animator/animator'
+import { repaintSignal, animateExplosion } from '$lib/Engine/Animator/animator'
 import { beginMaterialize } from '$lib/Engine/materialize'
 import { beginScriptedMutation, endScriptedMutation } from './scriptGate'
 import { fogOfWarEnabled } from '$lib/Engine/fogState'
@@ -86,6 +86,17 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 		repaintSignal.update((n) => n + 1)
 	}
 
+	// Destroy the unit on `tile`, mirroring the engine death path
+	// (applyAction.reduceHealth): play the explosion overlay, clear the tile, then
+	// run Death modifiers. Shared by the scripted `kill`, the spawn ambush and the
+	// terrain-flood drowning so all three read as a real kill, not a silent vanish.
+	// Callers re-check win conditions after (a death can end the match).
+	const destroyUnitAt = (tile: number, unit: UnitObject): void => {
+		void animateExplosion(map, tile)
+		map.layers.units[tile] = null
+		runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+	}
+
 	return {
 		// Each block starts fresh: a Skip in the previous block must not silence this one.
 		beginBlock: () => resetDialogueSkip(),
@@ -137,8 +148,7 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 				// gets no such warning — the arrival ambushes it: run the engine death
 				// path first, then land on the freed tile.
 				if (occupant.team === team) return
-				map.layers.units[tile] = null
-				runModifiers(occupant, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+				destroyUnitAt(tile, occupant)
 			}
 			map.layers.units[tile] = incoming
 			// Pixel warp-in so the unit assembles onto the board instead of popping
@@ -155,10 +165,7 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 			const tile = tileFor(map, x, y)
 			const unit = map.layers.units[tile]
 			if (!unit) return
-			// Mirror the engine's death path (applyAction.reduceHealth): clear the
-			// tile, run Death modifiers, then re-check win conditions.
-			map.layers.units[tile] = null
-			runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+			destroyUnitAt(tile, unit)
 			applyWinConditions(map)
 		},
 
@@ -193,8 +200,7 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 					// win conditions fire exactly as a combat kill would.
 					const occupant = map.layers.units[tile]
 					if (occupant && !validTerrain(ground, occupant)) {
-						map.layers.units[tile] = null
-						runModifiers(occupant, 'Death', { kind: 'unit', tile, state: get(gameState), map })
+						destroyUnitAt(tile, occupant)
 						applyWinConditions(map)
 					}
 					repaintSignal.update((n) => n + 1)

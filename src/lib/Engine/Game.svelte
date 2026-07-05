@@ -15,6 +15,8 @@
 	import { upcomingSpawns } from '$lib/Campaign/spawnTelegraph'
 	import { repaintSignal } from '$lib/Engine/Animator/animator'
 	import { scriptReferencedTypeIndices } from '$lib/Campaign/cutsceneScript'
+	import { mineReachableTerrainTypes } from '$lib/Engine/modifiers/miner'
+	import { burnResultTerrainTypes } from '$lib/Engine/modifiers/burn'
 	import { beginScriptBlock, endScriptBlock, resetScriptGate } from '$lib/Campaign/scriptGate'
 	import Dialogue from '$lib/Campaign/Dialogue.svelte'
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
@@ -65,12 +67,25 @@
 		const scriptTypes = campaign
 			? scriptReferencedTypeIndices(campaign)
 			: { ground: [], buildings: [], sky: [] }
-		const withScript = (included: number[], extra: number[]) => [...new Set([...included, ...extra])]
+		const withScript = (included: number[], extra: number[]) => [
+			...new Set([...included, ...extra]),
+		]
+
+		// Mining swaps a deposit's ground type mid-match (Enriched → Ore → Depleted),
+		// so also preload every tier reachable from the deposits actually present —
+		// same blank-tile failure mode as script-swapped terrain otherwise.
+		const groundTypes = withScript(map.filters.ground(map.layers.ground), scriptTypes.ground)
+		// A Scorcher burns Forest to Charred Forest mid-match; warm that result too or
+		// a freshly-scorched tile paints blank (same failure mode as mining above).
+		const mutableGround = withScript(
+			mineReachableTerrainTypes(groundTypes),
+			burnResultTerrainTypes(groundTypes)
+		)
 
 		rendererStore.update((store) => ({
 			ground: {
 				...store.ground,
-				...ground(withScript(map.filters.ground(map.layers.ground), scriptTypes.ground)),
+				...ground(withScript(groundTypes, mutableGround)),
 			},
 			sky: {
 				...store.sky,
@@ -89,7 +104,9 @@
 			attacks: { ...store.attacks, ...attacks(unitData.map((_, index) => index)) },
 			buildings: {
 				...store.buildings,
-				...buildings(withScript(map.filters.buildings(map.layers.buildings), scriptTypes.buildings)),
+				...buildings(
+					withScript(map.filters.buildings(map.layers.buildings), scriptTypes.buildings)
+				),
 			},
 			animation: { ...store.animation, ...animation(animationData.map((_, index) => index)) },
 		}))

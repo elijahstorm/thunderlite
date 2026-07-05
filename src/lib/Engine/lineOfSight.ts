@@ -1,4 +1,5 @@
 import { tileHeight, tileHeightTier, EYE_HEIGHT } from './modifiers/height'
+import { tileHasModifier } from './modifiers/terrainModifier'
 
 export type OcclusionMode = 'off' | 'viewer-relative' | 'raycast'
 
@@ -77,23 +78,21 @@ export const hasLineOfSight = (
 	return clearViewerRelative(map, viewer, target)
 }
 
-// Indirect-fire shadow (idea #4): a long-range shell can't reach a target that
-// sits in the shadow of higher ground between it and the firer — you can't drop
-// rounds onto a unit tucked behind a ridge, or down into a trench. Expressed in
-// tiers: the target is shadowed when some intervening tile is taller than BOTH
-// vantage points — the firer's own elevation and the target's. Firing from high
-// ground lets you see and reach over lower ridges down onto a target below, so a
-// rocket truck on a hill can hit a tank on the flat even with hills between them.
-// A mountaintop target is always hittable; a canyon floor is reachable only from
-// equally high ground. This generalises the Canyon `Trench` rule to all terrain.
-export const indirectFireShadowed = (
+// Indirect fire can't punch THROUGH a Rampart (the `Bulwark` terrain tag). A
+// long-range shell arcs freely over open ground and low cover, so elevation never
+// gates it — but a solid wall standing between the firer and its mark stops the shot
+// cold, which is how you shelter a unit behind a Rampart. Unlike the old height-tier
+// shadow this reasons purely about a concrete, visible terrain tag: what blocks a
+// shell is always something the player can point at. `lineBetween` excludes both
+// endpoints, so a unit standing ON a Bulwark isn't sheltered by it (standing-in
+// cover is the separate Trench rule) — only tiles strictly between the two count.
+export const indirectFireBlocked = (
 	map: Pick<MapObject, 'cols' | 'rows' | 'layers'>,
 	from: number,
 	target: number
 ): boolean => {
-	const vantageTier = Math.max(tileHeightTier(map, from), tileHeightTier(map, target))
 	for (const { tile } of lineBetween(map, from, target)) {
-		if (tileHeightTier(map, tile) > vantageTier) return true
+		if (tileHasModifier(map, tile, 'Bulwark')) return true
 	}
 	return false
 }

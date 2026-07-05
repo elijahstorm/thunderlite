@@ -7,19 +7,32 @@
 	import { paint, flushDeferredOverlays, type VisibilityProvider } from '$lib/Engine/paint'
 	import { canSelectUnit, gameState } from '$lib/Engine/gameState'
 	import { buildingData } from '$lib/GameData/building'
-	import { computeTeamVisibility, computeRadarTiles } from '$lib/Engine/visibility'
+	import {
+		computeTeamVisibility,
+		computeTeamAirVisibility,
+		computeRadarTiles,
+		isUnitStealthed,
+		unitSeenByViewer,
+		type ViewerFog,
+	} from '$lib/Engine/visibility'
 	import { onDestroy, onMount, tick } from 'svelte'
 	import {
 		animationFrame,
 		startAnimationClock,
 		stopAnimationClock,
 	} from '$lib/Sprites/animationFrameCount'
-	import { connectionDecision, cornerDecision } from '$lib/Sprites/spriteConnector'
+	import {
+		connectionDecision,
+		cornerDecision,
+		skyConnectionDecision,
+		skyFlowReversed,
+	} from '$lib/Sprites/spriteConnector'
 	import { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import { createImageLoader } from '$lib/Sprites/images'
 	import { writable, get } from 'svelte/store'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
+	import { splashPreviewForHover } from '$lib/Engine/aoePreview'
 	import { interactionSource, interactionState } from '$lib/Engine/Interactor/interactionState'
 	import { fogOfWarEnabled, viewerVisibility } from '$lib/Engine/fogState'
 	import { fogBusy, unitFadeBusy } from '$lib/Engine/fogRender'
@@ -40,6 +53,9 @@
 		animations,
 		repaintSignal,
 		boardBusy,
+		setRouteCamera,
+		clearRouteCamera,
+		type RouteCamera,
 	} from '$lib/Engine/Animator/animator'
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 	import { campaignCamera } from '$lib/Campaign/campaignInterface'
@@ -108,12 +124,13 @@
 		turnNumber: number
 		tile: number
 		visible: Set<number>
+		airVisible: Set<number>
 	} | null = null
 
 	// Fog is driven by the `fogOfWarEnabled` store (the single source of truth),
 	// not the `fogOfWar` prop directly, so a scripted `fog: on/off` command can
 	// toggle it live. The compute path is always available; the store gates it.
-	const computeVisibility = (): { visible: Set<number>; team: number } | null => {
+	const computeVisibility = (): ViewerFog | null => {
 		const state = $gameState
 		// Lift the fog entirely once the local player is eliminated or the
 		// match is decided: sight comes only from owned units, so a dead
@@ -137,9 +154,12 @@
 				turnNumber: state.turnNumber,
 				tile: state.actedTiles.size,
 				visible: computeTeamVisibility(map, team),
+				// The wider raw-reach set that spots airborne occupants over canopy /
+				// behind ridges (see unitSeenByViewer).
+				airVisible: computeTeamAirVisibility(map, team),
 			}
 		}
-		return { visible: cachedVisibility.visible, team }
+		return { visible: cachedVisibility.visible, airVisible: cachedVisibility.airVisible, team }
 	}
 
 	const visibilityProvider: VisibilityProvider = () =>
@@ -227,6 +247,7 @@
 			// The directional build picker owns map.route while it's up (the outward
 			// arrows aren't hover-driven), so leave it intact in that state only.
 			if ($interactionState !== 'selectBuildTile') map.route = []
+			map.splashPreview = undefined
 			// DEV TOOL — live path/move diagnostics (PathDebugPanel). dev-only.
 			if (dev && !mini && get(pathDebugEnabled)) analyzePathDebug(map, get(interactionSource), tile)
 			return
@@ -234,6 +255,10 @@
 		const result = updateRoute(map, $interactionSource, map.pathHistory ?? [], tile)
 		map.pathHistory = result.pathHistory
 		map.route = result.route
+		// Blast footprint for a splash/lance shot the cursor is lining up: the tiles
+		// the wash/passthrough would also hit, painted red so the player sees the area
+		// of effect before committing.
+		map.splashPreview = splashPreviewForHover(map, $interactionSource, result.pathHistory, tile)
 		// DEV TOOL — snapshot AFTER the live route is built so the panel sees the
 		// real traced pathHistory / arrows, not pathFinder's recomputation.
 		if (dev && !mini && get(pathDebugEnabled)) analyzePathDebug(map, get(interactionSource), tile)
@@ -294,6 +319,15 @@
 			object.state = connectionDecision(object)(map, index)
 			object.corners = cornerDecision(object)(map, index)
 		})
+		// Weather autotiles too: the Jetstream picks a directional frame from its
+		// same-type sky neighbours so a run of tiles flows as one connected highway
+		// (turns, verticals and junctions), instead of every tile drawing the same
+		// horizontal streak. Recomputed each pass so scripted weather shifts retile.
+		map.layers.sky.forEach((object, index) => {
+			if (!object) return
+			object.state = skyConnectionDecision(object)(map, index)
+			object.flowReversed = skyFlowReversed(object)(map, index)
+		})
 		render()
 	}
 
@@ -318,14 +352,47 @@
 	// run this binding, but they never get a `campaign` prop so the subscription
 	// below short-circuits and they don't pan with the main board.
 	let scrollerInstance:
-		| { panToTile?: (x: number, y: number, animate?: boolean) => void }
+		| {
+				panToTile?: (x: number, y: number, animate?: boolean) => void
+				viewport?: () => {
+					left: number
+					top: number
+					width: number
+					height: number
+					tileWidth: number
+					tileHeight: number
+				} | null
+				scrollToPx?: (
+					left: number,
+					top: number,
+					animate?: boolean
+				) => { left: number; top: number } | null
+		  }
 		| undefined
+
+	// Lets a route animation (an AI/online opponent's move, or a local move nearing
+	// an edge) drive this board's camera. Methods read `localTeam`/the live fog at
+	// call time, so the adapter object is stable across the board's lifetime.
+	const routeCam: RouteCamera = {
+		view: () => scrollerInstance?.viewport?.() ?? null,
+		panTo: (left, top, animate) => scrollerInstance?.scrollToPx?.(left, top, animate) ?? null,
+		sees: (tile, unit, m) => {
+			if (unit.team === localTeam) return true
+			const fog = get(viewerVisibility)
+			if (!unitSeenByViewer(fog, tile, unit)) return false
+			return !isUnitStealthed(m, tile, unit)
+		},
+		owns: (unit) => unit.team === localTeam,
+	}
 
 	onMount(() => {
 		if (!colorizer) colorizer = imageColorizer()
 
 		hudImages.advice.src = hud.advice
 		hudImages.arrow.src = hud.arrow
+
+		// Only the main gameplay board follows moves — never a minimap or the editor.
+		if (!mini && !editor) setRouteCamera(routeCam)
 
 		if (!campaign) return
 		// `move: x,y` in a campaign script publishes here. Skip the initial
@@ -337,6 +404,7 @@
 	})
 
 	onDestroy(() => {
+		clearRouteCamera(routeCam)
 		if (clockHeld) {
 			stopAnimationClock()
 			clockHeld = false
@@ -388,7 +456,14 @@
 							tileHeight={cellHeight}
 							contentWidth={cellWidth * map.cols}
 							contentHeight={cellHeight * map.rows}
-							paint={paint(renderData, hudImages, pause, visibilityProvider, localTeam, editor)(() => map)}
+							paint={paint(
+								renderData,
+								hudImages,
+								pause,
+								visibilityProvider,
+								localTeam,
+								editor
+							)(() => map)}
 							afterPaint={flushDeferredOverlays}
 							{requestRedraw}
 							{handleClick}

@@ -1,6 +1,12 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest'
-import { computeTeamVisibility, computeUnitSight } from '../../src/lib/Engine/visibility'
+import { describe, it, expect, afterEach } from 'vitest'
+import {
+	computeTeamVisibility,
+	computeTeamAirVisibility,
+	computeUnitSight,
+	concealedEnemyTiles,
+} from '../../src/lib/Engine/visibility'
+import { fogOfWarEnabled } from '../../src/lib/Engine/fogState'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { unitData } from '../../src/lib/GameData/unit'
 
@@ -24,6 +30,7 @@ const FOREST = terrainIndex('Forest')
 const STRIKE_COMMANDO = unitIndex('Strike Commando') // sight 2, range [1,1] (non-ranged)
 const ROCKET_TRUCK = unitIndex('Rocket Truck') // sight 4, range [3,5] (ranged)
 const JAMMER_TRUCK = unitIndex('Jammer Truck') // sight 2, radar ring range [2,3]
+const RAPTOR_FIGHTER = unitIndex('Raptor Fighter') // air unit
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
 const unit = (type: number, team = 0): UnitObject => ({ type, state: 0, team })
@@ -196,6 +203,19 @@ describe('computeTeamVisibility', () => {
 		expect(computeTeamVisibility(map, 0).has(radarForest)).toBe(false)
 	})
 
+	it('canopy hides a surface occupant of a distant forest but never an aircraft above it', () => {
+		const map = makeMap(7, 7)
+		const viewer = 3 * 7 + 3
+		map.layers.units[viewer] = unit(STRIKE_COMMANDO, 0) // sight 2
+		const far = 3 * 7 + 5 // distance 2 — in sight range, but wooded
+		map.layers.ground[far] = ground(FOREST)
+
+		// Ground reach hides the treed tile's occupant; the air reach (canopy filter
+		// stripped) still spots something flying over the same tile.
+		expect(computeTeamVisibility(map, 0).has(far)).toBe(false)
+		expect(computeTeamAirVisibility(map, 0).has(far)).toBe(true)
+	})
+
 	it('clips to the map edges', () => {
 		const map = makeMap(3, 3)
 		map.layers.units[0] = unit(STRIKE_COMMANDO, 0)
@@ -209,5 +229,24 @@ describe('computeTeamVisibility', () => {
 			expect(y).toBeLessThan(3)
 		}
 		expect(visible.has(0)).toBe(true)
+	})
+})
+
+describe('concealedEnemyTiles — canopy hides ground foes, not aircraft (fog on)', () => {
+	afterEach(() => fogOfWarEnabled.set(false))
+
+	it('conceals a ground enemy in a distant forest but spots an air enemy on the same tile', () => {
+		fogOfWarEnabled.set(true)
+		const map = makeMap(7, 7)
+		const viewer = 3 * 7 + 3
+		map.layers.units[viewer] = unit(STRIKE_COMMANDO, 0) // sight 2
+		const far = 3 * 7 + 5 // distance 2 — wooded, so canopy-concealed on the ground
+		map.layers.ground[far] = ground(FOREST)
+
+		map.layers.units[far] = unit(STRIKE_COMMANDO, 1) // ground foe hides under the trees
+		expect(concealedEnemyTiles(map, 0).has(far)).toBe(true)
+
+		map.layers.units[far] = unit(RAPTOR_FIGHTER, 1) // aircraft over the trees is seen
+		expect(concealedEnemyTiles(map, 0).has(far)).toBe(false)
 	})
 })

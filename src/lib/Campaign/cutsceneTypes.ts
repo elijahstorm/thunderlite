@@ -56,14 +56,17 @@ export type CutsceneEventKind = CutsceneEvent['kind']
 export type CompareOp = '<' | '<=' | '==' | '>=' | '>'
 
 /**
- * A `<when>` trigger condition: compares a team's unit count against `count`.
- * When `unitTypes` is null the whole team is counted; otherwise only units whose
- * type name is in the list. e.g. `team 1 units <= 2`, or
- * `team 0 units "Strike Commando","Heavy Commando" == 0`.
+ * A `<when>` trigger condition: compares a team's count of units or owned
+ * buildings against `count`. When `typeNames` is null everything the team has
+ * on that layer is counted; otherwise only entries whose type name is in the
+ * list. e.g. `team 1 units <= 2`,
+ * `team 0 units "Strike Commando","Heavy Commando" == 0`, or
+ * `team 0 buildings "Air Control" >= 1` (fires when the team captures one).
  */
 export interface TriggerCondition {
 	team: number
-	unitTypes: string[] | null
+	layer: 'units' | 'buildings'
+	typeNames: string[] | null
 	op: CompareOp
 	count: number
 }

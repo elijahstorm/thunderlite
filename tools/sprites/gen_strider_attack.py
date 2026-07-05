@@ -59,9 +59,12 @@ def railgun_blast(d, ox, oy, h, fl, beam):
     """Bright muzzle flash + a long thin railgun beam down the barrel line."""
     gh = G.POD_TOP + 0.6
     mx, my = G.P(ox, oy, h, 14.0, 0, lift=gh)
-    # long beam shooting forward
+    # long beam shooting forward. Reach budget: the render window is exactly this
+    # unit's 150px cell, so the tip must stay inside 75px of the cell centre
+    # ((14 + 26) * SCALE 1.8 ≈ 72px) — anything longer leaks into the neighbouring
+    # state's frames and shows up as stray beams "on the side" in-game.
     if beam > 0:
-        bx, by = G.P(ox, oy, h, 14.0 + 70.0, 0, lift=gh)
+        bx, by = G.P(ox, oy, h, 14.0 + 26.0, 0, lift=gh)
         d.line([mx, my, bx, by], fill=(G.EYE_HI[0], G.EYE_HI[1], G.EYE_HI[2],
                 int(230 * beam)), width=max(1, int(4 * beam)))
         d.line([mx, my, bx, by], fill=(255, 255, 255, int(255 * beam)),
@@ -106,13 +109,16 @@ def draw_attack_cell(d, ox, oy, h, frame):
 
 if __name__ == "__main__":
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img, "RGBA")
+    # Each cell is drawn on its own 150px tile and composited in, so no effect can
+    # ever bleed into a neighbouring state/frame cell (the in-game overlay shows
+    # exactly one cell, and anything painted outside it pollutes other states).
     for row in range(ROWS):
         for col in range(COLS):
+            tile = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
+            td = ImageDraw.Draw(tile, "RGBA")
             # center; nudge down so the tall mech sits in the cell, effect above
-            ox = col * CELL + CELL // 2
-            oy = row * CELL + CELL // 2 + 26
-            draw_attack_cell(d, ox, oy, HEADINGS[col], row)
+            draw_attack_cell(td, CELL // 2, CELL // 2 + 26, HEADINGS[col], row)
+            img.alpha_composite(tile, (col * CELL, row * CELL))
 
     relight(img)
     out = "/Users/elijah/dev/elijahstorm/thunderlite/static/game/play/unit/attack/strider.png"

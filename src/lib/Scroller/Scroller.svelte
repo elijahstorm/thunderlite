@@ -41,8 +41,7 @@
 	// scroller — doing that every animation frame dropped frames and flashed the
 	// board white mid-animation. Skipped while the scroller drives its own paint
 	// (touch tracking / deceleration) so we don't paint the same frame twice.
-	const render = () =>
-		redraw && !scroller?.__isDecelerating && !scroller?.__isTracking && redraw()
+	const render = () => redraw && !scroller?.__isDecelerating && !scroller?.__isTracking && redraw()
 	// Content dimensions last applied to the canvas/scroller, so `reflow` can
 	// no-op when a resize event fires with nothing actually changed.
 	let appliedContentWidth = -1
@@ -61,6 +60,46 @@
 		const left = (x + 0.5) * tileWidth - cw / 2
 		const top = (y + 0.5) * tileHeight - ch / 2
 		scroller.scrollTo(left, top, animate)
+	}
+
+	/**
+	 * Current committed scroll target (content px) plus the viewport and tile
+	 * sizes. Reports the *scheduled* position so a follow that fires mid-animation
+	 * measures from where the view is heading, not a half-completed slide. Null
+	 * until the scroller has mounted. Used by the route-camera follow.
+	 */
+	export const viewport = (): {
+		left: number
+		top: number
+		width: number
+		height: number
+		tileWidth: number
+		tileHeight: number
+	} | null => {
+		if (!scroller || !container) return null
+		return {
+			left: scroller.__scheduledLeft,
+			top: scroller.__scheduledTop,
+			width: container.clientWidth,
+			height: container.clientHeight,
+			tileWidth,
+			tileHeight,
+		}
+	}
+
+	/**
+	 * Scroll to a content-px position and return the clamped target that was
+	 * actually applied (scrollTo clamps to the map bounds). Used by the route
+	 * camera to trail a moving unit.
+	 */
+	export const scrollToPx = (
+		left: number,
+		top: number,
+		animate = true
+	): { left: number; top: number } | null => {
+		if (!scroller) return null
+		scroller.scrollTo(left, top, animate)
+		return { left: scroller.__scheduledLeft, top: scroller.__scheduledTop }
 	}
 	export let paint =
 		(context: CanvasRenderingContext2D) =>

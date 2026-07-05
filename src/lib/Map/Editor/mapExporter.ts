@@ -87,12 +87,7 @@ const process = (map: MapData) =>
 
 const processObjects =
 	(map: MapData, objects: LocationObject[]) =>
-	<
-		T extends
-			| typeof processTeamObjectState
-			| typeof processObjectState
-			| typeof processUnitState,
-	>(
+	<T extends typeof processTeamObjectState | typeof processObjectState | typeof processUnitState>(
 		processer: T
 	) => {
 		const result = new Array(map.cols * map.rows)
@@ -114,13 +109,16 @@ const processTeamObjectState =
 // Units round-trip their carried passenger: a serialized `cargo` (unit type)
 // becomes a fresh `rescuedUnit` owned by the carrier's team. Mirrors the in-game
 // transport, so an editor-placed loaded transport plays exactly as authored.
+// An authored `health` also survives the trip, so campaign maps can pre-place
+// already-injured units ("picked up mid-battle") without a script command.
 const processUnitState =
 	(source: (UnitObject | null)[]) =>
-	(object: LocationObject & TeamObject & { cargo?: number }) =>
+	(object: LocationObject & TeamObject & { cargo?: number; health?: number }) =>
 		(source[object.l] = {
 			type: object.type,
 			team: object.team,
 			state: 0,
+			...(object.health != null ? { health: object.health } : {}),
 			...(object.cargo != null
 				? { rescuedUnit: { type: object.cargo, team: object.team, state: 0 } }
 				: {}),

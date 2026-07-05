@@ -242,6 +242,21 @@ describe('endTurn', () => {
 		expect(map.layers.units[2]).toBeNull()
 	})
 
+	it('applyTerrainEndOfTurnDamage skips air units (they hover above the hazard)', () => {
+		const wastelandIdx = terrainData.findIndex((t) => t.name === 'Wasteland')
+		const raptorIdx = unitData.findIndex((u) => u.name === 'Raptor Fighter')
+		const map = makeMap()
+		map.layers.ground[0] = { type: wastelandIdx, state: 0 }
+		map.layers.units[0] = unit(0, raptorIdx)
+
+		const events = applyTerrainEndOfTurnDamage(map, 0)
+
+		expect(events).toEqual([])
+		expect(map.layers.units[0]!.health ?? unitData[raptorIdx].health).toBe(
+			unitData[raptorIdx].health
+		)
+	})
+
 	it('applyTerrainEndOfTurnDamage ignores enemy units', () => {
 		const wastelandIdx = terrainData.findIndex((t) => t.name === 'Wasteland')
 		const map = makeMap()

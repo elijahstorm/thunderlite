@@ -26,15 +26,19 @@ MUZZLE_F = 14.0  # matches the shortened idle nozzle tip
 
 # per-frame flame profile: (reach in local-forward px, half-width spread).
 # grows to a wide roaring cone, then trails off to lingering puffs.
+# Reach budget: the render window is exactly this unit's 150px cell, so the
+# farthest tongue (MUZZLE_F 14 + reach * 1.18, * SCALE 1.66) must stay inside
+# 75px of the cell centre or it leaks into the neighbouring state's frames.
+# Max reach ≈ 24 keeps the tip at ~70px and still engulfs the adjacent tile.
 FLAME = {
-    0: (8,  4),
-    1: (20, 7),
-    2: (34, 11),
-    3: (46, 14),
-    4: (50, 15),
-    5: (40, 13),
-    6: (26, 11),
-    7: (14, 8),
+    0: (4,  4),
+    1: (10, 7),
+    2: (16, 11),
+    3: (22, 14),
+    4: (24, 15),
+    5: (19, 13),
+    6: (12, 11),
+    7: (7,  8),
 }
 # small backward recoil shudder while firing the heavy projector
 RECOIL = {1: 0.6, 2: 1.2, 3: 1.6, 4: 1.4, 5: 0.7}
@@ -120,11 +124,15 @@ def draw_attack_cell(d, ox, oy, h, frame, seed):
 
 if __name__ == "__main__":
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+    # Each cell is drawn on its own 150px tile and composited in, so no flame can
+    # ever bleed into a neighbouring state/frame cell (the in-game overlay shows
+    # exactly one cell, and anything painted outside it pollutes other states).
     for row in range(ROWS):
         for col in range(COLS):
-            draw_attack_cell(d, col*CELL + CELL//2, row*CELL + CELL//2,
-                             HEADINGS[col], row, seed=col)
+            tile = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
+            td = ImageDraw.Draw(tile)
+            draw_attack_cell(td, CELL//2, CELL//2, HEADINGS[col], row, seed=col)
+            img.alpha_composite(tile, (col*CELL, row*CELL))
 
     relight(img)
     out = "/Users/elijah/dev/elijahstorm/thunderlite/static/game/play/unit/attack/scorcher.png"

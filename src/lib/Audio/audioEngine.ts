@@ -199,6 +199,13 @@ export class AudioEngine {
 	private fadeDuration = 0
 	private fadeCancel: (() => void) | null = null
 
+	/**
+	 * Runtime-only ducking multiplier for the `env` channel (0..1). Lets weather
+	 * ambience sit beneath the music bed without overwriting — and thus losing —
+	 * the player's own env volume preference. Not persisted; recomputed each play.
+	 */
+	private envDuck = 1
+
 	constructor(opts: AudioEngineOptions = {}) {
 		this.factory = opts.factory ?? null
 		this.format = opts.preferredFormat ?? 'ogg'
@@ -390,7 +397,7 @@ export class AudioEngine {
 		const el = this.acquireTrackElement(resolveAudioPath(base, this.format))
 		el.loop = loop
 		el.currentTime = 0
-		el.volume = effectiveVolume(this.state, channel)
+		el.volume = this.outputVolume(channel)
 		this.singleEls[channel] = el
 		if (!this.playbackSuppressed) void el.play()
 	}
@@ -465,6 +472,14 @@ export class AudioEngine {
 	setChannelVolume(channel: AudioChannel, volume: number): void {
 		this.commit(withChannelVolume(this.state, channel, volume))
 	}
+	/**
+	 * Set the runtime env ducking multiplier (0..1) and re-sync live volumes.
+	 * Composes with the persisted env channel volume rather than replacing it.
+	 */
+	setEnvDuck(multiplier: number): void {
+		this.envDuck = clampVolume(multiplier)
+		this.syncVolumes()
+	}
 	setMasterMute(muted: boolean): void {
 		this.commit(withChannelMute(this.state, 'master', muted))
 	}
@@ -480,6 +495,12 @@ export class AudioEngine {
 		this.commit({ ...createAudioState(settings), active: { ...this.state.active } })
 	}
 
+	/** Effective element gain, folding in the env duck for the `env` channel. */
+	private outputVolume(channel: AudioChannel): number {
+		const base = effectiveVolume(this.state, channel)
+		return channel === 'env' ? clampVolume(base * this.envDuck) : base
+	}
+
 	private commit(next: AudioState): void {
 		this.state = next
 		this.syncVolumes()
@@ -490,7 +511,7 @@ export class AudioEngine {
 	private syncVolumes(): void {
 		for (const channel of SINGLE_CHANNELS) {
 			const el = this.singleEls[channel]
-			if (el) el.volume = effectiveVolume(this.state, channel)
+			if (el) el.volume = this.outputVolume(channel)
 		}
 		this.syncMusicStemVolumes()
 		const sfxVol = effectiveVolume(this.state, 'sfx')

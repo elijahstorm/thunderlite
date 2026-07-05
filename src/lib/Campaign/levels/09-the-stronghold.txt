@@ -1,26 +1,126 @@
 <start>
-move: 7,4
-talk Vance: "Kael's fortress. Stone walls, an Annihilator at the gate, and there, in the center, his Warmachine.", "It builds his army. Destroy the Warmachine and Kael's finished outright. That's your target."
-move: 4,9
-talk Vance: "No single arm cracks a fortress. Use everything: artillery to soften the walls, your Condor Bomber to fly over them, ground troops to pour through the breach."
-move: 7,3
-talk Kael: "My stronghold has held against better than you. It will hold again."
-talk Reyes: "Every wall has a weak point. We'll find his."
+funds: 0,700
+move: 8,3
+talk Vance: "There it is, Reyes. Kael's fortress. Black stone, crags no engine can climb, and one gate."
+move: 8,1
+hl: 8,1
+talk Vance: "And there, up on the keep, his Warmachine. It digs the ore out from under that courtyard and turns it into fresh steel, every single turn.", "Destroy it and Kael is finished on the spot. That machine is his army, his treasury, and his throne. But the longer you take, the deeper his pockets get."
+unhl: 8,1
+move: 8,5
+talk Kael: "You are staring at my gate, Reyes. Everyone stares at the gate. An Annihilator holds it, and my towers have counted every stone on that road."
+move: 8,7
+talk Vance: "He is not bluffing. The road is the fast way in and the surest way to die. His gun towers reach three tiles past the gate, and the shell-torn ground either side bleeds ten health off anything that rests on it."
+move: 7,8
+talk Vance: "Which is why the first assault died digging you this sap. Ranged fire cannot reach into the trench. Walk your mortars up it one tile at a time and they can shell his gate from perfect safety."
+move: 3,2
+talk Vance: "The crags stop armor dead, but boots climb them, and your Strider walks them like a road. The rampart runs thin in places. Find them, and you can put fire behind his wall."
+move: 6,0
+talk Vance: "And look at the crown of the mountain. The vents keep the whole keep wrapped in ash. It hides a wing from every eye, but it burns ten a turn off anything not built for it. There is no clean air over that fortress except the gate lane, and his flak owns the gate lane.", "His last Petrel is in the veil somewhere, riding it for free. Mind your wings."
+move: 9,1
+talk Vance: "Last thing. The shield rig parked beside the Warmachine blunts every hit on its neighbors. Strip the Aegis first, or your killing blow will bounce off a wall of light."
+move: 13,9
+talk Vance: "The hamlet east and the village northwest still stand, and their coin keeps your factory running. This is a siege, Reyes. Sieges are fed."
+move: 8,1
+talk Kael: "My stronghold has held against better than you. The mountain feeds my machine, and my machine does not sleep."
+talk Reyes: "Every fortress is a tomb with one door, Kael. We are going to close it on you."
 </start>
 
 <turn 1,1>
 wait: 1
-move: 7,7
-talk Kael: "Sortie out. Drive them back from the gate."
-add unit: 1,"Scorpion Tank",7,7
-talk Vance: "He's sallying out to break our momentum. Hold formation. Combined arms, like we planned. Keep on the Warmachine."
+move: 8,5
+talk Kael: "Clear my road."
+add unit: 1,"Scorpion Tank",8,6
+add unit: 1,"Scorcher",7,6
+talk Vance: "Sortie, out of the gate. Meet it in the open and make him pay for the ground. Every tank he spends out here is one the machine has to replace."
 </turn>
 
+<turn 2,0>
+wait: 0.5
+move: 7,8
+talk Vance: "Work the sap while his sortie is spent. Guns creep forward under cover, armor screens the trench mouth, and nobody naps on the burnt ground."
+</turn>
+
+<turn 3,1>
+wait: 1
+move: 3,3
+talk Kael: "Walls work both ways, Reyes. Spiders, over the crags. Burn their guns in their pits."
+add unit: 1,"Spider Tank",3,2
+add unit: 1,"Spider Tank",3,4
+talk Vance: "Spider Tanks coming over the west rampart, straight for the battery. Do not let your guns fight alone."
+</turn>
+
+<turn 5,1>
+wait: 1
+move: 11,0
+talk Kael: "The mountain wakes. My Petrels were made for this sky."
+weather: "Ash Plume",4,1
+weather: "Ash Plume",11,1
+weather: "Ash Plume",14,1
+weather: "Ash Plume",2,2
+weather: "Ash Plume",4,2
+weather: "Ash Plume",5,2
+weather: "Ash Plume",11,2
+weather: "Ash Plume",12,2
+weather: "Ash Plume",14,2
+weather: "Ash Plume",12,3
+weather: "Ash Plume",12,4
+weather: "Ash Plume",13,4
+add unit: 1,"Petrel Stormrider",10,0
+talk Vance: "The vents are surging and the ash is spilling down into the courtyard itself. His keep flies blind now, and everything of ours burns inside it. A Kestrel Sentry can drag his Petrels into the open if you want that sky honest."
+</turn>
+
+<turn 7,1>
+wait: 1
+move: 8,2
+talk Kael: "Enough. Reserve armor to the gate. Nothing gets through."
+add unit: 1,"Lance Tank",8,2
+add unit: 1,"Scorpion Tank",7,3
+talk Vance: "He is pulling armor off the keep to plug the gate. That is fear, Reyes. Keep squeezing."
+</turn>
+
+<when team 1 units "Turret" == 0>
+move: 8,5
+talk Vance: "Both towers silent. The road is just a road now. Bring the armor up and put your boots on his stones."
+</when>
+
+<when team 1 units "Aegis" == 0>
+move: 8,1
+talk Vance: "The shield rig is scrap and the Warmachine stands naked. Everything you have, on the machine."
+</when>
+
+<when team 1 units "Annihilator Tank" == 0>
+talk Vance: "The gatekeeper is wreckage. First good news this siege has given us."
+</when>
+
+<when team 1 units "Petrel Stormrider" == 0>
+talk Vance: "His last wing is down. The ash hides only us now."
+</when>
+
+<when team 0 units "Mortar Truck","Rocket Truck" == 0>
+talk Vance: "The battery is gone. Without guns you will be trading blood for stone at that gate. Build replacements, or find your way in over the wall."
+</when>
+
+<when team 0 units "Strike Commando","Heavy Commando" == 0>
+talk Vance: "No boots left, so no more captures. The coin we hold is all the coin we get. Spend it carefully."
+</when>
+
+<when team 0 buildings "City" >= 4>
+talk Vance: "The countryside is paying us now. Coin becomes steel, and steel becomes the breach. Keep the lines moving."
+</when>
+
+<when team 1 units <= 5>
+move: 8,1
+talk Kael: "Machine. Build. BUILD."
+talk Vance: "Hear that? The garrison is dying faster than his machine can pour replacements, and the ore under that courtyard is not bottomless. Press him now."
+</when>
+
 <win>
-talk Vance: "The Warmachine's wreckage and the fortress has gone quiet. You took a stronghold, Reyes.", "Only Kael himself is left now."
+talk Vance: "The Warmachine is burning, and with it every tank he was ever going to build. You did not just take a fortress, Reyes. You killed the thing that makes his war."
+talk Kael: "A machine can be rebuilt. I still have the sea."
+talk Vance: "He is running for the coast, to his fleet. One last standoff, and this ends."
 </win>
 
 <lose>
-talk Kael: "Broken against my walls, and the Warmachine builds on while you bleed."
-talk Vance: "We hit it piecemeal. Bring every arm to bear at once. Fly the bomber over the walls."
+talk Kael: "My machine builds faster than you break. That is all a siege ever was, Reyes. Arithmetic. Mine is better."
+talk Vance: "We fed the siege too slowly and his machine outbuilt us. Shell the gate from the sap, strip the shield rig, and kill the machine before it mines the courtyard dry. Again."
 </lose>

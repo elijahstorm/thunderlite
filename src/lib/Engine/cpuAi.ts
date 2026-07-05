@@ -1,9 +1,10 @@
 import { get } from 'svelte/store'
 import { gameState } from './gameState'
-import { applyAction } from './applyAction'
+import { applyAction, type CommitOptions } from './applyAction'
 import { emitOutgoingAction } from './outgoingActions'
 import { animateRoute } from './Animator/animator'
 import { animateAttackSequence } from './attackSequence'
+import { playActionSfx } from '$lib/Audio/playActionSfx'
 import { pathFinder } from './Interactor/Pathing/pathFinder'
 import { truncateRouteAtCollision } from './Interactor/Pathing/movement'
 import { concealedEnemyTiles } from './visibility'
@@ -15,6 +16,7 @@ import {
 } from './cpuAi/stealthMemory'
 import { updateFogBelief } from './cpuAi/fogMemory'
 import { bestPlanFor } from './cpuAi/candidates'
+import { beginCpuPlanning, endCpuPlanning, planningUnits } from './cpuAi/planningContext'
 import { pickBuildOnce } from './cpuAi/production'
 import type { SerializedAction } from './Interactor/serializedAction'
 import type { ActionPlan } from './cpuAi/types'
@@ -42,11 +44,13 @@ export const isCpuTurn = (humanTeam: number): boolean => {
 	return state.currentTeam !== humanTeam
 }
 
-const commit = (map: MapObject, action: SerializedAction): void => {
+const commit = (map: MapObject, action: SerializedAction, opts?: CommitOptions): void => {
 	// The CPU turn is live, animated gameplay (one action at a time), so its
 	// moves/attacks/deaths should sound just like a human's. Only the reconnect
-	// replay path stays silent.
-	applyAction(map, action, { live: true })
+	// replay path stays silent. Animated actions (move / attack) voice their
+	// sound at the animation beat and pass `suppressSfxActions` so the commit
+	// doesn't play it a second time.
+	applyAction(map, action, { live: true, ...opts })
 	emitOutgoingAction(action)
 }
 
@@ -55,26 +59,28 @@ const findActableUnits = (
 	cpuTeam: number
 ): { tile: number; unit: UnitObject }[] => {
 	const acted = get(gameState).actedTiles
-	const out: { tile: number; unit: UnitObject }[] = []
-	const units = map.layers.units
-	for (let i = 0; i < units.length; i++) {
-		const u = units[i]
-		if (!u || u.team !== cpuTeam) continue
-		if (acted.has(i)) continue
-		out.push({ tile: i, unit: u })
-	}
-	return out
+	// planningUnits is the compact, per-tick-cached unit list (see planningContext).
+	// Must run inside an active planning window — pickBestPlan opens one first.
+	return planningUnits(map).filter(({ tile, unit }) => unit.team === cpuTeam && !acted.has(tile))
 }
 
 const pickBestPlan = (map: MapObject, cpuTeam: number): ActionPlan | null => {
-	const units = findActableUnits(map, cpuTeam)
-	let best: ActionPlan | null = null
-	for (const { tile, unit } of units) {
-		const plan = bestPlanFor(map, tile, unit, cpuTeam)
-		if (!plan) continue
-		if (!best || plan.score > best.score) best = plan
+	// Open a planning window: the board is frozen for the duration of this call, so
+	// the scorer's repeated reads (unit/building lists, enemy reach, concealment)
+	// are computed once and memoised, then torn down so the next tick starts clean.
+	beginCpuPlanning(map)
+	try {
+		const units = findActableUnits(map, cpuTeam)
+		let best: ActionPlan | null = null
+		for (const { tile, unit } of units) {
+			const plan = bestPlanFor(map, tile, unit, cpuTeam)
+			if (!plan) continue
+			if (!best || plan.score > best.score) best = plan
+		}
+		return best
+	} finally {
+		endCpuPlanning()
 	}
-	return best
 }
 
 export const runCpuTurn = ({
@@ -165,13 +171,20 @@ export const runCpuTurn = ({
 				return false
 			}
 			map.layers.units[action.from] = null
+			// Footsteps roll *with* the walk, not after it. The commit below
+			// suppresses 'move' so the sound isn't heard twice.
+			playActionSfx('move', unit)
 			await safeAnimate(() => animateRoute(map, unit, action.from, finalTile, walked))
 			map.layers.units[action.from] = unit
 			if (cancelled) return false
 			// A cloaked unit caught crossing an enemy radar ring mid-route is logged so
 			// the watching player "remembers" a stealth threat is about.
 			recordStealthPassthrough(map, walked, unit)
-			commit(map, { kind: 'move', from: action.from, to: finalTile })
+			commit(
+				map,
+				{ kind: 'move', from: action.from, to: finalTile },
+				{ suppressSfxActions: ['move'] }
+			)
 			return !collided
 		}
 
@@ -185,8 +198,8 @@ export const runCpuTurn = ({
 			// sequencer; pass it through so a cancelled turn skips the commit too.
 			if (cancelled) return false
 			await safeAnimate(() =>
-				animateAttackSequence(map, action.from, action.to, (a) => {
-					if (!cancelled) commit(map, a)
+				animateAttackSequence(map, action.from, action.to, (a, opts) => {
+					if (!cancelled) commit(map, a, opts)
 				})
 			)
 			return true

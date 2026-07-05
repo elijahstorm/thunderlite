@@ -133,11 +133,20 @@ export const concealedEnemyTiles = (map: VisibilityMap, team: number): Set<numbe
 	const out = new Set<number>()
 	const fog = get(fogOfWarEnabled)
 	const visible = fog ? computeTeamVisibility(map, team) : null
+	// Built lazily, only the first time an air enemy sits on a fog-dark tile.
+	let airVisible: Set<number> | null = null
 	const units = map.layers.units
 	for (let tile = 0; tile < units.length; tile++) {
 		const unit = units[tile]
 		if (!unit || unit.team === team) continue
-		if ((visible !== null && !visible.has(tile)) || isUnitStealthed(map, tile, unit)) {
+		let fogHidden = visible !== null && !visible.has(tile)
+		// Canopy and ridge occlusion hide surface units only: an air unit above the
+		// treetops is spotted by any viewer with the raw sight reach to its tile.
+		if (fogHidden && unitData[unit.type]?.type === 'air') {
+			airVisible ??= computeTeamAirVisibility(map, team)
+			fogHidden = !airVisible.has(tile)
+		}
+		if (fogHidden || isUnitStealthed(map, tile, unit)) {
 			out.add(tile)
 		}
 	}
@@ -178,6 +187,13 @@ export const isAirHiddenBySky = (map: VisibilityMap, tile: number, unit: UnitObj
 	return skyData[sky.type]?.modifiers.includes('hidden') ?? false
 }
 
+// Whether `unit` conceals itself at `tile` by its own faculties, before any enemy is
+// close enough to flush it: a stealth-type hull, or air cover from a concealing sky.
+// This is the single place that enumerates self-concealment sources, so move-reveal
+// and end-of-turn hiding stay in agreement and a new mechanic slots in here once.
+export const concealsSelfAt = (map: VisibilityMap, tile: number, unit: UnitObject): boolean =>
+	isStealthUnit(unit) || isAirHiddenBySky(map, tile, unit)
+
 export const applySkyHiding = (map: MapObject | MapProcesser, team: number): void => {
 	for (let tile = 0; tile < map.layers.units.length; tile++) {
 		const unit = map.layers.units[tile]
@@ -191,6 +207,10 @@ export const applySkyHiding = (map: MapObject | MapProcesser, team: number): voi
 export const computeUnitSight = (map: VisibilityMap, tile: number, unit: UnitObject): number => {
 	const base = unitData[unit.type]?.sight ?? 0
 	if (base <= 0) return 0
+	// A vantage point (Hills, Mountain) only lifts a unit that actually climbs it.
+	// An air unit flies at its own altitude wherever it is, so the terrain beneath
+	// adds nothing to its eyes.
+	if (unitData[unit.type]?.type === 'air') return base
 	return base + extraSightBonus(map, tile)
 }
 
@@ -198,12 +218,15 @@ export const computeUnitSight = (map: VisibilityMap, tile: number, unit: UnitObj
 // occlusion `mode` other than 'off' is supplied, each candidate tile must also have
 // an unobstructed line of sight from `center` — terrain height can hide tiles that
 // fall within raw range. Airborne viewers (passed mode 'off') ignore occlusion.
+// `canopyHides` applies the concealing-terrain filter; it's dropped when computing
+// where an AIR occupant would be seen, since treetops hide the ground, not the sky.
 const addDiamond = (
 	map: VisibilityMap,
 	center: number,
 	radius: number,
 	out: Set<number>,
-	mode: OcclusionMode
+	mode: OcclusionMode,
+	canopyHides = true
 ): void => {
 	if (radius < 0) return
 	const cx = center % map.cols
@@ -220,7 +243,8 @@ const addDiamond = (
 			// Forest and other concealing terrain hide their occupants from any viewer
 			// not standing on or directly beside the tile (radar reveal is layered on
 			// separately, in computeTeamVisibility).
-			if (Math.abs(dx) + Math.abs(dy) > 1 && isConcealingTerrain(map, tile)) continue
+			if (canopyHides && Math.abs(dx) + Math.abs(dy) > 1 && isConcealingTerrain(map, tile))
+				continue
 			out.add(tile)
 		}
 	}
@@ -240,4 +264,40 @@ export const computeTeamVisibility = (map: VisibilityMap, team: number): Set<num
 	}
 	addRadarRevealedConcealment(map, team, visible)
 	return visible
+}
+
+// Tiles where an AIRBORNE occupant would be spotted by `team`. Same viewer
+// diamonds as computeTeamVisibility, but with the two surface-only filters
+// stripped: forest canopy / smoke hide what sits UNDER them, and a ridge's
+// height occlusion blocks the sightline to the ground behind it — neither
+// hides an aircraft flying above the obstacle. Not a superset of the ground
+// set (radar-revealed canopy tiles live only there), so consumers check a
+// tile against BOTH via `unitSeenByViewer`.
+export const computeTeamAirVisibility = (map: VisibilityMap, team: number): Set<number> => {
+	const visible = new Set<number>()
+	const units = map.layers.units
+	for (let tile = 0; tile < units.length; tile++) {
+		const unit = units[tile]
+		if (!unit || unit.team !== team) continue
+		addDiamond(map, tile, computeUnitSight(map, tile, unit), visible, 'off', false)
+	}
+	return visible
+}
+
+// The viewer-side fog snapshot every renderer/overlay consults. `airVisible`
+// widens the reach for airborne occupants only (see computeTeamAirVisibility);
+// when omitted it falls back to `visible`, so a caller that doesn't distinguish
+// domains gets the conservative ground reach for everyone.
+export type ViewerFog = { visible: Set<number>; airVisible?: Set<number>; team: number }
+
+// Whether the viewer holding `fog` perceives `unit` standing on `tile`, honoring
+// the occupant's domain: surface units are seen by the ground set (canopy and
+// ridge occlusion apply), air units by either set (treetops can't hide a plane).
+// The single predicate the painter, animator and threat overlays share, so
+// "can I see it" never disagrees between systems. Fog `null` means fog is off.
+export const unitSeenByViewer = (fog: ViewerFog | null, tile: number, unit: UnitObject): boolean => {
+	if (!fog) return true
+	if (fog.visible.has(tile)) return true
+	if (unitData[unit.type]?.type === 'air') return (fog.airVisible ?? fog.visible).has(tile)
+	return false
 }

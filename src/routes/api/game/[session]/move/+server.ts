@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { isValidSerializedAction } from '$lib/Engine/Interactor/serializedAction.js'
 import { gameStore } from '$lib/Game/store.server'
+import { realtime } from '$lib/dontcode/server'
 
 export const POST = async ({ request, params, locals }) => {
 	const userSession = locals.session
@@ -39,6 +40,12 @@ export const POST = async ({ request, params, locals }) => {
 			const nextIdx = (idx + 1) % members.length
 			await gameStore.setCurrentTurn(session, members[nextIdx])
 		}
+
+		// Push the recorded event to everyone in the room. Best-effort — the
+		// event log above is the source of truth, and after an end-turn the
+		// publish must come AFTER the turn handover so a subscriber who acts
+		// on it immediately isn't rejected as "not your turn".
+		await realtime.tryPublish(`game:${session}`, { event })
 
 		return json({ event })
 	} catch (msg) {

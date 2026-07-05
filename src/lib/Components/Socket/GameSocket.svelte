@@ -8,7 +8,9 @@
 		type GameEvent,
 		type SerializedAction,
 	} from '$lib/Engine/Interactor/serializedAction'
+	import { animateRemoteAction } from '$lib/Engine/remoteAnimate'
 	import { outgoingActions } from '$lib/Engine/outgoingActions'
+	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import { fly } from 'svelte/transition'
 
 	export let map: () => MapObject | undefined
@@ -17,6 +19,9 @@
 	export const userSession: string = ''
 
 	const POLL_INTERVAL = 1500
+	// With a live websocket, polling drops to a slow reconciliation pass that
+	// only exists to catch a push the fire-and-forget channel lost.
+	const CONNECTED_POLL_EVERY_TICKS = 20
 
 	const isMultiplayer = (): boolean => {
 		if (!gameSession) return false
@@ -28,13 +33,49 @@
 	let multiplayer = false
 	let lastEventId = -1
 	let pollTimer: ReturnType<typeof setInterval> | null = null
+	let pollTick = 0
+	let realtimeConn: RealtimeConnection | null = null
+	let realtimeUp = false
 	let outgoingUnsubscribe: (() => void) | null = null
 	let requestRedraw: number = 0
 	let wrongTurn = false
 	let wrongTurnTimer: ReturnType<typeof setTimeout> | null = null
 	const locallyEmitted = new Set<string>()
 
-	const applyEvent = (event: GameEvent): boolean => {
+	// Opponent actions applied through a serial queue so their move/attack slides
+	// play one at a time instead of overlapping. `caughtUp` gates animation: the
+	// initial catch-up poll (and any gap backfill) applies instantly so a
+	// reconnect doesn't replay the whole match in slow motion — only live pushes
+	// once we're current get the full choreography.
+	let caughtUp = false
+	const animateQueue: SerializedAction[] = []
+	let draining = false
+
+	const drainQueue = async (): Promise<void> => {
+		if (draining) return
+		draining = true
+		try {
+			while (animateQueue.length) {
+				const action = animateQueue.shift()!
+				const m = map()
+				if (!m) continue
+				// Animate a lone, live move/attack; when actions have piled up
+				// (a burst, or catching up), fast-forward instantly to stay in sync.
+				const animate =
+					animateQueue.length === 0 && (action.kind === 'move' || action.kind === 'attack')
+				if (animate) {
+					await animateRemoteAction(m, action)
+				} else {
+					dispatchSerializedAction(m, action)
+				}
+				requestRedraw = performance.now()
+			}
+		} finally {
+			draining = false
+		}
+	}
+
+	const applyEvent = (event: GameEvent, live: boolean): boolean => {
 		const m = map()
 		if (!m) return false
 		if (typeof event.id !== 'number') return false
@@ -46,8 +87,14 @@
 		}
 		const fingerprint = JSON.stringify(action)
 		if (locallyEmitted.has(fingerprint)) {
+			// Our own action, already applied + animated locally when we made it.
 			locallyEmitted.delete(fingerprint)
+		} else if (live && caughtUp) {
+			// A live opponent action: queue it so its slide can play.
+			animateQueue.push(action)
+			void drainQueue()
 		} else {
+			// Catch-up / backfill: apply immediately, no animation.
 			dispatchSerializedAction(m, action)
 		}
 		lastEventId = event.id
@@ -63,10 +110,50 @@
 			const data = (await res.json()) as { events?: GameEvent[] }
 			if (!data?.events) return
 			for (const evt of data.events) {
-				if (!applyEvent(evt)) break
+				if (!applyEvent(evt, false)) break
 			}
 		} catch {
 			// network errors are expected occasionally; keep polling.
+		}
+	}
+
+	const pollTimerTick = () => {
+		pollTick += 1
+		if (realtimeUp && pollTick % CONNECTED_POLL_EVERY_TICKS !== 0) return
+		void poll()
+	}
+
+	// Pushed over the websocket the moment the server records a move. Events
+	// carry the log sequence id, so ordering is checkable: apply the next id
+	// directly, and on a gap (a lost push) backfill from the event log instead
+	// of applying out of order.
+	const onRealtimeEvent = (message: RealtimeMessage) => {
+		const event = (message.payload as { event?: GameEvent } | null)?.event
+		if (!event || typeof event.id !== 'number') return
+		if (event.id > lastEventId + 1) {
+			void poll()
+			return
+		}
+		applyEvent(event, true)
+	}
+
+	const connectRealtime = async () => {
+		const conn = new RealtimeConnection({
+			channels: [`game:${gameSession}`],
+			onStatus: (connected) => {
+				realtimeUp = connected
+				// Anything pushed while we were down is only in the event log.
+				if (connected) void poll()
+			},
+		})
+		conn.subscribe(`game:${gameSession}`, onRealtimeEvent)
+		try {
+			await conn.open()
+			realtimeConn = conn
+		} catch {
+			// No realtime (e.g. local mock gateway) — 1500ms polling carries the
+			// game exactly as before.
+			conn.close()
 		}
 	}
 
@@ -127,14 +214,18 @@
 		if (!multiplayer) return
 		outgoingUnsubscribe = outgoingActions.subscribe(onOutgoing)
 		void poll().then(() => {
-			pollTimer = setInterval(poll, POLL_INTERVAL)
+			// The backlog is on the board; from here on, live pushes animate.
+			caughtUp = true
+			pollTimer = setInterval(pollTimerTick, POLL_INTERVAL)
 		})
+		void connectRealtime()
 	})
 
 	onDestroy(() => {
 		if (pollTimer) clearInterval(pollTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
 		if (outgoingUnsubscribe) outgoingUnsubscribe()
+		realtimeConn?.close()
 	})
 </script>
 

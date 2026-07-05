@@ -6,7 +6,7 @@ import { buildableAdjacentTiles } from '../modifiers/builder'
 import { isWalletUnit, walletOf } from '../wallet'
 import { generateMovementList } from '../Interactor/Pathing/movement'
 import { generateAttackList } from '../Interactor/Pathing/attack'
-import { concealedEnemyTiles } from '../visibility'
+import { planningConcealed } from './planningContext'
 import { lurkingStealthCount } from './stealthMemory'
 import { rankBuildableTypes } from './production'
 import { enemyCount } from './evaluate'
@@ -58,7 +58,7 @@ export const generatePlansFor = (
 	// The CPU plays blind: enemies it can't perceive (fog / stealth) are ghosts to
 	// its pathing and scoring alike. Compute the set once and thread it everywhere
 	// so reachability, threat and advance all agree on what the AI "knows".
-	const concealed = concealedEnemyTiles(map, cpuTeam)
+	const concealed = planningConcealed(map, cpuTeam)
 	// How much remembered-but-unseen enemy stealth there is, to temper how far the
 	// unit is willing to push into the unknown (folded into the position score).
 	const lurking = lurkingStealthCount(map, cpuTeam)
@@ -79,7 +79,9 @@ export const generatePlansFor = (
 		const position = scorePositionBonus(map, dest, unit, cpuTeam, concealed, lurking)
 
 		if (!ranged || dest === unitTile) {
-			const targets = generateAttackList(map, dest, unit)
+			// Pass the CPU's cached concealment (unit.team === cpuTeam) so the attack
+			// list doesn't recompute an O(map) concealed set for every candidate tile.
+			const targets = generateAttackList(map, dest, unit, concealed)
 			for (const targetTile of targets) {
 				const target = map.layers.units[targetTile]
 				if (!target) continue
@@ -186,7 +188,7 @@ const generateBuilderPlans = (
 
 		// Opportunistic attack — heavily situational (see scoreBuilderAttack).
 		if (!ranged || dest === unitTile) {
-			for (const targetTile of generateAttackList(map, dest, unit)) {
+			for (const targetTile of generateAttackList(map, dest, unit, concealed)) {
 				const target = map.layers.units[targetTile]
 				if (!target) continue
 				const atk = scoreAttack(map, unit, dest, target, targetTile)

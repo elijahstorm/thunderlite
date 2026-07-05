@@ -1,6 +1,6 @@
 # ThunderLite
 
-A browser-based recreation of **Battalion: Arena** (Urban Squall) — a turn-based tactics game in the Advance Wars family. Built with SvelteKit, deployed on Vercel, and running on the **DontCode developer platform**: auth, database, and file storage are DontCode services reached over HTTP with a project API key — no local auth stack, no Postgres connection string, no storage credentials.
+A browser-based recreation of **Battalion: Arena** (Urban Squall) — a turn-based tactics game in the Advance Wars family. Built with SvelteKit, deployed on Vercel, and running on the **DontCode developer platform**: auth, database, file storage, KV cache, and realtime pub/sub are DontCode services reached over HTTP (and WebSocket) with a project API key — no local auth stack, no Postgres connection string, no Redis, no self-hosted socket server.
 
 See [cards/00-PROJECT-MISSION.md](cards/00-PROJECT-MISSION.md) for the full design north star.
 
@@ -9,20 +9,17 @@ See [cards/00-PROJECT-MISSION.md](cards/00-PROJECT-MISSION.md) for the full desi
 Docker is the canonical dev environment — you don't need Node or pnpm on the host.
 
 ```bash
-cp .env.example .env.local        # fill in DONTCODE_API_URL / DONTCODE_API_KEY + cloud vars (see below)
-docker compose up                 # builds and starts app + redis + kv shim + chat
+cp .env.example .env.local        # fill in DONTCODE_API_URL / DONTCODE_API_KEY (see below)
+docker compose up                 # builds and starts the app
 ```
 
 Open [http://localhost:15173](http://localhost:15173).
 
-| Service                                                                              | URL / endpoint                                                       | Purpose                                                                                           |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `app`                                                                                | [http://localhost:15173](http://localhost:15173)                     | SvelteKit dev server, HMR enabled                                                                 |
-| `kv` ([hiett/serverless-redis-http](https://github.com/hiett/serverless-redis-http)) | [http://localhost:180](http://localhost:180) (token `example_token`) | Upstash-compatible REST shim in front of Redis — what `@vercel/kv` talks to                       |
-| `redis`                                                                              | network-only                                                         | Backing store for the kv shim                                                                     |
-| `chat`                                                                               | `ws://localhost:18083/ws`                                            | In-game chat WebSocket broadcaster — script at [scripts/chat-server.mjs](scripts/chat-server.mjs) |
+| Service | URL / endpoint                                   | Purpose                           |
+| ------- | ------------------------------------------------ | --------------------------------- |
+| `app`   | [http://localhost:15173](http://localhost:15173) | SvelteKit dev server, HMR enabled |
 
-Auth, database, and file storage have **no local containers** — the app talks to the DontCode backend named by `DONTCODE_API_URL`, in dev and in prod alike. Only ephemeral pieces (KV game-session state, the chat broadcaster) run locally.
+There are **no other local containers** — auth, database, file storage, KV, and realtime all live behind the DontCode backend named by `DONTCODE_API_URL`, in dev and in prod alike. KV and realtime are hosted-gateway-only (the local mock gateway doesn't serve them yet); against the mock, the site config falls back to defaults, chat disables itself, and multiplayer sync falls back to HTTP polling.
 
 All host-side ports bind to `127.0.0.1` only. The `app` service mounts the working tree at `/app`, so file edits hot-reload in place. `node_modules` lives in a named volume inside the container so host changes don't shadow it.
 
@@ -31,7 +28,7 @@ All host-side ports bind to `127.0.0.1` only. The `app` service mounts the worki
 All thunderlite host ports prepend a `1` to the standard port (e.g. `5173` → `15173`). Override any host-side port if it's still in use:
 
 ```bash
-APP_HOST_PORT=15174 KV_HOST_PORT=181 CHAT_HOST_PORT=18084 docker compose up
+APP_HOST_PORT=15174 docker compose up
 ```
 
 ### Rebuilds
@@ -42,7 +39,7 @@ Re-run `docker compose build app` after changes to `package.json` or the lockfil
 
 ```bash
 docker compose down            # stop containers, keep data
-docker compose down -v         # nuke redisdata + cached node_modules
+docker compose down -v         # nuke cached node_modules
 ```
 
 ## Dev playground — animations & sounds
@@ -57,15 +54,13 @@ If nothing sounds, click anywhere on the page once — browsers block audio unti
 
 ## Environment variables
 
-`docker-compose.yml` overrides the in-network ones (`KV_REST_API_URL`, `KV_REST_API_TOKEN`, `NODE_ENV`) automatically — leave them blank in `.env.local`.
+| Variable           | Where it's used                                                                                  | Notes                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `DONTCODE_API_URL` | [src/lib/dontcode/server.ts](src/lib/dontcode/server.ts) — auth, database, storage, KV, realtime | **Required.** Base URL of the DontCode backend.                                |
+| `DONTCODE_API_KEY` | [src/lib/dontcode/server.ts](src/lib/dontcode/server.ts)                                         | **Required.** This project's API key (`dc_…`), minted in the DontCode console. |
+| `VITE_EMAIL_NAME`  | [src/routes/api/contact/mailCarrier.ts](src/routes/api/contact/mailCarrier.ts)                   | Sender address for the contact form                                            |
 
-| Variable                   | Where it's used                                                                            | Notes                                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `DONTCODE_API_URL`         | [src/lib/Server/dontcode.ts](src/lib/Server/dontcode.ts) — auth, database, storage         | **Required.** Base URL of the DontCode backend.                                |
-| `DONTCODE_API_KEY`         | [src/lib/Server/dontcode.ts](src/lib/Server/dontcode.ts)                                   | **Required.** This project's API key (`dc_…`), minted in the DontCode console. |
-| `EDGE_CONFIG`              | [src/routes/+layout.server.ts](src/routes/+layout.server.ts) — loads site title/desc/fonts | **Required for `/` to render.** Empty → home page returns 500.                 |
-| `PUBLIC_SOCKET_CONNECTION` | [src/lib/Components/Socket/ChatSocket.svelte](src/lib/Components/Socket/ChatSocket.svelte) | WebSocket endpoint for chat/multiplayer                                        |
-| `VITE_EMAIL_NAME`          | [src/routes/api/contact/mailCarrier.ts](src/routes/api/contact/mailCarrier.ts)             | Sender address for the contact form                                            |
+Site title/description/fonts live in DontCode KV under `site:config` (formerly Vercel Edge Config); the root layout falls back to built-in defaults when the entry is absent. Seed it with `pnpm kv:check --seed-site`.
 
 ### First-run schema setup
 
@@ -75,31 +70,31 @@ The app's tables live in the project's DontCode database. After pointing a fresh
 curl http://localhost:15173/api/migrations/up
 ```
 
-> **Vercel Marketplace note** — Vercel KV is no longer a first-party product. Provision **Upstash Redis** through the Vercel Marketplace; the same env-var names (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) are auto-populated.
-
 ## Running without Docker
 
 If you'd rather run on the host directly:
 
 - Node.js 24+ and pnpm 10+
 - `pnpm install`
-- Provide every variable from `.env.example` plus `KV_REST_API_URL` / `KV_REST_API_TOKEN` in `.env.local`
+- Provide every variable from `.env.example` in `.env.local`
 - `pnpm dev`
 
 ## Scripts
 
-| Command                 | What it does                                         |
-| ----------------------- | ---------------------------------------------------- |
-| `pnpm dev`              | Vite dev server on port 5173                         |
-| `pnpm build`            | Production build via the Vercel adapter              |
-| `pnpm preview`          | Serve the built output on port 4173                  |
-| `pnpm check`            | `svelte-kit sync` + `svelte-check`                   |
-| `pnpm check:watch`      | Same, in watch mode                                  |
-| `pnpm lint`             | Prettier check + ESLint                              |
-| `pnpm format`           | Prettier write                                       |
-| `pnpm test`             | Playwright integration tests, then Vitest unit tests |
-| `pnpm test:unit`        | Vitest only (`tests/**/*unit.(test\|spec).ts`)       |
-| `pnpm test:integration` | Playwright only                                      |
+| Command                 | What it does                                                                |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `pnpm dev`              | Vite dev server on port 5173                                                |
+| `pnpm build`            | Production build via the Vercel adapter                                     |
+| `pnpm preview`          | Serve the built output on port 4173                                         |
+| `pnpm check`            | `svelte-kit sync` + `svelte-check`                                          |
+| `pnpm check:watch`      | Same, in watch mode                                                         |
+| `pnpm lint`             | Prettier check + ESLint                                                     |
+| `pnpm format`           | Prettier write                                                              |
+| `pnpm test`             | Playwright integration tests, then Vitest unit tests                        |
+| `pnpm test:unit`        | Vitest only (`tests/**/*unit.(test\|spec).ts`)                              |
+| `pnpm test:integration` | Playwright only                                                             |
+| `pnpm kv:check`         | Round-trip the DontCode KV cache (add `--seed-site` to write `site:config`) |
+| `pnpm realtime:check`   | Mint a realtime token, open the WebSocket, publish → assert delivery        |
 
 Run any script inside the Docker stack with `docker compose exec app pnpm <script>`.
 

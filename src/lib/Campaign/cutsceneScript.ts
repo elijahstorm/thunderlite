@@ -199,37 +199,49 @@ const openBlock = (script: CutsceneScript, tag: ParsedTag, lineNo: number): Cuts
 
 /**
  * Parse a `<when>` attribute into a {@link TriggerCondition}. Grammar:
- *   team <N> units [<"Name">[,"Name"]…] <op> <K>
- * where `<op>` is one of `< <= == >= >`. With no unit-name list the whole team is
- * counted; with one, only units of those types. Examples:
+ *   team <N> (units|buildings) [<"Name">[,"Name"]…] <op> <K>
+ * where `<op>` is one of `< <= == >= >`. With no name list everything the team
+ * has on that layer is counted; with one, only the named types. Examples:
  *   team 1 units <= 2
  *   team 0 units "Strike Commando","Heavy Commando" == 0
+ *   team 0 buildings "Air Control" >= 1
  */
 const parseCondition = (attr: string, lineNo: number): TriggerCondition => {
-	const m = attr.trim().match(/^team\s+(\d+)\s+units\s*(.*?)\s*(<=|>=|==|<|>)\s*(\d+)$/)
+	const m = attr.trim().match(/^team\s+(\d+)\s+(units|buildings)\s*(.*?)\s*(<=|>=|==|<|>)\s*(\d+)$/)
 	if (!m) {
 		throw new CutsceneParseError(
-			`<when> requires 'team N units [\"Name\",…] OP K' (OP one of < <= == >= >), got "${attr}"`,
+			`<when> requires 'team N units|buildings [\"Name\",…] OP K' (OP one of < <= == >= >), got "${attr}"`,
 			lineNo
 		)
 	}
-	const middle = m[2].trim()
-	let unitTypes: string[] | null = null
+	const layer = m[2] as TriggerCondition['layer']
+	const validNames = layer === 'buildings' ? VALID_BUILDING_NAMES : VALID_UNIT_NAMES
+	const middle = m[3].trim()
+	let typeNames: string[] | null = null
 	if (middle !== '') {
-		unitTypes = [...middle.matchAll(/"([^"]+)"/g)].map((q) => q[1])
-		if (unitTypes.length === 0) {
+		typeNames = [...middle.matchAll(/"([^"]+)"/g)].map((q) => q[1])
+		if (typeNames.length === 0) {
 			throw new CutsceneParseError(
-				`<when> unit list must be quoted names, got "${middle}"`,
+				`<when> ${layer} list must be quoted names, got "${middle}"`,
 				lineNo
 			)
 		}
-		for (const name of unitTypes) {
-			if (!VALID_UNIT_NAMES.has(name)) {
-				throw new CutsceneParseError(`<when> references unknown unit "${name}"`, lineNo)
+		for (const name of typeNames) {
+			if (!validNames.has(name)) {
+				throw new CutsceneParseError(
+					`<when> references unknown ${layer === 'buildings' ? 'building' : 'unit'} "${name}"`,
+					lineNo
+				)
 			}
 		}
 	}
-	return { team: parseInt(m[1], 10), unitTypes, op: m[3] as CompareOp, count: parseInt(m[4], 10) }
+	return {
+		team: parseInt(m[1], 10),
+		layer,
+		typeNames,
+		op: m[4] as CompareOp,
+		count: parseInt(m[5], 10),
+	}
 }
 
 /**
@@ -483,7 +495,10 @@ const parseCommandInto = (
 			requireNoQualifier(keyword, qualifier, lineNo)
 			const fields = splitArgFields(argStr, lineNo)
 			if (fields.length !== 2) {
-				throw new CutsceneParseError(`funds expects "team,amount" (2 args), got ${fields.length}`, lineNo)
+				throw new CutsceneParseError(
+					`funds expects "team,amount" (2 args), got ${fields.length}`,
+					lineNo
+				)
 			}
 			events.push({
 				kind: 'funds',

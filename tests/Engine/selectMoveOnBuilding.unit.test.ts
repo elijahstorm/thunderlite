@@ -92,7 +92,7 @@ describe('selecting and moving a unit standing on an actable building', () => {
 			players: s.players.map((p) => ({
 				...p,
 				money: 99999,
-				controls: { ground: true, air: true, sea: true },
+				controls: { ground: 1, air: 1, sea: 1 },
 			})),
 		}))
 

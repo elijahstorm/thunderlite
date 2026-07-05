@@ -6,7 +6,8 @@
 	"scripts": {
 		"dev": "vite dev",
 		"mock": "dontcode-mock",
-		"chat": "node scripts/chat-server.mjs",
+		"kv:check": "tsx scripts/kv-check.ts",
+		"realtime:check": "tsx scripts/realtime-check.ts",
 		"build": "vite build",
 		"preview": "vite preview",
 		"test": "pnpm run test:integration && pnpm run test:unit",
@@ -21,9 +22,8 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@dontcode2/backend": "0.2.0",
+		"@dontcode2/backend": "0.2.3",
 		"@iconify/svelte": "5.1.0",
-		"@vercel/edge-config": "1.4.3",
 		"as-toast": "1.1.0",
 		"base-x": "5.0.1",
 		"flowbite-svelte": "1.30.0",
@@ -61,7 +61,6 @@
 		"typescript": "5.9.3",
 		"vi-canvas-mock": "1.0.0",
 		"vite": "7.2.7",
-		"vitest": "4.0.15",
-		"ws": "8.18.0"
+		"vitest": "4.0.15"
 	}
 }

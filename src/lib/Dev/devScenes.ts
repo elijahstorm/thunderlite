@@ -55,7 +55,7 @@ export type DevScene = {
 	build: () => MapObject
 }
 
-const buildScene = (spec: DevSceneSpec): MapObject => {
+export const buildScene = (spec: DevSceneSpec): MapObject => {
 	const rows = spec.rows
 	const cols = Math.max(...rows.map((r) => r.length))
 	const height = rows.length
@@ -97,15 +97,9 @@ const SPECS: DevSceneSpec[] = [
 	{
 		id: 'crossroads',
 		name: 'Crossroads',
-		blurb: 'Roads, forest and hills around a central junction — see how movement type changes reach.',
-		rows: [
-			'..f....f..',
-			'..f.rr.f..',
-			'rrrrrrrrrr',
-			'..^.rr.^..',
-			'..^.rr.^..',
-			'wwww..####',
-		],
+		blurb:
+			'Roads, forest and hills around a central junction — see how movement type changes reach.',
+		rows: ['..f....f..', '..f.rr.f..', 'rrrrrrrrrr', '..^.rr.^..', '..^.rr.^..', 'wwww..####'],
 		units: [
 			{ x: 0, y: 2, unit: 'Scorpion Tank', team: 0 },
 			{ x: 9, y: 2, unit: 'Strike Commando', team: 1 },
@@ -114,7 +108,8 @@ const SPECS: DevSceneSpec[] = [
 	{
 		id: 'skirmish',
 		name: 'Skirmish',
-		blurb: 'Two squads facing off across mixed terrain with capturable buildings — the AI inspector default.',
+		blurb:
+			'Two squads facing off across mixed terrain with capturable buildings — the AI inspector default.',
 		rows: [
 			'#..f...f..#',
 			'#..^...^..#',
@@ -141,7 +136,8 @@ const SPECS: DevSceneSpec[] = [
 	{
 		id: 'economy',
 		name: 'Holdings',
-		blurb: 'A spread of neutral and owned buildings — watch income, capture progress and supply tick.',
+		blurb:
+			'A spread of neutral and owned buildings — watch income, capture progress and supply tick.',
 		rows: ['rrrrrrrr', 'r.r..r.r', 'r.r..r.r', 'rrrrrrrr'],
 		units: [
 			{ x: 1, y: 1, unit: 'Strike Commando', team: 0 },
@@ -158,7 +154,8 @@ const SPECS: DevSceneSpec[] = [
 	{
 		id: 'ffa',
 		name: 'Four-way FFA',
-		blurb: 'Four armies (teams 0–3), each with a Command Center in a corner. Spectate and watch the runtime eliminate teams until one survives.',
+		blurb:
+			'Four armies (teams 0–3), each with a Command Center in a corner. Spectate and watch the runtime eliminate teams until one survives.',
 		rows: [
 			'r........r',
 			'..f....f..',
@@ -190,7 +187,8 @@ const SPECS: DevSceneSpec[] = [
 	{
 		id: 'duel2',
 		name: 'Two-army duel',
-		blurb: 'A clean 1-v-1 with Command Centers — the baseline for win-condition and death-state checks.',
+		blurb:
+			'A clean 1-v-1 with Command Centers — the baseline for win-condition and death-state checks.',
 		rows: ['r........r', '..f....f..', '....cc....', '..f....f..', 'r........r'],
 		units: [
 			{ x: 1, y: 2, unit: 'Scorpion Tank', team: 0 },
@@ -207,7 +205,8 @@ const SPECS: DevSceneSpec[] = [
 	{
 		id: 'airfield',
 		name: 'Open Skies',
-		blurb: 'Air units over open ground — the scene to feel weather. Storm chips air HP every turn; cloud cover hides air units from sight.',
+		blurb:
+			'Air units over open ground — the scene to feel weather. Storm chips air HP every turn; cloud cover hides air units from sight.',
 		rows: ['..........', '..........', '....cc....', '..........', '..........'],
 		units: [
 			{ x: 1, y: 0, unit: 'Raptor Fighter', team: 0 },
