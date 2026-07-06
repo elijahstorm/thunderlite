@@ -10,6 +10,7 @@
 	import { buildMenuState, closeBuildMenu } from './buildMenuStore'
 	import { audioEngine } from '$lib/Audio/audioEngine'
 	import { sfxForAction } from '$lib/Audio/sfxMap'
+	import { recordMatchStat } from '../matchStats'
 	import UnitSpritePreview from './UnitSpritePreview.svelte'
 
 	// The unit currently hovered in the grid — its preview cycles through the four
@@ -83,6 +84,10 @@
 			// so fire the build chime here. Replay never touches this path.
 			const sfx = sfxForAction('build')
 			if (sfx) audioEngine.playSfx(sfx)
+			// ...and credit the build stat inline for the same reason: CPU/online builds
+			// are counted by applyAction's live-gated sink, but this direct human path
+			// never reaches it, which left the local player's "Built" column at 0.
+			recordMatchStat({ kind: 'build', team: menu.team })
 			closeBuildMenu()
 			return
 		}

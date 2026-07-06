@@ -151,10 +151,16 @@ export const paint =
 		const buildingAtTile = map.layers.buildings[tile] ?? null
 		const hideEnemyBuildingCapture =
 			!tileVisible && fog !== null && buildingAtTile !== null && buildingAtTile.team !== fog.team
+		// The "acted this turn" dim (brightness/saturate below) is only applied to a
+		// building the viewer can actually see. The fog veil is semi-transparent, so
+		// dimming a fogged enemy building during their turn would leak — through the
+		// veil — that they just captured/produced there, sight the player never had.
+		// A fogged building draws at full brightness and the veil hides the rest.
 		const buildingActed =
 			buildingAtTile !== null &&
 			buildingAtTile.team === state.currentTeam &&
-			state.actedTiles.has(tile)
+			state.actedTiles.has(tile) &&
+			tileVisible
 		if (buildingActed) {
 			context.save()
 			context.filter = 'brightness(0.55) saturate(0.5)'

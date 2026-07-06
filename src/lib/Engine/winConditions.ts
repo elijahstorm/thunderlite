@@ -1,5 +1,5 @@
 import { get } from 'svelte/store'
-import { buildingGrants, gameState, type GameState } from './gameState'
+import { gameState, type GameState } from './gameState'
 
 export type WinConditionsResult = {
 	gameOver: boolean
@@ -10,16 +10,6 @@ export type WinConditionsResult = {
 const teamHasUnits = (map: MapObject | MapProcesser, team: number): boolean => {
 	for (const u of map.layers.units) {
 		if (u && u.team === team) return true
-	}
-	return false
-}
-
-// A team can rebuild an army only from a production building (Ground/Air/Sea
-// Control — anything that grants a build permission). A bare Command Center
-// does NOT count: it grants nothing, so it can't roll out units.
-const teamCanProduce = (map: MapObject | MapProcesser, team: number): boolean => {
-	for (const b of map.layers.buildings) {
-		if (b && b.team === team && buildingGrants(b.type).length > 0) return true
 	}
 	return false
 }
@@ -37,14 +27,12 @@ export const evaluateWinConditions = (
 			continue
 		}
 		if (!map) continue
-		// A team with no units left is defeated only if it also can't build any —
-		// holding a bare Command Center is no reprieve (the CC produces nothing),
-		// but a team that still owns a production building can rebuild, so it isn't
-		// lost. This is what keeps a fresh skirmish map (both sides start with only
-		// factories and zero units) from being declared a DRAW on turn one.
-		if (!teamHasUnits(map, player.team) && !teamCanProduce(map, player.team)) {
-			losersSet.add(player.team)
-		}
+		// Losing your last unit is a defeat — a surviving factory or Command Center
+		// is no reprieve. The one exemption is a team that has never fielded a unit
+		// yet (still in its opening build phase on a skirmish map); it hasn't lost
+		// an army, it just hasn't built one, so it isn't declared dead. `hasFielded`
+		// is what keeps such a map from being called a DRAW on turn one.
+		if (player.hasFielded && !teamHasUnits(map, player.team)) losersSet.add(player.team)
 	}
 
 	const losers = state.players.map((p) => p.team).filter((t) => losersSet.has(t))
@@ -60,26 +48,29 @@ export const evaluateWinConditions = (
 
 export const applyWinConditions = (map?: MapObject | MapProcesser): WinConditionsResult => {
 	const state = get(gameState)
-	const result = evaluateWinConditions(state, map)
+
+	// Latch `hasFielded` first: any team that currently has a unit is now (and
+	// stays) "fielded", so the moment it builds its first unit it becomes subject
+	// to the normal no-units-left defeat. Evaluate against these latched flags so a
+	// team that fields and then loses everything in the same pass is still caught.
+	const latch = (p: (typeof state.players)[number]) =>
+		map && !p.hasFielded && teamHasUnits(map, p.team) ? { ...p, hasFielded: true } : p
+
+	const result = evaluateWinConditions({ ...state, players: state.players.map(latch) }, map)
 	const losersSet = new Set(result.losers)
 
 	gameState.update((s) => {
-		const needsPlayerUpdate = s.players.some((p) => losersSet.has(p.team) && !p.hasLost)
-		const players = needsPlayerUpdate
-			? s.players.map((p) => (losersSet.has(p.team) && !p.hasLost ? { ...p, hasLost: true } : p))
-			: s.players
+		const players = s.players.map((p) => {
+			let next = latch(p)
+			if (losersSet.has(next.team) && !next.hasLost) next = { ...next, hasLost: true }
+			return next
+		})
+		const changed = players.some((p, i) => p !== s.players[i])
 
 		if (result.gameOver && s.phase !== 'gameOver') {
-			return {
-				...s,
-				players,
-				phase: 'gameOver',
-				winner: result.winner,
-			}
+			return { ...s, players, phase: 'gameOver', winner: result.winner }
 		}
-		if (needsPlayerUpdate) {
-			return { ...s, players }
-		}
+		if (changed) return { ...s, players }
 		return s
 	})
 

@@ -26,6 +26,7 @@ import { buildAdjacent, buildableAdjacentTiles } from '../modifiers/builder'
 import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction } from '$lib/Audio/sfxMap'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
+import { recordMatchStat } from '../matchStats'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -436,6 +437,9 @@ const selectBuildTile: Interactor = ({ map, tile }) => {
 		// the build chime here — same as the factory build menu path.
 		const sfx = sfxForAction('build')
 		if (sfx) audioEngine.playSfx(sfx)
+		// Credit the build stat inline too, mirroring applyAction's live-gated sink —
+		// otherwise builder-deployed units never reach the "Built" tally.
+		recordMatchStat({ kind: 'build', team: pending.team })
 		return
 	}
 	if (result.reason === 'no-space') {

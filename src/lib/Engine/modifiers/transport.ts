@@ -4,6 +4,7 @@ import { validTerrain, drag } from '$lib/Engine/Interactor/Pathing/movement'
 import { hasModifier } from './canAttack'
 import { resetCaptureProgress } from './capture'
 import { tileHasModifier } from './terrainModifier'
+import type { ModifierKey } from './index'
 
 const findUnitType = (name: string): number => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -106,16 +107,37 @@ export const transportLoad = (
 	return { ok: true, transportTile }
 }
 
+// A team controls a given production domain once it holds a building granting the
+// matching `Capture.Allow_*` modifier (Ground/Air/Sea Control).
+const teamHasControl = (
+	map: MapObject | MapProcesser,
+	team: number,
+	modifier: ModifierKey,
+): boolean => {
+	for (const building of map.layers.buildings) {
+		if (!building || building.team !== team) continue
+		if (buildingData[building.type]?.modifiers.includes(modifier)) return true
+	}
+	return false
+}
+
+// A team can launch sea transports once it controls a Sea Control building (the same
+// `Capture.Allow_Sea` grant that unlocks building sea units).
+export const teamHasSeaControl = (map: MapObject | MapProcesser, team: number): boolean =>
+	teamHasControl(map, team, 'Capture.Allow_Sea')
+
 // A ground unit can embark — transforming itself into a Leviathan sea transport
 // that carries it across the ocean (and can't attack) — only from a tile with the
 // `Port` terrain attribute. Shore is the stock Port tile, but any terrain authored
-// with the `Port` modifier now works the same way.
+// with the `Port` modifier now works the same way. As with building sea units, the
+// owning team must also hold a Sea Control building to launch.
 export const canShipOut = (map: MapObject | MapProcesser, unitTile: number): boolean => {
 	const unit = map.layers.units[unitTile]
 	if (!unit) return false
 	if (unitData[unit.type].type !== 'ground') return false
 	if (!map.layers.ground[unitTile]) return false
-	return tileHasModifier(map, unitTile, 'Port')
+	if (!tileHasModifier(map, unitTile, 'Port')) return false
+	return teamHasSeaControl(map, unit.team)
 }
 
 export type ShipOutResult =
@@ -145,13 +167,8 @@ export const shipOut = (map: MapObject | MapProcesser, unitTile: number): ShipOu
 
 // A team can paraglide its commandos into the air once it controls an Air Control
 // building (the same `Capture.Allow_Air` grant that unlocks building air units).
-export const teamHasAirControl = (map: MapObject | MapProcesser, team: number): boolean => {
-	for (const building of map.layers.buildings) {
-		if (!building || building.team !== team) continue
-		if (buildingData[building.type]?.modifiers.includes('Capture.Allow_Air')) return true
-	}
-	return false
-}
+export const teamHasAirControl = (map: MapObject | MapProcesser, team: number): boolean =>
+	teamHasControl(map, team, 'Capture.Allow_Air')
 
 // A commando (anything carrying `Self_Action.Transport` — Strike/Heavy Commandos)
 // can air-lift itself into a paraglider Transporter, mirroring `shipOut` but with

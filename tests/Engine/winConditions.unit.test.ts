@@ -129,18 +129,21 @@ describe('evaluateWinConditions (pure)', () => {
 		expect(result.losers).toEqual([])
 	})
 
-	it('a unit-less team keeping only a production building is not defeated (it can rebuild)', () => {
+	it('a team that fielded a unit then lost it IS defeated, even holding a production building', () => {
+		// A surviving factory is no reprieve once you have actually lost your army —
+		// losing your last unit is a defeat.
 		const map = makeMap()
 		map.layers.units[0] = unit(0)
 		map.layers.units[5] = unit(1)
 		map.layers.buildings[6] = building(1, GROUND_CONTROL_TYPE)
 		initGameStateFromMap(map)
 
-		map.layers.units[5] = null // team 1 has no units, but still owns a factory
+		map.layers.units[5] = null // team 1 loses its last unit; its factory still stands
 
 		const result = evaluateWinConditions(get(gameState), map)
-		expect(result.gameOver).toBe(false)
-		expect(result.losers).toEqual([])
+		expect(result.gameOver).toBe(true)
+		expect(result.winner).toBe(0)
+		expect(result.losers).toEqual([1])
 	})
 
 	it('two-player game ends when a side loses its last unit, even with its Command Center intact', () => {
@@ -253,6 +256,33 @@ describe('applyWinConditions (side-effects)', () => {
 		expect(state.players.find((p) => p.team === 1)?.hasLost).toBe(true)
 		expect(state.players.find((p) => p.team === 0)?.hasLost).toBe(false)
 		expect(state.players.find((p) => p.team === 2)?.hasLost).toBe(false)
+	})
+
+	it('build phase: a never-fielded team is exempt, but once it fields and loses its unit it is defeated', () => {
+		// Skirmish start: both sides own only a factory, zero units. Neither has
+		// fielded an army, so the opening evaluation must not eliminate anyone.
+		const map = makeMap()
+		map.layers.buildings[0] = building(0, GROUND_CONTROL_TYPE)
+		map.layers.buildings[15] = building(1, GROUND_CONTROL_TYPE)
+		initGameStateFromMap(map)
+
+		applyWinConditions(map)
+		expect(get(gameState).phase).toBe('playing')
+		expect(get(gameState).players.every((p) => !p.hasLost)).toBe(true)
+
+		// Team 0 builds its first unit — it is now "fielded" and thus subject to the
+		// normal defeat rule from here on.
+		map.layers.units[1] = unit(0)
+		applyWinConditions(map)
+		expect(get(gameState).players.find((p) => p.team === 0)?.hasFielded).toBe(true)
+		expect(get(gameState).phase).toBe('playing')
+
+		// That unit is destroyed: team 0 has fielded and now has nothing → defeated,
+		// handing the game to the still-building team 1.
+		map.layers.units[1] = null
+		const result = applyWinConditions(map)
+		expect(result.gameOver).toBe(true)
+		expect(get(gameState).players.find((p) => p.team === 0)?.hasLost).toBe(true)
 	})
 
 	it('leaves phase=playing while multiple teams survive', () => {

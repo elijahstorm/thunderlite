@@ -27,6 +27,12 @@ export type Player = {
 	name?: string
 	money: number
 	hasLost: boolean
+	// Whether this team has ever had a unit on the board. Latches true the first
+	// time it fields one and never clears. The "no units left = defeated" rule
+	// only applies once this is set, so a side still in its opening build phase
+	// (a skirmish map where you start with only buildings and zero units) isn't
+	// declared dead before it can build — see winConditions.
+	hasFielded?: boolean
 	controls?: PlayerControls
 	// CPU "memory" of how many stealth units it believes each other team fields,
 	// keyed by that team's number. A fuzzy running estimate updated only from what
@@ -111,8 +117,12 @@ export const gameState = writable<GameState>(makeInitialState())
 
 export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] => {
 	const teams = new Set<number>()
+	const teamsWithUnits = new Set<number>()
 	for (const u of map.layers.units) {
-		if (u && typeof u.team === 'number') teams.add(u.team)
+		if (u && typeof u.team === 'number') {
+			teams.add(u.team)
+			teamsWithUnits.add(u.team)
+		}
 	}
 	for (const b of map.layers.buildings) {
 		if (b && typeof b.team === 'number' && b.team !== NEUTRAL_TEAM) teams.add(b.team)
@@ -123,6 +133,10 @@ export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] =>
 			team,
 			money: 0,
 			hasLost: false,
+			// A team that starts with units is already "fielded"; one seeded only by
+			// buildings begins in its build phase and is exempt from no-units defeat
+			// until it produces something.
+			hasFielded: teamsWithUnits.has(team),
 			controls: controlsFromBuildings(map, team),
 		}))
 }
