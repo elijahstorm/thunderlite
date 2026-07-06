@@ -18,13 +18,16 @@ export const GET = async ({ params, locals }) => {
 	if (!session) throw error(400, 'Missing session')
 
 	try {
-		const room = await gameStore.getRoom(session)
+		// These three reads are mutually independent — resolve them in one barrier
+		// rather than three serial hops, since this endpoint is polled by the lobby.
+		const [room, seat, count] = await Promise.all([
+			gameStore.getRoom(session),
+			gameStore.seatOf(session, userSession),
+			gameStore.memberCount(session),
+		])
 		if (!room) throw error(404, 'Game session does not exist')
-
-		const seat = await gameStore.seatOf(session, userSession)
 		if (seat < 0) throw error(403, 'Not a member of this game session')
 
-		const count = await gameStore.memberCount(session)
 		const full = count >= MAX_PLAYERS
 
 		// Self-heal: a full room that never got its countdown armed (lost arm at

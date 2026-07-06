@@ -14,11 +14,18 @@ export const ssr = false
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) throw error(403, 'You are not logged in')
-	let user: UserDBData | null = null
 
-	try {
-		user = await getUserDBDataFromAuth(locals.user)
-	} catch (e) {
+	// The profile fetch and the match-stats fetch are independent, so run them in
+	// one barrier. `getUserStats` is defensive (a brand-new account with no match
+	// rows returns zeros), and a profile lookup failure means "no account yet" —
+	// caught below to bootstrap one — so swallow it here rather than rejecting the
+	// whole barrier.
+	let [user, stats] = await Promise.all([
+		getUserDBDataFromAuth(locals.user).catch(() => null),
+		getUserStats(locals.user),
+	])
+
+	if (!user) {
 		try {
 			await makeUserDBDataFromAuth(locals.user)
 			user = {
@@ -29,15 +36,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 				profile_image_url: '',
 				bio: '',
 				created_at: new Date(),
-			}
+			} as UserDBData
 		} catch (e) {
 			throw error(500, 'There was an issue making your new account')
 		}
 	}
-
-	// J3 — profile match record. Defensive in getUserStats, so a brand-new
-	// account (no match rows) returns zeros rather than throwing.
-	const stats = await getUserStats(locals.user)
 
 	return { user, stats }
 }

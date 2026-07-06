@@ -71,7 +71,7 @@ async function getRoom(session: string): Promise<RoomRow | null> {
 /** The room the player is currently in (with its map id), or null. */
 async function currentGame(
 	userSession: string
-): Promise<{ session: string; mapId: string } | null> {
+): Promise<{ session: string; mapId: string; room: RoomRow } | null> {
 	const pointer = await db.findOne<PlayerGameRow>('player_game', {
 		where: { user_session: userSession },
 		select: ['session', 'expires_at'],
@@ -79,7 +79,8 @@ async function currentGame(
 	if (!pointer || expired(pointer.expires_at)) return null
 	const room = await getRoom(pointer.session)
 	if (!room) return null
-	return { session: room.session, mapId: room.map_id }
+	// Hand back the room row so callers (the `/play` loader) don't re-fetch it.
+	return { session: room.session, mapId: room.map_id, room }
 }
 
 /** Point a player at a room (latest wins), refreshing the TTL. */
@@ -227,11 +228,16 @@ async function events(
 	sinceId: number
 ): Promise<{ events: GameEvent[]; lastEventId: number }> {
 	const startIndex = Math.max(0, sinceId + 1)
-	const rows = await db.find<EventRow>('game_event', {
-		where: { session, seq: { gte: startIndex } },
-		orderBy: { seq: 'asc' },
-	})
-	const total = await db.count('game_event', { session })
+	// Independent reads — the page of new events and the total count don't depend
+	// on each other, so run them in one barrier rather than back to back. This is
+	// the polled sync path, so the saved round-trip lands on every open game.
+	const [rows, total] = await Promise.all([
+		db.find<EventRow>('game_event', {
+			where: { session, seq: { gte: startIndex } },
+			orderBy: { seq: 'asc' },
+		}),
+		db.count('game_event', { session }),
+	])
 	return {
 		events: rows.map(toEvent),
 		lastEventId: total > 0 ? total - 1 : -1,

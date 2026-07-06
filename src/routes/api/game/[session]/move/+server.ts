@@ -21,14 +21,18 @@ export const POST = async ({ request, params, locals }) => {
 	if (!isValidSerializedAction(action)) throw error(400, 'Invalid action payload')
 
 	try {
-		const members = await gameStore.members(session)
+		// Membership and whose-turn-it-is are independent reads on different
+		// tables, so resolve them together before validating either.
+		const [members, current] = await Promise.all([
+			gameStore.members(session),
+			// `current_turn` is seeded to the creator at room creation, so it is set
+			// here; only honour it when present (a legacy room may still be null).
+			gameStore.currentTurn(session),
+		])
 		if (members.length === 0 || !members.includes(userSession)) {
 			throw error(403, 'Not a member of this game session')
 		}
 
-		// `current_turn` is seeded to the creator at room creation, so it is set
-		// here; only honour it when present (a legacy room may still be null).
-		const current = await gameStore.currentTurn(session)
 		if (current && current !== userSession) {
 			throw error(403, 'Not your turn')
 		}

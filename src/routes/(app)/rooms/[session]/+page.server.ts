@@ -13,16 +13,17 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!userSession) throw error(401, 'User not logged in')
 
 	const session = params.session
-	const room = await gameStore.getRoom(session)
+	// Room, seat and count are independent reads — resolve them in one barrier.
+	const [room, seat, count] = await Promise.all([
+		gameStore.getRoom(session),
+		gameStore.seatOf(session, userSession),
+		gameStore.memberCount(session),
+	])
 	if (!room) throw redirect(303, '/rooms')
-
-	const seat = await gameStore.seatOf(session, userSession)
 	if (seat < 0) throw redirect(303, '/rooms')
 
 	// Already started — the lobby is done; drop the member into the game.
 	if (room.start_at != null && room.start_at <= Date.now()) throw redirect(303, '/play')
-
-	const count = await gameStore.memberCount(session)
 
 	return {
 		session,

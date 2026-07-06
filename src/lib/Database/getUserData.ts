@@ -12,15 +12,21 @@ export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
 		const profile = await db.findOne<UserDBData>('profiles', { where: { auth } })
 
 		if (profile) {
-			const [following, follower, messageCount, relationship] = await Promise.all([
-				db.count('follows', { source: me, target: auth }),
-				db.count('follows', { source: auth, target: me }),
-				db.count('messages', { source: me, target: auth }),
-				db.findOne<{ status: RelationshipStatus }>('relationships', {
-					where: { source: me, target: auth },
-					select: ['status'],
-				}),
-			])
+			// The derived flags are all viewer-relative. With no viewer (`me === ''`,
+			// e.g. a logged-out profile view) they're all false/0/null, so skip the
+			// four round-trips entirely rather than querying `source: ''` — same
+			// logged-out short-circuit as the batched `queryUsersByAuth`.
+			const [following, follower, messageCount, relationship] = me
+				? await Promise.all([
+						db.count('follows', { source: me, target: auth }),
+						db.count('follows', { source: auth, target: me }),
+						db.count('messages', { source: me, target: auth }),
+						db.findOne<{ status: RelationshipStatus }>('relationships', {
+							where: { source: me, target: auth },
+							select: ['status'],
+						}),
+					])
+				: [0, 0, 0, null as { status: RelationshipStatus } | null]
 
 			user = {
 				...profile,

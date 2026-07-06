@@ -52,7 +52,8 @@ const getGameSession = async (userSession: string) => {
 		// The match hasn't been released by the lobby yet — send the player back to
 		// the lobby (where the fill/countdown plays out) instead of dropping them
 		// into an empty board that would end the instant win conditions evaluate.
-		const room = await gameStore.getRoom(current.session)
+		// `currentGame` already fetched the room, so reuse it here.
+		const room = current.room
 		if (!room || room.start_at == null || room.start_at > Date.now()) {
 			throw redirect(303, `/rooms/${current.session}`)
 		}

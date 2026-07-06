@@ -13,8 +13,10 @@ export const POST = async ({ request, locals }) => {
 	}
 
 	try {
-		const room = await gameStore.getRoom(session)
-		const members = await gameStore.members(session)
+		const [room, members] = await Promise.all([
+			gameStore.getRoom(session),
+			gameStore.members(session),
+		])
 		if (!room || members.length === 0) {
 			throw error(404, 'Game session does not exist')
 		}

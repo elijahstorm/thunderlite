@@ -14,13 +14,18 @@ export const GET = async ({ url, params, locals }) => {
 	if (!Number.isFinite(since)) throw error(400, 'Invalid since parameter')
 
 	try {
-		const members = await gameStore.members(session)
+		// The membership gate and the event read hit different tables and don't
+		// depend on each other, so fetch both in one barrier — this is the hot
+		// poll path. The events are discarded (never returned) if the 403 fires.
+		const [members, page] = await Promise.all([
+			gameStore.members(session),
+			gameStore.events(session, since),
+		])
 		if (members.length === 0 || !members.includes(userSession)) {
 			throw error(403, 'Not a member of this game session')
 		}
 
-		const { events, lastEventId } = await gameStore.events(session, since)
-		return json({ events, lastEventId })
+		return json({ events: page.events, lastEventId: page.lastEventId })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		logToErrorDb(msg)
