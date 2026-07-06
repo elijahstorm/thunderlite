@@ -9,6 +9,7 @@
 	import Icon from '@iconify/svelte'
 	import EditorButton from './Editor/EditorButton.svelte'
 	import MapOptions from './MapOptions.svelte'
+	import MapThumbnail from '$lib/Components/Widgets/Social/MapThumbnail.svelte'
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
 	import { mapStore, playMapStore } from './mapStore'
@@ -40,6 +41,12 @@
 
 	let openOptionsModal = false
 	let openScriptModal = false
+	// The Load picker: lists the signed-in user's saved maps so they can switch
+	// which map the editor is working on without leaving for /my/maps first.
+	let openLoadModal = false
+	let myMaps: MapDBData[] = []
+	let loadingMaps = false
+	let loadError = ''
 	let editType: Brush = 'ground'
 	let unitType = 0
 	let groundType = 0
@@ -214,6 +221,40 @@
 			sharing = false
 		}
 	}
+	// Open the Load picker and (lazily, once) pull the user's own library. The
+	// listing rows carry no map_data, so picking one navigates to /editor/<id>
+	// where the server loads that map's hash.
+	const openLoad = async () => {
+		openLoadModal = true
+		if (myMaps.length || loadingMaps) return
+		loadingMaps = true
+		loadError = ''
+		try {
+			const res = await fetch('/api/maps?mine=1')
+			if (!res.ok) throw new Error('bad status')
+			const data = await res.json()
+			myMaps = data.maps ?? []
+		} catch {
+			loadError = 'Could not load your maps. Try again.'
+		} finally {
+			loadingMaps = false
+		}
+	}
+
+	// Switch the editor to another saved map. Flush the current draft first (the
+	// autosave is debounced and may not have fired yet) so nothing in-flight is
+	// lost, then do a full navigation — the editor component is reused across
+	// /editor/<id> routes and only reads the map on mount, so a hard load is what
+	// actually swaps in the selected board.
+	const loadMap = (id: string) => {
+		if (id === currentMapId) {
+			openLoadModal = false
+			return
+		}
+		saveDraft(map, currentMapId)
+		window.location.href = `/editor/${id}`
+	}
+
 	const playMap = async () => {
 		if (!canPlay) return
 		mapStore.set(map)
@@ -301,6 +342,15 @@
 		</div>
 
 		<div class="flex items-center gap-1">
+			<button
+				type="button"
+				on:click={openLoad}
+				title="Load one of your maps"
+				class="btn btn-ghost btn-sm"
+			>
+				<Icon icon="fluent:folder-open-24-filled" width="16" height="16" />
+				<span class="hidden lg:inline">Load</span>
+			</button>
 			{#each tools as tool (tool.label)}
 				{@const busy = (tool.label === 'Save' && saving) || (tool.label === 'Share' && sharing)}
 				<button
@@ -423,6 +473,67 @@
 >
 	<MapRender pause mini map={updatedMap} select={() => {}} backdrop="bg-surface-2" />
 </MapOptions>
+
+<Modal title="Load a map" bind:open={openLoadModal} outsideclose size="xl">
+	<section class="flex flex-col gap-3">
+		<p class="text-sm text-muted-foreground">
+			Open one of your saved maps in the editor. Unsaved changes to the current map are kept as a
+			local draft.
+		</p>
+
+		{#if loadingMaps}
+			<div class="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+				<Icon icon="mdi:loading" width="18" height="18" class="animate-spin" />
+				Loading your maps…
+			</div>
+		{:else if loadError}
+			<div
+				class="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+			>
+				<Icon icon="mdi:alert-circle" width="16" height="16" class="shrink-0" />
+				{loadError}
+			</div>
+		{:else if myMaps.length === 0}
+			<div class="py-10 text-center text-sm text-muted-foreground">
+				You haven't saved any maps yet. Save this one to start your library.
+			</div>
+		{:else}
+			<div class="grid max-h-[60vh] gap-3 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+				{#each myMaps as m (m.public_id)}
+					<button
+						type="button"
+						on:click={() => loadMap(m.public_id)}
+						disabled={m.public_id === currentMapId}
+						class="card flex flex-col overflow-hidden text-left transition-shadow enabled:hover:shadow-md disabled:cursor-default disabled:opacity-60"
+					>
+						<div class="aspect-video bg-surface-2">
+							<MapThumbnail map={m} />
+						</div>
+						<div class="flex items-center justify-between gap-2 p-2.5">
+							<span class="truncate text-sm font-semibold tracking-tight text-foreground">
+								{m.name ?? 'Untitled map'}
+							</span>
+							{#if m.public_id === currentMapId}
+								<span class="chip shrink-0 text-[10px] tracking-wide uppercase">Editing</span>
+							{/if}
+						</div>
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</section>
+
+	{#snippet footer()}
+		<a href="/my/maps" class="btn btn-ghost">
+			<Icon icon="lucide:external-link" width="14" height="14" />
+			Manage in My Maps
+		</a>
+		<button type="button" on:click={() => (openLoadModal = false)} class="btn btn-primary ml-auto">
+			<Icon icon="mdi:close" width="16" height="16" />
+			Close
+		</button>
+	{/snippet}
+</Modal>
 
 <Modal title="Map script" bind:open={openScriptModal} outsideclose size="xl">
 	<section class="flex flex-col gap-3">

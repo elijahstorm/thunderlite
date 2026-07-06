@@ -9,12 +9,19 @@
  * only NULL transiently for legacy rows. `expires_at` is a millisecond epoch
  * used for lazy TTL: reads treat a room past its expiry as absent (KV used a 24h
  * `ex` here).
+ *
+ * `start_at` is the millisecond epoch the pre-game lobby hands off to `/play`.
+ * It is NULL while the room is still filling; the join that brings the room to
+ * capacity arms it to `now + LOBBY_COUNTDOWN`, and the host can pull it forward
+ * to `now` to skip the countdown. `/play` is gated on `start_at` being set and
+ * in the past, so nobody drops into a live match before the lobby releases it.
  */
 export const CreateGameRoom = `
 create table if not exists game_room (
     session text primary key,
     map_id text not null,
     current_turn text,
-    expires_at bigint not null
+    expires_at bigint not null,
+    start_at bigint
 );
 `

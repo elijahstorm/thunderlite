@@ -35,7 +35,9 @@
 					throw { message: session?.message ?? session ?? 'Could not create game session' }
 				}
 				if (!browser) return
-				goto('/play')
+				// Land in the pre-game lobby, not the match — this gives an opponent a
+				// window to join with the room code before play begins.
+				goto(`/rooms/${session.session}`)
 			})
 			.catch((reason) => {
 				status = 'error'
@@ -71,10 +73,12 @@
 				<Loader label="Creating session" />
 			{:else}
 				<div class="flex flex-wrap justify-end gap-2 pt-2">
-					<a href="/editor/{map.public_id}" class="btn btn-ghost">
-						<Icon icon="fluent:edit-24-filled" width={14} />
-						Open in editor
-					</a>
+					{#if data.isOwner}
+						<a href="/editor/{map.public_id}" class="btn btn-ghost">
+							<Icon icon="fluent:edit-24-filled" width={14} />
+							Open in editor
+						</a>
+					{/if}
 					{#if data.signedIn}
 						<button class="btn btn-primary" on:click={makeGame}>
 							<Icon icon="lucide:rocket" width={14} />

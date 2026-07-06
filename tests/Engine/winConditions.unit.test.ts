@@ -10,6 +10,7 @@ import { unitData } from '../../src/lib/GameData/unit'
 
 const COMMAND_CENTER_TYPE = buildingData.findIndex((b) => b.name === 'Command Center')
 const CITY_TYPE = buildingData.findIndex((b) => b.name === 'City')
+const GROUND_CONTROL_TYPE = buildingData.findIndex((b) => b.name === 'Ground Control')
 const STRIKE_COMMANDO_TYPE = unitData.findIndex((u) => u.name === 'Strike Commando')
 
 const makeMap = (overrides: Partial<MapProcesser> = {}): MapProcesser => ({
@@ -111,6 +112,35 @@ describe('evaluateWinConditions (pure)', () => {
 		const result = evaluateWinConditions(get(gameState), map)
 		expect(result.losers).toEqual([1])
 		expect(result.gameOver).toBe(false) // teams 0 and 2 still alive
+	})
+
+	it('does NOT declare a DRAW at skirmish start when both sides have production buildings but no units yet', () => {
+		// A fresh multiplayer map: each side owns a production building (Ground
+		// Control) and starts with zero units — you build your army from scratch.
+		// Neither side is lost, so the match must not end on turn one.
+		const map = makeMap()
+		map.layers.buildings[0] = building(0, GROUND_CONTROL_TYPE)
+		map.layers.buildings[15] = building(1, GROUND_CONTROL_TYPE)
+		initGameStateFromMap(map)
+
+		const result = evaluateWinConditions(get(gameState), map)
+		expect(result.gameOver).toBe(false)
+		expect(result.winner).toBeUndefined()
+		expect(result.losers).toEqual([])
+	})
+
+	it('a unit-less team keeping only a production building is not defeated (it can rebuild)', () => {
+		const map = makeMap()
+		map.layers.units[0] = unit(0)
+		map.layers.units[5] = unit(1)
+		map.layers.buildings[6] = building(1, GROUND_CONTROL_TYPE)
+		initGameStateFromMap(map)
+
+		map.layers.units[5] = null // team 1 has no units, but still owns a factory
+
+		const result = evaluateWinConditions(get(gameState), map)
+		expect(result.gameOver).toBe(false)
+		expect(result.losers).toEqual([])
 	})
 
 	it('two-player game ends when a side loses its last unit, even with its Command Center intact', () => {

@@ -1,5 +1,5 @@
 import { get } from 'svelte/store'
-import { gameState, type GameState } from './gameState'
+import { buildingGrants, gameState, type GameState } from './gameState'
 
 export type WinConditionsResult = {
 	gameOver: boolean
@@ -10,6 +10,16 @@ export type WinConditionsResult = {
 const teamHasUnits = (map: MapObject | MapProcesser, team: number): boolean => {
 	for (const u of map.layers.units) {
 		if (u && u.team === team) return true
+	}
+	return false
+}
+
+// A team can rebuild an army only from a production building (Ground/Air/Sea
+// Control — anything that grants a build permission). A bare Command Center
+// does NOT count: it grants nothing, so it can't roll out units.
+const teamCanProduce = (map: MapObject | MapProcesser, team: number): boolean => {
+	for (const b of map.layers.buildings) {
+		if (b && b.team === team && buildingGrants(b.type).length > 0) return true
 	}
 	return false
 }
@@ -27,10 +37,14 @@ export const evaluateWinConditions = (
 			continue
 		}
 		if (!map) continue
-		// A team with no units left is defeated, even if they still hold an
-		// uncaptured Command Center — the CC can't rebuild an army (it isn't a
-		// production building), so an army-less player has no way back.
-		if (!teamHasUnits(map, player.team)) losersSet.add(player.team)
+		// A team with no units left is defeated only if it also can't build any —
+		// holding a bare Command Center is no reprieve (the CC produces nothing),
+		// but a team that still owns a production building can rebuild, so it isn't
+		// lost. This is what keeps a fresh skirmish map (both sides start with only
+		// factories and zero units) from being declared a DRAW on turn one.
+		if (!teamHasUnits(map, player.team) && !teamCanProduce(map, player.team)) {
+			losersSet.add(player.team)
+		}
 	}
 
 	const losers = state.players.map((p) => p.team).filter((t) => losersSet.has(t))

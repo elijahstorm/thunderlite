@@ -36,7 +36,9 @@
 				throw new Error(body?.message ?? 'Could not join game session')
 			}
 			if (browser) {
-				goto('/play')
+				// Into the lobby, not straight into the match — the host may still be
+				// waiting there, and this is where the start countdown plays out.
+				goto(`/rooms/${session}`)
 				return
 			}
 			joinStatus = 'idle'
@@ -92,9 +94,9 @@
 						<Icon icon="lucide:copy" width={14} />
 						Copy
 					</button>
-					<a href="/play" class="btn btn-primary btn-sm">
+					<a href="/rooms/{gameData.session}" class="btn btn-primary btn-sm">
 						<Icon icon="lucide:play" width={14} />
-						Go to game
+						Go to lobby
 					</a>
 				</div>
 

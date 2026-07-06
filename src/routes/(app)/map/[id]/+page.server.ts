@@ -10,5 +10,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		map: result.map,
 		owner: result.owner,
 		signedIn: !!locals.user,
+		// Only the authenticated owner may jump straight into the editor for this
+		// map; everyone else just gets the "Make game" path.
+		isOwner: !!locals.user && locals.user === result.owner.auth,
 	}
 }

@@ -24,10 +24,18 @@ import { generateKey } from '$lib/Security/keys'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
 export const MAX_PLAYERS = 2
+/** How long the lobby counts down once the room is full before it opens `/play`. */
+export const LOBBY_COUNTDOWN_MS = 10_000
 const ROOM_TTL_MS = 1000 * 60 * 60 * 24
 const APPEND_RETRIES = 8
 
-type RoomRow = { session: string; map_id: string; current_turn: string | null; expires_at: number }
+type RoomRow = {
+	session: string
+	map_id: string
+	current_turn: string | null
+	expires_at: number
+	start_at: number | null
+}
 type MemberRow = { user_session: string; seat: number }
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = { seq: number; user_session: string; action: unknown; ts: number }
@@ -129,6 +137,42 @@ async function memberCount(session: string): Promise<number> {
 	return db.count('game_member', { session })
 }
 
+/** The player's join seat (0 = creator/host), or -1 if not a member. */
+async function seatOf(session: string, userSession: string): Promise<number> {
+	const row = await db.findOne<MemberRow>('game_member', {
+		where: { session, user_session: userSession },
+		select: ['seat'],
+	})
+	return row ? Number(row.seat) : -1
+}
+
+/**
+ * Arm the pre-game countdown: set `start_at` to `now + LOBBY_COUNTDOWN_MS` the
+ * first time the room reaches capacity. No-op if it's already armed, so a
+ * re-join or a duplicate call never resets the clock out from under a countdown
+ * already ticking on every client. Best-effort: a room whose schema predates
+ * the `start_at` column just never counts down rather than failing the join.
+ */
+async function armStartCountdown(session: string): Promise<number | null> {
+	const room = await getRoom(session)
+	if (!room) return null
+	if (room.start_at != null) return Number(room.start_at)
+	const start_at = now() + LOBBY_COUNTDOWN_MS
+	try {
+		await db.update('game_room', { session }, { start_at })
+		return start_at
+	} catch {
+		return null
+	}
+}
+
+/** Host skip: pull the handoff forward to now so the lobby opens `/play` at once. */
+async function startNow(session: string): Promise<number> {
+	const start_at = now()
+	await db.update('game_room', { session }, { start_at })
+	return start_at
+}
+
 /** Whose turn it is, or null (only transient before a turn is seeded). */
 async function currentTurn(session: string): Promise<string | null> {
 	const room = await db.findOne<RoomRow>('game_room', {
@@ -204,6 +248,9 @@ export const gameStore = {
 	addMember,
 	removeMember,
 	memberCount,
+	seatOf,
+	armStartCountdown,
+	startNow,
 	currentTurn,
 	setCurrentTurn,
 	appendEvent,
