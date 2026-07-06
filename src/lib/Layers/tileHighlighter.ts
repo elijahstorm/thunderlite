@@ -312,13 +312,14 @@ const convertToHighlightable = (
 	tiles.map<TileHighlight>((tile) => {
 		if (type === highlightTypes.attack) {
 			// Attack advice rates the trade against the enemy on the tile. Preview
-			// danger-zone tiles carry no real target (and pass no unit), so they fall
-			// back to the neutral marker that just shows reach.
+			// danger-zone tiles carry no real target, so they're flagged reachOnly:
+			// the red reach wash still paints, but the advice badge is skipped rather
+			// than stamping a meaningless severity triangle on empty ground.
 			const defender = map.layers.units[tile]
-			const tip =
-				unit && defender
-					? attackAdviceTip(map, unit, attackerTile ?? tile, defender, tile)
-					: highlightTypes.neutral
+			if (!defender) return { tile, type, tip: highlightTypes.neutral, reachOnly: true }
+			const tip = unit
+				? attackAdviceTip(map, unit, attackerTile ?? tile, defender, tile)
+				: highlightTypes.neutral
 			return { tile, type, tip }
 		}
 

@@ -118,10 +118,10 @@ describe('applyAction build-adjacent', () => {
 
 describe('CPU builder scoring', () => {
 	it('mine reward scales up as the wallet empties', () => {
-		expect(scoreBuilderMine(WARMACHINE_WALLET)).toBe(60)
-		expect(scoreBuilderMine(LOW_WALLET)).toBe(60)
-		expect(scoreBuilderMine(0)).toBe(200)
-		expect(scoreBuilderMine(LOW_WALLET / 2)).toBeCloseTo(130)
+		expect(scoreBuilderMine(WARMACHINE_WALLET)).toBe(80)
+		expect(scoreBuilderMine(LOW_WALLET)).toBe(80)
+		expect(scoreBuilderMine(0)).toBe(260)
+		expect(scoreBuilderMine(LOW_WALLET / 2)).toBeCloseTo(170)
 	})
 
 	it('build value folds the chosen unit score with the tile safety', () => {

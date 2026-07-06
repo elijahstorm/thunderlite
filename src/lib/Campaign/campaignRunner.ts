@@ -163,6 +163,18 @@ const dispatchEvent = (event: CutsceneEvent, iface: CampaignInterface): MaybePro
 const localPlayerWon = (outcome: CampaignOutcome): boolean =>
 	outcome.players.find((p) => p.isLocal)?.outcome === 'win'
 
+/**
+ * The runner's "which blocks have already fired" state, flat and JSON-safe so a
+ * campaign save can persist it and a refresh can restore it — otherwise a resumed
+ * level would replay the opening cutscene and any already-played turn/`<when>`
+ * blocks. `conditionsFired` is positional, matching `script.conditions` order.
+ */
+export interface CampaignRunnerState {
+	started: boolean
+	firedTurns: string[]
+	conditionsFired: boolean[]
+}
+
 export interface CampaignRunner {
 	/** Play the `start` block once. Subsequent calls are no-ops. */
 	start(): Promise<void>
@@ -179,6 +191,10 @@ export interface CampaignRunner {
 	hasPendingConditions(map: ConditionMap): boolean
 	/** Fire every unfired `<when>` block whose condition now holds, each once. */
 	checkConditions(map: ConditionMap): Promise<void>
+	/** Snapshot which blocks have fired, for a campaign save. */
+	serialize(): CampaignRunnerState
+	/** Restore fired-state from a save so a resumed level doesn't replay blocks. */
+	restore(state: CampaignRunnerState): void
 }
 
 /**
@@ -239,6 +255,19 @@ export const createCampaignRunner = (
 			await runCutsceneEvents(localPlayerWon(outcome) ? script.win : script.lose, iface)
 		},
 		hasFinished: () => finished,
+		serialize: () => ({
+			started,
+			firedTurns: [...firedTurns],
+			conditionsFired: conditions.map((c) => c.fired),
+		}),
+		restore: (state) => {
+			started = state.started
+			firedTurns.clear()
+			for (const key of state.firedTurns) firedTurns.add(key)
+			state.conditionsFired.forEach((fired, i) => {
+				if (conditions[i]) conditions[i].fired = fired
+			})
+		},
 		hasPendingConditions: (map) => !finished && conditions.some((c) => !c.fired && holds(c, map)),
 		checkConditions: async (map) => {
 			if (finished) return

@@ -311,7 +311,7 @@ export const unitData: UnitData[] = [
 		cost: 470,
 		range: [3, 5],
 		actable: true,
-		modifiers: ['Can_Attack.Counter_Range', 'Self_Action.Repairable'],
+		modifiers: ['Can_Attack.Air_Raid', 'Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	{
 		url: '/game/play/unit/idle/jammer-truck.png',
@@ -572,7 +572,7 @@ export const unitData: UnitData[] = [
 		cost: 0,
 		range: [2, 5],
 		actable: true,
-		modifiers: ['Self_Action.Repairable'],
+		modifiers: ['Can_Attack.Air_Raid', 'Self_Action.Repairable'],
 	},
 	{
 		url: '/game/play/unit/idle/blockade.png',
@@ -952,6 +952,34 @@ export const unitData: UnitData[] = [
 			'Can_Attack.Counter_Range',
 			'Self_Action.Repairable',
 		],
+	},
+	{
+		url: '/game/play/unit/idle/nightjar.png',
+		frames: 4,
+		xOffset: 0,
+		yOffset: 60,
+		attackSprite: {
+			url: '/game/play/unit/attack/nightjar.png',
+			frames: 8,
+			xOffset: 45,
+			yOffset: 45,
+		},
+		name: 'Nightjar',
+		description:
+			'Cloaked infiltrator. Runs silent and unseen until it strikes, gutting aircraft from ambush, but folds the instant anything catches it in the open.',
+		type: 'air',
+		weaponType: 'light',
+		armorType: 'light',
+		movementType: 'high air',
+		power: 18,
+		health: 30,
+		movement: 9,
+		sight: 6,
+		cost: 500,
+		range: COMMON_RANGE,
+		actable: true,
+		stealth: true,
+		modifiers: ['End_Turn.Cloak', 'Damage.Stealth_Strike', 'Can_Attack.Air_Raid', 'Self_Action.Repairable'],
 	},
 ]
 

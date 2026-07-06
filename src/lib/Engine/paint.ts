@@ -1308,9 +1308,10 @@ const advice =
 		// tile *is* — footsteps on a reachable move tile (row 0), the red marker on
 		// an attackable one (row 1) — and a severity badge layered on top rates it:
 		// move advice in column 1, attack advice in column 2, rows good→terrible.
-		// Firing-shadow tiles aren't real targets, and the selected unit's own
-		// (origin) tile isn't a move destination, so neither carries an advice icon.
-		if (!highlight || highlight.shadowed || highlight.origin) return
+		// Firing-shadow tiles aren't real targets, the selected unit's own (origin)
+		// tile isn't a move destination, and reach-only attack tiles have no enemy to
+		// rate — none of them carry an advice icon.
+		if (!highlight || highlight.shadowed || highlight.origin || highlight.reachOnly) return
 
 		// Base glyph at half strength so it reads as a wash beneath the badge.
 		context.globalAlpha = 0.5

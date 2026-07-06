@@ -242,7 +242,7 @@ export const animateRoute = (
 				// route overlay is still mounted. Then defer the clear to the next
 				// macrotask — after the .then() microtask has committed the move —
 				// so the canvas has the idle unit to draw at the destination
-				// before the DOM overlay's out:fly fades it away. Otherwise the
+				// before the DOM overlay is unmounted. Otherwise the
 				// synchronous reactive render on `routeAnimation = null` paints
 				// the destination tile blank between "overlay cleared" and
 				// "applyMove committed", and the unit flashes invisible.

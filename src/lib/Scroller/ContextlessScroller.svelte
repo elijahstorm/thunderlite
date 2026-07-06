@@ -14,6 +14,8 @@
 		mousemove,
 		click,
 		keypress,
+		keydown,
+		wheel,
 	} from './PageInteractions'
 
 	export let tileWidth: number
@@ -119,6 +121,8 @@
 		scroller
 	)(handleClick)}
 	on:keypress={keypress(handleKeypress)}
+	on:keydown={keydown(scroller, tileWidth, tileHeight)}
+	on:wheel|preventDefault={wheel(scroller)}
 	on:touchstart|stopPropagation|preventDefault={touchstart(scroller)}
 	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
 	on:touchend|stopPropagation|preventDefault={touchend(scroller)}

@@ -1,4 +1,9 @@
-import type { KeyboardEventHandler, MouseEventHandler, TouchEventHandler } from 'svelte/elements'
+import type {
+	KeyboardEventHandler,
+	MouseEventHandler,
+	TouchEventHandler,
+	WheelEventHandler,
+} from 'svelte/elements'
 import type { Scroller } from './Scroller'
 
 export const click =
@@ -18,6 +23,49 @@ export const keypress =
 	(keypress: (key: string, shiftKey: boolean) => void): KeyboardEventHandler<HTMLElement> =>
 	(e) =>
 		validate(preventOnForms, validateEnter as (e: Event) => boolean)(keypress, e.key, e.shiftKey)(e)
+
+// Arrow keys nudge the camera exactly one tile at a time. Arrow presses fire
+// `keydown` (never `keypress`), so this is a separate path from the Enter-only
+// `keypress` handler above. `scrollBy` clamps to the map bounds, so pressing
+// into an edge is a no-op rather than scrolling past the board.
+export const keydown =
+	(scroller: Scroller, tileWidth: number, tileHeight: number): KeyboardEventHandler<HTMLElement> =>
+	(e) => {
+		if (!preventOnForms(e)) return
+		let dx = 0
+		let dy = 0
+		switch (e.key) {
+			case 'ArrowLeft':
+				dx = -tileWidth
+				break
+			case 'ArrowRight':
+				dx = tileWidth
+				break
+			case 'ArrowUp':
+				dy = -tileHeight
+				break
+			case 'ArrowDown':
+				dy = tileHeight
+				break
+			default:
+				return
+		}
+		e.preventDefault()
+		scroller.scrollBy(dx, dy, true)
+	}
+
+// Two-finger trackpad drags (and mouse wheels) arrive as `wheel` events with
+// pixel deltas; pan the board by them. deltaMode 1/2 report line/page units
+// instead of pixels, so scale those up to a sensible pixel step. preventDefault
+// is applied via the `|preventDefault` modifier at the call site so the page
+// itself never scrolls or zooms underneath the board.
+export const wheel =
+	(scroller: Scroller): WheelEventHandler<HTMLElement> =>
+	(e) => {
+		if (!preventOnForms(e)) return
+		const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? scroller.__clientHeight : 1
+		scroller.scrollBy(e.deltaX * scale, e.deltaY * scale, false)
+	}
 
 export const touchstart =
 	(scroller: Scroller): TouchEventHandler<HTMLElement> =>

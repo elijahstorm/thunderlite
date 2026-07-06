@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte'
+	import { onMount, onDestroy } from 'svelte'
+	import { browser } from '$app/environment'
 	import GameBoard from '$lib/Map/GameBoard.svelte'
 	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
 	import GameStateManager from '$lib/Engine/GameStateManager.svelte'
@@ -8,6 +9,7 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { gameState } from '$lib/Engine/gameState'
 	import { parseCutsceneScript } from './cutsceneScript'
+	import { currentCampaignLevelId } from './campaignSave'
 	import { getLevelMap, getLevelScriptText } from './levelContent'
 	import type { CutsceneScript } from './cutsceneTypes'
 	import type { CampaignLevel } from './levels'
@@ -61,6 +63,16 @@
 	}
 
 	const map: MapObject = getLevelMap(level.id) ?? stubMap()
+
+	// Mark this as a campaign match (and which level) so the engine layer enables
+	// mid-match save/resume. Set here in the component body — not in `onMount` — so
+	// it is in place before this match's deeply-nested `Game` child mounts and reads
+	// it (child `onMount` runs before this parent's). Cleared on teardown so a later
+	// online/hotseat match on the same page never inherits campaign resume.
+	if (browser) currentCampaignLevelId.set(level.id)
+	onDestroy(() => {
+		if (browser) currentCampaignLevelId.set(null)
+	})
 
 	// K1/K2: parse the level's script up front (bundled content is synchronous) and
 	// hand it to `Game` via `MapRender`. `Game` owns the canonical campaign wiring —

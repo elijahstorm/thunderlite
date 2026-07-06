@@ -49,8 +49,23 @@
 		})
 	}
 
+	// The DOM overlay layer that hosts the Animator (walk/attack/explosion sprites).
+	// Its scroll offset is applied imperatively (below) rather than through a Svelte
+	// prop, so it can't fall out of sync with the canvas.
+	let animatorLayer: HTMLElement | undefined
+
 	const handleOffset = (x: number, y: number, zoom: number) => {
 		interfacer.offset = { x, y, zoom }
+		// Slide the whole overlay layer to match the canvas's scroll position. This
+		// runs inside the scroller's own paint loop (the same call that redraws the
+		// canvas), so the overlays move in the *same frame* as the board — no
+		// one-frame lag, no waiting on a Svelte flush. The Animator's sprites are
+		// positioned in content coordinates; this single transform is what maps them
+		// into screen space. Doing it here (not as a reactive `offset` prop threaded
+		// into each sprite's left/top) is why an attack or move animation tracks the
+		// board even when it pans mid-animation, and it never restyles the animating
+		// element itself, so the in:fly transition is left untouched.
+		if (animatorLayer) animatorLayer.style.transform = `translate3d(${-x}px, ${-y}px, 0)`
 		publishGeometry()
 	}
 
@@ -80,8 +95,8 @@
 	</div>
 
 	{#if !editor}
-		<div class="col-start-1 row-start-1 pointer-events-none">
-			<svelte:component this={animator} offset={interfacer.offset} {cellWidth} {cellHeight} />
+		<div bind:this={animatorLayer} class="col-start-1 row-start-1 pointer-events-none">
+			<svelte:component this={animator} {cellWidth} {cellHeight} />
 		</div>
 	{/if}
 

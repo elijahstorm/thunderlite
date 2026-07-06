@@ -15,12 +15,10 @@
 	import { fly } from 'svelte/transition'
 	import { linear } from 'svelte/easing'
 
-	export let offset: { x: number; y: number }
 	export let cellWidth = 60
 	export let cellHeight = 60
 
 	let index = 0
-	let hideNewInstance = false
 
 	// Fog mask: when fog is on, suppress overlays whose source tile isn't in the
 	// viewer's visibility set. The canvas already dims those tiles; without this
@@ -72,7 +70,6 @@
 		startIncrementer(
 			() => {
 				index++
-				hideNewInstance = true
 			},
 			() => index < route.length - 1
 		)
@@ -96,7 +93,12 @@
 			xOffset: unit.xOffset,
 			yOffset: unit.yOffset,
 			frames: unit.frames,
-			state: getDirection(route.map, route.route, index),
+			// Face the step the sprite is *currently sliding along* (route[index-1] →
+			// route[index]), which is the same direction as its in:fly. Facing the
+			// *next* step here would turn the unit the instant it enters a corner tile,
+			// so it crabs sideways into the bend before setting off the new way. The
+			// turn belongs to the next beat, when the following element slides out.
+			state: getDirection(route.map, route.route, Math.max(0, index - 1)),
 		}
 	}
 
@@ -123,9 +125,13 @@
 		yOffset /= scale
 		width = !width ? cellWidth + xOffset : width / scale
 		height = !height ? cellHeight + yOffset : height / scale
+		// Positioned in *content* coordinates (map space), not screen space: the
+		// scroll offset is applied once by the overlay layer's transform (see
+		// TileSelector's handleOffset), so every sprite here scrolls with the board as
+		// a single unit and animations stay locked to their tile as the map pans.
 		return `
-			left: ${x * cellWidth - xOffset - offset.x}px;
-			top: ${y * cellHeight - yOffset - offset.y}px; 
+			left: ${x * cellWidth - xOffset}px;
+			top: ${y * cellHeight - yOffset}px;
 			width: ${width}px;
 			height: ${height}px;
 			background-image: url('${source}');
@@ -142,7 +148,7 @@
 	// Health bar for the *moving* unit. During a move the unit is lifted off the
 	// board and drawn as this DOM overlay, so the canvas bar would vanish for the
 	// whole slide. We render the bar as a *child of the sprite mover div* so it
-	// inherits the exact same out:fly transform and glides with the unit instead of
+	// inherits the exact same in:fly transform and glides with the unit instead of
 	// snapping tile-to-tile. Coordinates are therefore div-local: the sprite div's
 	// box starts at (tileX − xOffset, tileY − yOffset), so the unit's cell sits at
 	// (xOffset, yOffset) within it (offsets scaled the same way render() scales them).
@@ -200,36 +206,34 @@
 		`
 	}
 
-	const animationDirection = [
-		{ x: cellWidth },
-		{ y: cellHeight },
+	// Where the newly-keyed sprite *enters from*: one cell back along its travel
+	// direction, so an `in:fly` glides it into the current tile. This is the reverse
+	// of the movement vector — a rightward step (dir 0) enters from the left, etc.
+	const enterDirection = [
 		{ x: -cellWidth },
 		{ y: -cellHeight },
+		{ x: cellWidth },
+		{ y: cellHeight },
 	]
 
 	$: traverseRoute($routeAnimation?.route ?? null)
-
-	$: setTimeout(() => {
-		index
-		hideNewInstance = false
-	}, ANIMATION_TIME)
 </script>
 
 {#if $routeAnimation && routeVisible($routeAnimation, $viewerVisibility, $viewerTeam, index)}
 	{@const route = $routeAnimation}
 	{#key index}
 		{@const flyParams = {
-			...animationDirection[getDirection(route.map, route.route, index - 1)],
+			...enterDirection[getDirection(route.map, route.route, index - 1)],
 			duration: ANIMATION_TIME,
 			easing: linear,
 			opacity: 1,
 		}}
 		{@const bar = parseRouteHealth(route)}
-		{@const alpha = hideNewInstance ? 0 : routeOpacity(route, $viewerTeam, index)}
+		{@const alpha = routeOpacity(route, $viewerTeam, index)}
 		<div
 			class="absolute overflow-clip"
 			style={`${render(parseRoute(route), $animationFrame)} opacity: ${alpha};`}
-			out:fly={flyParams}
+			in:fly={flyParams}
 		>
 			{#if bar}
 				<div class="absolute" style={routeBarTrackStyle(bar)}></div>

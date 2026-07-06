@@ -1,5 +1,6 @@
 <start>
 funds: 0,1200
+funds: 1,600
 color Vance: #38bdf8
 color Reyes: #4ade80
 color Kael: #ef4444
@@ -27,6 +28,12 @@ move: 11,0
 talk Vance: "Mind the sky, too. The jetstream over the north field will fling an aircraft clear across the map. The storm on the coast hides his planes and burns yours. His Petrels ride it untouched, so a Kestrel Sentry to drag them out is worth its weight."
 move: 8,8
 talk Vance: "And the towns in the middle are the whole war, Reyes. Take them, hold them, and their coin builds the army that cracks three fortresses at once. Lose that race and his machines outbuild you."
+move: 21,2
+hl: 21,2
+hl: 22,2
+talk Vance: "One more thing. There is a derelict warfactory walled into the far north-east corner, an old coast depot nobody holds. Neutral, for now.", "Kael's engineers are already crawling toward it. If he takes it he builds fresh armor from your own flank, so get boots on it first or wreck whatever rolls out the moment it does."
+unhl: 21,2
+unhl: 22,2
 move: 2,10
 talk Reyes: "Three engines, one at a time, and never stop. I've got it, Vance.", "This is the last hill, Kael. We're taking it."
 </start>
@@ -170,6 +177,17 @@ add unit: 1,"Raptor Fighter",14,0
 hurt unit: 14,4,45
 </turn>
 
+<turn 7,1>
+wait: 1
+move: 20,6
+talk Kael: "You cannot see what the murk hides, Reyes. I can. Armor in the dust, hulls under the swells, and not one of them on your maps.", "By the time you find them they will already be inside your line."
+add unit: 1,"Stealth Tank",19,6
+add unit: 1,"Stealth Tank",20,6
+add unit: 1,"U-Boat",21,11
+add unit: 1,"U-Boat",21,13
+talk Vance: "Cloaked armor and submarines rolling out of the eastern fog, Reyes. Keep a Jammer Truck or a Kestrel Sentry sweeping that flank, or they gut you from a tile you never thought to check."
+</turn>
+
 <turn 8,1>
 wait: 1
 move: 16,15
@@ -217,6 +235,12 @@ talk Vance: "The bay is yours. Nothing left on the water to stop a landing. Put 
 
 <when team 0 buildings "City" >= 5>
 talk Vance: "The whole coast is paying us now. That is the race won, Reyes. Coin into steel faster than his mountain can dig. Bury him in it."
+</when>
+
+<when team 1 buildings "Warfactory" >= 1>
+move: 21,2
+talk Kael: "The coast depot answers to me now. Your own steelworks, turned on your flank. I build here while you break yourself on my gates."
+talk Vance: "He took the north-east warfactory, Reyes. That is a fresh line of armor at your back now. Retake it, or put fire on whatever crawls out before it forms up."
 </when>
 
 <when team 1 units "Annihilator Tank" == 0>

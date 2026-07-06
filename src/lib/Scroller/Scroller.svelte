@@ -13,6 +13,8 @@
 		mousemove,
 		click,
 		keypress,
+		keydown,
+		wheel,
 	} from './PageInteractions'
 
 	export let tileWidth: number
@@ -277,8 +279,11 @@
 	role="grid"
 	tabindex="0"
 	bind:this={container}
+	on:pointerdown={() => container.focus({ preventScroll: true })}
 	on:click|stopPropagation|preventDefault={click(boardRect, scroller)(handleClick)}
 	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
+	on:keydown={keydown(scroller, tileWidth, tileHeight)}
+	on:wheel|preventDefault={wheel(scroller)}
 	on:touchstart={touchstart(scroller)}
 	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
 	on:touchend={touchend(scroller)}

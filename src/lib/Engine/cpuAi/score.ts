@@ -554,8 +554,13 @@ export const scoreBuilderPosition = (
 	// Inverse of a combat unit's "advance": reward keeping distance from the enemy.
 	const safety = enemyDist > 0 ? Math.min(enemyDist, 8) * 2 : 0
 	// Low on funds: pull toward the closest ore so it can mine and keep building.
+	// The emptier the wallet the harder the pull, so a nearly broke Warmachine will
+	// commit to closing on ore over hugging cover or padding its distance from the
+	// enemy. It still never overrides `danger` (×5) — it won't walk onto a tile an
+	// enemy can actually hit just to reach ore.
 	const ore = closestOreDistance(map, tile)
-	const refuel = wallet < LOW_WALLET && ore > 0 ? -ore * 2 : 0
+	const urgency = wallet < LOW_WALLET ? (LOW_WALLET - wallet) / LOW_WALLET : 0
+	const refuel = wallet < LOW_WALLET && ore > 0 ? -ore * (5 + urgency * 9) : 0
 	return cover - danger + safety + refuel
 }
 
@@ -564,7 +569,7 @@ export const scoreBuilderPosition = (
 // Warmachine prefers refilling over building the cheapest thing it can afford.
 export const scoreBuilderMine = (wallet: number): number => {
 	const urgency = wallet < LOW_WALLET ? (LOW_WALLET - wallet) / LOW_WALLET : 0
-	return 60 + urgency * 140
+	return 80 + urgency * 180
 }
 
 // Value of a Warmachine spending its wallet to build a unit, from a given tile.

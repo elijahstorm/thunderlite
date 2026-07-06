@@ -81,6 +81,11 @@ type HighlightMeta = {
 	 * the renderer paints it a muted amber to signal that clicking it opens the
 	 * unit's action menu rather than moving it. */
 	origin?: boolean
+	/** True for an attack tile that only shows reach, with no enemy actually on it
+	 * (the read-only danger-zone preview of a unit that can't be targeted here).
+	 * Keeps the red reach wash but suppresses the advice badge, which would
+	 * otherwise draw a meaningless severity triangle on empty ground. */
+	reachOnly?: boolean
 }
 type TileInfo = {
 	tile: number
