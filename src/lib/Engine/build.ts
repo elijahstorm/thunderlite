@@ -21,6 +21,17 @@ export type SpawnResult =
 	| { ok: true; tile: number }
 	| { ok: false; reason: 'no-space' | 'not-affordable' | 'not-buildable' | 'invalid' }
 
+/**
+ * A unit whose loss ends the game (Death.Insta_Lose) is a unique command unit:
+ * the player starts with exactly one and can never manufacture another. It's
+ * excluded from every production menu — the Warfactory and the Warmachine's own
+ * builder alike — and from both spawn guards, so no funding source can churn one
+ * out. (Units are otherwise buildable purely by having a positive cost.)
+ */
+export const isProducibleUnit = (
+	data: Pick<(typeof unitData)[number], 'modifiers'>
+): boolean => !data.modifiers.includes('Death.Insta_Lose')
+
 export const playerCanBuildType = (
 	player: Pick<Player, 'controls'>,
 	unitType: 'ground' | 'air' | 'sea'
@@ -105,6 +116,7 @@ export const buildableUnits = (
 	for (let type = 0; type < unitData.length; type++) {
 		const data = unitData[type]
 		if (data.cost <= 0) continue
+		if (!isProducibleUnit(data)) continue
 		const controlled = opts.ignoreControls ? true : playerCanBuildType(player, data.type)
 		// The Warmachine (ignoreControls) spends its own wallet, not main money,
 		// so the control discount never applies to it.
@@ -137,6 +149,7 @@ export const spawnBuiltUnit = (
 	const player = state.players.find((p) => p.team === team)
 	if (!player) return { ok: false, reason: 'invalid' }
 	if (data.cost <= 0) return { ok: false, reason: 'not-buildable' }
+	if (!isProducibleUnit(data)) return { ok: false, reason: 'not-buildable' }
 	if (!playerCanBuildType(player, data.type)) return { ok: false, reason: 'not-buildable' }
 	const cost = discountedUnitCost(player, data)
 	if (player.money < cost) return { ok: false, reason: 'not-affordable' }

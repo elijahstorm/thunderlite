@@ -1,4 +1,5 @@
 import { unitData } from '$lib/GameData/unit'
+import { isProducibleUnit } from '$lib/Engine/build'
 import { terrainData } from '$lib/GameData/terrain'
 import { markTileActed } from '$lib/Engine/gameState'
 import { beginBuildFade } from '$lib/Engine/buildFade'
@@ -64,6 +65,7 @@ export const buildAdjacent = (
 	const data = unitData[unitType]
 	if (!data) return { ok: false, reason: 'invalid' }
 	if (data.cost <= 0) return { ok: false, reason: 'not-buildable' }
+	if (!isProducibleUnit(data)) return { ok: false, reason: 'not-buildable' }
 
 	// A Warmachine is a self-contained mobile factory: it can build any unit type
 	// regardless of which factories the player owns, paying out of its own wallet
