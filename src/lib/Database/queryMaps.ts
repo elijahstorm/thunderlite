@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit'
-import { getUserDBDataFromAuth } from './getUserData'
+import { getUserDBDataFromAuth, queryUsersByAuth } from './getUserData'
 import { logToErrorDb } from '$lib/Security/serverLogs'
 import { db, type Where } from '$lib/dontcode/server'
 
@@ -99,7 +99,6 @@ export const queryMaps: (
 	{ search = '', type = '', page = 0 },
 	me = ''
 ) => {
-	let maps: MapDBData[]
 	const limit = 10
 
 	try {
@@ -136,13 +135,17 @@ export const queryMaps: (
 		const mapIds = rows.map((map) => map.id)
 		const typeIds = [...new Set(rows.map((map) => map.map_type_id).filter((id) => id !== null))]
 
-		const [mapTypes, infoMorphs, likes, shares] = mapIds.length
-			? await Promise.all([
+		// The per-map detail lookups and the owner hydration both depend only on
+		// the maps rows, so run them in a single barrier instead of in series.
+		// queryUsersByAuth collapses what used to be 1 + 4 calls PER owner into
+		// one batched wave (and zero social calls when logged out).
+		const detailsPromise = mapIds.length
+			? Promise.all([
 					typeIds.length
 						? db.find<{ id: number; text: string }>('map_types', {
 								where: { id: { in: typeIds } },
 							})
-						: Promise.resolve([]),
+						: Promise.resolve<{ id: number; text: string }[]>([]),
 					db.find<{ info_id: number | null; entity_id: number }>('info_morph_map', {
 						where: { entity_id: { in: mapIds }, entity_type: 'maps' },
 						select: ['info_id', 'entity_id'],
@@ -156,7 +159,20 @@ export const queryMaps: (
 						select: ['entity_id'],
 					}),
 				])
-			: [[], [], [], []]
+			: Promise.resolve([[], [], [], []] as [
+					{ id: number; text: string }[],
+					{ info_id: number | null; entity_id: number }[],
+					{ map_id: number; user_auth: string | null }[],
+					{ entity_id: number }[],
+				])
+
+		const [[mapTypes, infoMorphs, likes, shares], users] = await Promise.all([
+			detailsPromise,
+			queryUsersByAuth(
+				rows.map((map) => map.owner_auth),
+				me
+			),
+		])
 
 		const infoIds = [
 			...new Set(infoMorphs.map((morph) => morph.info_id).filter((id) => id !== null)),
@@ -172,7 +188,7 @@ export const queryMaps: (
 		const oneMonthAgo = new Date()
 		oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1)
 
-		maps = rows.map((map) => {
+		const maps = rows.map((map) => {
 			const mapLikes = likes.filter((like) => like.map_id === map.id)
 			return {
 				...map,
@@ -189,27 +205,11 @@ export const queryMaps: (
 				liked_by_me: mapLikes.some((like) => like.user_auth === me),
 			} as unknown as MapDBData
 		})
+
+		return { maps, users }
 	} catch (msg) {
 		logToErrorDb(msg)
 		throw error(500, 'Could not get map from database')
-	}
-
-	const users = (await Promise.all(
-		Object.values(
-			maps.reduce(
-				(users, map) => {
-					if (users[map.owner_auth]) return users
-					users[map.owner_auth] = getUserDBDataFromAuth(map.owner_auth, me)
-					return users
-				},
-				{} as { [key: string]: Promise<UserDBData> | undefined }
-			)
-		)
-	)) as UserDBData[]
-
-	return {
-		maps,
-		users,
 	}
 }
 
