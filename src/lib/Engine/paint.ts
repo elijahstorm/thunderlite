@@ -1,5 +1,6 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
+import { terrainData } from '$lib/GameData/terrain'
 import { ANIMATION_POINTER, ANIMATION_SELECT } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { gameState } from './gameState'
@@ -17,6 +18,17 @@ import { get } from 'svelte/store'
 type ActiveObject = { state: number; type: number; team?: number }
 
 const spriteSize = 60
+
+// The Sea terrain, whose coastline sheet is borrowed to draw the water (and shore,
+// when the tile touches land) beneath a singular ocean obstacle (Reef / Archipelago /
+// Rock Formation), whose own sprite is transparent where its water used to be. See
+// `groundLayer` and spriteConnector.seaUnderlayDecision.
+const SEA_TYPE = terrainData.findIndex((t) => t.name === 'Sea')
+
+// How much a coastline-adjacent ocean obstacle shrinks (centred) so its feature pulls
+// in off the banks and the Sea shore drawn under it reads all the way round. Only
+// applied when the tile touches land; an open-water obstacle stays full size.
+const OCEAN_OBSTACLE_SCALE = 0.65
 
 // Draws that must land on top of the *finished* grid rather than just their own
 // tile. The threat-source outline ring hugs the unit and so bleeds a few pixels
@@ -112,8 +124,7 @@ export const paint =
 		context.save()
 		context.translate(left, top)
 
-		render.always(map.layers.ground[tile], renderData.ground)
-		render.corners(map.layers.ground[tile], renderData.ground)
+		render.ground(map.layers.ground[tile], renderData.ground)
 		// A terrain rebuild is part of the ground, so its energy cover draws here —
 		// under the units, buildings and overlays — otherwise it washes over a unit
 		// standing on the tile, which reads as the unit dissolving rather than the
@@ -351,6 +362,7 @@ const contextProvider = (
 ) => ({
 	always: always(width, height, frame, scale)(context),
 	corners: corners(width, height, frame)(context),
+	ground: groundLayer(width, height, frame, scale)(context),
 	conditionally: conditionally(width, height, frame, scale)(context),
 	// Frame-0 variant for units that must not idle-animate (spent or non-active team).
 	conditionallyStatic: conditionally(width, height, 0, scale)(context),
@@ -813,6 +825,74 @@ const corners =
 				destHalfHeight
 			)
 		}
+	}
+
+// Like renderObject, but draws the sprite shrunk to `inset` of its tile and centred,
+// so the Sea shore drawn underneath an ocean obstacle reads around its edges. Keeps
+// renderObject's offset math, then scales the whole box about the tile centre.
+const renderObjectInset =
+	(width: number, height: number, frame: number, scale: number, inset: number) =>
+	(context: CanvasRenderingContext2D) =>
+	<T extends ActiveObject>(object: T, render: ObjectSpriteRenderer) => {
+		const sprite = render?.sprite?.[object.team ?? 0]
+		if (!sprite) return
+		const step = frame % render.frames
+		const destW = (width + render.xOffset / scale) * inset
+		const destH = (height + render.yOffset / scale) * inset
+		context.drawImage(
+			sprite,
+			object.state * (spriteSize + render.xOffset),
+			step * (spriteSize + render.yOffset),
+			spriteSize + render.xOffset,
+			spriteSize + render.yOffset,
+			width / 2 - destW / 2,
+			height / 2 - destH / 2,
+			destW,
+			destH
+		)
+	}
+
+// Ground layer for one tile. Normal tiles draw their base frame plus any coastline
+// inner corners. A singular ocean obstacle (Reef / Archipelago / Rock Formation,
+// seaState set by spriteConnector.seaUnderlayDecision) has a transparent-water sprite
+// (see tools/sprites/gen_terrain_sea_obstacles.py), so it draws a Sea tile beneath —
+// plain water, or a coastline frame when it touches land — then the obstacle feature
+// on top, then the shore's inner-corner land LAST so a diagonal bank is never buried
+// under the obstacle. Against land the obstacle is shrunk (centred) so its feature
+// pulls in off the banks; in open water it stays full size.
+const groundLayer =
+	(width: number, height: number, frame: number, scale: number) =>
+	(context: CanvasRenderingContext2D) =>
+	(object: GroundObject, renderer: (type: number) => ObjectSpriteRenderer) => {
+		if (object.seaState === undefined) {
+			renderObject(width, height, frame, scale)(context)(object, renderer(object.type))
+			corners(width, height, frame)(context)(object, renderer)
+			return
+		}
+		const seaBase = { type: SEA_TYPE, state: object.seaState, corners: object.seaCorners }
+		renderObject(width, height, frame, scale)(context)(seaBase, renderer(SEA_TYPE))
+		// A Bridge / High Bridge (connector 4) rides the Sea underlay just like an ocean
+		// obstacle, but its deck spans the whole tile at full size (no coastline shrink),
+		// and its shore inner-corners are part of the water UNDER it — so draw them before
+		// the deck. Drawn after (as an obstacle does) a diagonal bank paints over the
+		// deck and chops its corner.
+		if (terrainData[object.type].connector === 4) {
+			corners(width, height, frame)(context)(seaBase, renderer)
+			renderObject(width, height, frame, scale)(context)(object, renderer(object.type))
+			return
+		}
+		// An ocean obstacle shrinks against land so the shore reads around it, then draws
+		// the inner-corner land LAST so a diagonal bank is never buried under it.
+		const touchesLand = object.seaState !== 0 || (object.seaCorners?.length ?? 0) > 0
+		if (touchesLand) {
+			renderObjectInset(width, height, frame, scale, OCEAN_OBSTACLE_SCALE)(context)(
+				object,
+				renderer(object.type)
+			)
+		} else {
+			renderObject(width, height, frame, scale)(context)(object, renderer(object.type))
+		}
+		corners(width, height, frame)(context)(seaBase, renderer)
 	}
 
 const conditionally =

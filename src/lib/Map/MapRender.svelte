@@ -24,6 +24,7 @@
 	import {
 		connectionDecision,
 		cornerDecision,
+		seaUnderlayDecision,
 		skyConnectionDecision,
 		skyFlowReversed,
 	} from '$lib/Sprites/spriteConnector'
@@ -269,6 +270,13 @@
 		const tile = y * map.cols + x
 		const state = $gameState
 		if (state.phase !== 'playing') return false
+		// The hover marker is a "you can act on this" cue, so it must track the
+		// viewing player, not whoever's turn it is. On an opponent's turn their
+		// un-acted units are still selectable by the turn's rules — painting the
+		// marker on them under fog handed the player a cursor to sweep for hidden
+		// enemies. Only the local player ever selects on this board (non-local
+		// teams are CPU), so gate the cue to our own turn.
+		if (state.currentTeam !== localTeam) return false
 		const unit = map.layers.units[tile]
 		if (unit) return canSelectUnit(unit, tile, state)
 		const building = map.layers.buildings[tile]
@@ -318,6 +326,12 @@
 		map.layers.ground.forEach((object, index) => {
 			object.state = connectionDecision(object)(map, index)
 			object.corners = cornerDecision(object)(map, index)
+			// Singular ocean obstacles (Reef / Archipelago / Rock Formation) that touch
+			// land get a Sea coastline drawn beneath them; paint reads these two hints to
+			// composite the shore and shrink the obstacle. Undefined everywhere else.
+			const underlay = seaUnderlayDecision(object)(map, index)
+			object.seaState = underlay?.state
+			object.seaCorners = underlay?.corners
 		})
 		// Weather autotiles too: the Jetstream picks a directional frame from its
 		// same-type sky neighbours so a run of tiles flows as one connected highway
@@ -421,6 +435,7 @@
 			{colorizer}
 			{select}
 			{campaign}
+			{editor}
 			let:interfacer
 			let:renderData
 			let:select

@@ -216,6 +216,12 @@ add unit: 1,"Annihilator Tank",15,5
 <when team 1 units "Warmachine" == 1>
 move: 18,13
 talk Kael: "My last engine. Then take it, if you can reach it. Everything I have left, into the water. Drown them ALL."
+talk Kael: "And I will not cower behind the water. I am throwing spans across the bay. My whole army crosses to the engine now, over the sea and under it. Break yourself on all of it."
+terrain: "High Bridge",14,14
+terrain: "High Bridge",15,14
+terrain: "High Bridge",16,14
+terrain: "High Bridge",19,11
+terrain: "High Bridge",19,12
 weather: "Storm",17,15
 weather: "Storm",18,15
 weather: "Storm",19,15
@@ -225,7 +231,7 @@ weather: "Storm",16,18
 add unit: 1,"Battle Cruiser",22,18
 add unit: 1,"Corvette",18,18
 add unit: 1,"Petrel Stormrider",19,17
-talk Vance: "He is throwing the whole fleet across that last machine and the storm has swallowed the bay. This is it, Reyes. One engine between you and the end of the war. Land the assault and finish it."
+talk Vance: "He has bridged the island to the mainland, Reyes. High spans, so his hulls still slip beneath them while his armor pours across the top. Two turrets and a jammer truck are dug in on that rock, and the jammer walls the air right out. You want that engine, you take the bridges and go in on the ground."
 </when>
 
 <when team 1 units "Battle Cruiser","Corvette","Hunter Support","U-Boat" == 0>

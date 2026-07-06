@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import { terrainRenderer } from '$lib/GameData/terrain'
-	import { skyRenderer } from '$lib/GameData/sky'
+	import { terrainData, terrainRenderer } from '$lib/GameData/terrain'
+	import { skyData, skyRenderer } from '$lib/GameData/sky'
 	import { attacksRenderer, unitData, unitRenderer } from '$lib/GameData/unit'
-	import { buildingRenderer } from '$lib/GameData/building'
+	import { buildingData, buildingRenderer } from '$lib/GameData/building'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
 	import type { imageColorizer } from '$lib/Sprites/imageColorizer'
 	import type { createImageLoader } from '$lib/Sprites/images'
@@ -40,6 +40,9 @@
 	export let select = (x: number, y: number) => {}
 	/** When set, this level is a scripted campaign level (K1 parse output). */
 	export let campaign: CutsceneScript | undefined = undefined
+	/** Map-editor mode: warm every terrain/weather sprite up front so a freshly
+	 * painted type (one not yet present on the map) never renders as a blank tile. */
+	export let editor = false
 
 	let validTile = (x: number, y: number) => x < map.cols && y < map.rows
 
@@ -98,7 +101,11 @@
 		// Mining swaps a deposit's ground type mid-match (Enriched → Ore → Depleted),
 		// so also preload every tier reachable from the deposits actually present —
 		// same blank-tile failure mode as script-swapped terrain otherwise.
-		const groundTypes = withScript(map.filters.ground(map.layers.ground), scriptTypes.ground)
+		// The editor palette can paint any type, so warm them all — same blank-tile
+		// failure mode as script-swapped terrain, but for every unused type at once.
+		const groundTypes = editor
+			? terrainData.map((_, index) => index)
+			: withScript(map.filters.ground(map.layers.ground), scriptTypes.ground)
 		// A Scorcher burns Forest to Charred Forest mid-match; warm that result too or
 		// a freshly-scorched tile paints blank (same failure mode as mining above).
 		const mutableGround = withScript(
@@ -113,7 +120,11 @@
 			},
 			sky: {
 				...store.sky,
-				...sky(withScript(map.filters.sky(map.layers.sky), scriptTypes.sky)),
+				...sky(
+					editor
+						? skyData.map((_, index) => index)
+						: withScript(map.filters.sky(map.layers.sky), scriptTypes.sky)
+				),
 			},
 			// Preload every unit type's idle/move sprite, not just the ones standing
 			// on the initial map. Factories can build types that weren't placed at
@@ -129,7 +140,9 @@
 			buildings: {
 				...store.buildings,
 				...buildings(
-					withScript(map.filters.buildings(map.layers.buildings), scriptTypes.buildings)
+					editor
+						? buildingData.map((_, index) => index)
+						: withScript(map.filters.buildings(map.layers.buildings), scriptTypes.buildings)
 				),
 			},
 			animation: { ...store.animation, ...animation(animationData.map((_, index) => index)) },

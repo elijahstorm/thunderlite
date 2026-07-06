@@ -313,9 +313,14 @@ export const terrainData: TerrainData[] = [
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
-		connector: 0,
+		// connector 2 (random) like Forest / Mountain: a 5-column sheet whose variant
+		// is chosen per tile by `location % 5` (see spriteConnector.random). All five
+		// are the same riveted steel barricade taking escalating battle damage (pristine,
+		// dented, shell-holed, scorched, blown open), so a wall of ramparts reads as one
+		// emplacement under fire. Art: tools/sprites/gen_terrain_rampart.py.
+		connector: 2,
 		name: 'Rampart',
-		description: 'A solid wall. Impassable, and indirect fire cannot reach past it.',
+		description: 'A fortified barrier. Impassable, and indirect fire cannot reach past it.',
 		details: 'impassable',
 		ocean: false,
 		protection: 0,

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { writable } from 'svelte/store'
+	import { onMount } from 'svelte'
 	import { addToast } from 'as-toast'
+	import { browser } from '$app/environment'
 	import { goto } from '$app/navigation'
 	import { Modal } from 'flowbite-svelte'
 	import MapRender from './MapRender.svelte'
@@ -12,6 +14,7 @@
 	import { mapStore, playMapStore } from './mapStore'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
+	import { clearDraft, loadDraft, saveDraft } from './Editor/editorDraft'
 	import { publishMap, shareLink } from './Editor/mapShare'
 	import { renderMapThumbnail } from './Editor/mapThumbnail'
 	import { skyData } from '$lib/GameData/sky'
@@ -54,6 +57,11 @@
 	// Persists across placements so several loaded transports drop without reselecting.
 	let cargoType: number | null = null
 	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
+	// Whether we arrived here mid-session with a live draft still in memory (e.g.
+	// bounced back from the Play page). That in-memory map is always the freshest
+	// copy, so we must never clobber it with a (possibly older) localStorage
+	// recovery — only a genuinely fresh load (reload / crash) triggers recovery.
+	const resumedFromMemory = $mapStore != null
 
 	/** Brushes that place a team-owned object (so the team picker is shown). */
 	const teamedBrush = (brush: Brush) => brush === 'units' || brush === 'buildings'
@@ -178,6 +186,10 @@
 		if (!result) return null
 		if (!currentMapId) {
 			currentMapId = result.id
+			// This draft was autosaved under the shared `new` slot; it now lives under
+			// its own id, so drop the `new` backup or a future blank editor would
+			// recover this map into it. Ongoing edits re-draft under the id slot.
+			clearDraft(undefined)
 			await goto(`/editor/${result.id}`, { replaceState: true, noScroll: true, keepFocus: true })
 		}
 		return result.id
@@ -235,6 +247,28 @@
 	]
 
 	$: mapStore.set(map)
+
+	// Continuously back the working draft up to localStorage (debounced) so an
+	// accidental reload or a browser crash can't lose unsaved work. Skipped on the
+	// server; scoped by map id so distinct maps don't overwrite each other.
+	let autosaveTimer: ReturnType<typeof setTimeout> | undefined
+	$: if (browser && map) {
+		clearTimeout(autosaveTimer)
+		const snapshot = map
+		autosaveTimer = setTimeout(() => saveDraft(snapshot, currentMapId), 500)
+	}
+
+	// On a fresh load (not a mid-session return), restore any autosaved draft for
+	// this editing context — but only when it actually differs from what we'd
+	// otherwise show, so a clean reload doesn't nag with a recovery toast.
+	onMount(() => {
+		if (resumedFromMemory) return
+		const recovered = loadDraft(currentMapId)
+		if (recovered && recovered.hash !== mapHasher(map)) {
+			map = recovered.map
+			addToast('Recovered unsaved changes from your last session')
+		}
+	})
 </script>
 
 <div class="flex h-full min-h-0 flex-col bg-background text-foreground select-none">
@@ -637,13 +671,18 @@
 {/snippet}
 
 {#snippet terrainImg(tType: number)}
+	<!-- The sea-obstacle sprites (Reef / Archipelago / Rock Formation) and the bridge
+	     decks (connector 4) have their water knocked out to transparency (drawn over live
+	     water in-game), so back every ocean terrain and bridge with a water tone in the
+	     palette. Opaque tiles (Sea / Shore) hide it. -->
 	<img
 		class="pointer-events-none min-w-fit object-cover object-top-left"
 		src={terrainData[tType].url}
 		alt={terrainData[tType].name}
-		style="margin: {-terrainData[tType].yOffset}px {-terrainData[tType].xOffset}px 0 {-(
-			terrainData[tType].editorState ?? 0
-		) * 60}px;"
+		style="{terrainData[tType].ocean || terrainData[tType].connector === 4
+			? 'background-color: #3c6bbe;'
+			: ''} margin: {-terrainData[tType].yOffset}px {-terrainData[tType]
+			.xOffset}px 0 {-(terrainData[tType].editorState ?? 0) * 60}px;"
 	/>
 {/snippet}
 
@@ -666,8 +705,14 @@
 {/snippet}
 
 {#snippet skyImg(sType: number)}
+	<!-- Weather sprites are mostly white (clouds, rain, snow) with transparency, so
+	     they disappear against the light palette button. Sit them on a dark sky-like
+	     wash — matching how they read over the map — so each one is legible. -->
+	<div
+		class="pointer-events-none absolute inset-0 bg-linear-to-b from-slate-700 to-slate-900"
+	></div>
 	<img
-		class="pointer-events-none min-w-fit object-cover object-top-left"
+		class="pointer-events-none relative min-w-fit object-cover object-top-left"
 		src={skyData[sType].url}
 		alt={skyData[sType].name}
 		style="margin: {-skyData[sType].yOffset}px {-skyData[sType].xOffset}px 0 0;"

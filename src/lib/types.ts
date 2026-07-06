@@ -19,6 +19,13 @@ type GroundObject = ObjectType &
 		// the base tile. A water tile can need several at once, which `state` alone
 		// (one frame) can't express. Recomputed alongside `state`; see spriteConnector.
 		corners?: number[]
+		// Transient render hints for a singular ocean obstacle (Reef / Archipelago /
+		// Rock Formation) that touches land: the Sea coastline border frame and inner
+		// corners to draw *beneath* the obstacle so the shore reads around it. Undefined
+		// for every other tile and for obstacles sitting in open water. Recomputed
+		// alongside `state`; see spriteConnector.seaUnderlayDecision and paint.ts.
+		seaState?: number
+		seaCorners?: number[]
 	}
 type SkyObject = ObjectType &
 	AnimatedObject & {

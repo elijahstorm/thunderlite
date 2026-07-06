@@ -153,7 +153,7 @@ const descriptions: Partial<Record<ModifierKey, string>> = {
 	'Can_Attack.Counter_Range': 'Can return fire even against attackers striking from range.',
 	'Move.Radar':
 		'Sweeps the surrounding area as it moves, revealing hidden enemies within its range.',
-	'Idle.Jamming': 'While stationary, jams enemy sensors and stealth nearby.',
+	'Idle.Jamming': 'While stationary, its jamming field walls off the surrounding airspace, blocking enemy aircraft from flying through it.',
 	'Self_Action.Miner': 'Can mine resources from the terrain.',
 	'Self_Action.Builder': 'Can construct structures or fortifications.',
 	'Death.Insta_Lose':

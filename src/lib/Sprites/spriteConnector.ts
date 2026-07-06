@@ -9,7 +9,30 @@ type CornerDecision = (map: MapObject, location: number) => number[]
 // Charred Forest scar), `ocean` matches any water body (the Sea border). Defined up
 // here because `flowDecision` binds them into its border decisions at module load.
 const type = (map: GroundObject[], location: number) => map[location].type
-const ocean = (map: GroundObject[], location: number) => terrainData[map[location].type].ocean
+
+// A bridge deck spans open water and bakes its own banks into the sprite, so for
+// coastline autotiling it reads as water: neighbouring sea flows straight under the
+// deck instead of drawing a shoreline (and its diagonal inner-corners) against it.
+// Gameplay still treats a low Bridge as non-ocean — this only affects how the
+// surrounding water tiles pick their border frames. Connector 4 is Bridge / High
+// Bridge (see `flowDecision`).
+const ocean = (map: GroundObject[], location: number) => {
+	const t = terrainData[map[location].type]
+	return t.ocean || t.connector === 4
+}
+
+// Road decks and both bridge kinds form one continuous path, so a road autotiles
+// straight onto a bridge (and vice versa) instead of dead-ending at the bank.
+// Canyon shares connector 1 (`rollInto`) but stays out of the family, so it keeps
+// matching only its own type. `PATH_TOKEN` is a sentinel below the 0-based type
+// range so it can never collide with a real terrain index.
+const PATH_TOKEN = -1
+const isPath = (t: number) => terrainData[t].name === 'Road' || terrainData[t].connector === 4
+const path = (map: GroundObject[], location: number) => {
+	const t = map[location].type
+	return isPath(t) ? PATH_TOKEN : t
+}
+
 type Reader = typeof type | typeof ocean
 
 export const connectionDecision = (object: GroundObject) =>
@@ -60,12 +83,30 @@ const borderCornersWith =
 
 const singular: ConnectionDecision = (map, location) => 0
 
-const rollInto: ConnectionDecision = (map, location) =>
-	rollDecision[left(map, location) ? 'true' : 'false'][up(map, location) ? 'true' : 'false'][
-		right(map, location) ? 'true' : 'false'
-	][down(map, location) ? 'true' : 'false']
+// Directional 16-frame autotile (indexed by `rollDecision`): the frame is chosen by
+// which cardinal neighbours "connect" under `reader`. Roads connect along the path
+// family; a bridge deck connects to any bank (see the readers below).
+const rollIntoWith =
+	(reader: Reader): ConnectionDecision =>
+	(map, location) =>
+		rollDecision[left(map, location, reader) ? 'true' : 'false'][
+			up(map, location, reader) ? 'true' : 'false'
+		][right(map, location, reader) ? 'true' : 'false'][down(map, location, reader) ? 'true' : 'false']
 
-const random: ConnectionDecision = (map, location) => location % 5
+// `location % 5` walks 0,1,2,3,4,0,1… straight across each row, so adjacent tiles
+// almost always differ by exactly one frame and the map reads as diagonal stripes.
+// Instead mix the row and column through an integer hash before folding to 5 frames:
+// the result is still a pure function of the tile's position (so a tile keeps its
+// frame across reloads) but neighbours land on uncorrelated frames, which reads as
+// random scatter without ever storing per-tile state.
+const random: ConnectionDecision = (map, location) => {
+	const col = location % map.cols
+	const row = (location / map.cols) | 0
+	let h = (col * 0x1f1f1f1f) ^ (row * 0x27d4eb2d)
+	h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
+	h ^= h >>> 13
+	return (h >>> 0) % 5
+}
 
 const borderWith =
 	(reader: Reader): ConnectionDecision =>
@@ -76,19 +117,57 @@ const borderWith =
 			down(map, location, reader) ? 'true' : 'false'
 		]
 
-const bridge: ConnectionDecision = (map, location) =>
-	up(map, location) || down(map, location) ? 1 : 0
+// A bridge deck lands on any solid bank (or another path/bridge tile) and spans
+// only open water, so for the deck autotile a neighbour "connects" when it is NOT
+// open water. This reads the RAW ocean flag rather than the `ocean` coastline
+// reader above (which counts a bridge as water) so two stacked bridge tiles still
+// read as connected to each other. A normal river crossing has banks on one axis
+// and water on the other, so it resolves to a straight deck; a bend or junction
+// only appears where three-plus sides are solid.
+const landward = (map: GroundObject[], location: number) =>
+	terrainData[map[location].type].ocean ? 0 : 1
 
-// Indexed by TerrainData.connector: 0 singular, 1 rollInto, 2 random, 3 sea-border
-// (ocean), 4 bridge, 5 type-border (a scar autotiling against its own type).
+// Indexed by TerrainData.connector: 0 singular, 1 rollInto (path family), 2 random,
+// 3 sea-border (ocean), 4 bridge deck (rollInto against banks), 5 type-border (a
+// scar autotiling against its own type).
 const flowDecision: ConnectionDecision[] = [
 	singular,
-	rollInto,
+	rollIntoWith(path),
 	random,
 	borderWith(ocean),
-	bridge,
+	rollIntoWith(landward),
 	borderWith(type),
 ]
+
+// Reef, Archipelago and Rock Formation are singular obstacle sprites flagged
+// `ocean` (see terrainData): the surrounding Sea coastline flows straight *under*
+// them (the `ocean` reader counts them as water) and, being singular (connector 0),
+// they paint no shoreline of their own. Their sprites' water background is knocked
+// out to transparency (see tools/sprites/gen_terrain_sea_obstacles.py) so the
+// renderer draws a Sea tile beneath them and only the reef/rock feature on top —
+// otherwise the obstacle's own baked water covered the shore (and inner-corner land)
+// a Sea tile beneath it would draw, leaving a gap against the bank.
+//
+// This returns the Sea tile to draw underneath as a border `state` + inner `corners`,
+// computed exactly as a Sea tile would (borderWith / borderCornersWith against
+// `ocean`), or null when the tile isn't an ocean obstacle. In open water this is
+// state 0 (plain water) — still needed, since the obstacle is transparent and has no
+// water of its own anymore.
+const isOceanObstacle = (t: number) => terrainData[t].ocean && terrainData[t].connector === 0
+// Bridge / High Bridge (connector 4): their deck sprites are cut out over transparent
+// water too (see tools/sprites/gen_bridge.py), so they ride the same Sea underlay — the
+// water (and the shore where the deck meets a bank) reads beneath the span. Unlike an
+// obstacle the deck draws full size, not shrunk (see paint.ts groundLayer).
+const isBridge = (t: number) => terrainData[t].connector === 4
+const seaBorder = borderWith(ocean)
+const seaBorderCorners = borderCornersWith(ocean)
+
+export const seaUnderlayDecision =
+	(object: GroundObject) =>
+	(map: MapObject, location: number): { state: number; corners: number[] } | null => {
+		if (!isOceanObstacle(object.type) && !isBridge(object.type)) return null
+		return { state: seaBorder(map, location), corners: seaBorderCorners(map, location) }
+	}
 
 const rollDecision = {
 	true: {
