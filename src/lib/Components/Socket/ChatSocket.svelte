@@ -12,12 +12,14 @@
 		target: string
 	}
 
-	// Chat rides the DontCode realtime service on one shared broadcast channel,
-	// mirroring the retired standalone chat-server (which broadcast every
-	// message to every connected client and let ChatList/ChatRoom filter by
-	// source/target). The connection token is minted by /api/realtime, so only
-	// signed-in users can join.
-	const CHAT_CHANNEL = 'chat:global'
+	// Chat rides the DontCode realtime service. Each client joins two channels:
+	//   chat:global — presence only, so /api/chat/online can list who's signed in
+	//   dm:{myAuth} — this user's private inbox; DMs are published here by the
+	//                 server (see /api/user/[userAuth]/message), so nobody else's
+	//                 conversation ever reaches this client.
+	// The connection token is minted by /api/realtime (identity = profile auth).
+	const PRESENCE_CHANNEL = 'chat:global'
+	const inboxChannel = (auth: string) => `dm:${auth}`
 
 	const socketMessages = writable<
 		(SocketMessage & {
@@ -34,17 +36,12 @@
 	/** Realtime is not served here (e.g. local mock gateway) — disable chat quietly. */
 	let unavailable = false
 
-	const populate = (props: SocketMessage) => conn?.publish(CHAT_CHANNEL, props)
-
 	const onChatMessage = (incoming: RealtimeMessage) => {
 		const data = incoming.payload as SocketMessage | undefined
 		if (!data?.message) return
-		// The sender already rendered its own message locally (see ChatRoom);
-		// drop the copy if the service echoes publishes back to their origin.
+		// Only our own inbox delivers here, but guard anyway: never echo our own
+		// sends (ChatRoom renders those optimistically) or anything misaddressed.
 		if (data.source && data.source === currentAuth) return
-		// One global channel carries every user's messages, so drop anything not
-		// addressed to us — otherwise other people's conversations leak into this
-		// client's chat list and open chat room.
 		if (data.target && data.target !== currentAuth) return
 		$socketMessages = [
 			...$socketMessages,
@@ -59,12 +56,13 @@
 	let currentAuth: string | null = null
 
 	const connect = async () => {
-		if (conn || unavailable) return
+		if (conn || unavailable || !currentAuth) return
+		const inbox = inboxChannel(currentAuth)
 		const attempt = new RealtimeConnection({
-			channels: [CHAT_CHANNEL],
+			channels: [PRESENCE_CHANNEL, inbox],
 			onStatus: (connected) => (opened = connected),
 		})
-		attempt.subscribe(CHAT_CHANNEL, onChatMessage)
+		attempt.subscribe(inbox, onChatMessage)
 		try {
 			await attempt.open()
 			conn = attempt
@@ -112,7 +110,7 @@
 {#if error}
 	<div class="fixed"></div>
 {:else}
-	<slot {populate} {socketMessages}></slot>
+	<slot {socketMessages}></slot>
 
 	{#if opened === false}
 		<div class="fixed bottom-0 group" in:fly={{ y: -20 }} out:fly={{ y: -20 }}>

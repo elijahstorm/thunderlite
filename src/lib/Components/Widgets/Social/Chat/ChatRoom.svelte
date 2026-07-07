@@ -8,7 +8,6 @@
 	import ChatInput from './ChatInput.svelte'
 	import ChatHeader from './ChatHeader.svelte'
 
-	export let populate: (props: { message: string; source: string; target: string }) => void
 	export let socketMessages: Writable<
 		(MessageDBData & {
 			created_at: Date
@@ -81,20 +80,15 @@
 	const populateMessage = (data: { detail: { message: string } }) => {
 		const { message } = data.detail
 		if (!message) return
-		populate({
-			target,
-			source,
-			message,
-		})
+		// Optimistic render; the ChatInput form POST persists it and the server
+		// pushes it to the recipient's inbox (see /api/user/[userAuth]/message).
 		$allMessages = [
-			...[
-				{
-					target,
-					source,
-					message,
-					created_at: new Date(),
-				},
-			],
+			{
+				target,
+				source,
+				message,
+				created_at: new Date(),
+			},
 			...$allMessages,
 		]
 	}

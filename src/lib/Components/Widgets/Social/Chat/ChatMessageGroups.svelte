@@ -35,33 +35,28 @@
 </script>
 
 {#if sourceUser && targetUser && (messageGroup.user === sourceUser.auth || messageGroup.user === targetUser.auth)}
-	<div class="flex items-end" class:justify-end={messageGroup.user === sourceUser.auth}>
-		<div
-			class="flex flex-col space-y-2 text-xs max-w-xs w-full mx-2 items-start"
-			class:order-2={messageGroup.user === targetUser.auth}
-		>
-			<p class="truncate text-xs text-center self-center text-gray-600 opacity-80 w-full pt-1">
+	{@const mine = messageGroup.user === sourceUser.auth}
+	<div class="flex items-end gap-2" class:justify-end={mine} class:flex-row-reverse={mine}>
+		<div class="flex-shrink-0">
+			<UserIcon user={mine ? sourceUser : targetUser} noClick size={1.75} />
+		</div>
+		<div class="flex flex-col gap-1 max-w-[75%]" class:items-end={mine}>
+			<p class="text-[11px] text-muted-foreground px-1">
 				{shortenDate(new Date(messageGroup.messages[0].created_at))}
 			</p>
 			{#each messageGroup.messages as message, index (`${new Date(message.created_at).getTime()}_${message.message}`)}
 				<div
-					class="px-4 py-2 rounded-lg inline-block bg-gray-300 text-gray-600"
-					class:self-end={messageGroup.user === sourceUser.auth}
-					class:bg-gray-300={messageGroup.user === targetUser.auth}
-					class:text-gray-600={messageGroup.user === targetUser.auth}
-					class:bg-blue-600={messageGroup.user === sourceUser.auth}
-					class:text-white={messageGroup.user === sourceUser.auth}
-					class:rounded-bl-none={messageGroup.user === targetUser.auth &&
-						index === messageGroup.messages.length - 1}
-					class:rounded-br-none={messageGroup.user === sourceUser.auth &&
-						index === messageGroup.messages.length - 1}
+					class="px-3 py-2 rounded-2xl text-sm break-words w-fit"
+					class:bg-brand-500={mine}
+					class:text-white={mine}
+					class:bg-muted={!mine}
+					class:text-foreground={!mine}
+					class:rounded-br-sm={mine && index === messageGroup.messages.length - 1}
+					class:rounded-bl-sm={!mine && index === messageGroup.messages.length - 1}
 				>
 					{message.message}
 				</div>
 			{/each}
-		</div>
-		<div class:order-2={messageGroup.user === sourceUser.auth}>
-			<UserIcon user={messageGroup.user === targetUser.auth ? targetUser : sourceUser} noClick />
 		</div>
 	</div>
 {/if}

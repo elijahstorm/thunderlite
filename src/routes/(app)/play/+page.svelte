@@ -8,6 +8,7 @@
 	import { dev } from '$app/environment'
 	import PathDebugPanel from '$lib/Engine/Interactor/Pathing/PathDebugPanel.svelte'
 	import PlayerRosterSync from '$lib/Engine/HUD/PlayerRosterSync.svelte'
+	import GameChat from '$lib/Components/Socket/GameChat.svelte'
 	import { derivePlayersFromMap } from '$lib/Engine/gameState'
 
 	export let data: PageData
@@ -60,6 +61,9 @@
 			</GameStateManager>
 		</GameSocket>
 	</MapLoader>
+
+	<!-- Realtime group chat for this room; click a name to open a private DM. -->
+	<GameChat session={gameSession} roster={data.roster ?? []} />
 
 	<!-- DEV TOOL — movement/pathfinding diagnostics. dev-only (stripped from prod). -->
 	{#if dev}

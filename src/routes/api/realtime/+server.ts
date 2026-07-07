@@ -12,25 +12,35 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
  *
  * Channel policy:
  *   game:{session} — members of that game room only
- *   chat:global    — any signed-in user
+ *   chat:{session} — members of that game room only (ephemeral group chat)
+ *   chat:global    — any signed-in user (presence backbone for "who's online")
+ *   dm:{auth}      — a user's own private mailbox; only that user may join it
  *
- * Identity is the caller's opaque `userSession` (server-derived, unspoofable,
- * not a secret), so channel presence lines up with game_member rows.
+ * Identity depends on the channel set. Game channels use the opaque `userSession`
+ * so presence lines up with game_member rows. Chat/DM channels use the profile
+ * `auth` id so `presence('chat:global')` yields ids we can hydrate to profiles
+ * for the online-users list (see /api/chat/online).
  */
 
 /** Token lifetime. Long enough for a play session; the client re-mints on reconnect. */
 const TOKEN_TTL_SECONDS = 60 * 60
 
-const authorizeChannel = async (channel: string, userSession: string): Promise<boolean> => {
+const authorizeChannel = async (
+	channel: string,
+	{ auth, userSession }: { auth: string; userSession: string }
+): Promise<boolean> => {
 	if (channel === 'chat:global') return true
-	const game = channel.match(/^game:(.+)$/)
-	if (game) return gameStore.isMember(game[1], userSession)
+	const dm = channel.match(/^dm:(.+)$/)
+	if (dm) return dm[1] === auth // you may only listen on your own mailbox
+	const room = channel.match(/^(?:game|chat):(.+)$/)
+	if (room) return gameStore.isMember(room[1], userSession)
 	return false
 }
 
 export const POST = async ({ request, locals }) => {
 	const userSession = locals.session
-	if (!userSession) throw error(401, 'User not logged in')
+	const auth = locals.user
+	if (!userSession || !auth) throw error(401, 'User not logged in')
 
 	let body: unknown
 	try {
@@ -45,15 +55,21 @@ export const POST = async ({ request, locals }) => {
 	const channels = requested.map(String)
 
 	for (const channel of channels) {
-		if (!(await authorizeChannel(channel, userSession))) {
+		if (!(await authorizeChannel(channel, { auth, userSession }))) {
 			throw error(403, `Not allowed to join channel ${channel}`)
 		}
 	}
 
+	// Game channels need `userSession` identity (matches game_member rows); chat
+	// and DM channels need the profile `auth` so presence resolves to profiles.
+	const identity = channels.some((channel) => channel.startsWith('game:'))
+		? userSession
+		: auth
+
 	try {
 		const token = await realtime.mintToken({
 			channels,
-			identity: userSession,
+			identity,
 			ttl: TOKEN_TTL_SECONDS,
 		})
 		return json(token)

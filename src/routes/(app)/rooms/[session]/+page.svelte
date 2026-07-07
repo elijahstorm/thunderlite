@@ -6,6 +6,9 @@
 	import Icon from '@iconify/svelte'
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
+	import GameChat from '$lib/Components/Socket/GameChat.svelte'
+	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 
 	export let data: PageData
@@ -162,19 +165,34 @@
 
 			<ul class="space-y-2" data-testid="lobby-seats">
 				{#each seatSlots as i (i)}
+					{@const player = data.roster?.[i] ?? null}
 					<li
 						class="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
 						class:opacity-50={i >= count}
 					>
-						<Icon
-							icon={i < count ? 'lucide:user-check' : 'lucide:user'}
-							width={16}
-							class={i < count ? 'text-foreground' : 'text-muted-foreground'}
-						/>
-						<span class="text-foreground">
-							{i === 0 ? 'Host' : `Player ${i + 1}`}
-							{#if i === seat}<span class="text-muted-foreground">(you)</span>{/if}
-						</span>
+						{#if player}
+							<UserIcon user={player} noClick size={1.75} />
+						{:else}
+							<Icon
+								icon={i < count ? 'lucide:user-check' : 'lucide:user'}
+								width={16}
+								class={i < count ? 'text-foreground' : 'text-muted-foreground'}
+							/>
+						{/if}
+						{#if player && i !== seat}
+							<button
+								type="button"
+								class="text-foreground hover:underline"
+								on:click={() => openDmWith.set(player.auth)}
+							>
+								{player.display_name || player.username}
+							</button>
+						{:else}
+							<span class="text-foreground">
+								{player?.display_name || player?.username || (i === 0 ? 'Host' : `Player ${i + 1}`)}
+								{#if i === seat}<span class="text-muted-foreground">(you)</span>{/if}
+							</span>
+						{/if}
 						<span class="ml-auto text-xs text-muted-foreground">
 							{i < count ? 'Ready' : 'Waiting…'}
 						</span>
@@ -228,3 +246,6 @@
 		</section>
 	</div>
 </ContentWithFooter>
+
+<!-- Realtime group chat while the room fills; click a name to open a private DM. -->
+<GameChat session={data.session} roster={data.roster ?? []} />

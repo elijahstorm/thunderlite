@@ -11,8 +11,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 		'/play',
 		'/make',
 		'/rooms',
+		'/chat',
 		'/api/game',
 		'/api/realtime',
+		'/api/chat',
 		'/api/user',
 		'/api/upload',
 	]

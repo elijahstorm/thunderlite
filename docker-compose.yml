@@ -1,10 +1,51 @@
-# Local dev stack. Auth, database, and file storage are DontCode platform
-# services; for local dev run the bundled mock gateway on your host
-# (`pnpm mock`, see .env.example) and this stack reaches it automatically.
-# DONTCODE_API_KEY comes from .env.local. KV and realtime are also DontCode
-# services (hosted gateway only — the mock doesn't serve them yet), so no
-# side containers are needed anymore.
+# Local dev stack: the SvelteKit app plus the DontCode mock gateway.
+#
+# `docker compose up` now brings up BOTH — you no longer run `pnpm mock` on the
+# host. Auth, database, storage, KV cache, and realtime pub/sub are all served
+# by the `mock` container (@dontcode2/backend >= 0.2.4).
+#
+# Ports follow a `localhost:1<port>` convention so they never collide with a
+# host-side `pnpm dev`/`pnpm mock`:
+#     app  → container 5173  → http://localhost:15173
+#     mock → container 14000 → http://localhost:14000   (HTTP + realtime WS + KV)
+#
+# Why the mock runs on 14000 INSIDE the container (not its usual 4000): the mock
+# hands the browser absolute URLs for the realtime WebSocket (ws://localhost:<port>)
+# and for public storage objects (http://localhost:<port>/__storage/...). The
+# browser is on your host, so those must point at the host-mapped port. Keeping
+# the internal and published port identical (14000:14000) makes the advertised
+# URL correct without the mock needing to know its external address.
+#
+# After the first `up`, apply the schema against the mock once (from the host):
+#     DONTCODE_API_URL=http://localhost:14000 pnpm migrate
 services:
+  mock:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # Bind 0.0.0.0 so both the host port mapping and the `app` container can
+    # reach it; --port matches the published port (see header note).
+    command: pnpm exec dontcode-mock --host 0.0.0.0 --port ${DONTCODE_MOCK_PORT:-14000} --data-dir /data
+    ports:
+      - '127.0.0.1:${DONTCODE_MOCK_PORT:-14000}:${DONTCODE_MOCK_PORT:-14000}'
+    # No api-key pinning: the mock accepts any dc_… bearer by default, so it
+    # always agrees with whatever DONTCODE_API_KEY the app loads from .env.local.
+    volumes:
+      # Persist Postgres/auth/storage across restarts (KV is in-memory by design).
+      - mock_data:/data
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:${DONTCODE_MOCK_PORT:-14000}/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
   app:
     build:
       context: .
@@ -16,17 +57,18 @@ services:
     environment:
       CI: 'true'
       NODE_ENV: development
-      # The mock gateway runs on the host (`pnpm mock`); from inside the
-      # container the host is `host.docker.internal`, not localhost. This
-      # overrides whatever DONTCODE_API_URL is set in .env.local.
-      DONTCODE_API_URL: http://host.docker.internal:${DONTCODE_MOCK_HOST_PORT:-4000}
-    extra_hosts:
-      # Make host.docker.internal resolve on Linux engines too (Docker
-      # Desktop already provides it).
-      - 'host.docker.internal:host-gateway'
+      # Reach the mock over the compose network by service name. This overrides
+      # whatever DONTCODE_API_URL is set in .env.local. The port matches the
+      # mock's published port so browser-facing URLs (realtime ws, storage) line
+      # up with what the host can reach.
+      DONTCODE_API_URL: http://mock:${DONTCODE_MOCK_PORT:-14000}
+    depends_on:
+      mock:
+        condition: service_healthy
     volumes:
       - .:/app
       - app_node_modules:/app/node_modules
 
 volumes:
   app_node_modules:
+  mock_data:

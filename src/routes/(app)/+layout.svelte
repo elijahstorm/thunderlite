@@ -3,6 +3,8 @@
 	import ChatSocket from '$lib/Components/Socket/ChatSocket.svelte'
 	import ChatList from '$lib/Components/Widgets/Social/Chat/ChatList.svelte'
 	import ChatRoom from '$lib/Components/Widgets/Social/Chat/ChatRoom.svelte'
+	import { openDmWith } from '$lib/Stores/openDm'
+	import { onDestroy } from 'svelte'
 	import { writable } from 'svelte/store'
 
 	let auth = writable<string | null>(null)
@@ -16,6 +18,16 @@
 		showChat = true
 	}
 
+	// Any descendant (game roster, group chat, profile) can request a DM by
+	// setting the shared store; we pop it open and clear the request.
+	const stopDmRequests = openDmWith.subscribe((target) => {
+		if (target) {
+			openChat(target)
+			openDmWith.set(null)
+		}
+	})
+	onDestroy(stopDmRequests)
+
 	if (browser) {
 		import('$lib/dontcode/client').then((session) => (auth = session.userAuth))
 	}
@@ -23,7 +35,7 @@
 
 <slot></slot>
 
-<ChatSocket let:populate let:socketMessages>
+<ChatSocket let:socketMessages>
 	<section
 		class="fixed sm:block right-4 z-50 rounded-t-xl overflow-clip transition-all border border-border border-b-0 bg-surface shadow-lg"
 		class:-bottom-96={!showChatList}
@@ -51,7 +63,6 @@
 		>
 			{#key chattingWith}
 				<ChatRoom
-					{populate}
 					{socketMessages}
 					source={$auth}
 					target={chattingWith}

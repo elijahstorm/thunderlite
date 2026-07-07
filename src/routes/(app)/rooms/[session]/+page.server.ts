@@ -1,6 +1,23 @@
 import { error, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { gameStore, MAX_PLAYERS } from '$lib/Game/store.server'
+import { queryUsersByAuth } from '$lib/Database/getUserData'
+import { logToErrorDb } from '$lib/Security/serverLogs.js'
+
+/** Seat-indexed public profiles for the room, so group chat can name authors. */
+const buildRoster = async (session: string, me: string): Promise<(UserDBData | null)[]> => {
+	try {
+		const seats = await gameStore.roster(session)
+		const auths = seats.map((s) => s.userAuth).filter((a): a is string => !!a)
+		const byAuth = new Map((await queryUsersByAuth(auths, me)).map((u) => [u.auth, u]))
+		return [...seats]
+			.sort((a, b) => a.seat - b.seat)
+			.map((s) => (s.userAuth ? (byAuth.get(s.userAuth) ?? null) : null))
+	} catch (msg) {
+		logToErrorDb(msg)
+		return []
+	}
+}
 
 /**
  * Pre-game lobby for a single room. Members wait here while the room fills;
@@ -13,11 +30,12 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!userSession) throw error(401, 'User not logged in')
 
 	const session = params.session
-	// Room, seat and count are independent reads — resolve them in one barrier.
-	const [room, seat, count] = await Promise.all([
+	// Room, seat, count and roster are independent reads — resolve in one barrier.
+	const [room, seat, count, roster] = await Promise.all([
 		gameStore.getRoom(session),
 		gameStore.seatOf(session, userSession),
 		gameStore.memberCount(session),
+		buildRoster(session, locals.user ?? ''),
 	])
 	if (!room) throw redirect(303, '/rooms')
 	if (seat < 0) throw redirect(303, '/rooms')
@@ -33,5 +51,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		count,
 		maxPlayers: MAX_PLAYERS,
 		startAt: room.start_at ?? null,
+		roster,
 	}
 }

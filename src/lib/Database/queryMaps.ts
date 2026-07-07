@@ -221,6 +221,40 @@ export const MAX_MAPS_PER_USER = 30
  * /my/maps library. Lighter than {@link queryMaps}: no info/like/share joins,
  * just the row metadata the library cards need, plus the remaining quota.
  */
+/**
+ * Another player's public maps, for their profile page. Same shape as the
+ * listing rows but excludes private drafts (mirrors the `status` gate in
+ * getMapById), so a profile never leaks a map its owner hasn't shared.
+ */
+export const queryUserPublicMaps: (owner: string) => Promise<{ maps: MapDBData[] }> = async (
+	owner
+) => {
+	if (!owner) return { maps: [] }
+	try {
+		const rows = await db.find<MapRow & { status: string }>('maps', {
+			where: { owner_auth: owner, status: { not: 'private' } },
+			select: MAP_LIST_COLUMNS,
+			orderBy: { updated_at: 'desc' },
+		})
+		const maps = rows.map(
+			(row) =>
+				({
+					...row,
+					type: null,
+					info: [],
+					likes: 0,
+					shares: 0,
+					trending: false,
+					liked_by_me: 0,
+				}) as unknown as MapDBData
+		)
+		return { maps }
+	} catch (msg) {
+		logToErrorDb(msg)
+		return { maps: [] }
+	}
+}
+
 export const queryMyMaps: (
 	owner: string
 ) => Promise<{ maps: MapDBData[]; limit: number; remaining: number }> = async (owner) => {
