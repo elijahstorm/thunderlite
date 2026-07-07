@@ -1,7 +1,12 @@
 <script lang="ts">
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 
-	export let noFooterOnMobile = false
+	interface Props {
+		noFooterOnMobile?: boolean
+		children?: import('svelte').Snippet
+	}
+
+	let { noFooterOnMobile = false, children }: Props = $props()
 
 	const socialLinks = [
 		{
@@ -40,7 +45,7 @@
 
 <div class="min-h-screen flex flex-col bg-background">
 	<div class="flex-1">
-		<slot></slot>
+		{@render children?.()}
 	</div>
 
 	<footer

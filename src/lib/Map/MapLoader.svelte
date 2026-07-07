@@ -1,14 +1,22 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
 	import { deriveFromHash } from './Editor/mapExporter'
 	import { playMapStore } from './mapStore'
 
-	export let mapHash: string | undefined
+	interface Props {
+		mapHash: string | undefined
+		children?: import('svelte').Snippet<[any]>
+	}
 
-	const map: MapObject = $playMapStore ?? deriveFromHash(mapHash)
+	let { mapHash, children }: Props = $props()
+
+	// Snapshot once at mount: the engine mutates this map in place, so it must not be
+	// a live derivation. `untrack` documents the deliberate one-time read of `mapHash`.
+	const map: MapObject = untrack(() => $playMapStore ?? deriveFromHash(mapHash))
 
 	// Consume the hand-off so a refresh re-derives from `mapHash` cleanly
 	// instead of replaying a mutated in-memory map.
 	playMapStore.set(null)
 </script>
 
-<slot {map}></slot>
+{@render children?.({ map })}

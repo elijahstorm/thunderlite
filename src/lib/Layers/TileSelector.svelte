@@ -7,17 +7,32 @@
 	import { campaignScriptActive } from '$lib/Campaign/scriptGate'
 	import { boardBusy } from '$lib/Engine/Animator/animator'
 
-	export let interfacer: InterfaceInteraction
-	export let select: (x: number, y: number) => void
-	export let hover: (x: number, y: number) => void
-	export let validTile: (x: number, y: number) => boolean
-	export let canSelectAt: (x: number, y: number) => boolean = () => true
-	export let mini: boolean = false
-	export let editor: boolean = false
-	export let animator: typeof Animator = Animator
+	interface Props {
+		interfacer: InterfaceInteraction
+		select: (x: number, y: number) => void
+		hover: (x: number, y: number) => void
+		validTile: (x: number, y: number) => boolean
+		canSelectAt?: (x: number, y: number) => boolean
+		mini?: boolean
+		editor?: boolean
+		animator?: typeof Animator
+		children?: import('svelte').Snippet<[any]>
+	}
 
-	const cellWidth = mini ? 20 : 60
-	const cellHeight = cellWidth
+	let {
+		interfacer = $bindable(),
+		select,
+		hover,
+		validTile,
+		canSelectAt = () => true,
+		mini = false,
+		editor = false,
+		animator = Animator,
+		children,
+	}: Props = $props()
+
+	const cellWidth = $derived(mini ? 20 : 60)
+	const cellHeight = $derived(cellWidth)
 
 	const handleClick = (_x: number, _y: number) => {
 		const [x, y] = [tileX(_x), tileY(_y)]
@@ -35,8 +50,8 @@
 	// Only the live gameplay board publishes its screen geometry — the editor and
 	// minimap never host the post-move ActionMenu, so they'd only fight over the
 	// shared store (and the minimap's tiny cells would mis-anchor it).
-	const publishesGeometry = !mini && !editor
-	let section: HTMLElement | undefined
+	const publishesGeometry = $derived(!mini && !editor)
+	let section: HTMLElement | undefined = $state()
 
 	const publishGeometry = () => {
 		if (!publishesGeometry || !section) return
@@ -52,7 +67,7 @@
 	// The DOM overlay layer that hosts the Animator (walk/attack/explosion sprites).
 	// Its scroll offset is applied imperatively (below) rather than through a Svelte
 	// prop, so it can't fall out of sync with the canvas.
-	let animatorLayer: HTMLElement | undefined
+	let animatorLayer: HTMLElement | undefined = $state()
 
 	const handleOffset = (x: number, y: number, zoom: number) => {
 		interfacer.offset = { x, y, zoom }
@@ -86,17 +101,24 @@
 		}px; width: ${cellWidth}px; height: ${cellHeight}px;`
 </script>
 
-<svelte:window on:resize={publishGeometry} />
+<svelte:window onresize={publishGeometry} />
 
 <section bind:this={section} class="grid relative w-full h-full overflow-hidden">
 	<div class="col-start-1 row-start-1 cursor-pointer">
-		<slot {handleClick} {handleHover} {handleKeypress} {handleOffset} {cellWidth} {cellHeight}
-		></slot>
+		{@render children?.({
+			handleClick,
+			handleHover,
+			handleKeypress,
+			handleOffset,
+			cellWidth,
+			cellHeight,
+		})}
 	</div>
 
 	{#if !editor}
+		{@const SvelteComponent = animator}
 		<div bind:this={animatorLayer} class="col-start-1 row-start-1 pointer-events-none">
-			<svelte:component this={animator} {cellWidth} {cellHeight} />
+			<SvelteComponent {cellWidth} {cellHeight} />
 		</div>
 	{/if}
 

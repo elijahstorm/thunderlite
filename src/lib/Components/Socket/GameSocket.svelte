@@ -13,10 +13,14 @@
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import { fly } from 'svelte/transition'
 
-	export let map: () => MapObject | undefined
-	export let gameSession: string = ''
+	interface Props {
+		map: () => MapObject | undefined
+		gameSession?: string
+		userSession?: string
+		children?: import('svelte').Snippet<[any]>
+	}
 
-	export const userSession: string = ''
+	let { map, gameSession = '', children }: Props = $props()
 
 	const POLL_INTERVAL = 1500
 	// With a live websocket, polling drops to a slow reconciliation pass that
@@ -34,7 +38,7 @@
 		return true
 	}
 
-	let multiplayer = false
+	let multiplayer = $state(false)
 	let lastEventId = -1
 	let pollTimer: ReturnType<typeof setInterval> | null = null
 	let heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -42,8 +46,8 @@
 	let realtimeConn: RealtimeConnection | null = null
 	let realtimeUp = false
 	let outgoingUnsubscribe: (() => void) | null = null
-	let requestRedraw: number = 0
-	let wrongTurn = false
+	let requestRedraw: number = $state(0)
+	let wrongTurn = $state(false)
 	let wrongTurnTimer: ReturnType<typeof setTimeout> | null = null
 	const locallyEmitted = new Set<string>()
 
@@ -241,10 +245,12 @@
 		if (outgoingUnsubscribe) outgoingUnsubscribe()
 		realtimeConn?.close()
 	})
+
+	const children_render = $derived(children)
 </script>
 
 {#if multiplayer}
-	<slot {socket} {requestRedraw}></slot>
+	{@render children?.({ socket, requestRedraw })}
 	{#if wrongTurn}
 		<div
 			class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm font-mono px-4 py-2 rounded shadow-lg z-50 pointer-events-none"
@@ -256,7 +262,9 @@
 		</div>
 	{/if}
 {:else}
-	<LocalInteracter {map} let:socket let:requestRedraw>
-		<slot {socket} {requestRedraw}></slot>
+	<LocalInteracter {map}>
+		{#snippet children({ socket, requestRedraw })}
+			{@render children_render?.({ socket, requestRedraw })}
+		{/snippet}
 	</LocalInteracter>
 {/if}

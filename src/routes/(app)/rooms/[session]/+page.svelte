@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types'
-	import { onDestroy, onMount } from 'svelte'
+	import { onDestroy, onMount, untrack } from 'svelte'
 	import { browser } from '$app/environment'
 	import { goto, invalidateAll } from '$app/navigation'
 	import Icon from '@iconify/svelte'
@@ -11,19 +11,25 @@
 	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 
-	export let data: PageData
+	interface Props {
+		data: PageData
+	}
+
+	let { data }: Props = $props()
 
 	const POLL_INTERVAL = 1500
 	const TICK_INTERVAL = 250
 
-	let count = data.count
-	let startAt: number | null = data.startAt
-	const maxPlayers = data.maxPlayers
-	$: isHost = data.isHost
-	$: teams = data.teams
-	$: members = data.members
-	$: memberByTeam = new Map(members.filter((m) => m.team != null).map((m) => [m.team, m]))
-	$: randomMembers = members.filter((m) => m.team == null)
+	let count = $state(untrack(() => data.count))
+	let startAt: number | null = $state(untrack(() => data.startAt))
+	const maxPlayers = $derived(data.maxPlayers)
+	let isHost = $derived(data.isHost)
+	let teams = $derived(data.teams)
+	let members = $derived(data.members)
+	let memberByTeam = $derived(
+		new Map(members.filter((m) => m.team != null).map((m) => [m.team, m]))
+	)
+	let randomMembers = $derived(members.filter((m) => m.team == null))
 
 	// Side labels/colours by team index (0 = red, 1 = blue, …).
 	const SIDE = [
@@ -36,8 +42,8 @@
 	const nameOf = (m: (typeof members)[number]) =>
 		m.isAi ? 'CPU' : m.isMe ? 'You' : m.user?.display_name || m.user?.username || 'Player'
 
-	let lobbyBusy = false
-	let lobbyError = ''
+	let lobbyBusy = $state(false)
+	let lobbyError = $state('')
 
 	const lobbyAction = async (body: Record<string, unknown>) => {
 		if (lobbyBusy) return
@@ -70,13 +76,13 @@
 	const toggleLock = () => lobbyAction({ action: 'lock', lock: !data.lockRandom })
 
 	// Recomputed on a fast ticker so the countdown reads down smoothly.
-	let now = Date.now()
-	$: full = count >= maxPlayers
-	$: remainingMs = startAt != null ? Math.max(0, startAt - now) : null
-	$: remainingSecs = remainingMs != null ? Math.ceil(remainingMs / 1000) : null
+	let now = $state(Date.now())
+	let full = $derived(count >= maxPlayers)
+	let remainingMs = $derived(startAt != null ? Math.max(0, startAt - now) : null)
+	let remainingSecs = $derived(remainingMs != null ? Math.ceil(remainingMs / 1000) : null)
 
-	let starting = false
-	let startError = ''
+	let starting = $state(false)
+	let startError = $state('')
 	let launched = false
 
 	const launch = () => {
@@ -88,7 +94,9 @@
 	// The single place the lobby decides it's time to play: `start_at` is set and
 	// has arrived. Driven by both the poll (canonical state) and the ticker (so we
 	// fire the instant the local countdown hits zero without waiting for a poll).
-	$: if (startAt != null && now >= startAt) launch()
+	$effect(() => {
+		if (startAt != null && now >= startAt) launch()
+	})
 
 	const applyState = (state: { count?: number; startAt?: number | null }) => {
 		// A change in occupancy means seats/teams may have changed too — re-run the
@@ -211,7 +219,7 @@
 				>
 					{data.session}
 				</code>
-				<button type="button" class="btn btn-outline btn-sm" on:click={copyCode}>
+				<button type="button" class="btn btn-outline btn-sm" onclick={copyCode}>
 					<Icon icon="lucide:copy" width={14} />
 					Copy
 				</button>
@@ -241,7 +249,7 @@
 						type="checkbox"
 						checked={data.lockRandom}
 						disabled={lobbyBusy}
-						on:change={toggleLock}
+						onchange={toggleLock}
 					/>
 					Lock all seats to random (no one picks a side)
 				</label>
@@ -264,7 +272,7 @@
 								<button
 									type="button"
 									class="text-foreground hover:underline"
-									on:click={() => holder.user && openDmWith.set(holder.user.auth)}
+									onclick={() => holder.user && openDmWith.set(holder.user.auth)}
 								>
 									{nameOf(holder)}
 								</button>
@@ -278,7 +286,7 @@
 										type="button"
 										class="btn btn-ghost btn-xs"
 										disabled={lobbyBusy}
-										on:click={goRandom}>Go random</button
+										onclick={goRandom}>Go random</button
 									>
 								{/if}
 								{#if isHost && !holder.isMe}
@@ -286,7 +294,7 @@
 										type="button"
 										class="btn btn-ghost btn-xs text-destructive"
 										disabled={lobbyBusy}
-										on:click={() => removeMember(holder.userSession)}
+										onclick={() => removeMember(holder.userSession)}
 									>
 										{holder.isAi ? 'Remove AI' : 'Kick'}
 									</button>
@@ -298,7 +306,7 @@
 									type="button"
 									class="btn btn-outline btn-xs"
 									disabled={lobbyBusy || (data.lockRandom && !isHost)}
-									on:click={() => takeSide(team)}
+									onclick={() => takeSide(team)}
 								>
 									Take side
 								</button>
@@ -307,7 +315,7 @@
 										type="button"
 										class="btn btn-ghost btn-xs"
 										disabled={lobbyBusy}
-										on:click={() => addAi(team)}
+										onclick={() => addAi(team)}
 									>
 										<Icon icon="lucide:bot" width={13} /> Add AI
 									</button>
@@ -335,7 +343,7 @@
 										type="button"
 										class="btn btn-ghost btn-xs text-destructive"
 										disabled={lobbyBusy}
-										on:click={() => removeMember(m.userSession)}
+										onclick={() => removeMember(m.userSession)}
 									>
 										{m.isAi ? 'Remove AI' : 'Kick'}
 									</button>
@@ -385,7 +393,7 @@
 					<button
 						type="button"
 						class="btn btn-primary btn-sm"
-						on:click={startNow}
+						onclick={startNow}
 						disabled={starting}
 					>
 						<Icon icon="lucide:play" width={14} />

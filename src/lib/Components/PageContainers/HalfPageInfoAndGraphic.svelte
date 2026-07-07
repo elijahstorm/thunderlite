@@ -2,8 +2,13 @@
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 	import Icon from '@iconify/svelte'
 
-	// Kept for back-compat with existing call sites. No longer used visually.
-	export let icon: keyof typeof iconMap = 'welcome'
+	interface Props {
+		// Kept for back-compat with existing call sites. No longer used visually.
+		icon?: keyof typeof iconMap
+		children?: import('svelte').Snippet
+	}
+
+	let { icon = 'welcome', children }: Props = $props()
 	const iconMap = {
 		calendar: '',
 		events: '',
@@ -14,7 +19,6 @@
 		toronto: '',
 		welcome: '',
 	}
-	icon
 
 	const highlights = [
 		{ icon: 'lucide:swords', label: 'Turn-based tactical combat' },
@@ -75,7 +79,7 @@
 		</header>
 		<div class="flex-1 flex items-center justify-center px-6 py-10 md:py-16">
 			<div class="w-full max-w-md">
-				<slot></slot>
+				{@render children?.()}
 			</div>
 		</div>
 	</main>

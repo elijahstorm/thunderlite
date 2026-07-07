@@ -14,8 +14,10 @@
 	</header>
 
 	<div class="card overflow-hidden">
-		<ChatSocket let:socketMessages>
-			<ChatList {socketMessages} on:chat={({ detail }) => openChat(detail)} />
+		<ChatSocket>
+			{#snippet children({ socketMessages })}
+				<ChatList {socketMessages} onchat={(auth) => openChat(auth)} />
+			{/snippet}
 		</ChatSocket>
 	</div>
 </section>

@@ -8,16 +8,20 @@
 	import { shownThreatUnits, toggleAllThreats } from '$lib/Engine/threatOverlay'
 	import { isDevMode, downloadDevLog, devLogSize } from '$lib/Engine/devLog'
 
-	export let map: MapObject | undefined = undefined
-	export let localTeam = 0
-	export let menuHref = '/'
+	interface Props {
+		map?: MapObject | undefined
+		localTeam?: number
+		menuHref?: string
+	}
 
-	let open = false
-	let view: 'menu' | 'confirmGiveUp' | 'confirmExit' = 'menu'
+	let { map = undefined, localTeam = 0, menuHref = '/' }: Props = $props()
 
-	$: masterMuted = $audioSettings.master.muted
-	$: playing = $gameState.phase === 'playing'
-	$: threatShown = $shownThreatUnits.size > 0
+	let open = $state(false)
+	let view: 'menu' | 'confirmGiveUp' | 'confirmExit' = $state('menu')
+
+	let masterMuted = $derived($audioSettings.master.muted)
+	let playing = $derived($gameState.phase === 'playing')
+	let threatShown = $derived($shownThreatUnits.size > 0)
 
 	// Music and SFX are independent channels — expose each so players can, say,
 	// kill the soundtrack while keeping combat feedback. Master rides above both.
@@ -64,7 +68,7 @@
 <div class="pointer-events-none fixed left-4 top-4 z-50 flex flex-col items-start gap-2">
 	<button
 		type="button"
-		on:click={toggle}
+		onclick={toggle}
 		aria-label="Game settings"
 		aria-expanded={open}
 		class="pointer-events-auto rounded-lg bg-black/70 p-2 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/85"
@@ -81,7 +85,7 @@
 				<button
 					type="button"
 					role="menuitem"
-					on:click={toggleMasterMute}
+					onclick={toggleMasterMute}
 					class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
 				>
 					<span class="flex items-center gap-2">
@@ -101,7 +105,7 @@
 						<div class="flex items-center justify-between">
 							<button
 								type="button"
-								on:click={() => audioEngine.toggleMute(ch.key)}
+								onclick={() => audioEngine.toggleMute(ch.key)}
 								aria-label={`${ch.label}: ${settings.muted ? 'unmute' : 'mute'}`}
 								class="flex items-center gap-2 rounded-md text-left transition-colors hover:text-white/80"
 							>
@@ -119,7 +123,7 @@
 							step="0.05"
 							value={settings.volume}
 							aria-label={`${ch.label} volume`}
-							on:input={(e) => audioEngine.setChannelVolume(ch.key, e.currentTarget.valueAsNumber)}
+							oninput={(e) => audioEngine.setChannelVolume(ch.key, e.currentTarget.valueAsNumber)}
 							class="mt-1.5 h-1.5 w-full cursor-pointer accent-white"
 						/>
 					</div>
@@ -130,7 +134,7 @@
 				<button
 					type="button"
 					role="menuitem"
-					on:click={toggleThreatOverlay}
+					onclick={toggleThreatOverlay}
 					class="flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
 				>
 					<span class="flex items-center gap-2">
@@ -150,7 +154,7 @@
 					type="button"
 					role="menuitem"
 					disabled={!playing}
-					on:click={() => (view = 'confirmGiveUp')}
+					onclick={() => (view = 'confirmGiveUp')}
 					class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-red-300 transition-colors hover:bg-red-500/15 disabled:opacity-40 disabled:hover:bg-transparent"
 				>
 					<Icon icon="mdi:flag-variant" width="18" height="18" />
@@ -159,7 +163,7 @@
 				<button
 					type="button"
 					role="menuitem"
-					on:click={() => (view = 'confirmExit')}
+					onclick={() => (view = 'confirmExit')}
 					class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
 				>
 					<Icon icon="mdi:exit-run" width="18" height="18" />
@@ -174,7 +178,7 @@
 					<button
 						type="button"
 						role="menuitem"
-						on:click={downloadDevLog}
+						onclick={downloadDevLog}
 						class="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left transition-colors hover:bg-white/10"
 					>
 						<span class="flex items-center gap-2">
@@ -197,14 +201,14 @@
 				<div class="flex gap-2 px-1 pb-1">
 					<button
 						type="button"
-						on:click={view === 'confirmGiveUp' ? giveUp : exitToMenu}
+						onclick={view === 'confirmGiveUp' ? giveUp : exitToMenu}
 						class="flex-1 rounded-md bg-red-600 px-3 py-1.5 font-medium transition-colors hover:bg-red-500"
 					>
 						{view === 'confirmGiveUp' ? 'Give up' : 'Exit'}
 					</button>
 					<button
 						type="button"
-						on:click={() => (view = 'menu')}
+						onclick={() => (view = 'menu')}
 						class="flex-1 rounded-md bg-white/10 px-3 py-1.5 transition-colors hover:bg-white/20"
 					>
 						Cancel
@@ -222,6 +226,6 @@
 		aria-label="Close settings"
 		tabindex="-1"
 		class="fixed inset-0 z-40 cursor-default"
-		on:click={close}
+		onclick={close}
 	></button>
 {/if}

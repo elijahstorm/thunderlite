@@ -18,6 +18,7 @@ import { updateFogBelief } from './cpuAi/fogMemory'
 import { bestPlanFor } from './cpuAi/candidates'
 import { beginCpuPlanning, endCpuPlanning, planningUnits } from './cpuAi/planningContext'
 import { pickBuildOnce } from './cpuAi/production'
+import { isWalletUnit } from './wallet'
 import type { SerializedAction } from './Interactor/serializedAction'
 import type { ActionPlan } from './cpuAi/types'
 
@@ -26,6 +27,36 @@ import type { ActionPlan } from './cpuAi/types'
 // comes from the animations themselves — this just keeps distinct actions from
 // blurring together.
 export const CPU_AI_TURN_DELAY_MS = 150
+
+// The planner is greedy best-first: each tick it re-plans every still-actable unit
+// just to pick the single highest-scoring action, dispatches that one unit, and
+// repeats. That's ~N²/2 full unit plannings per turn (N + (N-1) + … + 1), and each
+// planning is a move-BFS plus per-reachable-tile attack/threat scans — the CPU stall
+// you feel once armies get big.
+//
+// But committing one action only changes the board *near* the tiles it touched, so
+// only units whose reach/threat footprint overlaps those tiles can have a different
+// best plan next tick. Above this many actable units we cache each unit's best plan
+// across ticks and recompute only the ones a committed action could have affected
+// (see `invalidatePlans`), collapsing the turn back to ~O(N). Below the threshold the
+// planner recomputes everything every tick exactly as before — the caching bookkeeping
+// isn't worth it, and small games stay byte-for-byte identical.
+const LAZY_PLAN_THRESHOLD = 70
+
+// Chebyshev radius within which a just-committed action can alter another unit's best
+// plan. A unit's plan depends on its own reachable tiles (≤ max move = 9) and, over
+// those tiles, enemy attack options and threat coverage — an enemy can reach one of
+// those tiles from up to (max move 9 + max attack range 6) away. So a change at tile X
+// only matters to unit U when X is within 9 + 9 + 6 = 24 of U. A generous superset for
+// the ordinary case; a longer-range interaction (e.g. fog/vision shifting a distant
+// unit's knowledge) is possible but rare, an accepted approximation on huge boards.
+const PLAN_INVALIDATION_RADIUS = 24
+
+// Per-unit best plan, keyed by the unit's current tile, persisted across the ticks of a
+// single CPU turn. Unacted units never move between ticks (only the one chosen unit acts,
+// and it's then flagged in `actedTiles` and skipped), so a unit's tile is a stable key
+// and a cached plan stays valid until `invalidatePlans` clears it.
+type PlanCache = Map<number, ActionPlan | null>
 
 export type CpuAiHandle = {
 	cancel: () => void
@@ -54,6 +85,34 @@ const commit = (map: MapObject, action: SerializedAction, opts?: CommitOptions):
 	emitOutgoingAction(action)
 }
 
+// Tiles a committed action altered, for plan-cache invalidation. Move/attack report
+// their real endpoints from `dispatch` (a move can be truncated); this covers the
+// self-actions, where the effect sits on a single tile (`build-adjacent` spawns onto a
+// neighbour of the builder, comfortably inside the invalidation radius).
+const actionTiles = (action: SerializedAction): number[] => {
+	switch (action.kind) {
+		case 'move':
+		case 'attack':
+			return [action.from, action.to]
+		case 'build-adjacent':
+			return [action.builder]
+		case 'build':
+			// Factory build: a fresh unit lands on the building tile.
+			return [action.building]
+		case 'capture':
+		case 'wait':
+		case 'mine':
+		case 'repair':
+			return [action.tile]
+		case 'transport-load':
+			return [action.transport, action.passenger]
+		case 'transport-unload':
+			return [action.transport, action.tile]
+		default:
+			return []
+	}
+}
+
 const findActableUnits = (
 	map: MapObject,
 	cpuTeam: number
@@ -64,22 +123,59 @@ const findActableUnits = (
 	return planningUnits(map).filter(({ tile, unit }) => unit.team === cpuTeam && !acted.has(tile))
 }
 
-const pickBestPlan = (map: MapObject, cpuTeam: number): ActionPlan | null => {
+const pickBestPlan = (map: MapObject, cpuTeam: number, cache: PlanCache): ActionPlan | null => {
 	// Open a planning window: the board is frozen for the duration of this call, so
 	// the scorer's repeated reads (unit/building lists, enemy reach, concealment)
 	// are computed once and memoised, then torn down so the next tick starts clean.
 	beginCpuPlanning(map)
 	try {
 		const units = findActableUnits(map, cpuTeam)
+		// Only trust cached plans once the army is large enough for the N² recompute to
+		// bite. Below that we recompute every unit fresh, so behaviour is unchanged.
+		const lazy = units.length >= LAZY_PLAN_THRESHOLD
 		let best: ActionPlan | null = null
 		for (const { tile, unit } of units) {
-			const plan = bestPlanFor(map, tile, unit, cpuTeam)
+			// Wallet units (Warmachines) score against globals like total enemy count, so a
+			// kill anywhere can shift their plan — cheaper to always recompute the handful of
+			// them than to track that dependency. Every other unit's plan is purely local.
+			const cacheable = !isWalletUnit(unit)
+			let plan: ActionPlan | null
+			if (lazy && cacheable && cache.has(tile)) {
+				plan = cache.get(tile) ?? null
+			} else {
+				plan = bestPlanFor(map, tile, unit, cpuTeam)
+				if (cacheable) cache.set(tile, plan)
+			}
 			if (!plan) continue
 			if (!best || plan.score > best.score) best = plan
 		}
 		return best
 	} finally {
 		endCpuPlanning()
+	}
+}
+
+// Drop the cached plans of every unit whose situation the just-committed action could
+// have changed: any unit within `PLAN_INVALIDATION_RADIUS` (Chebyshev) of a touched
+// tile. They'll be replanned on the next tick; everyone else keeps their still-correct
+// cached plan. Deleting entries during Map iteration is safe (visited-once semantics).
+const invalidatePlans = (cache: PlanCache, changed: readonly number[], map: MapObject): void => {
+	if (cache.size === 0 || changed.length === 0) return
+	const cols = map.cols
+	const cx = changed.map((t) => t % cols)
+	const cy = changed.map((t) => Math.floor(t / cols))
+	for (const tile of [...cache.keys()]) {
+		const x = tile % cols
+		const y = Math.floor(tile / cols)
+		for (let i = 0; i < cx.length; i++) {
+			if (
+				Math.abs(x - cx[i]) <= PLAN_INVALIDATION_RADIUS &&
+				Math.abs(y - cy[i]) <= PLAN_INVALIDATION_RADIUS
+			) {
+				cache.delete(tile)
+				break
+			}
+		}
 	}
 }
 
@@ -109,6 +205,11 @@ export const runCpuTurn = ({
 
 	let cancelled = false
 	let timer: ReturnType<typeof setTimeout> | null = null
+
+	// Best plan per still-actable unit, reused across this turn's ticks so we don't
+	// re-plan every unit just to pick one. Entries are dropped as committed actions
+	// invalidate them (see `invalidatePlans`); it only kicks in above LAZY_PLAN_THRESHOLD.
+	const planCache: PlanCache = new Map()
 
 	const stillOurTurn = (): boolean => {
 		if (cancelled) return false
@@ -149,13 +250,16 @@ export const runCpuTurn = ({
 	// change, so a CPU move slides and a CPU attack swings + explodes instead of
 	// teleporting. Animations resolve via their own timers; we await them so the
 	// turn paces itself off the animation length.
-	// Returns whether the rest of the unit's plan should still run. A move that walks
-	// into a concealed enemy returns false: the unit halts and forfeits any queued
-	// follow-up (attack/capture), exactly like the human path.
-	const dispatch = async (action: SerializedAction): Promise<boolean> => {
+	// Returns `proceed` (whether the rest of the unit's plan should still run — a move
+	// that walks into a concealed enemy returns false: the unit halts and forfeits any
+	// queued follow-up, exactly like the human path) plus `changed`, the tiles this
+	// action actually altered, so the plan cache can invalidate only the units near them.
+	const dispatch = async (
+		action: SerializedAction
+	): Promise<{ proceed: boolean; changed: number[] }> => {
 		if (action.kind === 'move') {
 			const unit = map.layers.units[action.from]
-			if (!unit) return false
+			if (!unit) return { proceed: false, changed: [] }
 			// The CPU plays blind, so its planned route can run through an enemy it
 			// couldn't perceive. Re-pathfind with the same concealment the planner used,
 			// then stop on the last clear tile if it collides — and commit the truncated
@@ -168,7 +272,7 @@ export const runCpuTurn = ({
 			if (collided && finalTile === action.from) {
 				// Ambushed before taking a step: forfeit the move in place.
 				commit(map, { kind: 'wait', tile: action.from })
-				return false
+				return { proceed: false, changed: [action.from] }
 			}
 			map.layers.units[action.from] = null
 			// Footsteps roll *with* the walk, not after it. The commit below
@@ -176,7 +280,7 @@ export const runCpuTurn = ({
 			playActionSfx('move', unit)
 			await safeAnimate(() => animateRoute(map, unit, action.from, finalTile, walked))
 			map.layers.units[action.from] = unit
-			if (cancelled) return false
+			if (cancelled) return { proceed: false, changed: [] }
 			// A cloaked unit caught crossing an enemy radar ring mid-route is logged so
 			// the watching player "remembers" a stealth threat is about.
 			recordStealthPassthrough(map, walked, unit)
@@ -185,29 +289,32 @@ export const runCpuTurn = ({
 				{ kind: 'move', from: action.from, to: finalTile },
 				{ suppressSfxActions: ['move'] }
 			)
-			return !collided
+			// The unit vacated `from` and now sits on `finalTile`; both flip the board for
+			// nearby planners. Intermediate path tiles hold no unit, so they don't count.
+			return { proceed: !collided, changed: [action.from, finalTile] }
 		}
 
 		if (action.kind === 'attack') {
 			const attacker = map.layers.units[action.from]
 			const target = map.layers.units[action.to]
-			if (!attacker || !target) return true
+			if (!attacker || !target) return { proceed: true, changed: [] }
 			// Same choreography a human attack plays — swing, target bar/explosion,
 			// counter, attacker bar/explosion — committing the result at the end.
 			// `safeAnimate` still guards the visuals, but the commit lives inside the
 			// sequencer; pass it through so a cancelled turn skips the commit too.
-			if (cancelled) return false
+			if (cancelled) return { proceed: false, changed: [] }
 			await safeAnimate(() =>
 				animateAttackSequence(map, action.from, action.to, (a, opts) => {
 					if (!cancelled) commit(map, a, opts)
 				})
 			)
-			return true
+			// Both combatants' HP (or deaths) changed here, reshaping threat around them.
+			return { proceed: true, changed: [action.from, action.to] }
 		}
 
-		if (cancelled) return false
+		if (cancelled) return { proceed: false, changed: [] }
 		commit(map, action)
-		return true
+		return { proceed: true, changed: actionTiles(action) }
 	}
 
 	// One tick = one unit's full plan (e.g. move → attack → explosion) dispatched
@@ -221,7 +328,7 @@ export const runCpuTurn = ({
 		// back to the player. Without this net a single throw leaves the turn
 		// hung, since nothing else schedules the next tick.
 		try {
-			const plan = pickBestPlan(map, startTeam)
+			const plan = pickBestPlan(map, startTeam, planCache)
 			const actions = plan?.actions ?? []
 			if (actions.length === 0) {
 				const build = pickBuildOnce(map, startTeam)
@@ -229,18 +336,24 @@ export const runCpuTurn = ({
 					finish()
 					return
 				}
-				await dispatch(build)
+				const { changed } = await dispatch(build)
+				invalidatePlans(planCache, changed, map)
 				if (!stillOurTurn()) return
 				schedule(() => void tick())
 				return
 			}
 
+			// A unit's plan can be several actions (move → attack); collect every tile they
+			// touch, then invalidate once so nearby units replan against the settled board.
+			const changed: number[] = []
 			for (const action of actions) {
 				if (!stillOurTurn()) return
-				const proceed = await dispatch(action)
+				const result = await dispatch(action)
+				changed.push(...result.changed)
 				// A blind move that collided ends this unit's plan; other units still act.
-				if (!proceed) break
+				if (!result.proceed) break
 			}
+			invalidatePlans(planCache, changed, map)
 			if (!stillOurTurn()) return
 			schedule(() => void tick())
 		} catch {

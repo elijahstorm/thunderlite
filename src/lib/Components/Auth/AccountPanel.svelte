@@ -6,8 +6,8 @@
 	import { onMount } from 'svelte'
 	import { logout, redirectAfterLogout, refreshSession } from '$lib/dontcode/client'
 
-	let email: string | null = null
-	let loaded = false
+	let email: string | null = $state(null)
+	let loaded = $state(false)
 
 	onMount(async () => {
 		const user = await refreshSession()
@@ -30,5 +30,5 @@
 		</p>
 	</div>
 
-	<button class="btn btn-outline btn-sm" type="button" on:click={signOut}> Sign out </button>
+	<button class="btn btn-outline btn-sm" type="button" onclick={signOut}> Sign out </button>
 </div>

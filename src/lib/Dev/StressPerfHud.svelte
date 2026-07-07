@@ -7,12 +7,17 @@
 	// frame once our synchronous work (the per-frame terrain sweep, fog/threat
 	// recompute, a CPU turn, canvas paint) has cleared the main thread, so the gap
 	// between frames IS the jank. We report a rolling FPS, the worst frame in the
-	// window (the stutter you actually feel), and a count of dropped frames.
-	export let stats: StressStats
 
-	let fps = 0
-	let worstMs = 0
-	let jankFrames = 0
+	interface Props {
+		// window (the stutter you actually feel), and a count of dropped frames.
+		stats: StressStats
+	}
+
+	let { stats }: Props = $props()
+
+	let fps = $state(0)
+	let worstMs = $state(0)
+	let jankFrames = $state(0)
 	let running = true
 
 	// A "long" frame — anything past ~two 60fps frames is a visible hitch.
@@ -58,12 +63,17 @@
 	})
 
 	// Green while smooth, amber as it strains, red once it's clearly dropping frames.
-	$: fpsColor = fps >= 50 ? 'text-emerald-400' : fps >= 30 ? 'text-amber-400' : 'text-rose-400'
-	$: worstColor =
+	let fpsColor = $derived(
+		fps >= 50 ? 'text-emerald-400' : fps >= 30 ? 'text-amber-400' : 'text-rose-400'
+	)
+	let worstColor = $derived(
 		worstMs <= 20 ? 'text-emerald-400' : worstMs <= 50 ? 'text-amber-400' : 'text-rose-400'
+	)
 </script>
 
-<div class="pointer-events-auto space-y-2 rounded-lg border border-slate-700 bg-slate-950/80 p-3 font-mono text-xs backdrop-blur">
+<div
+	class="pointer-events-auto space-y-2 rounded-lg border border-slate-700 bg-slate-950/80 p-3 font-mono text-xs backdrop-blur"
+>
 	<div class="flex items-baseline justify-between gap-6">
 		<span class="text-slate-400">FPS</span>
 		<span class="text-lg font-bold tabular-nums {fpsColor}">{fps}</span>
@@ -76,7 +86,9 @@
 		<span class="text-slate-400">dropped (&gt;{LONG_FRAME_MS}ms)</span>
 		<span class="tabular-nums text-slate-200"
 			>{jankFrames}
-			<button class="ml-1 rounded bg-slate-800 px-1 text-slate-400 hover:text-slate-100" on:click={resetJank}>↺</button
+			<button
+				class="ml-1 rounded bg-slate-800 px-1 text-slate-400 hover:text-slate-100"
+				onclick={resetJank}>↺</button
 			></span
 		>
 	</div>

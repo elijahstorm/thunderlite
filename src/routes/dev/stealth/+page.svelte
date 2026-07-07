@@ -15,30 +15,37 @@
 	// isn't `team` is CPU-controlled — set `team` to -1 to spectate a full CPU run.
 	const gameSession = 'ephemeral'
 
-	let sceneIndex = 0
-	let fog = true
-	let team = 0
+	let sceneIndex = $state(0)
+	let fog = $state(true)
+	let team = $state(0)
 
-	$: scene = stealthScenes[sceneIndex]
+	let scene = $derived(stealthScenes[sceneIndex])
 
 	// Engine reads fog live; mirror it so the concealment readout below computes
 	// against the same value the board renders with. (GameBoard also sets it.)
-	$: fogOfWarEnabled.set(fog)
+	$effect.pre(() => {
+		fogOfWarEnabled.set(fog)
+	})
 
 	// MapRender caches fog visibility, so a settings change wouldn't refresh the
 	// board on its own. Fold every setting into a key and rebuild a fresh map +
 	// remount the whole board whenever it changes.
-	$: key = `${scene.id}|${fog}|${team}`
-	let map: MapObject
-	let lastKey = ''
-	$: if (key !== lastKey) {
-		lastKey = key
-		map = scene.build()
-	}
+	let key = $derived(`${scene.id}|${fog}|${team}`)
+	let map = $state.raw<MapObject>()
+	let lastKey = $state('')
+	$effect.pre(() => {
+		if (key !== lastKey) {
+			lastKey = key
+			map = scene.build()
+		}
+	})
 
 	// Tear animation overlays down on any board-identity change (they live in
 	// module-global timer-driven stores and would otherwise leak onto the new board).
-	$: key, clearAnimations()
+	$effect(() => {
+		void key
+		clearAnimations()
+	})
 
 	type Row = {
 		tile: number
@@ -52,10 +59,10 @@
 	// Live concealment readout. concealedEnemyTiles reads the fog store via get(),
 	// so touch $gameState + fog inside the block as explicit deps: it recomputes
 	// after every CPU action (markTileActed bumps gameState) and on a fog toggle.
-	let rows: Row[] = []
-	$: {
-		$gameState
-		fog
+	let rows: Row[] = $state([])
+	$effect(() => {
+		void $gameState
+		void fog
 		rows = []
 		if (map) {
 			const concealed0 = concealedEnemyTiles(map, 0)
@@ -75,7 +82,7 @@
 			}
 			rows.sort((a, b) => a.team - b.team)
 		}
-	}
+	})
 
 	const teamLabel = (t: number) => (t === 0 ? 'red' : t === 1 ? 'blue' : `t${t}`)
 	const teamDot = (t: number) => (t === 0 ? 'bg-red-400' : t === 1 ? 'bg-sky-400' : 'bg-slate-400')
@@ -103,7 +110,7 @@
 						class="rounded px-2 py-1 text-left text-sm transition-colors {i === sceneIndex
 							? 'bg-yellow-500 font-semibold text-slate-900'
 							: 'bg-slate-800 hover:bg-slate-700'}"
-						on:click={() => (sceneIndex = i)}
+						onclick={() => (sceneIndex = i)}
 					>
 						{s.name}
 					</button>
@@ -155,7 +162,8 @@
 							</td>
 							<td class="py-1">
 								{#if r.stealth}<span
-										class="mr-1 rounded bg-violet-500/20 px-1 text-[10px] text-violet-300">stealth</span
+										class="mr-1 rounded bg-violet-500/20 px-1 text-[10px] text-violet-300"
+										>stealth</span
 									>{/if}
 								{#if r.hidden}<span class="rounded bg-slate-600/40 px-1 text-[10px] text-slate-300"
 										>hidden</span
@@ -175,8 +183,8 @@
 			<p class="mt-2 text-xs leading-snug text-slate-500">
 				"vs enemy" = whether the opposing team currently perceives this unit (fog + stealth +
 				cloak). This is exactly what movement pathing and the human attack list honor. NB: the CPU's
-				attack list only filters by fog tiles, not the hidden flag — so a "hidden" unit on a tile the
-				CPU can see is still a target for it.
+				attack list only filters by fog tiles, not the hidden flag — so a "hidden" unit on a tile
+				the CPU can see is still a target for it.
 			</p>
 		</section>
 
@@ -189,25 +197,30 @@
 	<!-- Board -->
 	<main class="relative flex-1 overflow-hidden">
 		{#key key}
-			<GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
-				<GameStateManager
-					{map}
-					{gameSession}
-					localTeam={team}
-					mode="hotseat"
-					interactor={socket ? socketSelect(socket, () => map) : undefined}
-					endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-					let:select
-				>
-					<GameBoard
+			<GameSocket map={() => map} {gameSession}>
+				{#snippet children({ socket, requestRedraw })}
+					<GameStateManager
 						{map}
-						{requestRedraw}
-						{select}
-						fogOfWar={fog}
+						{gameSession}
 						localTeam={team}
-						menuHref="/dev/stealth"
-					/>
-				</GameStateManager>
+						mode="hotseat"
+						interactor={socket ? socketSelect(socket, () => map) : undefined}
+						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+					>
+						{#snippet children({ select })}
+							{#if map}
+								<GameBoard
+									{map}
+									{requestRedraw}
+									{select}
+									fogOfWar={fog}
+									localTeam={team}
+									menuHref="/dev/stealth"
+								/>
+							{/if}
+						{/snippet}
+					</GameStateManager>
+				{/snippet}
 			</GameSocket>
 		{/key}
 	</main>

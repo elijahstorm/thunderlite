@@ -1,5 +1,9 @@
 <script lang="ts">
-	export let map: MapDBData
+	interface Props {
+		map: MapDBData
+	}
+
+	let { map }: Props = $props()
 </script>
 
 <div class="h-full w-full bg-surface-2 overflow-hidden">

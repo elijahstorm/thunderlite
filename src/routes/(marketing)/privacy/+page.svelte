@@ -3763,7 +3763,7 @@
 		border-bottom: 1px solid transparent !important;
 		transition: border-bottom-color 0.3s ease !important;
 	}
-	:is([data-custom-class='link'], [data-custom-class='link'] *):hover {
+	:is(:global([data-custom-class='link'], [data-custom-class='link'] *)):hover {
 		border-bottom-color: var(--primary) !important;
 	}
 	ul {

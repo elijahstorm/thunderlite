@@ -1,13 +1,17 @@
 <script lang="ts">
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 
-	export let messageGroup: {
-		key: string
-		user: string
-		messages: MessageDBData[]
+	interface Props {
+		messageGroup: {
+			key: string
+			user: string
+			messages: MessageDBData[]
+		}
+		sourceUser: UserDBData
+		targetUser: UserDBData
 	}
-	export let sourceUser: UserDBData
-	export let targetUser: UserDBData
+
+	let { messageGroup, sourceUser, targetUser }: Props = $props()
 
 	const shortenDate = (when?: Date, now = new Date()) => {
 		if (!when) return ''

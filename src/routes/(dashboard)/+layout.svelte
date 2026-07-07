@@ -4,8 +4,13 @@
 	import Casing from '$lib/Components/PageContainers/Casing.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import Icon from '@iconify/svelte'
+	interface Props {
+		children?: import('svelte').Snippet
+	}
 
-	let openAside = false
+	let { children }: Props = $props()
+
+	let openAside = $state(false)
 
 	const escape = (e: KeyboardEvent) => e.key === 'Escape' && closeAside()
 	const toggleAside = () => (openAside = !openAside)
@@ -36,18 +41,18 @@
 		},
 	]
 
-	$: pathname = $page.url.pathname
+	let pathname = $derived($page.url.pathname)
 </script>
 
-<svelte:window on:keydown={escape} />
+<svelte:window onkeydown={escape} />
 
 <ContentWithFooter>
 	<Casing {toggleAside}>
 		<div
 			class="fixed inset-0 z-30 bg-foreground/30 backdrop-blur-sm md:hidden"
 			class:hidden={!openAside}
-			on:keydown={closeAside}
-			on:click={closeAside}
+			onkeydown={closeAside}
+			onclick={closeAside}
 			aria-label="Close navigation side bar"
 			role="button"
 			tabindex="0"
@@ -101,7 +106,7 @@
 
 			<div class="flex-1 min-w-0">
 				<div class="space-y-6">
-					<slot></slot>
+					{@render children?.()}
 				</div>
 			</div>
 		</div>

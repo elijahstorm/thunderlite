@@ -10,48 +10,57 @@
 	import PlayerRosterSync from '$lib/Engine/HUD/PlayerRosterSync.svelte'
 	import GameChat from '$lib/Components/Socket/GameChat.svelte'
 
-	export let data: PageData
-	$: userSession = data.userSession
-	$: gameSession = data.gameSession
-	$: mapHash = data.mapHash
+	interface Props {
+		data: PageData
+	}
+
+	let { data }: Props = $props()
+	let userSession = $derived(data.userSession)
+	let gameSession = $derived(data.gameSession)
+	let mapHash = $derived(data.mapHash)
 	// Authoritative side this client commands, resolved + assigned server-side
 	// (see +page.server.ts). Replaces the old per-client re-derivation that let
 	// both players end up as team 0.
-	$: localTeam = data.localTeam ?? 0
+	let localTeam = $derived(data.localTeam ?? 0)
 	// Server sends profiles already keyed by team.
-	$: teamRoster = data.roster ?? {}
+	let teamRoster = $derived(data.roster ?? {})
 	// Online CPU seats + whether this client drives them.
-	$: aiTeams = data.aiTeams ?? []
-	$: isAiDriver = data.isAiDriver ?? false
+	let aiTeams = $derived(data.aiTeams ?? [])
+	let isAiDriver = $derived(data.isAiDriver ?? false)
 </script>
 
 <section class="h-screen overflow-clip">
-	<MapLoader {mapHash} let:map>
-		<PlayerRosterSync roster={teamRoster} />
-		<GameSocket map={() => map} {gameSession} {userSession} let:socket let:requestRedraw>
-			<GameStateManager
-				{userSession}
-				{gameSession}
-				{map}
-				minimap
-				{localTeam}
-				{aiTeams}
-				{isAiDriver}
-				fogOfWar={map.fog ?? true}
-				interactor={socket ? socketSelect(socket, () => map) : undefined}
-				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-				let:select
-			>
-				<GameBoard
-					{map}
-					{requestRedraw}
-					{select}
-					{localTeam}
-					fogOfWar={map.fog ?? true}
-					menuHref="/rooms"
-				/>
-			</GameStateManager>
-		</GameSocket>
+	<MapLoader {mapHash}>
+		{#snippet children({ map })}
+			<PlayerRosterSync roster={teamRoster} />
+			<GameSocket map={() => map} {gameSession} {userSession}>
+				{#snippet children({ socket, requestRedraw })}
+					<GameStateManager
+						{userSession}
+						{gameSession}
+						{map}
+						minimap
+						{localTeam}
+						{aiTeams}
+						{isAiDriver}
+						fogOfWar={map.fog ?? true}
+						interactor={socket ? socketSelect(socket, () => map) : undefined}
+						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+					>
+						{#snippet children({ select })}
+							<GameBoard
+								{map}
+								{requestRedraw}
+								{select}
+								{localTeam}
+								fogOfWar={map.fog ?? true}
+								menuHref="/rooms"
+							/>
+						{/snippet}
+					</GameStateManager>
+				{/snippet}
+			</GameSocket>
+		{/snippet}
 	</MapLoader>
 
 	<!-- Realtime group chat for this room; click a name to open a private DM. -->

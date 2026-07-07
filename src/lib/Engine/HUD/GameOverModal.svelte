@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { gameState } from '../gameState'
 
-	export let localTeam = 0
+	interface Props {
+		localTeam?: number
+	}
 
-	$: state = $gameState
-	$: isGameOver = state.phase === 'gameOver'
-	$: localWon = typeof state.winner === 'number' && state.winner === localTeam
-	$: title = localWon ? 'Victory' : 'Defeat'
+	let { localTeam = 0 }: Props = $props()
+
+	let state = $derived($gameState)
+	let isGameOver = $derived(state.phase === 'gameOver')
+	let localWon = $derived(typeof state.winner === 'number' && state.winner === localTeam)
+	let title = $derived(localWon ? 'Victory' : 'Defeat')
 </script>
 
 {#if isGameOver}

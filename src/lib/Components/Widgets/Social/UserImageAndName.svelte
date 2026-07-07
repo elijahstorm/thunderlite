@@ -1,9 +1,13 @@
 <script lang="ts">
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 
-	export let user: UserDBData | null
-	export let text = false
-	export let noClick = false
+	interface Props {
+		user: UserDBData | null
+		text?: boolean
+		noClick?: boolean
+	}
+
+	let { user, text = false, noClick = false }: Props = $props()
 </script>
 
 <div class="flex items-center gap-3">

@@ -7,27 +7,35 @@
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 	import { parseCutsceneScript } from '$lib/Campaign/cutsceneScript'
 	import { gameState } from '$lib/Engine/gameState'
-	import {
-		viewerTeam,
-		toggleAllThreats,
-		clearThreatOverlay,
-	} from '$lib/Engine/threatOverlay'
+	import { viewerTeam, toggleAllThreats, clearThreatOverlay } from '$lib/Engine/threatOverlay'
 
-	/**
-	 * The single presentation wrapper for a live game board. Every gameplay route
-	 * (online play, campaign, …) renders through this so the framing stays
-	 * consistent: the shared `game-backdrop` and the in-game settings menu (mute /
-	 * give up / exit) both live here in one place. The corner overview minimap is
-	 * part of the HUD stack (see HUDRoot) so it can't overlap the other HUD chrome.
-	 */
-	export let map: MapObject
-	export let select: ((x: number, y: number) => void) | undefined = undefined
-	export let requestRedraw = 0
-	export let fogOfWar = false
-	export let campaign: CutsceneScript | undefined = undefined
-	export let localTeam = 0
-	/** Where "Exit to menu" navigates for this context. */
-	export let menuHref = '/'
+	interface Props {
+		/**
+		 * The single presentation wrapper for a live game board. Every gameplay route
+		 * (online play, campaign, …) renders through this so the framing stays
+		 * consistent: the shared `game-backdrop` and the in-game settings menu (mute /
+		 * give up / exit) both live here in one place. The corner overview minimap is
+		 * part of the HUD stack (see HUDRoot) so it can't overlap the other HUD chrome.
+		 */
+		map: MapObject
+		select?: ((x: number, y: number) => void) | undefined
+		requestRedraw?: number
+		fogOfWar?: boolean
+		campaign?: CutsceneScript | undefined
+		localTeam?: number
+		/** Where "Exit to menu" navigates for this context. */
+		menuHref?: string
+	}
+
+	let {
+		map,
+		select = undefined,
+		requestRedraw = 0,
+		fogOfWar = false,
+		campaign = undefined,
+		localTeam = 0,
+		menuHref = '/',
+	}: Props = $props()
 
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
 
@@ -43,11 +51,13 @@
 			return undefined
 		}
 	}
-	$: resolvedCampaign = campaign ?? parseMapScript(map.script)
+	let resolvedCampaign = $derived(campaign ?? parseMapScript(map.script))
 
 	// The threat overlay is drawn from the local player's vantage point — keep the
 	// shared store in step with this board's viewer.
-	$: viewerTeam.set(localTeam)
+	$effect.pre(() => {
+		viewerTeam.set(localTeam)
+	})
 
 	// The threat overlay is keyed by unit object reference (see threatOverlay.ts):
 	// it follows each enemy as it moves and self-heals when a unit dies or slips

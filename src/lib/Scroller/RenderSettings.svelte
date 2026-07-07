@@ -2,41 +2,63 @@
 	import { onMount } from 'svelte'
 	import type { Scroller } from './Scroller'
 
-	export let scroller: Scroller
+	interface Props {
+		scroller: Scroller
+	}
 
-	let scrollingX: boolean = true
-	let scrollingY: boolean = true
-	let animating: boolean = true
-	let bouncing: boolean = false
-	let locking: boolean = true
+	let { scroller = $bindable() }: Props = $props()
 
-	let zooming: boolean = true
-	let zoomLevel: string = '1'
-	let zoom: VoidFunction
-	let zoomIn: VoidFunction
-	let zoomOut: VoidFunction
+	let scrollingX: boolean = $state(true)
+	let scrollingY: boolean = $state(true)
+	let animating: boolean = $state(true)
+	let bouncing: boolean = $state(false)
+	let locking: boolean = $state(true)
 
-	let scrollLeft: string = '0'
-	let scrollTop: string = '0'
-	let scrollTo: VoidFunction | null = null
-	let scrollByUp: VoidFunction
-	let scrollByDown: VoidFunction
-	let scrollByLeft: VoidFunction
-	let scrollByRight: VoidFunction
+	let zooming: boolean = $state(true)
+	let zoomLevel: string = $state('1')
+	let zoom = $state<VoidFunction>()
+	let zoomIn = $state<VoidFunction>()
+	let zoomOut = $state<VoidFunction>()
 
-	let saveChanges = (
-		key: 'scrollingX' | 'scrollingY' | 'animating' | 'bouncing' | 'locking' | 'zooming',
-		value: boolean
-	) => {}
+	let scrollLeft: string = $state('0')
+	let scrollTop: string = $state('0')
+	let scrollTo: VoidFunction | null = $state(null)
+	let scrollByUp = $state<VoidFunction>()
+	let scrollByDown = $state<VoidFunction>()
+	let scrollByLeft = $state<VoidFunction>()
+	let scrollByRight = $state<VoidFunction>()
 
-	$: saveChanges('scrollingX', scrollingX)
-	$: saveChanges('scrollingY', scrollingY)
-	$: saveChanges('animating', animating)
-	$: saveChanges('bouncing', bouncing)
-	$: saveChanges('locking', locking)
-	$: saveChanges('zooming', zooming)
-	$: scrollTo && scrollTop !== null ? scrollTo() : null
-	$: scrollTo && scrollLeft !== null ? scrollTo() : null
+	let saveChanges = $state(
+		(
+			key: 'scrollingX' | 'scrollingY' | 'animating' | 'bouncing' | 'locking' | 'zooming',
+			value: boolean
+		) => {}
+	)
+
+	$effect(() => {
+		saveChanges('scrollingX', scrollingX)
+	})
+	$effect(() => {
+		saveChanges('scrollingY', scrollingY)
+	})
+	$effect(() => {
+		saveChanges('animating', animating)
+	})
+	$effect(() => {
+		saveChanges('bouncing', bouncing)
+	})
+	$effect(() => {
+		saveChanges('locking', locking)
+	})
+	$effect(() => {
+		saveChanges('zooming', zooming)
+	})
+	$effect(() => {
+		scrollTo && scrollTop !== null ? scrollTo() : null
+	})
+	$effect(() => {
+		scrollTo && scrollLeft !== null ? scrollTo() : null
+	})
 
 	onMount(() => {
 		saveChanges = (key, value) => {
@@ -131,9 +153,9 @@
 		/>
 	</div>
 	<div>
-		<button on:click={zoom} id="zoom">Zoom to Level</button><button on:click={zoomIn} id="zoomIn"
+		<button onclick={zoom} id="zoom">Zoom to Level</button><button onclick={zoomIn} id="zoomIn"
 			>+</button
-		><button on:click={zoomOut} id="zoomOut">-</button>
+		><button onclick={zoomOut} id="zoomOut">-</button>
 	</div>
 
 	<div>
@@ -152,14 +174,14 @@
 			size="9"
 		/>
 	</div>
-	<div><button on:click={scrollTo} id="scrollTo">Scroll to Coords</button></div>
+	<div><button onclick={scrollTo} id="scrollTo">Scroll to Coords</button></div>
 
 	<div>
-		<button on:click={scrollByUp} id="scrollByUp">&uarr;</button><button
-			on:click={scrollByDown}
+		<button onclick={scrollByUp} id="scrollByUp">&uarr;</button><button
+			onclick={scrollByDown}
 			id="scrollByDown">&darr;</button
-		><button on:click={scrollByLeft} id="scrollByLeft">&larr;</button><button
-			on:click={scrollByRight}
+		><button onclick={scrollByLeft} id="scrollByLeft">&larr;</button><button
+			onclick={scrollByRight}
 			id="scrollByRight">&rarr;</button
 		>
 	</div>

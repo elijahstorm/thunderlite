@@ -1,9 +1,17 @@
 <script lang="ts">
-	export let icon: string = '/images/logo/colored-small-tank.png'
-	export let url: string = '/images/logo/colored-small.png'
+	interface Props {
+		icon?: string
+		url?: string
+		width?: number
+		height?: number
+	}
 
-	export let width = 200
-	export let height = 150
+	let {
+		icon = '/images/logo/colored-small-tank.png',
+		url = '/images/logo/colored-small.png',
+		width = 200,
+		height = 150,
+	}: Props = $props()
 </script>
 
 <div class="logo">

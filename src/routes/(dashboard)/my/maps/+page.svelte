@@ -3,9 +3,13 @@
 	import type { PageData } from './$types'
 	import MapThumbnail from '$lib/Components/Widgets/Social/MapThumbnail.svelte'
 
-	export let data: PageData
-	$: maps = data.maps
-	$: atLimit = data.remaining <= 0
+	interface Props {
+		data: PageData
+	}
+
+	let { data }: Props = $props()
+	let maps = $derived(data.maps)
+	let atLimit = $derived(data.remaining <= 0)
 
 	const formatDate = (date: Date | string) =>
 		new Date(date).toLocaleDateString(undefined, {

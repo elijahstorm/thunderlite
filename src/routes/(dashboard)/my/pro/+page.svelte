@@ -4,23 +4,23 @@
 	import { invalidateAll } from '$app/navigation'
 	import { PLANS, PERKS, formatPrice, type PlanId, type SubscriptionView } from '$lib/Pro/plans'
 
-	export let data
+	let { data } = $props()
 
-	$: subscription = data.subscription as SubscriptionView | null
-	$: isPro = subscription?.isPro ?? false
+	let subscription = $derived(data.subscription as SubscriptionView | null)
+	let isPro = $derived(subscription?.isPro ?? false)
 
-	let selectedPlan: PlanId = 'monthly'
-	let checkoutOpen = false
-	let processing = false
+	let selectedPlan: PlanId = $state('monthly')
+	let checkoutOpen = $state(false)
+	let processing = $state(false)
 
 	// Test-mode card fields. These never leave the browser — the server records
 	// only the chosen plan. They exist so the payment flow can be exercised.
-	let cardName = ''
-	let cardNumber = ''
-	let cardExpiry = ''
-	let cardCvc = ''
+	let cardName = $state('')
+	let cardNumber = $state('')
+	let cardExpiry = $state('')
+	let cardCvc = $state('')
 
-	$: plan = PLANS[selectedPlan]
+	let plan = $derived(PLANS[selectedPlan])
 
 	const formatDate = (iso: string | null) =>
 		iso
@@ -132,9 +132,7 @@
 					<p class="text-xs uppercase tracking-wide text-muted-foreground">Current plan</p>
 					<p class="text-2xl font-semibold tracking-tight text-foreground mt-1">
 						{PLANS[subscription.plan].label} · {formatPrice(subscription.priceCents)}
-						<span class="text-sm font-normal text-muted-foreground"
-							>/{subscription.interval}</span
-						>
+						<span class="text-sm font-normal text-muted-foreground">/{subscription.interval}</span>
 					</p>
 				</div>
 				<span
@@ -162,11 +160,11 @@
 
 			<div class="border-t border-border pt-6 flex flex-wrap gap-3">
 				{#if subscription.cancelAtPeriodEnd}
-					<button class="btn btn-primary" on:click={resume} disabled={processing}>
+					<button class="btn btn-primary" onclick={resume} disabled={processing}>
 						Resume subscription
 					</button>
 				{:else}
-					<button class="btn btn-secondary" on:click={cancel} disabled={processing}>
+					<button class="btn btn-secondary" onclick={cancel} disabled={processing}>
 						Cancel subscription
 					</button>
 				{/if}
@@ -174,8 +172,8 @@
 
 			<p class="text-xs text-muted-foreground flex items-center gap-1.5">
 				<Icon icon="lucide:flask-conical" width={13} />
-				Test mode. No real charge is made. Pro currently unlocks nothing; it exists to exercise the
-				billing flow.
+				Test mode. No real charge is made. Pro currently unlocks nothing; it exists to exercise the billing
+				flow.
 			</p>
 		</div>
 	{:else}
@@ -203,7 +201,7 @@
 						class:bg-accent={selectedPlan === p.id}
 						class:border-border={selectedPlan !== p.id}
 						class:hover:bg-muted={selectedPlan !== p.id}
-						on:click={() => (selectedPlan = p.id)}
+						onclick={() => (selectedPlan = p.id)}
 					>
 						<div class="flex items-center justify-between">
 							<span class="text-sm font-semibold text-foreground">{p.label}</span>
@@ -229,7 +227,7 @@
 					<Icon icon="lucide:flask-conical" width={13} />
 					Test mode. No real charge is made.
 				</p>
-				<button class="btn btn-primary" on:click={() => openCheckout(selectedPlan)}>
+				<button class="btn btn-primary" onclick={() => openCheckout(selectedPlan)}>
 					Subscribe · {formatPrice(plan.priceCents)}/{plan.interval}
 				</button>
 			</div>
@@ -241,16 +239,16 @@
 	<!-- Simulated checkout. Card details stay in the browser. -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-sm"
-		on:click={closeCheckout}
-		on:keydown={(e) => e.key === 'Escape' && closeCheckout()}
+		onclick={closeCheckout}
+		onkeydown={(e) => e.key === 'Escape' && closeCheckout()}
 		role="button"
 		tabindex="-1"
 		aria-label="Close checkout"
 	>
 		<div
 			class="card w-full max-w-md p-6 sm:p-8 space-y-5"
-			on:click|stopPropagation
-			on:keydown|stopPropagation
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.stopPropagation()}
 			role="dialog"
 			aria-modal="true"
 			tabindex="0"
@@ -264,7 +262,7 @@
 				</div>
 				<button
 					class="text-muted-foreground hover:text-foreground"
-					on:click={closeCheckout}
+					onclick={closeCheckout}
 					disabled={processing}
 					aria-label="Close"
 				>
@@ -277,7 +275,7 @@
 			>
 				<Icon icon="lucide:flask-conical" width={14} />
 				Test mode. This won't charge a real card.
-				<button class="ml-auto underline hover:no-underline" type="button" on:click={fillTestCard}>
+				<button class="ml-auto underline hover:no-underline" type="button" onclick={fillTestCard}>
 					Use test card
 				</button>
 			</div>
@@ -331,7 +329,7 @@
 
 			<button
 				class="btn btn-primary w-full"
-				on:click={submitCheckout}
+				onclick={submitCheckout}
 				disabled={processing || !cardComplete()}
 			>
 				{#if processing}

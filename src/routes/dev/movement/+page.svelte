@@ -5,40 +5,23 @@
 	import { terrainData } from '$lib/GameData/terrain'
 	import { generateMovementList, drag, validTerrain } from '$lib/Engine/Interactor/Pathing/movement'
 
-	let sceneIndex = 0
-	$: scene = devScenes[sceneIndex]
+	let sceneIndex = $state(0)
 
-	let map: MapObject
-	let lastSceneId = ''
-	$: if (scene.id !== lastSceneId) {
-		lastSceneId = scene.id
-		map = scene.build()
-		selected = firstUnitTile(map)
-		overrideType = selected != null ? (map.layers.units[selected]?.type ?? 0) : 0
-	}
+	let map = $state.raw<MapObject>()
+	let lastSceneId = $state('')
 
 	const firstUnitTile = (m: MapObject): number | null => {
 		const i = m.layers.units.findIndex((u) => u)
 		return i < 0 ? null : i
 	}
 
-	let selected: number | null = null
+	let selected: number | null = $state(null)
 	// Override the selected unit's type to compare movement profiles on one map.
-	let overrideType = 0
-
-	$: selectedUnit =
-		selected != null && map?.layers.units[selected]
-			? { ...map.layers.units[selected]!, type: overrideType }
-			: null
-
-	$: reachable =
-		selected != null && selectedUnit
-			? new Set(generateMovementList(map, selected, selectedUnit))
-			: new Set<number>()
+	let overrideType = $state(0)
 
 	// Single-step entry cost into each tile for the selected unit's profile.
 	const entryCost = (tile: number): number | null => {
-		if (!selectedUnit) return null
+		if (!selectedUnit || !map) return null
 		const ground = map.layers.ground[tile]
 		if (!validTerrain(ground, selectedUnit)) return null
 		return drag(selectedUnit, ground, map.layers.sky[tile])
@@ -59,24 +42,51 @@
 	}
 
 	const onTile = (tile: number) => {
-		if (map.layers.units[tile]) {
+		if (map?.layers.units[tile]) {
 			selected = tile
 			overrideType = map.layers.units[tile]!.type
 		}
 	}
 
-	$: stats = unitData[overrideType]
-
+	let scene = $derived(devScenes[sceneIndex])
+	$effect(() => {
+		if (scene.id !== lastSceneId) {
+			lastSceneId = scene.id
+			const built = scene.build()
+			map = built
+			selected = firstUnitTile(built)
+			overrideType = selected != null ? (built.layers.units[selected]?.type ?? 0) : 0
+		}
+	})
+	let selectedUnit = $derived(
+		selected != null && map?.layers.units[selected]
+			? { ...map.layers.units[selected]!, type: overrideType }
+			: null
+	)
+	let reachable = $derived(
+		selected != null && selectedUnit && map
+			? new Set(generateMovementList(map, selected, selectedUnit))
+			: new Set<number>()
+	)
+	let stats = $derived(unitData[overrideType])
 	// ── Cost reference: every terrain × the selected movement type ──────────────
-	$: costRows = terrainData.map((t, ti) => ({
-		name: t.name,
-		cost: drag({ type: overrideType, team: 0, state: 0 } as UnitObject, { type: ti } as GroundObject),
-		passable: validTerrain({ type: ti } as GroundObject, {
-			type: overrideType,
-			team: 0,
-			state: 0,
-		} as UnitObject),
-	}))
+	let costRows = $derived(
+		terrainData.map((t, ti) => ({
+			name: t.name,
+			cost: drag(
+				{ type: overrideType, team: 0, state: 0 } as UnitObject,
+				{ type: ti } as GroundObject
+			),
+			passable: validTerrain(
+				{ type: ti } as GroundObject,
+				{
+					type: overrideType,
+					team: 0,
+					state: 0,
+				} as UnitObject
+			),
+		}))
+	)
 </script>
 
 <svelte:head><title>ThunderLite — Movement & Transport</title></svelte:head>
@@ -87,8 +97,9 @@
 		<h1 class="text-2xl font-bold">Movement &amp; Transport</h1>
 		<p class="text-sm text-slate-400">
 			Reachable range and per-tile entry cost via the live
-			<code class="text-slate-300">generateMovementList</code> / <code class="text-slate-300">drag</code>.
-			Click a unit to select it; override its profile to compare movement types on the same map.
+			<code class="text-slate-300">generateMovementList</code> /
+			<code class="text-slate-300">drag</code>. Click a unit to select it; override its profile to
+			compare movement types on the same map.
 		</p>
 	</header>
 
@@ -100,7 +111,7 @@
 						class="rounded px-3 py-1.5 text-sm {i === sceneIndex
 							? 'bg-yellow-500 font-semibold text-slate-900'
 							: 'bg-slate-800 hover:bg-slate-700'}"
-						on:click={() => (sceneIndex = i)}
+						onclick={() => (sceneIndex = i)}
 					>
 						{s.name}
 					</button>

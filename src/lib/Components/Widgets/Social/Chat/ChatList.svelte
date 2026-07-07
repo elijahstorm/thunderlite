@@ -4,27 +4,31 @@
 	import UserImageAndName from '../UserImageAndName.svelte'
 	import { browser } from '$app/environment'
 	import { writable, type Writable } from 'svelte/store'
-	import { onDestroy, onMount, createEventDispatcher } from 'svelte'
+	import { onDestroy, onMount } from 'svelte'
 
-	export let socketMessages: Writable<
-		(MessageDBData & {
-			created_at: Date
-			read_at: Date | null
-		})[]
-	>
-	export let highlight = false
+	interface Props {
+		socketMessages: Writable<
+			(MessageDBData & {
+				created_at: Date
+				read_at: Date | null
+			})[]
+		>
+		highlight?: boolean
+		onchat?: (userAuth: string) => void
+		ontoggle?: () => void
+	}
 
-	const dispatch = createEventDispatcher()
+	let { socketMessages, highlight = false, onchat, ontoggle }: Props = $props()
 
 	let auth = writable<string | null>(null)
-	let me: Promise<UserDBData> | undefined
+	let me: Promise<UserDBData> | undefined = $state()
 
 	// Two ways to find someone to talk to: who's signed in right now (realtime
 	// presence, polled) and your friends (persisted). In-game players are opened
 	// straight from the game roster, not this panel.
 	const online = writable<UserDBData[]>([])
 	const friends = writable<UserDBData[]>([])
-	let loadingFriends = true
+	let loadingFriends = $state(true)
 	let onlineTimer: ReturnType<typeof setInterval> | null = null
 
 	const ONLINE_POLL_MS = 12_000
@@ -42,18 +46,18 @@
 			.catch(() => {})
 			.finally(() => (loadingFriends = false))
 
-	const openChatRoom = (userAuth: string) => dispatch('chat', userAuth)
+	const openChatRoom = (userAuth: string) => onchat?.(userAuth)
 
 	// Online takes priority; a friend who is also online shows only in the top
 	// section so nobody appears twice.
-	$: onlineAuths = new Set($online.map((user) => user.auth))
-	$: offlineFriends = $friends.filter((user) => !onlineAuths.has(user.auth))
+	let onlineAuths = $derived(new Set($online.map((user) => user.auth)))
+	let offlineFriends = $derived($friends.filter((user) => !onlineAuths.has(user.auth)))
 
 	// A live DM updates the sender's preview + unread mark in the friends list.
 	// If the sender isn't listed yet, a presence refresh pulls them into "Online
 	// now" so there's always a row to open.
-	let lastSeen = 0
-	$: {
+	let lastSeen = $state(0)
+	$effect(() => {
 		const fresh = $socketMessages.slice(lastSeen)
 		if (fresh.length) {
 			lastSeen = $socketMessages.length
@@ -73,7 +77,7 @@
 				)
 			}
 		}
-	}
+	})
 
 	const timeSince = (when?: Date | string | null, now = new Date()) => {
 		if (!when) return ''
@@ -122,7 +126,10 @@
 		<button
 			type="button"
 			class="flex items-center gap-3 min-w-0"
-			on:click|stopPropagation={() => dispatch('toggle')}
+			onclick={(e) => {
+				e.stopPropagation()
+				ontoggle?.()
+			}}
 			aria-label="Toggle chat"
 		>
 			{#await me}
@@ -135,7 +142,10 @@
 			type="button"
 			class="text-muted-foreground hover:text-foreground rounded-full p-1"
 			class:hidden={highlight}
-			on:click|stopPropagation={() => dispatch('toggle')}
+			onclick={(e) => {
+				e.stopPropagation()
+				ontoggle?.()
+			}}
 			aria-label="Close"
 		>
 			<svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
@@ -155,7 +165,7 @@
 					<button
 						type="button"
 						class="w-full text-left rounded-lg px-2 py-2 hover:bg-muted transition-colors flex items-center gap-3"
-						on:click={() => openChatRoom(user.auth)}
+						onclick={() => openChatRoom(user.auth)}
 					>
 						<div class="relative flex-shrink-0">
 							<UserIcon {user} noClick size={2.25} />
@@ -186,7 +196,7 @@
 					<button
 						type="button"
 						class="w-full text-left rounded-lg px-2 py-2 hover:bg-muted transition-colors flex items-center gap-3"
-						on:click={() => openChatRoom(user.auth)}
+						onclick={() => openChatRoom(user.auth)}
 					>
 						<UserIcon {user} noClick size={2.25} />
 						<div class="min-w-0 flex-1">

@@ -7,10 +7,14 @@
 	import { performMenuAction, peekMenu, cancelMenu } from '../Interactor/interactor'
 	import type { ActionMenuItemId } from '../actions'
 
-	export let map: MapObject | undefined = undefined
+	interface Props {
+		map?: MapObject | undefined
+	}
 
-	$: menu = $actionMenuState
-	$: geo = $boardGeometry
+	let { map = undefined }: Props = $props()
+
+	let menu = $derived($actionMenuState)
+	let geo = $derived($boardGeometry)
 
 	const labels: Record<ActionMenuItemId, string> = {
 		attack: 'Attack',
@@ -32,20 +36,20 @@
 	const ITEM_DURATION = 220
 
 	// Viewport size (kept live) so the panel can clamp itself fully on-screen.
-	let vw = 0
-	let vh = 0
+	let vw = $state(0)
+	let vh = $state(0)
 
 	// The rendered panel's box, measured so placement math knows how much room it
 	// needs before deciding which side of the unit to sit on.
-	let panelW = 0
-	let panelH = 0
+	let panelW = $state(0)
+	let panelH = $state(0)
 
 	// On-screen box of the unit's tile, derived from the board geometry the main
 	// TileSelector publishes as the camera moves. Tracks both the open menu and the
 	// "peek" state, so the focus ring keeps marking the pending unit while the
 	// player looks around. Null until the board + a (open or peeking) menu exist —
 	// the fallback below then centres the panel.
-	$: tileBox =
+	let tileBox = $derived(
 		geo && (menu.open || menu.peeking) && menu.unitTile != null && map
 			? {
 					left: geo.originLeft + (menu.unitTile % map.cols) * geo.cellWidth,
@@ -54,6 +58,7 @@
 					h: geo.cellHeight,
 				}
 			: null
+	)
 
 	const MARGIN = 12
 	const GAP = 14
@@ -61,25 +66,27 @@
 	// Anchor the panel beside the unit: prefer its right flank, fall back to the
 	// left when that would run off-screen, then clamp vertically around the tile's
 	// centre. `side` feeds the cascade direction so buttons fly *out from* the unit.
-	$: placement = (() => {
-		if (!tileBox || !vw || !vh || !panelW || !panelH) {
-			return { left: null as number | null, top: null as number | null, side: 'right' as const }
-		}
-		const tileCenterY = tileBox.top + tileBox.h / 2
-		let side: 'right' | 'left' = 'right'
-		let left = tileBox.left + tileBox.w + GAP
-		if (left + panelW > vw - MARGIN) {
-			side = 'left'
-			left = tileBox.left - GAP - panelW
-		}
-		left = Math.max(MARGIN, Math.min(left, vw - panelW - MARGIN))
-		let top = tileCenterY - panelH / 2
-		top = Math.max(MARGIN, Math.min(top, vh - panelH - MARGIN))
-		return { left, top, side }
-	})()
+	let placement = $derived(
+		(() => {
+			if (!tileBox || !vw || !vh || !panelW || !panelH) {
+				return { left: null as number | null, top: null as number | null, side: 'right' as const }
+			}
+			const tileCenterY = tileBox.top + tileBox.h / 2
+			let side: 'right' | 'left' = 'right'
+			let left = tileBox.left + tileBox.w + GAP
+			if (left + panelW > vw - MARGIN) {
+				side = 'left'
+				left = tileBox.left - GAP - panelW
+			}
+			left = Math.max(MARGIN, Math.min(left, vw - panelW - MARGIN))
+			let top = tileCenterY - panelH / 2
+			top = Math.max(MARGIN, Math.min(top, vh - panelH - MARGIN))
+			return { left, top, side }
+		})()
+	)
 
-	$: anchored = placement.left != null && placement.top != null
-	$: flyFrom = placement.side === 'left' ? 18 : -18
+	let anchored = $derived(placement.left != null && placement.top != null)
+	let flyFrom = $derived(placement.side === 'left' ? 18 : -18)
 
 	const handleSelect = (id: ActionMenuItemId) => {
 		if (!map) return
@@ -146,7 +153,7 @@
 		class="fixed inset-0 z-54 cursor-default bg-black/25"
 		aria-label={menu.moved ? 'Dismiss menu and look around' : 'Cancel and deselect unit'}
 		data-testid="action-menu-backdrop"
-		on:click={handleDismiss}
+		onclick={handleDismiss}
 		transition:fade={{ duration: 180 }}
 	></button>
 
@@ -174,7 +181,7 @@
 					title={menu.moved
 						? 'Look around: tap the board to bring the menu back'
 						: 'Cancel: deselect this unit without using its turn'}
-					on:click={handleDismiss}
+					onclick={handleDismiss}
 				>
 					{#if menu.moved}
 						<svg
@@ -216,8 +223,14 @@
 						data-testid={`action-menu-${item.id}`}
 						disabled={!item.enabled}
 						title={item.reason ?? labels[item.id]}
-						on:click={() => handleSelect(item.id)}
-						in:fly={{ x: flyFrom, y: 4, duration: ITEM_DURATION, delay: i * STAGGER_MS, easing: cubicOut }}
+						onclick={() => handleSelect(item.id)}
+						in:fly={{
+							x: flyFrom,
+							y: 4,
+							duration: ITEM_DURATION,
+							delay: i * STAGGER_MS,
+							easing: cubicOut,
+						}}
 					>
 						{labels[item.id]}
 						{#if !item.enabled && item.reason}

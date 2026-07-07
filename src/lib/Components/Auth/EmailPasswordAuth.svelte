@@ -4,16 +4,16 @@
 
 	type Mode = 'login' | 'signup' | 'verify-email' | 'mfa'
 
-	let mode: Mode = 'login'
-	let email = ''
-	let password = ''
-	let confirmPassword = ''
-	let code = ''
-	let recoveryCode = ''
-	let useRecoveryCode = false
-	let loading = false
-	let errorMessage = ''
-	let noticeMessage = ''
+	let mode = $state<Mode>('login')
+	let email = $state('')
+	let password = $state('')
+	let confirmPassword = $state('')
+	let code = $state('')
+	let recoveryCode = $state('')
+	let useRecoveryCode = $state(false)
+	let loading = $state(false)
+	let errorMessage = $state('')
+	let noticeMessage = $state('')
 
 	const NETWORK_ERROR = 'Could not reach the server. Please try again.'
 
@@ -146,8 +146,8 @@
 		}
 	}
 
-	$: isCodeStep = mode === 'verify-email' || mode === 'mfa'
-	$: heading =
+	let isCodeStep = $derived(mode === 'verify-email' || mode === 'mfa')
+	let heading = $derived(
 		mode === 'login'
 			? 'Sign in'
 			: mode === 'signup'
@@ -155,7 +155,8 @@
 				: mode === 'verify-email'
 					? 'Verify your email'
 					: 'Two-factor authentication'
-	$: subheading =
+	)
+	let subheading = $derived(
 		mode === 'login'
 			? 'Welcome back. Pick up where you left off.'
 			: mode === 'signup'
@@ -165,7 +166,8 @@
 					: useRecoveryCode
 						? 'Enter one of your recovery codes.'
 						: 'Enter the code from your authenticator app.'
-	$: submitLabel =
+	)
+	let submitLabel = $derived(
 		mode === 'login'
 			? 'Sign in'
 			: mode === 'signup'
@@ -173,6 +175,7 @@
 				: mode === 'verify-email'
 					? 'Verify email'
 					: 'Verify code'
+	)
 </script>
 
 <div class="space-y-6">
@@ -188,7 +191,7 @@
 				role="tab"
 				aria-selected={mode === 'login'}
 				class="btn btn-sm {mode === 'login' ? 'btn-primary' : 'btn-ghost'}"
-				on:click={() => switchMode('login')}
+				onclick={() => switchMode('login')}
 			>
 				Sign in
 			</button>
@@ -197,7 +200,7 @@
 				role="tab"
 				aria-selected={mode === 'signup'}
 				class="btn btn-sm {mode === 'signup' ? 'btn-primary' : 'btn-ghost'}"
-				on:click={() => switchMode('signup')}
+				onclick={() => switchMode('signup')}
 			>
 				Sign up
 			</button>
@@ -208,7 +211,13 @@
 		<p class="text-sm p-3 rounded-lg border border-border bg-surface-2">{noticeMessage}</p>
 	{/if}
 
-	<form class="space-y-4" on:submit|preventDefault={submit}>
+	<form
+		class="space-y-4"
+		onsubmit={(e) => {
+			e.preventDefault()
+			submit()
+		}}
+	>
 		{#if mode === 'login' || mode === 'signup'}
 			<div class="space-y-1.5">
 				<label for="email" class="field-label">Email</label>
@@ -298,19 +307,21 @@
 		<button
 			type="button"
 			class="link text-sm"
-			on:click={() => {
+			onclick={() => {
 				useRecoveryCode = !useRecoveryCode
 				code = ''
 				recoveryCode = ''
 				errorMessage = ''
 			}}
 		>
-			{useRecoveryCode ? 'Use your authenticator code instead' : "Can't access your authenticator? Use a recovery code"}
+			{useRecoveryCode
+				? 'Use your authenticator code instead'
+				: "Can't access your authenticator? Use a recovery code"}
 		</button>
 	{/if}
 
 	{#if isCodeStep}
-		<button type="button" class="link text-sm" on:click={() => goTo('login')}>
+		<button type="button" class="link text-sm" onclick={() => goTo('login')}>
 			← Back to sign in
 		</button>
 	{:else}

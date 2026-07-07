@@ -5,13 +5,24 @@
 	import EndTurnButton from './EndTurnButton.svelte'
 	import TileInfoPanel from './TileInfoPanel.svelte'
 
-	export let map: MapObject | undefined = undefined
-	export let onEndTurn: () => void = () => {}
-	export let localTeam: number = 0
-	export let cpuOpponent: boolean = false
-	/** Show the dimmed, hover-to-reveal overview map atop the HUD stack. */
-	export let minimap: boolean = false
-	export let fogOfWar: boolean = false
+	interface Props {
+		map?: MapObject | undefined
+		onEndTurn?: () => void
+		localTeam?: number
+		cpuOpponent?: boolean
+		/** Show the dimmed, hover-to-reveal overview map atop the HUD stack. */
+		minimap?: boolean
+		fogOfWar?: boolean
+	}
+
+	let {
+		map = undefined,
+		onEndTurn = () => {},
+		localTeam = 0,
+		cpuOpponent = false,
+		minimap = false,
+		fogOfWar = false,
+	}: Props = $props()
 </script>
 
 <!--

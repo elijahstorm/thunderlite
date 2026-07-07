@@ -3,10 +3,14 @@
 	import FallbackImage from '../Images/FallbackImage.svelte'
 	import { browser } from '$app/environment'
 
-	export let user: UserDBData
+	interface Props {
+		user: UserDBData
+	}
+
+	let { user }: Props = $props()
 
 	let relationship: string
-	let auth = writable<string | null>(null)
+	let auth = $state(writable<string | null>(null))
 
 	if (browser) {
 		import('$lib/dontcode/client').then((session) => (auth = session.userAuth))
@@ -25,11 +29,11 @@
 
 	const message = () => fetch(`/api/user/${user.auth}/message`, { method: 'POST' })
 
-	$: {
+	$effect(() => {
 		if ($auth && $auth !== user.auth) {
 			getRelationshipStatus()
 		}
-	}
+	})
 </script>
 
 <div
@@ -55,13 +59,19 @@
 			<div class="flex mt-4 space-x-2" class:hidden={true}>
 				<button
 					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground h-9 rounded-md px-3 w-full hover:bg-gray-700 hover:text-white transition-all duration-200"
-					on:click|stopPropagation={friend}
+					onclick={(e) => {
+						e.stopPropagation()
+						friend()
+					}}
 				>
 					Friend
 				</button>
 				<button
 					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground h-9 rounded-md px-3 w-full hover:bg-gray-700 hover:text-white transition-all duration-200"
-					on:click|stopPropagation={block}
+					onclick={(e) => {
+						e.stopPropagation()
+						block()
+					}}
 				>
 					Block
 				</button>
@@ -69,13 +79,19 @@
 			<div class="flex mt-4 space-x-2">
 				<button
 					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground h-9 rounded-md px-3 w-full hover:bg-gray-700 hover:text-white transition-all duration-200"
-					on:click|stopPropagation={follow}
+					onclick={(e) => {
+						e.stopPropagation()
+						follow()
+					}}
 				>
 					Follow
 				</button>
 				<button
 					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent h-9 rounded-md px-3 w-full hover:border-gray-700 hover:text-gray-700 transition-all duration-200"
-					on:click|stopPropagation={message}
+					onclick={(e) => {
+						e.stopPropagation()
+						message()
+					}}
 				>
 					Message
 				</button>

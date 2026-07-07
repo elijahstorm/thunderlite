@@ -7,8 +7,8 @@
 	import { getLevelById, getLevelByOrder } from '$lib/Campaign/levels'
 	import { isUnlocked } from '$lib/Campaign/progress'
 
-	$: levelId = $page.params.levelId ?? ''
-	$: level = getLevelById(levelId)
+	let levelId = $derived($page.params.levelId ?? '')
+	let level = $derived(getLevelById(levelId))
 
 	// A locked or unknown level can't be launched directly. Progress is read from
 	// the local mirror (guest bucket — see progress.ts), so this runs client-side.

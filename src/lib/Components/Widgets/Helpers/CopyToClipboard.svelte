@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
 
-	export let value: string
+	interface Props {
+		value: string
+	}
 
-	let textarea: HTMLTextAreaElement
+	let { value = $bindable() }: Props = $props()
+
+	let textarea = $state<HTMLTextAreaElement>()
 
 	onMount(() => {
+		if (!textarea) return
 		textarea.select()
 		textarea.setSelectionRange(0, 99999)
 		navigator.clipboard.writeText(textarea.value)

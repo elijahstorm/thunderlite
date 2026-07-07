@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
 	import { enhance } from '$app/forms'
 	import AccountPanel from '$lib/Components/Auth/AccountPanel.svelte'
 	import DataInput from '$lib/Components/Widgets/Forms/DataInput.svelte'
@@ -6,32 +7,42 @@
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
 	import { addToast } from 'as-toast'
 
-	export let data
-	$: user = data.user
-	$: stats = data.stats
+	let { data, form } = $props()
 
-	export let form
-	let errors: { [key: string]: string } = {}
+	// Local working copy of the profile: seeded from the server user, kept in sync as
+	// the server value changes, but preserving in-progress edits (hence the self-merge,
+	// which a plain writable `$derived` can't express).
+	// eslint-disable-next-line svelte/prefer-writable-derived
+	let updated: UserDBData = $state(untrack(() => data.user))
 
-	let updated: UserDBData
-	$: updated = { ...(user ?? {}), ...(updated ?? {}) }
-
-	let usernameTaken = false
+	let usernameTaken = $state(false)
 
 	const resetForm = (data = {}) => (updated = { ...(user ?? {}), ...data })
 
-	const checkUsernameTaken = (data: { detail: { target: { value: string } } }) =>
-		data.detail.target.value &&
-		fetch(`/api/user/exists/${data.detail.target.value}`)
-			.then((response) => response.json())
-			.then((data) => (usernameTaken = data.exists?.length))
-
-	$: {
-		errors = Object.entries(form?.errors ?? {}).reduce(
-			(carry, [dataName, errors]) => ({ ...carry, [dataName]: errors[0] }),
-			{}
+	const checkUsernameTaken = (e: Event) => {
+		const value = (e.target as HTMLInputElement)?.value
+		return (
+			value &&
+			fetch(`/api/user/exists/${value}`)
+				.then((response) => response.json())
+				.then((data) => (usernameTaken = data.exists?.length))
 		)
 	}
+
+	let user = $derived(data.user)
+	let stats = $derived(data.stats)
+	// Re-merge server fields into the working copy when the server user changes,
+	// preserving in-progress local edits. Depends only on `user`; `updated` is read
+	// untracked so a local edit doesn't re-trigger the merge (which would loop).
+	$effect.pre(() => {
+		updated = { ...(user ?? {}), ...untrack(() => updated ?? {}) }
+	})
+	const errors: { [key: string]: string } = $derived(
+		Object.entries(form?.errors ?? {}).reduce(
+			(carry, [dataName, e]) => ({ ...carry, [dataName]: (e as string[])[0] }),
+			{} as { [key: string]: string }
+		)
+	)
 </script>
 
 <section>
@@ -81,7 +92,7 @@
 			id="username"
 			invalid={usernameTaken || Object.hasOwn(errors, 'username')}
 			message={usernameTaken ? 'Sorry! This username is already taken' : (errors.username ?? '')}
-			on:change={checkUsernameTaken}
+			onchange={checkUsernameTaken}
 		/>
 
 		<DataInput
@@ -96,7 +107,7 @@
 		/>
 
 		<div class="flex justify-end gap-2 pt-6">
-			<button class="btn btn-ghost" type="button" on:click={() => resetForm()}>Cancel</button>
+			<button class="btn btn-ghost" type="button" onclick={() => resetForm()}>Cancel</button>
 			<button class="btn btn-primary" type="submit">Save changes</button>
 		</div>
 	</form>

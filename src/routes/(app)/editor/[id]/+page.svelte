@@ -2,9 +2,13 @@
 	import type { PageData } from './$types'
 	import MapEditor from '$lib/Map/MapEditor.svelte'
 
-	export let data: PageData
-	$: mapHash = data.mapHash
-	$: mapId = data.mapId
+	interface Props {
+		data: PageData
+	}
+
+	let { data }: Props = $props()
+	let mapHash = $derived(data.mapHash)
+	let mapId = $derived(data.mapId)
 </script>
 
 <MapEditor {mapHash} {mapId} />

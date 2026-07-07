@@ -3,20 +3,24 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { buildingData } from '$lib/GameData/building'
 
-	export let map: MapObject
-	export let cell = 56
-	/** Per-tile overlay. Return styling/labels to paint on top of a tile. */
-	export let overlay: (tile: number) => {
-		bg?: string
-		text?: string
-		textColor?: string
-		ring?: string
-	} = () => ({})
-	export let onTile: (tile: number) => void = () => {}
-	export let selected: number | null = null
+	interface Props {
+		map: MapObject
+		cell?: number
+		/** Per-tile overlay. Return styling/labels to paint on top of a tile. */
+		overlay?: (tile: number) => {
+			bg?: string
+			text?: string
+			textColor?: string
+			ring?: string
+		}
+		onTile?: (tile: number) => void
+		selected?: number | null
+	}
 
-	$: cols = map.cols
-	$: rows = map.rows
+	let { map, cell = 56, overlay = () => ({}), onTile = () => {}, selected = null }: Props = $props()
+
+	let cols = $derived(map.cols)
+	let rows = $derived(map.rows)
 
 	// Mirrors the in-game colorizer palette: 0 red, 1 blue, 2 green, 3 yellow, 4 grey (neutral).
 	const teamColor = (team: number): string =>
@@ -45,7 +49,7 @@
 			style="width:{cell}px;height:{cell}px;background:{terrainColor(
 				map.layers.ground[tile].type
 			)};{selected === tile ? 'outline:2px solid #fff;outline-offset:-2px;z-index:2;' : ''}"
-			on:click={() => onTile(tile)}
+			onclick={() => onTile(tile)}
 		>
 			<!-- terrain overlay (heatmap / highlight) -->
 			{#if o.bg}

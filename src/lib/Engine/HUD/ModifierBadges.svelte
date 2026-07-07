@@ -3,14 +3,19 @@
 
 	// Condensed-but-expandable modifier list. Renders each modifier as a small,
 	// color-coded chip you can read at a glance; clicking one reveals how it
-	// works. Each instance tracks its own expanded chip.
-	export let modifiers: readonly ModifierKey[] = []
-	export let testid: string | undefined = undefined
 
-	let expanded: ModifierKey | null = null
+	interface Props {
+		// works. Each instance tracks its own expanded chip.
+		modifiers?: readonly ModifierKey[]
+		testid?: string | undefined
+	}
 
-	$: displays = modifiers.map(modifierDisplay)
-	$: active = expanded != null ? modifierDisplay(expanded) : null
+	let { modifiers = [], testid = undefined }: Props = $props()
+
+	let expanded: ModifierKey | null = $state(null)
+
+	let displays = $derived(modifiers.map(modifierDisplay))
+	let active = $derived(expanded != null ? modifierDisplay(expanded) : null)
 
 	const toggle = (key: ModifierKey) => {
 		expanded = expanded === key ? null : key
@@ -29,7 +34,7 @@
 					data-testid={testid}
 					aria-expanded={expanded === d.key}
 					title={d.label}
-					on:click={() => toggle(d.key)}
+					onclick={() => toggle(d.key)}
 				>
 					<span aria-hidden="true" class="opacity-70">{d.glyph}</span>
 					<span>{d.label}</span>

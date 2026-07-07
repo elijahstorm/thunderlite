@@ -8,16 +8,15 @@
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 
-	export let data: PageData
-	$: user = data.user
-	$: auth = data.auth ?? ''
-	$: redirectTo = data.redirectTo ?? '/make'
+	interface Props {
+		data: PageData
+		form: any
+	}
 
-	export let form
-	let errors: { [key: string]: string } = {}
+	let { data, form }: Props = $props()
 
-	let updated: UserDBData
-	let usernameTaken = false
+	let updated = $state<UserDBData>()
+	let usernameTaken = $state(false)
 
 	const resetForm = (data = {}) =>
 		(updated = {
@@ -36,20 +35,28 @@
 
 	resetForm()
 
-	const checkUsernameTaken = (data: { detail: { target: { value: string } } }) =>
-		data.detail.target.value &&
-		fetch(`/api/user/exists/${data.detail.target.value}`)
-			.then((response) => response.json())
-			.then((data) => (usernameTaken = data.exists?.length))
-
-	$: {
-		errors = Object.entries(form?.errors ?? {}).reduce(
-			(carry, [dataName, errors]) => ({ ...carry, [dataName]: errors[0] }),
-			{}
+	const checkUsernameTaken = (e: Event) => {
+		const value = (e.target as HTMLInputElement)?.value
+		return (
+			value &&
+			fetch(`/api/user/exists/${value}`)
+				.then((response) => response.json())
+				.then((data) => (usernameTaken = data.exists?.length))
 		)
 	}
 
-	$: user && resetForm()
+	let user = $derived(data.user)
+	let auth = $derived(data.auth ?? '')
+	let redirectTo = $derived(data.redirectTo ?? '/make')
+	const errors: { [key: string]: string } = $derived(
+		Object.entries(form?.errors ?? {}).reduce(
+			(carry, [dataName, e]) => ({ ...carry, [dataName]: (e as string[])[0] }),
+			{} as { [key: string]: string }
+		)
+	)
+	$effect.pre(() => {
+		user && resetForm()
+	})
 </script>
 
 <ContentWithFooter noFooterOnMobile>
@@ -57,14 +64,14 @@
 	<div class="md:container w-full break break-word">
 		<div class="max-w-md mx-auto py-8">
 			{#if auth}
-				{#if updated.username}
+				{#if updated?.username}
 					<p class="text-lg pb-4">Upload a picture for you!</p>
 
 					<ImageUploader
 						alt="user profile"
-						src={updated.profile_image_url}
+						src={updated?.profile_image_url}
 						{auth}
-						on:complete={() => goto(redirectTo)}
+						oncomplete={() => goto(redirectTo)}
 					/>
 				{:else}
 					<form
@@ -91,7 +98,7 @@
 
 						<DataInput
 							icon="/images/icons/person.svg"
-							value={updated.display_name}
+							value={updated?.display_name ?? ''}
 							placeholder="Solid Scoundral"
 							label="Display name"
 							name="display_name"
@@ -102,7 +109,7 @@
 						/>
 
 						<DataInput
-							value={updated.username ? `@${updated.username}` : ''}
+							value={updated?.username ? `@${updated.username}` : ''}
 							placeholder="@solidscoundral26"
 							label="Username"
 							name="username"
@@ -111,11 +118,11 @@
 							message={usernameTaken
 								? 'Sorry! This username is already taken'
 								: (errors.username ?? '')}
-							on:change={checkUsernameTaken}
+							onchange={checkUsernameTaken}
 						/>
 
 						<DataInput
-							value={updated.bio}
+							value={updated?.bio ?? ''}
 							placeholder="I like spicy food and..."
 							label="About you"
 							name="bio"

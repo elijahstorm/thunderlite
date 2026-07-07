@@ -1,8 +1,13 @@
 <script lang="ts">
 	import { socketMessage } from '$lib/Components/Socket/socket'
 
-	export let map: () => MapObject | undefined
-	let requestRedraw: number
+	interface Props {
+		map: () => MapObject | undefined
+		children?: import('svelte').Snippet<[any]>
+	}
+
+	let { map, children }: Props = $props()
+	let requestRedraw = $state(0)
 
 	let socket = {
 		send: (data: string) =>
@@ -15,4 +20,4 @@
 	} as WebSocket
 </script>
 
-<slot {socket} {requestRedraw}></slot>
+{@render children?.({ socket, requestRedraw })}

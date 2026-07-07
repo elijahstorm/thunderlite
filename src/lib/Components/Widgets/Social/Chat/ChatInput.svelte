@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
 	import { addToast } from 'as-toast'
-	import { createEventDispatcher } from 'svelte'
 
-	export let target: string
-	let chatInput: HTMLInputElement
+	interface Props {
+		target: string
+		onsend?: (detail: { message: string }) => void
+	}
 
-	const dispatch = createEventDispatcher()
+	let { target, onsend }: Props = $props()
+	let chatInput = $state<HTMLInputElement>()
 
-	const send = (message: string) => dispatch('send', { message })
+	const send = (message: string) => onsend?.({ message })
 </script>
 
 <form
@@ -22,7 +24,7 @@
 			return
 		}
 		send(message.toString())
-		chatInput.value = ''
+		if (chatInput) chatInput.value = ''
 		return async ({ result, update }) => {
 			// @ts-ignore
 			if (result.status !== 'ok') {

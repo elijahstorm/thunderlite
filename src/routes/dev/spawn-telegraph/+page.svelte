@@ -21,29 +21,17 @@
 	// you see here is what a campaign level does.
 
 	type Perspective = 0 | 1 | -1
-	let perspective: Perspective = 0
-	let fog = false
-	let showTelegraphs = true
-	let rebuildNonce = 0
-	let redraw = 0
+	let perspective: Perspective = $state(0)
+	let fog = $state(false)
+	let showTelegraphs = $state(true)
+	let rebuildNonce = $state(0)
+	let redraw = $state(0)
 
-	// Spectating (team -1) with fog on just blacks the board out — sight comes only
-	// from owned units — so force fog off with no team selected.
-	$: effectiveFog = perspective >= 0 && fog
-	$: fogOfWarEnabled.set(effectiveFog)
-
-	// Any control change rebuilds a fresh board so each run starts from a clean slate.
-	// (Firing a case mutates the board in place; switch a control to reset it.)
-	$: buildKey = `${perspective}|${effectiveFog}|${showTelegraphs}|${rebuildNonce}`
-	let map: MapObject
+	let map = $state.raw<MapObject>()
 	let iface: ReturnType<typeof createCampaignInterface>
-	let fired = new Set<number>()
-	let flooded = new Set<number>()
-	let lastBuildKey = ''
-	$: if (buildKey !== lastBuildKey) {
-		lastBuildKey = buildKey
-		rebuild()
-	}
+	let fired = $state(new Set<number>())
+	let flooded = $state(new Set<number>())
+	let lastBuildKey = $state('')
 
 	const rebuild = () => {
 		clearAnimations()
@@ -64,7 +52,7 @@
 		fired.add(i)
 		fired = fired
 		// Resolved now, so drop its telegraph ghost.
-		if (map.scheduledSpawns) {
+		if (map?.scheduledSpawns) {
 			map.scheduledSpawns = map.scheduledSpawns.filter(
 				(t) => !(t.tile === tileAt(s.x, s.y) && t.team === s.team)
 			)
@@ -85,14 +73,31 @@
 	const fireAllSpawns = () => SPAWN_PLAN.forEach((_, i) => !fired.has(i) && fireSpawn(i))
 	const reset = () => (rebuildNonce += 1)
 
-	$: team0Cases = SPAWN_PLAN.map((s, i) => ({ ...s, i })).filter((s) => s.team === 0)
-	$: team1Cases = SPAWN_PLAN.map((s, i) => ({ ...s, i })).filter((s) => s.team === 1)
+	// Spectating (team -1) with fog on just blacks the board out — sight comes only
+	// from owned units — so force fog off with no team selected.
+	let effectiveFog = $derived(perspective >= 0 && fog)
+	$effect.pre(() => {
+		fogOfWarEnabled.set(effectiveFog)
+	})
+	// Any control change rebuilds a fresh board so each run starts from a clean slate.
+	// (Firing a case mutates the board in place; switch a control to reset it.)
+	let buildKey = $derived(`${perspective}|${effectiveFog}|${showTelegraphs}|${rebuildNonce}`)
+	$effect.pre(() => {
+		if (buildKey !== lastBuildKey) {
+			lastBuildKey = buildKey
+			rebuild()
+		}
+	})
+	let team0Cases = $derived(SPAWN_PLAN.map((s, i) => ({ ...s, i })).filter((s) => s.team === 0))
+	let team1Cases = $derived(SPAWN_PLAN.map((s, i) => ({ ...s, i })).filter((s) => s.team === 1))
 </script>
 
 <svelte:head><title>Spawn Telegraph Playground</title></svelte:head>
 
 <div class="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100">
-	<aside class="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-700 p-4 text-sm">
+	<aside
+		class="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-700 p-4 text-sm"
+	>
 		<div>
 			<a href="/dev" class="text-slate-400 hover:text-white">← Dev</a>
 			<h1 class="mt-1 text-lg font-bold">Spawn Telegraph</h1>
@@ -110,7 +115,7 @@
 						class="flex-1 rounded px-2 py-1 text-xs {perspective === opt.v
 							? 'bg-sky-600 text-white'
 							: 'bg-slate-700 text-slate-300 hover:bg-slate-600'}"
-						on:click={() => (perspective = opt.v as Perspective)}
+						onclick={() => (perspective = opt.v as Perspective)}
 					>
 						{opt.l}
 					</button>
@@ -120,7 +125,9 @@
 				<input type="checkbox" bind:checked={showTelegraphs} />
 				Show next-turn telegraphs
 			</label>
-			<label class="flex items-center gap-2 {perspective < 0 ? 'text-slate-500' : 'text-slate-300'}">
+			<label
+				class="flex items-center gap-2 {perspective < 0 ? 'text-slate-500' : 'text-slate-300'}"
+			>
 				<input type="checkbox" bind:checked={fog} disabled={perspective < 0} />
 				Fog of war
 			</label>
@@ -132,8 +139,13 @@
 
 		<div class="space-y-2 rounded-lg border border-slate-700 bg-slate-800/60 p-3">
 			<div class="flex items-center justify-between">
-				<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Team 0 drops</span>
-				<button class="rounded bg-slate-700 px-2 py-0.5 text-[11px] hover:bg-slate-600" on:click={fireAllSpawns}>
+				<span class="text-xs font-semibold uppercase tracking-wide text-slate-400"
+					>Team 0 drops</span
+				>
+				<button
+					class="rounded bg-slate-700 px-2 py-0.5 text-[11px] hover:bg-slate-600"
+					onclick={fireAllSpawns}
+				>
 					Fire all
 				</button>
 			</div>
@@ -141,7 +153,7 @@
 				<button
 					class="w-full rounded border border-slate-700 bg-slate-900/60 p-2 text-left disabled:opacity-40"
 					disabled={fired.has(c.i)}
-					on:click={() => fireSpawn(c.i)}
+					onclick={() => fireSpawn(c.i)}
 				>
 					<div class="font-semibold text-slate-200">{c.label} {fired.has(c.i) ? '✓' : ''}</div>
 					<div class="text-[11px] text-slate-400">{c.expect}</div>
@@ -155,7 +167,7 @@
 				<button
 					class="w-full rounded border border-slate-700 bg-slate-900/60 p-2 text-left disabled:opacity-40"
 					disabled={fired.has(c.i)}
-					on:click={() => fireSpawn(c.i)}
+					onclick={() => fireSpawn(c.i)}
 				>
 					<div class="font-semibold text-slate-200">{c.label} {fired.has(c.i) ? '✓' : ''}</div>
 					<div class="text-[11px] text-slate-400">{c.expect}</div>
@@ -164,12 +176,14 @@
 		</div>
 
 		<div class="space-y-2 rounded-lg border border-slate-700 bg-slate-800/60 p-3">
-			<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Terrain floods</span>
+			<span class="text-xs font-semibold uppercase tracking-wide text-slate-400"
+				>Terrain floods</span
+			>
 			{#each FLOOD_PLAN as f, i}
 				<button
 					class="w-full rounded border border-slate-700 bg-slate-900/60 p-2 text-left disabled:opacity-40"
 					disabled={flooded.has(i)}
-					on:click={() => fireFlood(i)}
+					onclick={() => fireFlood(i)}
 				>
 					<div class="font-semibold text-slate-200">{f.label} {flooded.has(i) ? '✓' : ''}</div>
 					<div class="text-[11px] text-slate-400">{f.expect}</div>
@@ -177,20 +191,22 @@
 			{/each}
 		</div>
 
-		<button class="rounded bg-slate-700 px-3 py-2 text-sm hover:bg-slate-600" on:click={reset}>
+		<button class="rounded bg-slate-700 px-3 py-2 text-sm hover:bg-slate-600" onclick={reset}>
 			Reset board
 		</button>
 	</aside>
 
 	<main class="relative flex-1 overflow-hidden">
 		{#key buildKey}
-			<GameBoard
-				{map}
-				requestRedraw={redraw}
-				fogOfWar={effectiveFog}
-				localTeam={perspective}
-				menuHref="/dev/spawn-telegraph"
-			/>
+			{#if map}
+				<GameBoard
+					{map}
+					requestRedraw={redraw}
+					fogOfWar={effectiveFog}
+					localTeam={perspective}
+					menuHref="/dev/spawn-telegraph"
+				/>
+			{/if}
 		{/key}
 	</main>
 </div>

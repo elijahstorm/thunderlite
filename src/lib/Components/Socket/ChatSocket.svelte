@@ -5,6 +5,11 @@
 	import { userAuth } from '$lib/dontcode/client'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import { fly } from 'svelte/transition'
+	interface Props {
+		children?: import('svelte').Snippet<[any]>
+	}
+
+	let { children }: Props = $props()
 
 	type SocketMessage = {
 		message: string
@@ -32,7 +37,7 @@
 	let unsubscribeAuth: (() => void) | null = null
 	let error = false
 	/** undefined until a connection succeeds or fails; drives the offline pill. */
-	let opened: boolean | undefined = undefined
+	let opened: boolean | undefined = $state(undefined)
 	/** Realtime is not served here (e.g. local mock gateway) — disable chat quietly. */
 	let unavailable = false
 
@@ -110,7 +115,7 @@
 {#if error}
 	<div class="fixed"></div>
 {:else}
-	<slot {socketMessages}></slot>
+	{@render children?.({ socketMessages })}
 
 	{#if opened === false}
 		<div class="fixed bottom-0 group" in:fly={{ y: -20 }} out:fly={{ y: -20 }}>

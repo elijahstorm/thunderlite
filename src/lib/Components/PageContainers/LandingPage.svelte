@@ -3,7 +3,7 @@
 	import { writable, type Readable } from 'svelte/store'
 	import Icon from '@iconify/svelte'
 
-	let loggedIn: Readable<boolean> = writable(false)
+	let loggedIn: Readable<boolean> = $state(writable(false))
 
 	if (browser) {
 		import('$lib/dontcode/client').then((m) => (loggedIn = m.loggedIn))
@@ -54,9 +54,8 @@
 				</h1>
 
 				<p class="text-lg text-muted-foreground max-w-xl leading-relaxed">
-					ThunderLite is a love letter to Battalion: Arena, a turn-based tactics game in the
-					Advance Wars family. Play live in the browser, design your own maps, and challenge your
-					friends.
+					ThunderLite is a love letter to Battalion: Arena, a turn-based tactics game in the Advance
+					Wars family. Play live in the browser, design your own maps, and challenge your friends.
 				</p>
 
 				<div class="flex flex-wrap items-center gap-3 pt-2">

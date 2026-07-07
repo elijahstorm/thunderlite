@@ -12,21 +12,21 @@
 	import { dialogueState, advanceDialogue, skipDialogue } from './dialogueStore'
 	import { speakerColorOverrides, resolveSpeakerColor } from './speakerColors'
 
-	$: state = $dialogueState
-	$: line = state.lines[state.index] ?? ''
-	$: hasMore = state.index < state.lines.length - 1
+	let state = $derived($dialogueState)
+	let line = $derived(state.lines[state.index] ?? '')
+	let hasMore = $derived(state.index < state.lines.length - 1)
 	// Resolve the speaker's voice colour (script override → built-in → default) and
 	// derive a lighter, readable tint of it for the line text.
-	$: color = resolveSpeakerColor(state.speaker, $speakerColorOverrides)
-	$: textColor = `color-mix(in oklab, ${color} 55%, white)`
+	let color = $derived(resolveSpeakerColor(state.speaker, $speakerColorOverrides))
+	let textColor = $derived(`color-mix(in oklab, ${color} 55%, white)`)
 </script>
 
 {#if state.active}
-	<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 	<div
 		class="fixed inset-x-0 bottom-0 z-[70] flex justify-center p-4"
 		data-testid="dialogue-overlay"
-		on:click={advanceDialogue}
+		onclick={advanceDialogue}
 	>
 		<div
 			class="pointer-events-auto w-full max-w-2xl cursor-pointer rounded border-l-4 bg-black/90 p-4 font-mono text-white shadow-lg"
@@ -40,7 +40,10 @@
 					type="button"
 					class="rounded cursor-pointer bg-white/10 px-2 py-1 text-xs hover:bg-white/20"
 					data-testid="dialogue-skip"
-					on:click|stopPropagation={skipDialogue}
+					onclick={(e) => {
+						e.stopPropagation()
+						skipDialogue()
+					}}
 				>
 					Skip
 				</button>

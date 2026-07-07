@@ -30,31 +30,50 @@
 	import { turnTransitionActive } from './HUD/turnTransitionStore'
 	import { campaignScriptActive } from '$lib/Campaign/scriptGate'
 
-	export let interactor: undefined | ReturnType<typeof socketSelect>
-	export let endTurnAction: (() => void) | undefined = undefined
-	export let localTeam: number = 0
-	// Online CPU seats: which teams a CPU plays, and whether THIS client is the
-	// one that drives them (the lowest-seat human relays the AI's moves).
-	export let aiTeams: number[] = []
-	export let isAiDriver: boolean = false
+	interface Props {
+		interactor: undefined | ReturnType<typeof socketSelect>
+		endTurnAction?: (() => void) | undefined
+		localTeam?: number
+		// Online CPU seats: which teams a CPU plays, and whether THIS client is the
+		// one that drives them (the lowest-seat human relays the AI's moves).
+		aiTeams?: number[]
+		isAiDriver?: boolean
+		userSession?: string
+		gameSession?: string
+		map?: MapObject | undefined
+		/** Surface the corner overview map in the HUD stack (currently the play route). */
+		minimap?: boolean
+		fogOfWar?: boolean
+		// K4 — campaign integration. When `mode` is supplied it overrides the
+		// hotseat/online derivation (campaign is single-player, never a socket match);
+		// `campaignLevelId` rides into the match result so K3's unlock subscriber knows
+		// which level was beaten, and the Continue/Retry callbacks wire the stats
+		// screen to the campaign shell's auto-advance / reload flow.
+		mode?: MatchMode | undefined
+		campaignLevelId?: string | undefined
+		onContinue?: (() => void) | undefined
+		onRetry?: (() => void) | undefined
+		campaignHref?: string
+		children?: import('svelte').Snippet<[{ select: (x: number, y: number) => void }]>
+	}
 
-	export const userSession: string = ''
-	export let gameSession: string = ''
-	export let map: MapObject | undefined = undefined
-	/** Surface the corner overview map in the HUD stack (currently the play route). */
-	export let minimap: boolean = false
-	export let fogOfWar: boolean = false
-
-	// K4 — campaign integration. When `mode` is supplied it overrides the
-	// hotseat/online derivation (campaign is single-player, never a socket match);
-	// `campaignLevelId` rides into the match result so K3's unlock subscriber knows
-	// which level was beaten, and the Continue/Retry callbacks wire the stats
-	// screen to the campaign shell's auto-advance / reload flow.
-	export let mode: MatchMode | undefined = undefined
-	export let campaignLevelId: string | undefined = undefined
-	export let onContinue: (() => void) | undefined = undefined
-	export let onRetry: (() => void) | undefined = undefined
-	export let campaignHref: string = '/campaign'
+	let {
+		interactor,
+		endTurnAction = undefined,
+		localTeam = 0,
+		aiTeams = [],
+		isAiDriver = false,
+		gameSession = '',
+		map = undefined,
+		minimap = false,
+		fogOfWar = false,
+		mode = undefined,
+		campaignLevelId = undefined,
+		onContinue = undefined,
+		onRetry = undefined,
+		campaignHref = '/campaign',
+		children,
+	}: Props = $props()
 
 	// Pause between the local player's last action finishing and the turn
 	// auto-ending, so the flip to the next side isn't too quick to register.
@@ -66,12 +85,13 @@
 	const TURN_TIMEOUT_MS = 30_000
 	const TURN_WARN_SECONDS = 10
 
-	const isMultiplayer =
+	const isMultiplayer = $derived(
 		gameSession !== '' && gameSession !== 'ephemeral' && gameSession !== 'testSession'
+	)
 
-	$: resolvedMode = mode ?? (isMultiplayer ? 'online' : 'hotseat')
+	const resolvedMode = $derived(mode ?? (isMultiplayer ? 'online' : 'hotseat'))
 
-	let state: 'waiting' | 'animating' | 'overlay' = 'waiting'
+	let viewState: 'waiting' | 'animating' | 'overlay' = 'waiting'
 	let active = false
 
 	// Teams whose defeat explosions have already been kicked off this match, so
@@ -84,57 +104,65 @@
 	// a rematch must restore from this snapshot — re-deriving players from the
 	// end-of-match layers would resurrect a board with the losers already wiped.
 	let initialLayers: MapLayers | undefined
-	$: if (map && map !== lastMap) {
-		lastMap = map
-		initialLayers = structuredClone(map.layers)
-		defeatedTeams = new Set<number>()
-		initGameStateFromMap(map)
-		// A fresh board is a fresh match — clear the emit-once guard so this match
-		// can fire its own match-end event (J1), and zero the stat tracker (J2).
-		resetMatchEnd()
-		resetMatchStats()
-		resetDevLog(localTeam)
-		// F3 weather → env ambience: loop the matching track while sky weather is
-		// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
-		// re-renders and replayed states never restack the loop.
-		weatherAudio.setWeather(weatherForMap(map))
-	}
+	// `$effect.pre` (not `$effect`): this seeds `gameState` from the incoming board,
+	// and the HUD/menu children below read that store — running before the DOM flush
+	// keeps them from painting a frame against an empty/previous match's state.
+	$effect.pre(() => {
+		if (map && map !== lastMap) {
+			lastMap = map
+			initialLayers = structuredClone(map.layers)
+			defeatedTeams = new Set<number>()
+			initGameStateFromMap(map)
+			// A fresh board is a fresh match — clear the emit-once guard so this match
+			// can fire its own match-end event (J1), and zero the stat tracker (J2).
+			resetMatchEnd()
+			resetMatchStats()
+			resetDevLog(localTeam)
+			// F3 weather → env ambience: loop the matching track while sky weather is
+			// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
+			// re-renders and replayed states never restack the loop.
+			weatherAudio.setWeather(weatherForMap(map))
+		}
+	})
 
 	// J1 — match-end hook. The engine flips `phase` to `gameOver` from many call
 	// sites (applyAction, turnLoop, interactor); rather than instrument each, we
 	// observe the authoritative transition here and emit once. `emitMatchEnd` is
 	// idempotent per match, so this reactive block re-running is harmless. The
 	// winner is read straight from the engine state, never from any UI claim.
-	$: if (map && $gameState.phase === 'gameOver') {
-		emitMatchEnd(
-			buildMatchResult({
-				state: $gameState,
-				winner: typeof $gameState.winner === 'number' ? $gameState.winner : null,
-				mode: resolvedMode,
-				campaignLevelId,
-				localTeam,
-				isCpuTeam: (team) => !isMultiplayer && team !== localTeam,
-				sessionId: isMultiplayer ? gameSession : undefined,
-				// J2 — carry the live per-player stat tracker into the result so the
-				// stats screen (and J3 persistence) read it off `MatchResult.stats`.
-				stats: matchStatsList(),
-			})
-		)
-	}
+	$effect(() => {
+		if (map && $gameState.phase === 'gameOver') {
+			emitMatchEnd(
+				buildMatchResult({
+					state: $gameState,
+					winner: typeof $gameState.winner === 'number' ? $gameState.winner : null,
+					mode: resolvedMode,
+					campaignLevelId,
+					localTeam,
+					isCpuTeam: (team) => !isMultiplayer && team !== localTeam,
+					sessionId: isMultiplayer ? gameSession : undefined,
+					// J2 — carry the live per-player stat tracker into the result so the
+					// stats screen (and J3 persistence) read it off `MatchResult.stats`.
+					stats: matchStatsList(),
+				})
+			)
+		}
+	})
 
 	// When a team is eliminated — by forfeit or by losing its last unit/HQ — blow
 	// up everything it still owns with the death explosion. Runs on each client
 	// independently off the deterministic `hasLost` flip, so both sides see the
 	// same army go up. The results screen (StatsScreen) waits on `defeatAnimating`
 	// so these blasts aren't immediately hidden behind it.
-	$: if (map) {
+	$effect(() => {
+		if (!map) return
 		for (const player of $gameState.players) {
 			if (player.hasLost && !defeatedTeams.has(player.team)) {
 				defeatedTeams.add(player.team)
 				void animateTeamDefeat(map, player.team)
 			}
 		}
-	}
+	})
 
 	// Double-click detection: a second click on the same tile inside this window
 	// opens the unit's action menu in place (act without moving) instead of just
@@ -145,7 +173,7 @@
 
 	const select = (x: number, y: number) => {
 		if (!interactor) return
-		if (state !== 'waiting') return
+		if (viewState !== 'waiting') return
 		if (active) return
 		if (!isMultiplayer && $gameState.currentTeam !== localTeam) return
 		if ($turnTransitionActive) return
@@ -195,13 +223,14 @@
 	// misrouted and the board showed move tiles that couldn't be commanded. Keyed on
 	// team+turn so it fires once per handoff, never mid-turn.
 	let lastInteractionTurnKey = ''
-	$: if (map) {
+	$effect(() => {
+		if (!map) return
 		const key = `${$gameState.currentTeam}:${$gameState.turnNumber}`
 		if (key !== lastInteractionTurnKey) {
 			lastInteractionTurnKey = key
 			resetInteraction(map)
 		}
-	}
+	})
 
 	const handleEndTurn = () => {
 		if (endTurnAction) {
@@ -257,7 +286,7 @@
 	// `runCpuTurn` is scheduled.
 	let cpuHandle: CpuAiHandle | null = null
 	let lastCpuKey = ''
-	$: {
+	$effect(() => {
 		const s = $gameState
 		// Hold the CPU off while a campaign block runs, the same way as the turn
 		// transition: the gate collapses the key to '' (cancelling any in-flight
@@ -267,9 +296,7 @@
 		// driver runs CPU seats, and only for the teams that are actually CPUs.
 		const isCpu =
 			s.phase === 'playing' &&
-			(!isMultiplayer
-				? s.currentTeam !== localTeam
-				: isAiDriver && aiTeams.includes(s.currentTeam))
+			(!isMultiplayer ? s.currentTeam !== localTeam : isAiDriver && aiTeams.includes(s.currentTeam))
 		const key = isCpu && !blocked ? `${s.currentTeam}:${s.turnNumber}` : ''
 		if (key !== lastCpuKey) {
 			lastCpuKey = key
@@ -285,7 +312,7 @@
 				})
 			}
 		}
-	}
+	})
 
 	// Auto-end the local player's turn the moment there's nothing left to do —
 	// every owned unit has acted and no factory can still produce. We only fire
@@ -305,7 +332,7 @@
 	// for a human to follow.
 	let autoEndedTurnKey = ''
 	let autoEndTimer: ReturnType<typeof setTimeout> | null = null
-	$: {
+	$effect(() => {
 		const s = $gameState
 		const turnKey = `${s.currentTeam}:${s.turnNumber}`
 		const idle =
@@ -340,31 +367,34 @@
 				handleEndTurn()
 			}, AUTO_END_TURN_DELAY_MS)
 		}
-	}
+	})
 
 	// --- Online turn timeout (anti-stall) ---------------------------------------
 	// Only in online multiplayer: a human who sits idle (or leaves) would freeze
 	// the match for everyone, so their turn auto-ends after TURN_TIMEOUT_MS. Any
 	// committed action refreshes the clock; a countdown warns near the end.
-	let turnExpiresAt = 0
-	let turnNow = 0
+	let turnExpiresAt = $state(0)
+	let turnNow = $state(0)
 	let turnTimer: ReturnType<typeof setInterval> | null = null
 	let timedOutTurnKey = ''
 	let armedTurnKey = ''
 	let outgoingResetUnsub: (() => void) | null = null
 
-	$: myOnlineTurn =
+	const myOnlineTurn = $derived(
 		isMultiplayer && $gameState.phase === 'playing' && $gameState.currentTeam === localTeam
-	$: turnSecondsLeft = turnExpiresAt ? Math.max(0, Math.ceil((turnExpiresAt - turnNow) / 1000)) : 0
+	)
+	const turnSecondsLeft = $derived(
+		turnExpiresAt ? Math.max(0, Math.ceil((turnExpiresAt - turnNow) / 1000)) : 0
+	)
 
 	// (Re)arm the deadline the moment my online turn begins.
-	$: {
+	$effect(() => {
 		const key = myOnlineTurn ? `${$gameState.currentTeam}:${$gameState.turnNumber}` : ''
 		if (key !== armedTurnKey) {
 			armedTurnKey = key
 			turnExpiresAt = key && typeof window !== 'undefined' ? Date.now() + TURN_TIMEOUT_MS : 0
 		}
-	}
+	})
 
 	// Music director: keyed to game phase. In single-player every opponent is a
 	// CPU, so its turns play the "thinking" theme; in multiplayer they're human.
@@ -395,7 +425,12 @@
 		// Tick the countdown and fire the auto-end once past the deadline.
 		turnTimer = setInterval(() => {
 			turnNow = Date.now()
-			if (myOnlineTurn && turnExpiresAt && turnNow >= turnExpiresAt && timedOutTurnKey !== armedTurnKey) {
+			if (
+				myOnlineTurn &&
+				turnExpiresAt &&
+				turnNow >= turnExpiresAt &&
+				timedOutTurnKey !== armedTurnKey
+			) {
 				timedOutTurnKey = armedTurnKey
 				handleEndTurn()
 			}
@@ -418,7 +453,7 @@
 	})
 </script>
 
-<slot {select}></slot>
+{@render children?.({ select })}
 
 {#if myOnlineTurn && turnSecondsLeft > 0 && turnSecondsLeft <= TURN_WARN_SECONDS}
 	<div
@@ -432,7 +467,14 @@
 	</div>
 {/if}
 
-<HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} cpuOpponent={!isMultiplayer} />
+<HUDRoot
+	{map}
+	{minimap}
+	{fogOfWar}
+	onEndTurn={handleEndTurn}
+	{localTeam}
+	cpuOpponent={!isMultiplayer}
+/>
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />

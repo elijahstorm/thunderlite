@@ -3,8 +3,12 @@
 	import LoginLogoutButton from '$lib/Components/Auth/LoginLogoutButton.svelte'
 	import Logo from './Logo.svelte'
 
-	export let logoLink: string = '/'
-	export let toggleAside: VoidFunction | null = null
+	interface Props {
+		logoLink?: string
+		toggleAside?: VoidFunction | null
+	}
+
+	let { logoLink = '/', toggleAside = null }: Props = $props()
 
 	const navLinks = [
 		{ href: '/campaign', label: 'Play' },
@@ -14,7 +18,7 @@
 		{ href: '/about', label: 'About' },
 	]
 
-	$: pathname = $page.url.pathname
+	let pathname = $derived($page.url.pathname)
 </script>
 
 <header
@@ -29,7 +33,7 @@
 				aria-label="Open sidebar"
 				type="button"
 				class="inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-muted md:hidden"
-				on:click={toggleAside}
+				onclick={toggleAside}
 			>
 				<svg
 					class="h-5 w-5"

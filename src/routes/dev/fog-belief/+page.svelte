@@ -16,35 +16,41 @@
 	const CPU_TEAM = 1
 	const PLAYER_TEAM = 0
 
-	let sceneIndex = 0
-	let team = PLAYER_TEAM
-	let fog = true // fog belief is meaningless without fog
+	let sceneIndex = $state(0)
+	let team = $state(PLAYER_TEAM)
+	let fog = $state(true) // fog belief is meaningless without fog
 
-	$: scene = fogScenes[sceneIndex]
+	let scene = $derived(fogScenes[sceneIndex])
 
-	$: fogOfWarEnabled.set(fog)
+	$effect.pre(() => {
+		fogOfWarEnabled.set(fog)
+	})
 
-	$: key = `${scene.id}|${fog}|${team}`
-	let map: MapObject
-	let lastKey = ''
-	$: if (key !== lastKey) {
-		lastKey = key
-		map = scene.build()
-	}
+	let key = $derived(`${scene.id}|${fog}|${team}`)
+	const map = $derived.by(() => {
+		void key // rebuild a fresh map on any settings change
+		return scene.build()
+	})
 
-	$: key, clearAnimations()
+	$effect(() => {
+		void key
+		clearAnimations()
+	})
 
 	// Recompute the CPU's fog belief on demand — diffing the board against its last
 	// snapshot — so you can manoeuvre your units and watch the hunch update without
 	// having to end a turn. (The CPU also runs this itself at the start of its turn.)
-	let scans = 0
+	let scans = $state(0)
 	const scanAsCpu = () => {
 		if (!map) return
 		updateFogBelief(map, CPU_TEAM)
 		scans++
 	}
 
-	$: key, (scans = 0)
+	$effect(() => {
+		void key
+		scans = 0
+	})
 
 	type Intel = {
 		believed: number
@@ -54,18 +60,18 @@
 		ownUnits: number
 		cleared: number
 	}
-	let intel: Intel = {
+	let intel: Intel = $state({
 		believed: 0,
 		focus: null,
 		hot: [],
 		seenEnemies: 0,
 		ownUnits: 0,
 		cleared: 0,
-	}
-	$: {
-		$gameState
-		fog
-		scans
+	})
+	$effect(() => {
+		void $gameState
+		void fog
+		void scans
 		const out: Intel = {
 			believed: 0,
 			focus: null,
@@ -99,7 +105,7 @@
 			map.debugFocus = strongest ? strongest.tile : undefined
 		}
 		intel = out
-	}
+	})
 
 	const onKeydown = (e: KeyboardEvent) => {
 		if (!dev) return
@@ -110,16 +116,18 @@
 
 	const teamDot = (t: number) => (t === 0 ? 'bg-red-400' : t === 1 ? 'bg-sky-400' : 'bg-slate-400')
 
-	$: cpuUnits = map
-		? map.layers.units
-				.map((u, tile) => ({ u, tile }))
-				.filter((e): e is { u: UnitObject; tile: number } => !!e.u && e.u.team === CPU_TEAM)
-		: []
+	let cpuUnits = $derived(
+		map
+			? map.layers.units
+					.map((u, tile) => ({ u, tile }))
+					.filter((e): e is { u: UnitObject; tile: number } => !!e.u && e.u.team === CPU_TEAM)
+			: []
+	)
 </script>
 
 <svelte:head><title>ThunderLite — Fog Belief (AI)</title></svelte:head>
 
-<svelte:window on:keydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} />
 
 <div class="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100">
 	<!-- Control panel -->
@@ -144,7 +152,7 @@
 						class="rounded px-2 py-1 text-left text-sm transition-colors {i === sceneIndex
 							? 'bg-yellow-500 font-semibold text-slate-900'
 							: 'bg-slate-800 hover:bg-slate-700'}"
-						on:click={() => (sceneIndex = i)}
+						onclick={() => (sceneIndex = i)}
 					>
 						{s.name}
 					</button>
@@ -157,7 +165,7 @@
 			<h2 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Controls</h2>
 			<button
 				class="rounded bg-emerald-600 px-2 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500"
-				on:click={scanAsCpu}
+				onclick={scanAsCpu}
 			>
 				Scan as CPU {scans > 0 ? `(×${scans})` : ''}
 			</button>
@@ -177,7 +185,11 @@
 				</select>
 			</label>
 			<label class="flex items-center gap-2 text-sm">
-				<input type="checkbox" checked={$fogDebugLog} on:change={() => fogDebugLog.update((v) => !v)} />
+				<input
+					type="checkbox"
+					checked={$fogDebugLog}
+					onchange={() => fogDebugLog.update((v) => !v)}
+				/>
 				Debug log (console)
 			</label>
 			<p class="text-xs leading-snug text-slate-500">
@@ -197,9 +209,7 @@
 			<div class="grid grid-cols-2 gap-1.5 text-xs">
 				<div class="rounded bg-slate-800 p-2">
 					<div class="text-slate-500">believed tiles</div>
-					<div
-						class="text-lg font-bold {intel.believed > 0 ? 'text-amber-300' : 'text-slate-300'}"
-					>
+					<div class="text-lg font-bold {intel.believed > 0 ? 'text-amber-300' : 'text-slate-300'}">
 						{intel.believed}
 					</div>
 				</div>
@@ -248,8 +258,8 @@
 			<p class="mt-2 text-xs leading-snug text-slate-500">
 				<b>enemies in sight</b> / <b>own units</b> are the CPU's last vision snapshot — the hunch is
 				seeded by what changes between snapshots. <b class="text-teal-300">ruled out</b> is ground it
-				recently peeked into and found empty (a Forest counts only when it stood right beside it);
-				that confidence decays over ~5 scans, so a swept patch becomes worth re-checking again.
+				recently peeked into and found empty (a Forest counts only when it stood right beside it); that
+				confidence decays over ~5 scans, so a swept patch becomes worth re-checking again.
 			</p>
 			<div class="mt-2 flex items-center gap-3 text-[11px]">
 				<span class="flex items-center gap-1">
@@ -300,25 +310,28 @@
 	<!-- Board -->
 	<main class="relative flex-1 overflow-hidden">
 		{#key key}
-			<GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
-				<GameStateManager
-					{map}
-					{gameSession}
-					localTeam={team}
-					mode="hotseat"
-					interactor={socket ? socketSelect(socket, () => map) : undefined}
-					endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-					let:select
-				>
-					<GameBoard
+			<GameSocket map={() => map} {gameSession}>
+				{#snippet children({ socket, requestRedraw })}
+					<GameStateManager
 						{map}
-						{requestRedraw}
-						{select}
-						fogOfWar={fog}
+						{gameSession}
 						localTeam={team}
-						menuHref="/dev/fog-belief"
-					/>
-				</GameStateManager>
+						mode="hotseat"
+						interactor={socket ? socketSelect(socket, () => map) : undefined}
+						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+					>
+						{#snippet children({ select })}
+							<GameBoard
+								{map}
+								{requestRedraw}
+								{select}
+								fogOfWar={fog}
+								localTeam={team}
+								menuHref="/dev/fog-belief"
+							/>
+						{/snippet}
+					</GameStateManager>
+				{/snippet}
 			</GameSocket>
 		{/key}
 	</main>

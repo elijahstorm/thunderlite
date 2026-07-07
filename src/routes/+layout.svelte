@@ -5,15 +5,24 @@
 	import { initSession } from '$lib/dontcode/client'
 	import '../app.css'
 
-	export let data: LayoutData
+	interface Props {
+		data: LayoutData
+		children?: import('svelte').Snippet
+	}
 
-	const { title, desc, googleFonts } = data.config
+	let { data, children }: Props = $props()
+
+	const title = $derived(data.config.title)
+	const desc = $derived(data.config.desc)
+	const googleFonts = $derived(data.config.googleFonts)
 	const IMG_URL = `/images/embedded-card.png`
 
 	// Seed the client session stores from the server-resolved user. Kept to the
 	// browser so the module-level stores are never mutated during SSR (which
 	// would leak one request's user into another's render).
-	$: if (browser) initSession(data.user)
+	$effect(() => {
+		if (browser) initSession(data.user)
+	})
 </script>
 
 <svelte:head>
@@ -37,6 +46,6 @@
 	{/if}
 </svelte:head>
 
-<slot></slot>
+{@render children?.()}
 
 <Toasts />

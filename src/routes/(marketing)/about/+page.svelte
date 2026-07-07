@@ -60,8 +60,8 @@
 		<p>
 			Browser flash games shaped a generation of strategy fans, and Battalion: Arena was one of the
 			best of them. When Flash sunset, that whole library went dark. ThunderLite is one small
-			attempt to bring that genre forward, with the same patient, thoughtful pacing, in a modern stack that
-			just runs.
+			attempt to bring that genre forward, with the same patient, thoughtful pacing, in a modern
+			stack that just runs.
 		</p>
 		<p>
 			It is built and maintained by one person, in the open. There is no monetization, no tracking

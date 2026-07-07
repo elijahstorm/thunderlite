@@ -1,20 +1,33 @@
 <script lang="ts">
-	export let fallback: string = '/404.png'
-	export let src: string = fallback
-	export let alt: string
-	export let cover = false
-	export let tailwind = ''
-	export let style = ''
+	interface Props {
+		fallback?: string
+		src?: string
+		alt: string
+		cover?: boolean
+		tailwind?: string
+		style?: string
+	}
 
-	let img: HTMLImageElement
+	let {
+		fallback = '/404.png',
+		src = fallback,
+		alt,
+		cover = false,
+		tailwind = '',
+		style = '',
+	}: Props = $props()
 
-	const handleError = (e: unknown) => (img.src = fallback)
+	let img = $state<HTMLImageElement>()
 
-	$: {
+	const handleError = (e: unknown) => {
+		if (img) img.src = fallback
+	}
+
+	$effect(() => {
 		if (img && !img.src) {
 			img.src = fallback
 		}
-	}
+	})
 </script>
 
 <img
@@ -24,5 +37,5 @@
 	{style}
 	{src}
 	{alt}
-	on:error={handleError}
+	onerror={handleError}
 />

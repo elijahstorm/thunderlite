@@ -17,25 +17,19 @@
 		wheel,
 	} from './PageInteractions'
 
-	export let tileWidth: number
-	export let tileHeight: number
-	export let contentWidth: number
-	export let contentHeight: number
-	export let requestRedraw = 0
-
-	export let handleClick: (x: number, y: number) => void
-	export let handleHover: (x: number, y: number) => void
-	export let handleOffset: (x: number, y: number, zoom: number) => void
-	export let handleKeypress: (key: string, shiftKey: boolean) => void
-
-	let scroller: Scroller
-	let container: HTMLElement
-	let content: HTMLCanvasElement
+	// $state.raw, NOT $state: MakeScroller returns a plain object whose internal
+	// tap/drag/deceleration state machine (__isTracking, __scrollLeft, RAF loop, …)
+	// mutates itself in place. A deep $state proxy corrupts that machine (input dies
+	// after the first interaction) and fires reactivity on every pan tick. Raw state
+	// still reacts to the one-time assignment in onMount for the `if (!scroller)` guards.
+	let scroller = $state.raw<Scroller>()
+	let container = $state<HTMLElement>()
+	let content = $state<HTMLCanvasElement>()
 	let context: CanvasRenderingContext2D
 	let tiling: Tiling
 
 	let redraw: VoidFunction
-	let reflow: VoidFunction
+	let reflow = $state<VoidFunction>()
 	// A redraw request (animation tick, fog fade, overlay change) only needs to
 	// repaint the current view, so it maps to the lightweight `redraw`, never the
 	// heavyweight `reflow`. Reassigning `content.width` clears the canvas and
@@ -103,36 +97,61 @@
 		scroller.scrollTo(left, top, animate)
 		return { left: scroller.__scheduledLeft, top: scroller.__scheduledTop }
 	}
-	export let paint =
-		(context: CanvasRenderingContext2D) =>
-		(
-			row: number,
-			col: number,
-			left: number,
-			top: number,
-			width: number,
-			height: number,
-			zoom: number
-		) => {
-			context.save()
-			context.translate(left, top)
-
-			context.fillStyle = (row % 2) + (col % 2) > 0 ? '#ddd' : '#fff'
-			context.fillRect(0, 0, width, height)
-
-			context.fillStyle = 'black'
-			context.font = (14 * zoom).toFixed(2) + 'px "Helvetica Neue", Helvetica, Arial, sans-serif'
-
-			context.fillText(`${row}, ${col}`, 6 * zoom, 18 * zoom)
-
-			context.restore()
-		}
 
 	// Optional pass run once per repaint, after every tile is painted. Lets a
 	// painter draw overlays that must sit on top of the finished grid (e.g. a
 	// unit outline that bleeds into neighbouring tiles which would otherwise
-	// paint over it).
-	export let afterPaint: ((context: CanvasRenderingContext2D) => void) | undefined = undefined
+
+	interface Props {
+		tileWidth: number
+		tileHeight: number
+		contentWidth: number
+		contentHeight: number
+		requestRedraw?: number
+		handleClick: (x: number, y: number) => void
+		handleHover: (x: number, y: number) => void
+		handleOffset: (x: number, y: number, zoom: number) => void
+		handleKeypress: (key: string, shiftKey: boolean) => void
+		paint?: any
+		// paint over it).
+		afterPaint?: ((context: CanvasRenderingContext2D) => void) | undefined
+	}
+
+	let {
+		tileWidth,
+		tileHeight,
+		contentWidth,
+		contentHeight,
+		requestRedraw = 0,
+		handleClick,
+		handleHover,
+		handleOffset,
+		handleKeypress,
+		paint = (context: CanvasRenderingContext2D) =>
+			(
+				row: number,
+				col: number,
+				left: number,
+				top: number,
+				width: number,
+				height: number,
+				zoom: number
+			) => {
+				context.save()
+				context.translate(left, top)
+
+				context.fillStyle = (row % 2) + (col % 2) > 0 ? '#ddd' : '#fff'
+				context.fillRect(0, 0, width, height)
+
+				context.fillStyle = 'black'
+				context.font = (14 * zoom).toFixed(2) + 'px "Helvetica Neue", Helvetica, Arial, sans-serif'
+
+				context.fillText(`${row}, ${col}`, 6 * zoom, 18 * zoom)
+
+				context.restore()
+			},
+		afterPaint = undefined,
+	}: Props = $props()
 
 	// Half of the leftover space on each axis when the content is smaller than the
 	// viewport. Larger-than-viewport content yields 0, so panning is unaffected.
@@ -154,7 +173,15 @@
 	}
 
 	onMount(() => {
-		const _context = content.getContext('2d')
+		if (!content || !container) return
+		// Capture non-null locals after the guard: `content`/`container` are
+		// `$state<T>()` (so typed `T | undefined`), and the guard above only
+		// narrows the direct onMount scope — the nested `renderCentered`/`redraw`/
+		// `reflow` closures below re-widen it. Both are assigned once on mount and
+		// never cleared, so these captures stay valid for the component's lifetime.
+		const canvas = content
+		const el = container
+		const _context = canvas.getContext('2d')
 		if (!_context) {
 			return
 		}
@@ -173,7 +200,7 @@
 			// off-map margin, which no tile repaints — without this clear those
 			// pixels smear into a trail while dragging/decelerating. (The redraw
 			// path via `reflow` already clears implicitly by reassigning canvas size.)
-			context.clearRect(0, 0, content.width, content.height)
+			context.clearRect(0, 0, canvas.width, canvas.height)
 			const [cx, cy] = centerOffset(zoom)
 			drawTiles(left - cx, top - cy, zoom)
 			afterPaint?.(context)
@@ -183,8 +210,8 @@
 			locking: false,
 		})
 
-		let rect = container.getBoundingClientRect()
-		scroller.setPosition(rect.left + container.clientLeft, rect.top + container.clientTop)
+		let rect = el.getBoundingClientRect()
+		scroller.setPosition(rect.left + el.clientLeft, rect.top + el.clientTop)
 
 		// Lightweight repaint of the current scroll position. This is what a redraw
 		// request should do — clear and redraw the tiles where the board already
@@ -197,16 +224,16 @@
 
 		reflow = () => {
 			if (!scroller || !context) return
-			const clientWidth = container.clientWidth
-			const clientHeight = container.clientHeight
+			const clientWidth = el.clientWidth
+			const clientHeight = el.clientHeight
 			// Assigning canvas.width/height clears the bitmap and resets context
 			// state even when the value is unchanged, and the tiling rebuild +
 			// getBoundingClientRect below are expensive. A resize event (or a
 			// spurious reactive fire) with no real size change must not pay that
 			// cost — just repaint, or the board flickers white during animations.
 			if (
-				clientWidth === content.width &&
-				clientHeight === content.height &&
+				clientWidth === canvas.width &&
+				clientHeight === canvas.height &&
 				contentWidth === appliedContentWidth &&
 				contentHeight === appliedContentHeight
 			) {
@@ -215,8 +242,8 @@
 			}
 			appliedContentWidth = contentWidth
 			appliedContentHeight = contentHeight
-			content.width = clientWidth
-			content.height = clientHeight
+			canvas.width = clientWidth
+			canvas.height = clientHeight
 			// Resizing the canvas resets all context state, so re-disable smoothing
 			// here (not just on mount). Pixel-art sprites: this stops drawImage from
 			// anti-aliasing tile edges and blending the cleared background in at seams.
@@ -233,8 +260,8 @@
 			// Re-anchor the scroller's screen position too — a window resize can shift
 			// the board's left/top, and the touch math relies on these to map finger
 			// coordinates back into the content.
-			const r = container.getBoundingClientRect()
-			scroller.setPosition(r.left + container.clientLeft, r.top + container.clientTop)
+			const r = el.getBoundingClientRect()
+			scroller.setPosition(r.left + el.clientLeft, r.top + el.clientTop)
 			scroller.setDimensions(clientWidth, clientHeight, contentWidth, contentHeight)
 			// setDimensions clamps the scroll position and repaints synchronously
 			// (its scrollTo snaps rather than animates), but the canvas was just
@@ -249,19 +276,19 @@
 	// A redraw request (per-frame animation tick, fog fade, overlay change) just
 	// repaints the current view. Kept separate from the reflow path below so the
 	// hot per-frame case never resizes the canvas or rebuilds tiling.
-	$: {
+	$effect(() => {
 		requestRedraw
 		render()
-	}
+	})
 
 	// The board's content dimensions changed (editor resized the map, or first
 	// mount). This genuinely needs a reflow to resize the canvas and recompute
 	// scroll bounds; `reflow` itself no-ops if nothing actually changed.
-	$: {
+	$effect(() => {
 		contentWidth
 		contentHeight
 		reflow?.()
-	}
+	})
 </script>
 
 <!--
@@ -273,25 +300,75 @@
 	way to scroll it back into view. The closure reads the current `reflow` at
 	event time instead.
 -->
-<svelte:window on:resize={() => reflow?.()} />
+<svelte:window onresize={() => reflow?.()} />
 
 <section
 	role="grid"
 	tabindex="0"
 	bind:this={container}
-	on:pointerdown={() => container.focus({ preventScroll: true })}
-	on:click|stopPropagation|preventDefault={click(boardRect, scroller)(handleClick)}
-	on:keypress|stopPropagation|preventDefault={keypress(handleKeypress)}
-	on:keydown={keydown(scroller, tileWidth, tileHeight)}
-	on:wheel|preventDefault={wheel(scroller)}
-	on:touchstart={touchstart(scroller)}
-	on:touchmove|stopPropagation|preventDefault={touchmove(scroller)}
-	on:touchend={touchend(scroller)}
-	on:touchcancel={touchcancel(scroller)}
-	on:mousedown|stopPropagation|preventDefault={mousedown(scroller)}
-	on:mouseup|stopPropagation|preventDefault={mouseup(scroller)}
-	on:contextmenu|stopPropagation|preventDefault={contextmenu(scroller)}
-	on:mousemove|stopPropagation|preventDefault={mousemove(boardRect, scroller)(handleHover)}
+	onpointerdown={() => container?.focus({ preventScroll: true })}
+	onclick={(e) => {
+		if (!scroller) return
+		e.stopPropagation()
+		e.preventDefault()
+		click(boardRect, scroller)(handleClick)(e)
+	}}
+	onkeypress={(e) => {
+		e.stopPropagation()
+		e.preventDefault()
+		keypress(handleKeypress)(e)
+	}}
+	onkeydown={(e) => {
+		if (!scroller) return
+		keydown(scroller, tileWidth, tileHeight)(e)
+	}}
+	onwheel={(e) => {
+		if (!scroller) return
+		e.preventDefault()
+		wheel(scroller)(e)
+	}}
+	ontouchstart={(e) => {
+		if (!scroller) return
+		touchstart(scroller)(e)
+	}}
+	ontouchmove={(e) => {
+		if (!scroller) return
+		e.stopPropagation()
+		e.preventDefault()
+		touchmove(scroller)(e)
+	}}
+	ontouchend={(e) => {
+		if (!scroller) return
+		touchend(scroller)(e)
+	}}
+	ontouchcancel={(e) => {
+		if (!scroller) return
+		touchcancel(scroller)(e)
+	}}
+	onmousedown={(e) => {
+		if (!scroller) return
+		e.stopPropagation()
+		e.preventDefault()
+		mousedown(scroller)(e)
+	}}
+	onmouseup={(e) => {
+		if (!scroller) return
+		e.stopPropagation()
+		e.preventDefault()
+		mouseup(scroller)(e)
+	}}
+	oncontextmenu={(e) => {
+		if (!scroller) return
+		e.stopPropagation()
+		e.preventDefault()
+		contextmenu(scroller)(e)
+	}}
+	onmousemove={(e) => {
+		if (!scroller) return
+		e.stopPropagation()
+		e.preventDefault()
+		mousemove(boardRect, scroller)(handleHover)(e)
+	}}
 	class="h-full outline-none"
 >
 	<canvas bind:this={content}></canvas>

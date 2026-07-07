@@ -6,12 +6,16 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { captureMaxStature } from '$lib/Engine/modifiers/capture'
 
-	export let map: MapObject
+	interface Props {
+		map: MapObject
+	}
+
+	let { map }: Props = $props()
 
 	// The engine mutates `map.layers` in place without notifying Svelte, so poll on
 	// a light interval to keep the map-derived panels live mid-turn. `gameState`
 	// updates reactively on its own (turn flips, money, hasLost).
-	let tick = 0
+	let tick = $state(0)
 	onMount(() => {
 		const id = setInterval(() => (tick += 1), 400)
 		return () => clearInterval(id)
@@ -74,16 +78,18 @@
 	}
 
 	// Recompute on every interval tick (map mutates in place) and on gameState changes.
-	let teamStats = new Map<number, TeamStat>()
-	let captures: CaptureInfo[] = []
-	let win = { gameOver: false, losers: [] as number[] } as ReturnType<typeof evaluateWinConditions>
-	$: {
+	let teamStats = $state(new Map<number, TeamStat>())
+	let captures: CaptureInfo[] = $state([])
+	let win = $state({ gameOver: false, losers: [] as number[] } as ReturnType<
+		typeof evaluateWinConditions
+	>)
+	$effect(() => {
 		void tick
 		teamStats = computeTeamStats(map)
 		captures = captureState(map)
 		win = evaluateWinConditions($gameState, map)
-	}
-	$: players = $gameState.players
+	})
+	let players = $derived($gameState.players)
 </script>
 
 <div class="w-80 space-y-4 text-sm">
@@ -99,7 +105,9 @@
 				style="background:{teamColor($gameState.currentTeam)}"
 			></span>
 			<span>Team {$gameState.currentTeam}'s turn</span>
-			<span class="ml-auto text-xs uppercase {win.gameOver ? 'text-emerald-400' : 'text-slate-500'}">
+			<span
+				class="ml-auto text-xs uppercase {win.gameOver ? 'text-emerald-400' : 'text-slate-500'}"
+			>
 				{$gameState.phase}
 			</span>
 		</div>
@@ -156,7 +164,9 @@
 				<div class="text-[11px]">
 					<div class="flex items-center justify-between">
 						<span class="flex items-center gap-1.5">
-							<span class="inline-block h-2.5 w-2.5 rounded-sm" style="background:{teamColor(c.team)}"
+							<span
+								class="inline-block h-2.5 w-2.5 rounded-sm"
+								style="background:{teamColor(c.team)}"
 							></span>
 							{c.name}
 						</span>

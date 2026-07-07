@@ -1,16 +1,28 @@
 <script lang="ts">
-	export let selected: boolean = false
-	export let action: VoidFunction
-	export let size: number
-	export let disabled = false
-	export let title: string | undefined = undefined
+	interface Props {
+		selected?: boolean
+		action: VoidFunction
+		size: number
+		disabled?: boolean
+		title?: string | undefined
+		children?: import('svelte').Snippet
+	}
 
-	$: style = `width: ${size}px; height: ${size}px;`
+	let {
+		selected = false,
+		action,
+		size,
+		disabled = false,
+		title = undefined,
+		children,
+	}: Props = $props()
+
+	let style = $derived(`width: ${size}px; height: ${size}px;`)
 </script>
 
 <button
 	type="button"
-	on:click={action}
+	onclick={action}
 	{disabled}
 	{title}
 	{style}
@@ -25,5 +37,5 @@
 	class:grayscale={disabled}
 	class:pointer-events-none={disabled}
 >
-	<slot></slot>
+	{@render children?.()}
 </button>

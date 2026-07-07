@@ -21,40 +21,45 @@
 	const CPU_TEAM = 1
 	const PLAYER_TEAM = 0
 
-	let sceneIndex = 0
-	let team = PLAYER_TEAM
-	let fog = false
+	let sceneIndex = $state(0)
+	let team = $state(PLAYER_TEAM)
+	let fog = $state(false)
 
-	$: scene = huntScenes[sceneIndex]
+	let scene = $derived(huntScenes[sceneIndex])
 
 	// When the scene changes, adopt its preferred fog default (each scene authors one).
-	let lastSceneId = ''
-	$: if (scene.id !== lastSceneId) {
-		lastSceneId = scene.id
-		fog = scene.fog
-	}
+	let lastSceneId = $state('')
+	$effect(() => {
+		if (scene.id !== lastSceneId) {
+			lastSceneId = scene.id
+			fog = scene.fog
+		}
+	})
 
 	// Engine reads fog live; mirror it so the readout matches what the board renders.
-	$: fogOfWarEnabled.set(fog)
+	$effect.pre(() => {
+		fogOfWarEnabled.set(fog)
+	})
 
 	// MapRender caches fog visibility, so fold every setting into a key and rebuild a
 	// fresh map + remount the board whenever it changes.
-	$: key = `${scene.id}|${fog}|${team}`
-	let map: MapObject
-	let lastKey = ''
-	$: if (key !== lastKey) {
-		lastKey = key
-		map = scene.build()
-	}
+	let key = $derived(`${scene.id}|${fog}|${team}`)
+	const map = $derived.by(() => {
+		void key // rebuild a fresh map on any settings change
+		return scene.build()
+	})
 
 	// Tear down animation overlays on any board-identity change.
-	$: key, clearAnimations()
+	$effect(() => {
+		void key
+		clearAnimations()
+	})
 
 	// "Brief the CPU": tell team 1 a cloaked enemy is at each of your stealth units'
 	// current tiles — exactly the intel a radar flush / sighting would have given it,
 	// but on demand and regardless of fog. The hunt logic (build radar, probe, screen)
 	// only fires once the CPU believes something is lurking, so this primes the demo.
-	let briefed = 0
+	let briefed = $state(0)
 	const briefCpu = () => {
 		if (!map) return
 		let any = false
@@ -69,7 +74,10 @@
 	}
 
 	// Re-briefing makes no sense across a rebuild; reset the badge with the board.
-	$: key, (briefed = 0)
+	$effect(() => {
+		void key
+		briefed = 0
+	})
 
 	// ── Live CPU intel readout ──────────────────────────────────────────────────
 	// Everything the AI's stealth logic consults, recomputed after every action
@@ -81,11 +89,11 @@
 		focus: { x: number; y: number; heat: number } | null
 		hot: { x: number; y: number; heat: number }[]
 	}
-	let intel: Intel = { lurking: 0, remembered: 0, ownRadar: 0, focus: null, hot: [] }
-	$: {
-		$gameState
-		fog
-		briefed
+	let intel: Intel = $state({ lurking: 0, remembered: 0, ownRadar: 0, focus: null, hot: [] })
+	$effect(() => {
+		void $gameState
+		void fog
+		void briefed
 		const out: Intel = { lurking: 0, remembered: 0, ownRadar: 0, focus: null, hot: [] }
 		if (map) {
 			out.lurking = lurkingStealthCount(map, CPU_TEAM)
@@ -109,7 +117,7 @@
 			map.debugFocus = entries.length > 0 ? entries[0].tile : undefined
 		}
 		intel = out
-	}
+	})
 
 	// Dev HUD toggle: "Q" overlays tile index + (x,y) and the CPU's suspicion heat /
 	// best-guess on the board itself. Dev-only — the store stays false in production.
@@ -122,16 +130,18 @@
 
 	const teamDot = (t: number) => (t === 0 ? 'bg-red-400' : t === 1 ? 'bg-sky-400' : 'bg-slate-400')
 
-	$: cpuUnits = map
-		? map.layers.units
-				.map((u, tile) => ({ u, tile }))
-				.filter((e): e is { u: UnitObject; tile: number } => !!e.u && e.u.team === CPU_TEAM)
-		: []
+	let cpuUnits = $derived(
+		map
+			? map.layers.units
+					.map((u, tile) => ({ u, tile }))
+					.filter((e): e is { u: UnitObject; tile: number } => !!e.u && e.u.team === CPU_TEAM)
+			: []
+	)
 </script>
 
 <svelte:head><title>ThunderLite — Stealth Hunt (AI)</title></svelte:head>
 
-<svelte:window on:keydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} />
 
 <div class="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100">
 	<!-- Control panel -->
@@ -141,8 +151,8 @@
 			<h1 class="mt-1 text-lg font-bold">Stealth Hunt (AI)</h1>
 			<p class="text-xs text-slate-400">
 				Watch the CPU (blue) react to cloaked enemies it believes are lurking — building radar,
-				probing toward its best guess, and screening its valuable units. Brief it, then end your turn
-				or spectate.
+				probing toward its best guess, and screening its valuable units. Brief it, then end your
+				turn or spectate.
 			</p>
 		</div>
 
@@ -154,7 +164,7 @@
 						class="rounded px-2 py-1 text-left text-sm transition-colors {i === sceneIndex
 							? 'bg-yellow-500 font-semibold text-slate-900'
 							: 'bg-slate-800 hover:bg-slate-700'}"
-						on:click={() => (sceneIndex = i)}
+						onclick={() => (sceneIndex = i)}
 					>
 						{s.name}
 					</button>
@@ -167,7 +177,7 @@
 			<h2 class="text-xs font-semibold uppercase tracking-wide text-slate-400">Controls</h2>
 			<button
 				class="rounded bg-emerald-600 px-2 py-1.5 text-sm font-semibold text-white hover:bg-emerald-500"
-				on:click={briefCpu}
+				onclick={briefCpu}
 			>
 				Brief the CPU {briefed > 0 ? `(×${briefed})` : ''}
 			</button>
@@ -242,9 +252,9 @@
 				</div>
 			{/if}
 			<p class="mt-2 text-xs leading-snug text-slate-500">
-				<b>lurking</b>: remembered cloak units it can't currently see. <b>best guess</b>: hottest tile
-				in its fuzzy location hunch — it steers probes/radar here. The hunch decays and spreads each
-				CPU turn, so a stale guess widens then fades.
+				<b>lurking</b>: remembered cloak units it can't currently see. <b>best guess</b>: hottest
+				tile in its fuzzy location hunch — it steers probes/radar here. The hunch decays and spreads
+				each CPU turn, so a stale guess widens then fades.
 			</p>
 			<div class="mt-2 flex items-center gap-2 text-xs">
 				<kbd class="rounded border border-slate-600 bg-slate-800 px-1.5 py-0.5 font-mono">Q</kbd>
@@ -258,9 +268,7 @@
 		</section>
 
 		<section>
-			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-				CPU roster
-			</h2>
+			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">CPU roster</h2>
 			<div class="flex flex-col gap-0.5 text-xs">
 				{#each cpuUnits as e (e.tile)}
 					<div class="flex items-center gap-1.5">
@@ -283,25 +291,28 @@
 	<!-- Board -->
 	<main class="relative flex-1 overflow-hidden">
 		{#key key}
-			<GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
-				<GameStateManager
-					{map}
-					{gameSession}
-					localTeam={team}
-					mode="hotseat"
-					interactor={socket ? socketSelect(socket, () => map) : undefined}
-					endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-					let:select
-				>
-					<GameBoard
+			<GameSocket map={() => map} {gameSession}>
+				{#snippet children({ socket, requestRedraw })}
+					<GameStateManager
 						{map}
-						{requestRedraw}
-						{select}
-						fogOfWar={fog}
+						{gameSession}
 						localTeam={team}
-						menuHref="/dev/stealth-hunt"
-					/>
-				</GameStateManager>
+						mode="hotseat"
+						interactor={socket ? socketSelect(socket, () => map) : undefined}
+						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+					>
+						{#snippet children({ select })}
+							<GameBoard
+								{map}
+								{requestRedraw}
+								{select}
+								fogOfWar={fog}
+								localTeam={team}
+								menuHref="/dev/stealth-hunt"
+							/>
+						{/snippet}
+					</GameStateManager>
+				{/snippet}
 			</GameSocket>
 		{/key}
 	</main>

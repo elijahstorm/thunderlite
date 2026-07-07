@@ -1,9 +1,13 @@
 <script lang="ts">
-	export let title: string
-	export let info: string
-	export let fileType: string
-	export let fileName: string
-	export let state: 'ready' | 'uploading' | 'finished' | 'failed' = 'ready'
+	interface Props {
+		title: string
+		info: string
+		fileType: string
+		fileName: string
+		state?: 'ready' | 'uploading' | 'finished' | 'failed'
+	}
+
+	let { title, info, fileType, fileName, state = 'ready' }: Props = $props()
 </script>
 
 <div

@@ -7,24 +7,35 @@
 	import type { PlayerMatchStats } from '../matchStats'
 	import { isDevMode, downloadDevLog, devLogSize } from '../devLog'
 
-	/** The team controlled on this machine — used to frame the banner as Victory/Defeat. */
-	export let localTeam = 0
-	/** Restart the same board (hotseat/online). Optional; button hidden when absent. */
-	export let onRematch: (() => void) | undefined = undefined
-	/** Advance to the next campaign level (campaign win). Wired by K4. */
-	export let onContinue: (() => void) | undefined = undefined
-	/** Reload the same campaign level (campaign loss). Wired by K4. */
-	export let onRetry: (() => void) | undefined = undefined
-	/** Where "Exit to rooms" points (online/hotseat). */
-	export let roomsHref = '/rooms'
-	/** Where "Exit to campaign" points (campaign). */
-	export let campaignHref = '/campaign'
+	interface Props {
+		/** The team controlled on this machine — used to frame the banner as Victory/Defeat. */
+		localTeam?: number
+		/** Restart the same board (hotseat/online). Optional; button hidden when absent. */
+		onRematch?: (() => void) | undefined
+		/** Advance to the next campaign level (campaign win). Wired by K4. */
+		onContinue?: (() => void) | undefined
+		/** Reload the same campaign level (campaign loss). Wired by K4. */
+		onRetry?: (() => void) | undefined
+		/** Where "Exit to rooms" points (online/hotseat). */
+		roomsHref?: string
+		/** Where "Exit to campaign" points (campaign). */
+		campaignHref?: string
+	}
+
+	let {
+		localTeam = 0,
+		onRematch = undefined,
+		onContinue = undefined,
+		onRetry = undefined,
+		roomsHref = '/rooms',
+		campaignHref = '/campaign',
+	}: Props = $props()
 
 	// The screen never computes the outcome itself (J1 owns that). It subscribes to
 	// the match-end event for fresh results and falls back to the last emitted
 	// result if it mounted after the terminal moment. Visibility is driven purely
 	// by the authoritative game phase, so a new match (phase → playing) hides it.
-	let live: MatchResult | null = null
+	let live: MatchResult | null = $state(null)
 	let off: (() => void) | undefined
 	onMount(() => {
 		off = onMatchEnd((r) => (live = r))
@@ -33,8 +44,9 @@
 
 	// Hold the results screen back while a defeated army is still blowing up, so
 	// those explosions are actually visible before the banner covers the board.
-	$: result =
+	let result = $derived(
 		$gameState.phase === 'gameOver' && $defeatAnimating === 0 ? (live ?? lastMatchResult()) : null
+	)
 
 	const STAT_COLUMNS: { key: keyof PlayerMatchStats; label: string }[] = [
 		{ key: 'unitsBuilt', label: 'Built' },
@@ -45,8 +57,8 @@
 	]
 
 	// Stats by team for O(1) row lookup; missing teams read as zeroed.
-	$: statsByTeam = new Map(
-		(result?.stats ?? []).map((s) => [s.team as number, s as unknown as PlayerMatchStats])
+	let statsByTeam = $derived(
+		new Map((result?.stats ?? []).map((s) => [s.team as number, s as unknown as PlayerMatchStats]))
 	)
 	const statValue = (team: number, key: keyof PlayerMatchStats): number => {
 		const row = statsByTeam.get(team)
@@ -57,20 +69,21 @@
 	// Prefer the real player's profile name (online roster, keyed by team) and
 	// fall back to the engine's generic label. Keeps the results screen showing
 	// "test02" rather than "Player 2".
-	$: labelFor = (team: number): string => {
+	let labelFor = $derived((team: number): string => {
 		const user = $playerRoster[team]
 		if (user) return user.display_name || user.username || `Player ${team + 1}`
 		const engineName = $gameState.players.find((p) => p.team === team)?.name
 		return engineName || `Player ${team + 1}`
-	}
+	})
 
-	$: isDraw = result?.winner === null || result?.winner === undefined
-	$: localWon = result != null && !isDraw && result.winner === localTeam
-	$: banner = result == null ? '' : isDraw ? 'Draw' : localWon ? 'Victory' : 'Defeat'
-	$: bannerDetail =
+	let isDraw = $derived(result?.winner === null || result?.winner === undefined)
+	let localWon = $derived(result != null && !isDraw && result.winner === localTeam)
+	let banner = $derived(result == null ? '' : isDraw ? 'Draw' : localWon ? 'Victory' : 'Defeat')
+	let bannerDetail = $derived(
 		result == null || isDraw ? 'No winner' : `${labelFor(result.winner as number)} wins`
+	)
 
-	$: isCampaign = result?.mode === 'campaign'
+	let isCampaign = $derived(result?.mode === 'campaign')
 
 	// Campaign win → Continue (auto-advance to the next level, decided by the host
 	// route). Campaign loss/draw → Retry (reload the same level).
@@ -136,7 +149,7 @@
 						<button
 							type="button"
 							class="rounded bg-emerald-500/80 px-4 py-2 text-sm hover:bg-emerald-500"
-							on:click={handleContinue}
+							onclick={handleContinue}
 							data-testid="stats-continue"
 						>
 							Continue
@@ -145,7 +158,7 @@
 						<button
 							type="button"
 							class="rounded bg-amber-500/80 px-4 py-2 text-sm hover:bg-amber-500"
-							on:click={handleRetry}
+							onclick={handleRetry}
 							data-testid="stats-retry"
 						>
 							Retry
@@ -163,7 +176,7 @@
 						<button
 							type="button"
 							class="rounded bg-white/10 px-4 py-2 text-sm hover:bg-white/20"
-							on:click={onRematch}
+							onclick={onRematch}
 							data-testid="stats-rematch"
 						>
 							Rematch
@@ -181,12 +194,14 @@
 
 			{#if isDevMode}
 				<div class="-mx-2 mt-1 border-t border-white/10 pt-3">
-					<p class="mb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-amber-400/80">
+					<p
+						class="mb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-amber-400/80"
+					>
 						Dev (local only)
 					</p>
 					<button
 						type="button"
-						on:click={downloadDevLog}
+						onclick={downloadDevLog}
 						class="mx-auto block rounded bg-amber-500/15 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/25"
 					>
 						Download game log ({$devLogSize} acts)

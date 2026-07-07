@@ -61,34 +61,54 @@
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 	import { campaignCamera } from '$lib/Campaign/campaignInterface'
 
-	export let map: MapObject
-	/** When set, this board is a scripted campaign level; forwarded to `Game`,
-	 * which drives the K1 script (dialogue, camera, spawns) against the engine. */
-	export let campaign: CutsceneScript | undefined = undefined
-	export let mini: boolean = false
-	export let pause = false
-	/** Map-editor mode: suppresses gameplay-only overlays (the tile-selector
-	 * animation and the hover "selectable unit" icon) that have no meaning while
-	 * authoring a map. */
-	export let editor = false
-	export let fogOfWar: boolean = false
-	/** Team whose fog-of-war perspective is drawn. Always the local viewer — never
-	 * the active turn's team — so an opponent's/CPU's turn never reveals their
-	 * units to us. */
-	export let localTeam: number = 0
-	export let requestRedraw = 0
-	export let backdrop = 'bg-yellow-300'
-	export let hud = {
-		advice: '/game/play/icon/move/advice.png',
-		arrow: '/game/play/icon/route/arrow.png',
+	interface Props {
+		map: MapObject
+		/** When set, this board is a scripted campaign level; forwarded to `Game`,
+		 * which drives the K1 script (dialogue, camera, spawns) against the engine. */
+		campaign?: CutsceneScript | undefined
+		mini?: boolean
+		pause?: boolean
+		/** Map-editor mode: suppresses gameplay-only overlays (the tile-selector
+		 * animation and the hover "selectable unit" icon) that have no meaning while
+		 * authoring a map. */
+		editor?: boolean
+		fogOfWar?: boolean
+		/** Team whose fog-of-war perspective is drawn. Always the local viewer — never
+		 * the active turn's team — so an opponent's/CPU's turn never reveals their
+		 * units to us. */
+		localTeam?: number
+		requestRedraw?: number
+		backdrop?: string
+		hud?: any
+		contextLoaded?: any
+		makeImage?: any
+		colorizer?: ReturnType<typeof imageColorizer> | undefined
+		scroller?: any
+		animator?: any
+		select?: ((x: number, y: number) => void) | undefined
 	}
 
-	export let contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
-	export let makeImage = createImageLoader((finished: boolean) => ($contextLoaded = finished))
-	export let colorizer: ReturnType<typeof imageColorizer> | undefined = undefined
-	export let scroller = Scroller
-	export let animator = Animator
-	export let select: ((x: number, y: number) => void) | undefined = undefined
+	let {
+		map = $bindable(),
+		campaign = undefined,
+		mini = false,
+		pause = false,
+		editor = false,
+		fogOfWar = false,
+		localTeam = 0,
+		requestRedraw = $bindable(0),
+		backdrop = 'bg-yellow-300',
+		hud = {
+			advice: '/game/play/icon/move/advice.png',
+			arrow: '/game/play/icon/route/arrow.png',
+		},
+		contextLoaded = writable(!!$rendererStore.ground[0]?.sprite),
+		makeImage = createImageLoader((finished: boolean) => ($contextLoaded = finished)),
+		colorizer = $bindable(undefined),
+		scroller = Scroller,
+		animator = Animator,
+		select = undefined,
+	}: Props = $props()
 
 	const render = () => (requestRedraw = performance.now())
 
@@ -126,7 +146,7 @@
 		tile: number
 		visible: Set<number>
 		airVisible: Set<number>
-	} | null = null
+	} | null = $state(null)
 
 	// Fog is driven by the `fogOfWarEnabled` store (the single source of truth),
 	// not the `fogOfWar` prop directly, so a scripted `fog: on/off` command can
@@ -166,24 +186,26 @@
 	const visibilityProvider: VisibilityProvider = () =>
 		get(fogOfWarEnabled) ? computeVisibility() : null
 
-	$: if ($fogOfWarEnabled) {
-		// invalidate cache when units move or turn changes
-		$gameState
-		cachedVisibility = null
-	}
+	$effect.pre(() => {
+		if ($fogOfWarEnabled) {
+			// invalidate cache when units move or turn changes
+			$gameState
+			cachedVisibility = null
+		}
+	})
 
 	// Visibility just shifted (a unit moved, the turn changed, or fog toggled):
 	// kick the fade pump so tiles animate to their new covered/visible state, and
 	// cloaked-unit opacity eases in/out. Not gated on fog — stealth units fade
 	// even with fog off — and the pump self-terminates once nothing is mid-fade.
-	$: {
+	$effect(() => {
 		$gameState
 		$fogOfWarEnabled
 		// A scripted spawn/terrain change bumps this when it begins its pixel
 		// assemble; kick the same pump so those effects animate too.
 		$materializeSignal
 		pumpFog()
-	}
+	})
 
 	// Engine code (attack list, AI, threat reach) consults `fogOfWarEnabled` to
 	// decide whether to apply the team-visibility filter. Sync it whenever this
@@ -191,47 +213,53 @@
 	// over a stale "on" value from a prior online match. A scripted `fog:`
 	// command writes the same store afterwards, and this never re-fires to clobber
 	// it because the `fogOfWar` prop itself doesn't change mid-match.
-	$: fogOfWarEnabled.set(fogOfWar)
+	$effect.pre(() => {
+		fogOfWarEnabled.set(fogOfWar)
+	})
 
 	// Mirror the viewer's visibility snapshot into a global store so the DOM
 	// Animator (walking/attack/explosion overlays) can hide animations whose
 	// source tile is in fog. Depends on $gameState (units act) and
 	// $fogOfWarEnabled (live fog toggles) so both refresh the mask.
-	$: {
+	$effect.pre(() => {
 		$gameState
 		viewerVisibility.set($fogOfWarEnabled ? visibilityProvider() : null)
-	}
+	})
 
 	// Persistent enemy-threat overlay. Recompute the painted tiles whenever the
 	// player toggles units on/off, a unit acts/moves/dies ($gameState), or fog
 	// shifts what's visible — then request a redraw. Gameplay boards only: the
 	// minimap and editor never show it.
-	$: if (!mini && !editor) {
-		$shownThreatUnits
-		$gameState
-		$fogOfWarEnabled
-		map.threatTiles = computeShownThreatTiles(map, $shownThreatUnits)
-		map.threatUnitTiles = computeShownThreatUnitTiles(map, $shownThreatUnits)
-		render()
-	}
+	$effect.pre(() => {
+		if (!mini && !editor) {
+			$shownThreatUnits
+			$gameState
+			$fogOfWarEnabled
+			map.threatTiles = computeShownThreatTiles(map, $shownThreatUnits)
+			map.threatUnitTiles = computeShownThreatUnitTiles(map, $shownThreatUnits)
+			render()
+		}
+	})
 
 	// Jammer Truck radar rings: our own net always, plus any enemy jammer we can
 	// see. Recompute on the same triggers as the threat overlay — a jammer moving,
 	// the turn flipping, or fog toggling all shift where the rings fall. The enemy
 	// rings are gated by the viewer's fog reach so a jammer hidden in fog leaks none.
-	$: if (!mini && !editor) {
-		$gameState
-		$fogOfWarEnabled
-		map.radarTiles = computeRadarTiles(
-			map,
-			localTeam,
-			$fogOfWarEnabled ? (visibilityProvider()?.visible ?? null) : null
-		)
-		render()
-	}
+	$effect.pre(() => {
+		if (!mini && !editor) {
+			$gameState
+			$fogOfWarEnabled
+			map.radarTiles = computeRadarTiles(
+				map,
+				localTeam,
+				$fogOfWarEnabled ? (visibilityProvider()?.visible ?? null) : null
+			)
+			render()
+		}
+	})
 
 	// @ts-ignore
-	let hudImages: HUDImages = {}
+	let hudImages: HUDImages = $state({})
 
 	const hover = (x: number, y: number) => {
 		// The previous action's movement/attack animations are still playing — don't
@@ -251,6 +279,11 @@
 			map.splashPreview = undefined
 			// DEV TOOL — live path/move diagnostics (PathDebugPanel). dev-only.
 			if (dev && !mini && get(pathDebugEnabled)) analyzePathDebug(map, get(interactionSource), tile)
+			// `map` mutations aren't reactive (plain object in-game / $state.raw), so the
+			// canvas won't repaint on its own. Legacy relied on Svelte 3/4 member-mutation
+			// reactivity here; in runes we request the redraw explicitly so the hover
+			// marker / route arrows track the cursor instead of the 200ms idle clock.
+			render()
 			return
 		}
 		const result = updateRoute(map, $interactionSource, map.pathHistory ?? [], tile)
@@ -263,6 +296,8 @@
 		// DEV TOOL — snapshot AFTER the live route is built so the panel sees the
 		// real traced pathHistory / arrows, not pathFinder's recomputation.
 		if (dev && !mini && get(pathDebugEnabled)) analyzePathDebug(map, get(interactionSource), tile)
+		// Repaint now (see note above) so the route-preview arrows follow the cursor.
+		render()
 	}
 
 	const canSelectAt = (x: number, y: number): boolean => {
@@ -296,10 +331,12 @@
 	// static frame, so they skip the per-frame repaint. The combat-overlay clock
 	// (`overlayFrame`) drives the DOM Animator reactively and needs no canvas
 	// repaint, so it isn't mirrored here.
-	$: if (!pause) {
-		$animationFrame
-		render()
-	}
+	$effect(() => {
+		if (!pause) {
+			$animationFrame
+			render()
+		}
+	})
 
 	// Resizing the map (editor "Map options") feeds the canvas through two
 	// independent reactive paths: the viewport size flows straight from `map.cols`
@@ -308,16 +345,16 @@
 	// new ground array has propagated, leaving stale tiles inside a correctly-sized
 	// viewport (visible when growing the map; clipped — and so unnoticed — when
 	// shrinking). Force one more redraw after the DOM settles so the two agree.
-	let lastDimensions = ''
-	$: {
+	let lastDimensions = $state('')
+	$effect(() => {
 		const dimensions = `${map.cols}x${map.rows}`
 		if (dimensions !== lastDimensions) {
 			lastDimensions = dimensions
 			tick().then(render)
 		}
-	}
+	})
 
-	$: {
+	$effect.pre(() => {
 		$animations
 		$routeAnimation
 		// Bumped per frame by health-bar eases (animateHealthBar) so each step of the
@@ -343,15 +380,15 @@
 			object.flowReversed = skyFlowReversed(object)(map, index)
 		})
 		render()
-	}
+	})
 
 	// Hold a reference on the global animation clock while this board is unpaused.
 	// `clockHeld` tracks our own one-and-only reference so the ref count stays
 	// balanced even if `pause` toggles at runtime: we acquire on the false edge,
 	// release on the true edge, and release once on destroy. The clock itself is
 	// a singleton, so this never starts a second tick chain.
-	let clockHeld = false
-	$: {
+	let clockHeld = $state(false)
+	$effect(() => {
 		if (!pause && !clockHeld) {
 			startAnimationClock(ANIMATION_TIME, OVERLAY_ANIMATION_TIME)
 			clockHeld = true
@@ -359,7 +396,7 @@
 			stopAnimationClock()
 			clockHeld = false
 		}
-	}
+	})
 
 	// Bound to the live `<svelte:component>` so we can call `panToTile` on it
 	// when the campaign script asks the camera to move. Minimap MapRenders also
@@ -382,7 +419,7 @@
 					animate?: boolean
 				) => { left: number; top: number } | null
 		  }
-		| undefined
+		| undefined = $state()
 
 	// Lets a route animation (an AI/online opponent's move, or a local move nearing
 	// an edge) drive this board's camera. Methods read `localTeam`/the live fog at
@@ -429,68 +466,62 @@
 
 <div class="w-full h-full flex justify-center items-center {backdrop}">
 	{#if colorizer}
-		<Game
-			{map}
-			{makeImage}
-			{colorizer}
-			{select}
-			{campaign}
-			{editor}
-			let:interfacer
-			let:renderData
-			let:select
-			let:validTile
-		>
-			{#if $contextLoaded}
-				<TileSelector
-					{animator}
-					{mini}
-					{editor}
-					{interfacer}
-					{select}
-					{validTile}
-					{canSelectAt}
-					{hover}
-					let:cellWidth
-					let:cellHeight
-					let:handleClick
-					let:handleHover
-					let:handleKeypress
-					let:handleOffset
-				>
-					<div
-						class="w-full h-full"
-						style={mini
-							? `max-width: ${map.cols * cellWidth}px; max-height: ${map.rows * cellHeight}px`
-							: ''}
+		<Game {map} {makeImage} {colorizer} {select} {campaign} {editor}>
+			{#snippet children({ interfacer, renderData, select, validTile })}
+				{#if $contextLoaded}
+					<TileSelector
+						{animator}
+						{mini}
+						{editor}
+						{interfacer}
+						{select}
+						{validTile}
+						{canSelectAt}
+						{hover}
 					>
-						<svelte:component
-							this={scroller}
-							bind:this={scrollerInstance}
-							tileWidth={cellWidth}
-							tileHeight={cellHeight}
-							contentWidth={cellWidth * map.cols}
-							contentHeight={cellHeight * map.rows}
-							paint={paint(
-								renderData,
-								hudImages,
-								pause,
-								visibilityProvider,
-								localTeam,
-								editor
-							)(() => map)}
-							afterPaint={flushDeferredOverlays}
-							{requestRedraw}
-							{handleClick}
-							{handleHover}
-							{handleKeypress}
-							{handleOffset}
-						/>
-					</div>
-				</TileSelector>
-			{:else}
-				<Loader />
-			{/if}
+						{#snippet children({
+							cellWidth,
+							cellHeight,
+							handleClick,
+							handleHover,
+							handleKeypress,
+							handleOffset,
+						})}
+							{@const SvelteComponent = scroller}
+							<div
+								class="w-full h-full"
+								style={mini
+									? `max-width: ${map.cols * cellWidth}px; max-height: ${map.rows * cellHeight}px`
+									: ''}
+							>
+								<SvelteComponent
+									bind:this={scrollerInstance}
+									tileWidth={cellWidth}
+									tileHeight={cellHeight}
+									contentWidth={cellWidth * map.cols}
+									contentHeight={cellHeight * map.rows}
+									paint={paint(
+										renderData,
+										hudImages,
+										pause,
+										visibilityProvider,
+										localTeam,
+										editor
+									)(() => map)}
+									afterPaint={flushDeferredOverlays}
+									{requestRedraw}
+									{handleClick}
+									{handleHover}
+									{handleKeypress}
+									{handleOffset}
+								/>
+							</div>
+						{/snippet}
+					</TileSelector>
+				{:else}
+					<Loader />
+				{/if}
+			{/snippet}
 		</Game>
 	{/if}
 </div>

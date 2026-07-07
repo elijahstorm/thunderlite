@@ -1,43 +1,53 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
 	import { deepClone, reform } from './Editor/mapResizer'
 	import { Modal } from 'flowbite-svelte'
 	import Icon from '@iconify/svelte'
 
-	export let map: MapObject
-	export let open = false
-	export let apply: (appliedChanges: MapObject) => void
+	interface Props {
+		map: MapObject
+		open?: boolean
+		apply: (appliedChanges: MapObject) => void
+		children?: import('svelte').Snippet<[any]>
+	}
 
-	let updatedMap = deepClone(map)
+	let { map, open = $bindable(false), apply, children }: Props = $props()
+
+	let updatedMap = $state.raw(untrack(() => deepClone(map)))
 
 	// Fog defaults to on; mirror through a boolean the checkbox can bind to.
-	let fog = updatedMap.fog ?? true
-	$: updatedMap.fog = fog
+	let fog = $state(untrack(() => updatedMap.fog ?? true))
+	$effect(() => {
+		updatedMap.fog = fog
+	})
 
 	// The dimension inputs bind to plain numbers, NOT directly to `updatedMap`.
 	// Mid-edit the field can momentarily be empty (null) or 0, and binding that
 	// straight onto the shared map object would collapse the resized layers and
 	// break the preview. Keeping them separate lets the resizer ignore invalid
 	// values while `updatedMap` stays a consistent, fully-resized map at all times.
-	let cols = updatedMap.cols
-	let rows = updatedMap.rows
+	let cols = $state(untrack(() => updatedMap.cols))
+	let rows = $state(untrack(() => updatedMap.rows))
 
-	let selectedDir: Direction = 'center'
+	let selectedDir: Direction = $state('center')
 
 	// `map` is mutated in place by the editor as the user paints, but the clones
 	// below are captured once at mount. Re-clone from the live map every time the
 	// modal opens so the preview and applied changes reflect the current map.
-	let wasOpen = false
-	$: if (open && !wasOpen) {
-		wasOpen = true
-		updatedMap = deepClone(map)
-		fog = updatedMap.fog ?? true
-		cols = updatedMap.cols
-		rows = updatedMap.rows
-		selectedDir = 'center'
-		resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
-	} else if (!open) {
-		wasOpen = false
-	}
+	let wasOpen = $state(false)
+	$effect(() => {
+		if (open && !wasOpen) {
+			wasOpen = true
+			updatedMap = deepClone(map)
+			fog = updatedMap.fog ?? true
+			cols = updatedMap.cols
+			rows = updatedMap.rows
+			selectedDir = 'center'
+			resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
+		} else if (!open) {
+			wasOpen = false
+		}
+	})
 	const directions = [
 		'topLeft',
 		'top',
@@ -61,12 +71,24 @@
 		bottomRight: 'mdi:arrow-bottom-right',
 	}
 
-	let resizer = reform(deepClone(map), (applied: MapObject) => (updatedMap = applied))
+	let resizer = $state(
+		untrack(() => reform(deepClone(map), (applied: MapObject) => (updatedMap = applied)))
+	)
 
 	// Resize only for valid positive dimensions; while the field is empty/0 the
 	// resizer is skipped and `updatedMap` retains the last good resized map, so the
 	// preview holds steady instead of collapsing until a valid number is entered.
-	$: if (cols > 0 && rows > 0) resizer({ ...updatedMap, cols, rows }, selectedDir)
+	// Depends only on the dimension inputs / anchor; `resizer` writes `updatedMap`,
+	// so reading it (or calling resizer) tracked would make this effect re-fire on
+	// its own output — an infinite loop. Run the resize untracked.
+	$effect(() => {
+		void cols
+		void rows
+		void selectedDir
+		if (cols > 0 && rows > 0) {
+			untrack(() => resizer({ ...updatedMap, cols, rows }, selectedDir))
+		}
+	})
 </script>
 
 <Modal title="Map options" bind:open outsideclose size="lg">
@@ -122,7 +144,7 @@
 					{#each directions as dir (dir)}
 						<button
 							type="button"
-							on:click={() => (selectedDir = dir)}
+							onclick={() => (selectedDir = dir)}
 							aria-label={`Anchor ${dir}`}
 							aria-pressed={selectedDir === dir}
 							class="flex h-10 w-10 items-center justify-center rounded-md border text-muted-foreground transition-all"
@@ -148,7 +170,7 @@
 					class="h-44 w-44 overflow-hidden rounded-xl border border-border bg-surface-2 shadow-inner"
 				>
 					{#if open}
-						<slot {updatedMap}></slot>
+						{@render children?.({ updatedMap })}
 					{/if}
 				</div>
 			</div>
@@ -156,12 +178,12 @@
 	</section>
 
 	{#snippet footer()}
-		<button type="button" on:click={() => (open = false)} class="btn btn-ghost ml-auto">
+		<button type="button" onclick={() => (open = false)} class="btn btn-ghost ml-auto">
 			Cancel
 		</button>
 		<button
 			type="button"
-			on:click={() => {
+			onclick={() => {
 				apply(deepClone(updatedMap))
 				open = false
 			}}

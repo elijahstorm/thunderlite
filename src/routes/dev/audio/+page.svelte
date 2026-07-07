@@ -28,9 +28,9 @@
 		{ name: 'intro-theme', loop: true },
 	]
 
-	let stemsRunning = false
-	let fadeMs = 800
-	let stems: ReadonlyMap<string, { currentGain: number; targetGain: number }> = new Map()
+	let stemsRunning = $state(false)
+	let fadeMs = $state(800)
+	let stems: ReadonlyMap<string, { currentGain: number; targetGain: number }> = $state(new Map())
 
 	const startStems = () => {
 		audioEngine.startMusicStems(MUSIC_STEMS)
@@ -81,7 +81,7 @@
 					max="1"
 					step="0.01"
 					value={$audioSettings[channel].volume}
-					on:input={(e) => setVolume(channel, parseFloat(e.currentTarget.value))}
+					oninput={(e) => setVolume(channel, parseFloat(e.currentTarget.value))}
 				/>
 				<span class="w-10 text-right text-xs tabular-nums text-slate-400">
 					{Math.round($audioSettings[channel].volume * 100)}%
@@ -90,7 +90,7 @@
 					class="rounded px-2 py-1 text-xs {$audioSettings[channel].muted
 						? 'bg-red-500/80'
 						: 'bg-slate-700 hover:bg-slate-600'}"
-					on:click={() => toggleMute(channel)}
+					onclick={() => toggleMute(channel)}
 				>
 					{$audioSettings[channel].muted ? 'Unmute' : 'Mute'}
 				</button>
@@ -104,7 +104,7 @@
 			{#each sfxNames as name}
 				<button
 					class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-					on:click={() => audioEngine.playSfx(name)}
+					onclick={() => audioEngine.playSfx(name)}
 				>
 					{name}
 				</button>
@@ -122,20 +122,17 @@
 			{#if !stemsRunning}
 				<button
 					class="rounded bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-500"
-					on:click={startStems}
+					onclick={startStems}
 				>
 					Start stems
 				</button>
 			{:else}
-				<button
-					class="rounded bg-red-600 px-3 py-1.5 text-sm hover:bg-red-500"
-					on:click={stopStems}
-				>
+				<button class="rounded bg-red-600 px-3 py-1.5 text-sm hover:bg-red-500" onclick={stopStems}>
 					Stop stems
 				</button>
 				<button
 					class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-					on:click={() => audioEngine.setMusicMix({}, { fadeMs })}
+					onclick={() => audioEngine.setMusicMix({}, { fadeMs })}
 				>
 					Silence all
 				</button>
@@ -152,7 +149,7 @@
 					{@const gain = stems.get(stem)?.currentGain ?? 0}
 					<button
 						class="rounded bg-slate-700 px-2 py-1 text-left text-xs hover:bg-slate-600"
-						on:click={() => soloStem(stem)}
+						onclick={() => soloStem(stem)}
 					>
 						{stem}
 					</button>
@@ -173,14 +170,14 @@
 			{#each stings as sting}
 				<button
 					class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-					on:click={() => audioEngine.playMusic(sting.name, { loop: sting.loop })}
+					onclick={() => audioEngine.playMusic(sting.name, { loop: sting.loop })}
 				>
 					{sting.name}{sting.loop ? ' (loop)' : ''}
 				</button>
 			{/each}
 			<button
 				class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-				on:click={() => audioEngine.stopMusic()}
+				onclick={() => audioEngine.stopMusic()}
 			>
 				Stop music
 			</button>
@@ -193,14 +190,14 @@
 			{#each envNames as name}
 				<button
 					class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-					on:click={() => audioEngine.playEnv(name)}
+					onclick={() => audioEngine.playEnv(name)}
 				>
 					{name}
 				</button>
 			{/each}
 			<button
 				class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-				on:click={() => audioEngine.stopEnv()}
+				onclick={() => audioEngine.stopEnv()}
 			>
 				Stop env
 			</button>

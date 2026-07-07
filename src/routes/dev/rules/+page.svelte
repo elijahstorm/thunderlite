@@ -10,20 +10,22 @@
 		(s): s is NonNullable<typeof s> => !!s
 	)
 
-	let sceneIndex = 0
-	$: scene = scenes[sceneIndex]
+	let sceneIndex = $state(0)
+	let scene = $derived(scenes[sceneIndex])
 
-	let map: MapObject
-	let rebuildKey = 0
-	let localTeam = -1 // default to spectating the FFA play out
-	let lastSceneId = ''
-	$: if (scene.id !== lastSceneId) {
-		lastSceneId = scene.id
-		map = scene.build()
-		rebuildKey += 1
-	}
+	let map = $state.raw<MapObject>()
+	let rebuildKey = $state(0)
+	let localTeam = $state(-1) // default to spectating the FFA play out
+	let lastSceneId = $state('')
+	$effect.pre(() => {
+		if (scene.id !== lastSceneId) {
+			lastSceneId = scene.id
+			map = scene.build()
+			rebuildKey += 1
+		}
+	})
 
-	$: teams = map ? derivePlayersFromMap(map).map((p) => p.team) : []
+	let teams = $derived(map ? derivePlayersFromMap(map).map((p) => p.team) : [])
 
 	const reset = () => {
 		map = scene.build()
@@ -51,7 +53,7 @@
 					class="rounded px-2.5 py-1 {i === sceneIndex
 						? 'bg-yellow-500 font-semibold text-slate-900'
 						: 'bg-slate-800 hover:bg-slate-700'}"
-					on:click={() => (sceneIndex = i)}
+					onclick={() => (sceneIndex = i)}
 				>
 					{s.name}
 				</button>
@@ -64,14 +66,16 @@
 				{#each teams as t}<option value={t}>Play team {t}</option>{/each}
 			</select>
 		</label>
-		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" on:click={reset}>
+		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" onclick={reset}>
 			Restart match
 		</button>
 		<span class="text-xs text-slate-500">{scene.blurb}</span>
 	</div>
 
 	<div class="flex flex-wrap gap-4">
-		<div class="relative h-[70vh] min-w-[420px] flex-1 overflow-hidden rounded-lg border border-slate-700">
+		<div
+			class="relative h-[70vh] min-w-[420px] flex-1 overflow-hidden rounded-lg border border-slate-700"
+		>
 			{#if map}
 				<DevMatch {map} {localTeam} {rebuildKey} fogOfWar={false} menuHref="/dev/rules" />
 			{/if}

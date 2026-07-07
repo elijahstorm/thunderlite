@@ -2,28 +2,32 @@
 	import { writable, type Writable } from 'svelte/store'
 	import { browser } from '$app/environment'
 	import { generateKey } from '$lib/Security/keys'
-	import { createEventDispatcher, onMount } from 'svelte'
+	import { onMount } from 'svelte'
 	import ChatMessageGroups from './ChatMessageGroups.svelte'
 	import InfiniteScroll from '../../Helpers/InfiniteScroll.svelte'
 	import ChatInput from './ChatInput.svelte'
 	import ChatHeader from './ChatHeader.svelte'
 
-	export let socketMessages: Writable<
-		(MessageDBData & {
-			created_at: Date
-			read_at: Date | null
-		})[]
-	>
-	export let highlight = false
-	export let source: string
-	export let target: string
+	interface Props {
+		socketMessages: Writable<
+			(MessageDBData & {
+				created_at: Date
+				read_at: Date | null
+			})[]
+		>
+		highlight?: boolean
+		source: string
+		target: string
+		ontoggle?: () => void
+	}
+
+	let { socketMessages, highlight = false, source, target, ontoggle }: Props = $props()
 	const targetUser = writable<UserDBData>()
 	const sourceUser = writable<UserDBData>()
 
 	const limit = 10
 	let page = -1
 	let hasMore = true
-	const dispatch = createEventDispatcher()
 
 	const allMessages = writable<MessageDBData[]>([])
 
@@ -34,7 +38,7 @@
 	const parseMessages = (allMessages: MessageDBData[]) => {
 		allMessages.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 		const parsedMessages = []
-		for (let i = 0; i < allMessages.length; ) {
+		for (let i = 0; i < allMessages.length;) {
 			const firstMessageInGroup = allMessages[i]
 			const currentUser = firstMessageInGroup.source
 			const messageGroup = []
@@ -77,8 +81,8 @@
 			.then((res) => res.json())
 			.then(resolve)
 
-	const populateMessage = (data: { detail: { message: string } }) => {
-		const { message } = data.detail
+	const populateMessage = (data: { message: string }) => {
+		const { message } = data
 		if (!message) return
 		// Optimistic render; the ChatInput form POST persists it and the server
 		// pushes it to the recipient's inbox (see /api/user/[userAuth]/message).
@@ -111,16 +115,16 @@
 </script>
 
 <div class="justify-between flex flex-col h-full max-h-screen">
-	<ChatHeader user={$targetUser} on:toggle={() => dispatch('toggle')} {highlight} />
+	<ChatHeader user={$targetUser} {ontoggle} {highlight} />
 	<InfiniteScroll
 		tailwind="flex flex-col-reverse max-h-[calc(21.25rem-1px)] h-[calc(21.25rem-1px)] justify-start gap-y-4 p-3 overflow-y-auto scrolling-touch"
 		threshold={40}
 		reverse
-		on:load={loadMoreMessage}
+		onload={loadMoreMessage}
 	>
 		{#each parseMessages( [...$allMessages, ...$socketMessages.filter((m) => m.source === target && m.target === source)] ) as messageGroup (messageGroup.key)}
 			<ChatMessageGroups {messageGroup} sourceUser={$sourceUser} targetUser={$targetUser} />
 		{/each}
 	</InfiniteScroll>
-	<ChatInput {target} on:send={populateMessage} />
+	<ChatInput {target} onsend={populateMessage} />
 </div>

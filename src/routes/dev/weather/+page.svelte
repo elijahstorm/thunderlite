@@ -5,28 +5,34 @@
 	import { skyData } from '$lib/GameData/sky'
 	import { derivePlayersFromMap } from '$lib/Engine/gameState'
 
-	let sceneIndex = devScenes.findIndex((s) => s.id === 'airfield')
-	if (sceneIndex < 0) sceneIndex = 0
-	$: scene = devScenes[sceneIndex]
+	let sceneIndex = $state(
+		Math.max(
+			0,
+			devScenes.findIndex((s) => s.id === 'airfield')
+		)
+	)
+	let scene = $derived(devScenes[sceneIndex])
 
-	let weatherIdx = 0 // index into WEATHER_OPTIONS
-	$: weather = WEATHER_OPTIONS[weatherIdx]
+	let weatherIdx = $state(0) // index into WEATHER_OPTIONS
+	let weather = $derived(WEATHER_OPTIONS[weatherIdx])
 
-	let map: MapObject
-	let rebuildKey = 0
-	let localTeam = -1
-	let lastKey = ''
+	let map = $state.raw<MapObject>()
+	let rebuildKey = $state(0)
+	let localTeam = $state(-1)
+	let lastKey = $state('')
 	// Weather is baked into the sky layer at build time, so it's part of the key —
 	// changing it rebuilds the board the same way the LOS page does.
-	$: key = `${scene.id}|${weather.name}`
-	$: if (key !== lastKey) {
-		lastKey = key
-		map = applyWeather(scene.build(), weather.skyType)
-		rebuildKey += 1
-	}
+	let key = $derived(`${scene.id}|${weather.name}`)
+	$effect.pre(() => {
+		if (key !== lastKey) {
+			lastKey = key
+			map = applyWeather(scene.build(), weather.skyType)
+			rebuildKey += 1
+		}
+	})
 
-	$: teams = map ? derivePlayersFromMap(map).map((p) => p.team) : []
-	$: activeSky = weather.skyType != null ? skyData[weather.skyType] : null
+	let teams = $derived(map ? derivePlayersFromMap(map).map((p) => p.team) : [])
+	let activeSky = $derived(weather.skyType != null ? skyData[weather.skyType] : null)
 
 	const reset = () => {
 		map = applyWeather(scene.build(), weather.skyType)
@@ -54,7 +60,7 @@
 					class="rounded px-2.5 py-1 {i === sceneIndex
 						? 'bg-yellow-500 font-semibold text-slate-900'
 						: 'bg-slate-800 hover:bg-slate-700'}"
-					on:click={() => (sceneIndex = i)}
+					onclick={() => (sceneIndex = i)}
 				>
 					{s.name}
 				</button>
@@ -73,7 +79,7 @@
 				{#each teams as t}<option value={t}>Play team {t}</option>{/each}
 			</select>
 		</label>
-		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" on:click={reset}>
+		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" onclick={reset}>
 			Restart
 		</button>
 	</div>
@@ -86,7 +92,9 @@
 	{/if}
 
 	<div class="flex flex-wrap gap-4">
-		<div class="relative h-[70vh] min-w-[420px] flex-1 overflow-hidden rounded-lg border border-slate-700">
+		<div
+			class="relative h-[70vh] min-w-[420px] flex-1 overflow-hidden rounded-lg border border-slate-700"
+		>
 			{#if map}
 				<DevMatch {map} {localTeam} {rebuildKey} fogOfWar={false} menuHref="/dev/weather" />
 			{/if}

@@ -14,11 +14,16 @@
 	import { isUnitStealthed, unitSeenByViewer } from '$lib/Engine/visibility'
 	import { fly } from 'svelte/transition'
 	import { linear } from 'svelte/easing'
+	import { untrack } from 'svelte'
 
-	export let cellWidth = 60
-	export let cellHeight = 60
+	interface Props {
+		cellWidth?: number
+		cellHeight?: number
+	}
 
-	let index = 0
+	let { cellWidth = 60, cellHeight = 60 }: Props = $props()
+
+	let index = $state(0)
 
 	// Fog mask: when fog is on, suppress overlays whose source tile isn't in the
 	// viewer's visibility set. The canvas already dims those tiles; without this
@@ -209,14 +214,23 @@
 	// Where the newly-keyed sprite *enters from*: one cell back along its travel
 	// direction, so an `in:fly` glides it into the current tile. This is the reverse
 	// of the movement vector — a rightward step (dir 0) enters from the left, etc.
-	const enterDirection = [
+	const enterDirection = $derived([
 		{ x: -cellWidth },
 		{ y: -cellHeight },
 		{ x: cellWidth },
 		{ y: cellHeight },
-	]
+	])
 
-	$: traverseRoute($routeAnimation?.route ?? null)
+	// Depend ONLY on $routeAnimation. `traverseRoute` → `startIncrementer` synchronously
+	// calls its terminator `() => index < route.length - 1`, which reads `index`; if that
+	// read is tracked, every `index++` step re-runs this effect, resetting `index = 0` and
+	// spawning a fresh incrementer — the sprite sticks at the start, then snaps to the end
+	// when the overlay clears. (Legacy `$:` tracked only statically-referenced deps, so it
+	// never saw `index`.) Run the walk untracked so the incrementer steps cleanly.
+	$effect(() => {
+		const route = $routeAnimation?.route ?? null
+		untrack(() => traverseRoute(route))
+	})
 </script>
 
 {#if $routeAnimation && routeVisible($routeAnimation, $viewerVisibility, $viewerTeam, index)}

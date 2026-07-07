@@ -35,7 +35,9 @@
 				>
 					<div class="flex items-center justify-between gap-2">
 						<h2 class="font-semibold group-hover:text-white">{page.title}</h2>
-						<span class="rounded px-2 py-0.5 text-[10px] uppercase tracking-wide {tagStyles[page.tag]}">
+						<span
+							class="rounded px-2 py-0.5 text-[10px] uppercase tracking-wide {tagStyles[page.tag]}"
+						>
 							{page.tag}
 						</span>
 					</div>
@@ -47,7 +49,9 @@
 				>
 					<div class="flex items-center justify-between gap-2">
 						<h2 class="font-semibold text-slate-300">{page.title}</h2>
-						<span class="rounded bg-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-400">
+						<span
+							class="rounded bg-slate-700 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-400"
+						>
 							soon
 						</span>
 					</div>

@@ -8,18 +8,20 @@
 	// the shot fires the actual flame / shrapnel / pierce overlays, the lockstep
 	// health-bar drains and friendly fire — everything a campaign level would.
 
-	let sceneIndex = 0
-	$: scene = splashScenes[sceneIndex]
+	let sceneIndex = $state(0)
+	let scene = $derived(splashScenes[sceneIndex])
 
-	let map: MapObject
-	let rebuildKey = 0
-	let localTeam = 0
-	let lastSceneId = ''
-	$: if (scene.id !== lastSceneId) {
-		lastSceneId = scene.id
-		map = scene.build()
-		rebuildKey += 1
-	}
+	let map = $state.raw<MapObject>()
+	let rebuildKey = $state(0)
+	let localTeam = $state(0)
+	let lastSceneId = $state('')
+	$effect(() => {
+		if (scene.id !== lastSceneId) {
+			lastSceneId = scene.id
+			map = scene.build()
+			rebuildKey += 1
+		}
+	})
 
 	const reset = () => {
 		map = scene.build()
@@ -56,7 +58,7 @@
 					class="rounded px-2.5 py-1 {i === sceneIndex
 						? 'bg-yellow-500 font-semibold text-slate-900'
 						: 'bg-slate-800 hover:bg-slate-700'}"
-					on:click={() => (sceneIndex = i)}
+					onclick={() => (sceneIndex = i)}
 				>
 					{s.name}
 				</button>
@@ -70,7 +72,7 @@
 				<option value={-1}>Spectate</option>
 			</select>
 		</label>
-		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" on:click={reset}>
+		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" onclick={reset}>
 			Reset scene
 		</button>
 	</div>

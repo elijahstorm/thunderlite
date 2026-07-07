@@ -19,18 +19,22 @@
 	import { TEAM_COLORS } from '../teamColors'
 	import { turnTransitionActive, TURN_TRANSITION_MS } from './turnTransitionStore'
 
-	export let localTeam: number = 0
-	/** True when other teams are CPU; flips the label between "Enemy" and "Player N". */
-	export let cpuOpponent: boolean = false
+	interface Props {
+		localTeam?: number
+		/** True when other teams are CPU; flips the label between "Enemy" and "Player N". */
+		cpuOpponent?: boolean
+	}
 
-	let lastKey = ''
-	let showing = false
-	let shownTeam = 0
-	let shownTurn = 1
-	let shownMoney = 0
-	let timer: ReturnType<typeof setTimeout> | null = null
+	let { localTeam = 0, cpuOpponent = false }: Props = $props()
 
-	$: {
+	let lastKey = $state('')
+	let showing = $state(false)
+	let shownTeam = $state(0)
+	let shownTurn = $state(1)
+	let shownMoney = $state(0)
+	let timer: ReturnType<typeof setTimeout> | null = $state(null)
+
+	$effect(() => {
 		const s = $gameState
 		const key = `${s.currentTeam}:${s.turnNumber}`
 		if (key !== lastKey && s.phase === 'playing') {
@@ -50,15 +54,16 @@
 				}, TURN_TRANSITION_MS)
 			}
 		}
-	}
+	})
 
-	$: accent = TEAM_COLORS[shownTeam] ?? TEAM_COLORS[0]
-	$: label =
+	let accent = $derived(TEAM_COLORS[shownTeam] ?? TEAM_COLORS[0])
+	let label = $derived(
 		shownTeam === localTeam
 			? 'Your Turn'
 			: cpuOpponent
 				? 'Enemy Turn'
 				: `Player ${shownTeam + 1}'s Turn`
+	)
 </script>
 
 {#if showing}

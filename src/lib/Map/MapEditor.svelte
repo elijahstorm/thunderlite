@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { writable } from 'svelte/store'
-	import { onMount } from 'svelte'
+	import { onMount, untrack } from 'svelte'
 	import { addToast } from 'as-toast'
 	import { browser } from '$app/environment'
 	import { goto } from '$app/navigation'
@@ -25,12 +25,18 @@
 	import { NEUTRAL_TEAM } from '$lib/Engine/gameState'
 	import { canPlaceUnit } from '$lib/Engine/Interactor/Pathing/movement'
 	import { carriableUnitTypes, isTransportType } from '$lib/Engine/modifiers/transport'
+	import { repaintSignal } from '$lib/Engine/Animator/animator'
 
-	export let mapHash: string | undefined = undefined
 	// The map's `public_id` when editing an existing, saved map. Save/Share write
 	// back to this row (mutable maps), so the shareable link stays stable across
-	// edits. New maps start undefined and adopt the id their first save mints.
-	export let mapId: string | undefined = undefined
+
+	interface Props {
+		mapHash?: string | undefined
+		// edits. New maps start undefined and adopt the id their first save mints.
+		mapId?: string | undefined
+	}
+
+	let { mapHash = undefined, mapId = undefined }: Props = $props()
 
 	const maxTeamAmount = 4
 	const size = 64
@@ -39,31 +45,31 @@
 
 	type Brush = 'ground' | 'units' | 'buildings' | 'sky'
 
-	let openOptionsModal = false
-	let openScriptModal = false
+	let openOptionsModal = $state(false)
+	let openScriptModal = $state(false)
 	// The Load picker: lists the signed-in user's saved maps so they can switch
 	// which map the editor is working on without leaving for /my/maps first.
-	let openLoadModal = false
-	let myMaps: MapDBData[] = []
-	let loadingMaps = false
-	let loadError = ''
-	let editType: Brush = 'ground'
-	let unitType = 0
-	let groundType = 0
-	let buildingType = 0
-	let skyType = 0
-	let team = 0
-	let erasing = false
+	let openLoadModal = $state(false)
+	let myMaps: MapDBData[] = $state([])
+	let loadingMaps = $state(false)
+	let loadError = $state('')
+	let editType = $state<Brush>('ground')
+	let unitType = $state(0)
+	let groundType = $state(0)
+	let buildingType = $state(0)
+	let skyType = $state(0)
+	let team = $state(0)
+	let erasing = $state(false)
 	// True while a Save/Share upload is in flight, so the toolbar can show a
 	// spinner and we never fire a second overlapping upload from a double-click.
-	let saving = false
-	let sharing = false
+	let saving = $state(false)
+	let sharing = $state(false)
 	// The saved map's id, adopted on first save so later saves update in place.
-	let currentMapId: string | undefined = mapId
+	let currentMapId: string | undefined = $state(untrack(() => mapId))
 	// The passenger a placed transport carries (a unit type), or null for empty.
 	// Persists across placements so several loaded transports drop without reselecting.
-	let cargoType: number | null = null
-	let map: MapObject = $mapStore ?? deriveFromHash(mapHash)
+	let cargoType: number | null = $state(null)
+	let map: MapObject = $state.raw(untrack(() => $mapStore ?? deriveFromHash(mapHash)))
 	// Whether we arrived here mid-session with a live draft still in memory (e.g.
 	// bounced back from the Play page). That in-memory map is always the freshest
 	// copy, so we must never clobber it with a (possibly older) localStorage
@@ -73,14 +79,16 @@
 	/** Brushes that place a team-owned object (so the team picker is shown). */
 	const teamedBrush = (brush: Brush) => brush === 'units' || brush === 'buildings'
 
-	map.filters = {
-		ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
-		sky: () => Array.from({ length: skyData.length }, (_, index) => index),
-		units: () => Array.from({ length: unitData.length }, (_, index) => index),
-		buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
-	}
+	untrack(() => {
+		map.filters = {
+			ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
+			sky: () => Array.from({ length: skyData.length }, (_, index) => index),
+			units: () => Array.from({ length: unitData.length }, (_, index) => index),
+			buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
+		}
+	})
 
-	$: type =
+	let type = $derived(
 		editType === 'units'
 			? unitType
 			: editType === 'buildings'
@@ -88,42 +96,69 @@
 				: editType === 'sky'
 					? skyType
 					: groundType
-	$: activeUnit = unitData[unitType]
-	$: activeTerrain = terrainData[groundType]
-	$: activeBuilding = buildingData[buildingType]
-	$: activeSky = skyData[skyType]
+	)
+	let activeUnit = $derived(unitData[unitType])
+	let activeTerrain = $derived(terrainData[groundType])
+	let activeBuilding = $derived(buildingData[buildingType])
+	let activeSky = $derived(skyData[skyType])
 
-	$: scriptError = (() => {
-		if (!map.script || map.script.trim() === '') return null
-		try {
-			parseCutsceneScript(map.script)
-			return null
-		} catch (e) {
-			if (e instanceof CutsceneParseError) return { line: e.line, message: e.message }
-			return { line: 0, message: e instanceof Error ? e.message : 'Unknown error' }
-		}
-	})()
+	let scriptError = $derived(
+		(() => {
+			if (!map.script || map.script.trim() === '') return null
+			try {
+				parseCutsceneScript(map.script)
+				return null
+			} catch (e) {
+				if (e instanceof CutsceneParseError) return { line: e.line, message: e.message }
+				return { line: 0, message: e instanceof Error ? e.message : 'Unknown error' }
+			}
+		})()
+	)
 
-	$: playerTeams = (() => {
-		const teams = new Set<number>()
-		for (const u of map.layers.units) if (u && typeof u.team === 'number') teams.add(u.team)
-		// Neutral buildings belong to nobody, so they don't count toward playable teams.
-		for (const b of map.layers.buildings)
-			if (b && typeof b.team === 'number' && b.team !== NEUTRAL_TEAM) teams.add(b.team)
-		return teams
-	})()
-	$: canPlay = playerTeams.size >= 2
+	let playerTeams = $derived(
+		(() => {
+			const teams = new Set<number>()
+			for (const u of map.layers.units) if (u && typeof u.team === 'number') teams.add(u.team)
+			// Neutral buildings belong to nobody, so they don't count toward playable teams.
+			for (const b of map.layers.buildings)
+				if (b && typeof b.team === 'number' && b.team !== NEUTRAL_TEAM) teams.add(b.team)
+			return teams
+		})()
+	)
+	let canPlay = $derived(playerTeams.size >= 2)
 
 	// Units always belong to a player; never leave the brush on Neutral when it
 	// would place a team-4 unit (which has no player and would render grey).
-	$: if (editType === 'units' && team === NEUTRAL_TEAM) team = 0
+	$effect(() => {
+		if (editType === 'units' && team === NEUTRAL_TEAM) team = 0
+	})
 
 	// Passenger options for the currently-selected unit — only transports can carry,
 	// and only the types each transport legally accepts. Drop a stale cargo choice
 	// when switching to a unit that can't carry it (or can't carry at all).
-	$: carriable =
+	let carriable = $derived(
 		editType === 'units' && isTransportType(unitType) ? carriableUnitTypes(unitType) : []
-	$: if (cargoType !== null && !carriable.includes(cargoType)) cargoType = null
+	)
+	$effect(() => {
+		if (cargoType !== null && !carriable.includes(cargoType)) cargoType = null
+	})
+
+	// `map` is `$state.raw` (a plain object, not a deep proxy — the engine and this
+	// editor mutate `map.layers` in place, and it get structuredClone'd on save, both of
+	// which break on a proxy). Raw state only reacts to reassignment, and legacy relied
+	// on Svelte 3/4 member-assignment reactivity (`map.x = y` → repaint) which runes
+	// doesn't have. We must NOT reassign `map` for a paint: that changes the prop
+	// identity flowing into MapRender→Game→TileSelector→Scroller, which desyncs the
+	// Scroller's mount-time render closures and freezes further clicks after one edit.
+	// Instead bump `repaintSignal` — the same store MapRender's autotile pass listens to
+	// — so the board repaints in place from the (mutated) `map.layers`, and tick an
+	// edit counter the autosave effect watches. (Reassignment stays for genuine identity
+	// changes: resize apply / recovered draft.)
+	let editVersion = $state(0)
+	const commitEdit = () => {
+		editVersion++
+		repaintSignal.update((n) => n + 1)
+	}
 
 	const select = (x: number, y: number) => {
 		const tile = y * map.cols + x
@@ -132,6 +167,7 @@
 			else if (editType === 'buildings') map.layers.buildings[tile] = null
 			else if (editType === 'sky') map.layers.sky[tile] = null
 			else map.layers.ground[tile] = { type: 0, state: 0 }
+			commitEdit()
 			return
 		}
 		if (editType === 'units') {
@@ -157,6 +193,7 @@
 		} else {
 			map.layers.ground[tile] = { type, state: 0 }
 		}
+		commitEdit()
 	}
 
 	const setBrush = (brush: Brush) => () => {
@@ -287,17 +324,28 @@
 		'funds: team,amount         - amount may be negative',
 	]
 
-	$: mapStore.set(map)
+	$effect.pre(() => {
+		mapStore.set(map)
+	})
 
 	// Continuously back the working draft up to localStorage (debounced) so an
 	// accidental reload or a browser crash can't lose unsaved work. Skipped on the
 	// server; scoped by map id so distinct maps don't overwrite each other.
+	// Plain let, NOT $state: a timer handle read+written only here and in onDestroy.
+	// As $state the effect below read it (clearTimeout) and wrote it (setTimeout),
+	// which is a read-write-same-state infinite loop.
 	let autosaveTimer: ReturnType<typeof setTimeout> | undefined
-	$: if (browser && map) {
-		clearTimeout(autosaveTimer)
-		const snapshot = map
-		autosaveTimer = setTimeout(() => saveDraft(snapshot, currentMapId), 500)
-	}
+	$effect(() => {
+		// Fire on each in-place paint (editVersion) and on map identity changes
+		// (resize apply / recovered draft — reading `map` tracks those).
+		void editVersion
+		void map
+		if (browser && map) {
+			clearTimeout(autosaveTimer)
+			const snapshot = map
+			autosaveTimer = setTimeout(() => saveDraft(snapshot, currentMapId), 500)
+		}
+	})
 
 	// On a fresh load (not a mid-session return), restore any autosaved draft for
 	// this editing context — but only when it actually differs from what we'd
@@ -332,7 +380,7 @@
 			/>
 			<button
 				type="button"
-				on:click={() => (openOptionsModal = true)}
+				onclick={() => (openOptionsModal = true)}
 				title="Resize map"
 				class="chip shrink-0 transition-colors hover:bg-surface-3"
 			>
@@ -344,7 +392,7 @@
 		<div class="flex items-center gap-1">
 			<button
 				type="button"
-				on:click={openLoad}
+				onclick={openLoad}
 				title="Load one of your maps"
 				class="btn btn-ghost btn-sm"
 			>
@@ -355,7 +403,7 @@
 				{@const busy = (tool.label === 'Save' && saving) || (tool.label === 'Share' && sharing)}
 				<button
 					type="button"
-					on:click={tool.act}
+					onclick={tool.act}
 					disabled={busy}
 					aria-busy={busy}
 					title={tool.label}
@@ -374,7 +422,7 @@
 			{/each}
 			<button
 				type="button"
-				on:click={() => (openScriptModal = true)}
+				onclick={() => (openScriptModal = true)}
 				title="Edit map script"
 				class="btn btn-ghost btn-sm"
 				class:text-destructive={scriptError}
@@ -387,7 +435,7 @@
 			</button>
 			<button
 				type="button"
-				on:click={() => (openOptionsModal = true)}
+				onclick={() => (openOptionsModal = true)}
 				title="Map options"
 				class="btn btn-ghost btn-sm"
 			>
@@ -397,7 +445,7 @@
 			<div class="mx-1 h-5 w-px bg-border"></div>
 			<button
 				type="button"
-				on:click={playMap}
+				onclick={playMap}
 				disabled={!canPlay}
 				title={canPlay ? 'Play' : 'Add units or buildings for at least 2 players to play'}
 				aria-disabled={!canPlay}
@@ -465,13 +513,10 @@
 	</div>
 </div>
 
-<MapOptions
-	{map}
-	bind:open={openOptionsModal}
-	apply={(appliedChanges) => (map = appliedChanges)}
-	let:updatedMap
->
-	<MapRender pause mini map={updatedMap} select={() => {}} backdrop="bg-surface-2" />
+<MapOptions {map} bind:open={openOptionsModal} apply={(appliedChanges) => (map = appliedChanges)}>
+	{#snippet children({ updatedMap })}
+		<MapRender pause mini map={updatedMap} select={() => {}} backdrop="bg-surface-2" />
+	{/snippet}
 </MapOptions>
 
 <Modal title="Load a map" bind:open={openLoadModal} outsideclose size="xl">
@@ -502,7 +547,7 @@
 				{#each myMaps as m (m.public_id)}
 					<button
 						type="button"
-						on:click={() => loadMap(m.public_id)}
+						onclick={() => loadMap(m.public_id)}
 						disabled={m.public_id === currentMapId}
 						class="card flex flex-col overflow-hidden text-left transition-shadow enabled:hover:shadow-md disabled:cursor-default disabled:opacity-60"
 					>
@@ -528,7 +573,7 @@
 			<Icon icon="lucide:external-link" width="14" height="14" />
 			Manage in My Maps
 		</a>
-		<button type="button" on:click={() => (openLoadModal = false)} class="btn btn-primary ml-auto">
+		<button type="button" onclick={() => (openLoadModal = false)} class="btn btn-primary ml-auto">
 			<Icon icon="mdi:close" width="16" height="16" />
 			Close
 		</button>
@@ -585,11 +630,7 @@
 	</section>
 
 	{#snippet footer()}
-		<button
-			type="button"
-			on:click={() => (openScriptModal = false)}
-			class="btn btn-primary ml-auto"
-		>
+		<button type="button" onclick={() => (openScriptModal = false)} class="btn btn-primary ml-auto">
 			<Icon icon="mdi:check" width="16" height="16" />
 			Done
 		</button>
@@ -599,7 +640,7 @@
 {#snippet brushTab(brush: Brush, icon: string, label: string)}
 	<button
 		type="button"
-		on:click={setBrush(brush)}
+		onclick={setBrush(brush)}
 		class="flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
 		class:bg-surface={editType === brush}
 		class:text-foreground={editType === brush}
@@ -626,7 +667,7 @@
 					{#each Array.from({ length: maxTeamAmount }) as _, i}
 						<button
 							type="button"
-							on:click={changeTeam(i)}
+							onclick={changeTeam(i)}
 							title={`Player ${i + 1}`}
 							aria-pressed={team === i}
 							class="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold transition-all"
@@ -647,7 +688,7 @@
 					{#if editType === 'buildings'}
 						<button
 							type="button"
-							on:click={changeTeam(NEUTRAL_TEAM)}
+							onclick={changeTeam(NEUTRAL_TEAM)}
 							title="Neutral (unclaimed, capturable)"
 							aria-pressed={team === NEUTRAL_TEAM}
 							class="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold transition-all"
@@ -666,7 +707,7 @@
 			{/if}
 			<button
 				type="button"
-				on:click={toggleErase}
+				onclick={toggleErase}
 				title="Toggle eraser"
 				aria-pressed={erasing}
 				class="btn btn-sm ml-auto shrink-0"
@@ -792,8 +833,9 @@
 		alt={terrainData[tType].name}
 		style="{terrainData[tType].ocean || terrainData[tType].connector === 4
 			? 'background-color: #3c6bbe;'
-			: ''} margin: {-terrainData[tType].yOffset}px {-terrainData[tType]
-			.xOffset}px 0 {-(terrainData[tType].editorState ?? 0) * 60}px;"
+			: ''} margin: {-terrainData[tType].yOffset}px {-terrainData[tType].xOffset}px 0 {-(
+			terrainData[tType].editorState ?? 0
+		) * 60}px;"
 	/>
 {/snippet}
 

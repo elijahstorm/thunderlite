@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte'
+	import { onMount, onDestroy, untrack } from 'svelte'
 	import { browser } from '$app/environment'
 	import GameBoard from '$lib/Map/GameBoard.svelte'
 	import GameSocket from '$lib/Components/Socket/GameSocket.svelte'
@@ -14,12 +14,16 @@
 	import type { CutsceneScript } from './cutsceneTypes'
 	import type { CampaignLevel } from './levels'
 
-	/** The level to host. Re-mounted by the route via `{#key levelId}` per level. */
-	export let level: CampaignLevel
-	/** Campaign win → advance. The route decides next-level vs campaign-complete. */
-	export let onContinue: (() => void) | undefined = undefined
-	/** Campaign loss → reload this same level cleanly. */
-	export let onRetry: (() => void) | undefined = undefined
+	interface Props {
+		/** The level to host. Re-mounted by the route via `{#key levelId}` per level. */
+		level: CampaignLevel
+		/** Campaign win → advance. The route decides next-level vs campaign-complete. */
+		onContinue?: (() => void) | undefined
+		/** Campaign loss → reload this same level cleanly. */
+		onRetry?: (() => void) | undefined
+	}
+
+	let { level, onContinue = undefined, onRetry = undefined }: Props = $props()
 
 	// Single-player is always team 0 vs CPU(s). A non-multiplayer game session makes
 	// GameSocket fall back to its LocalInteracter, so the match runs entirely
@@ -62,14 +66,14 @@
 		} as MapObject
 	}
 
-	const map: MapObject = getLevelMap(level.id) ?? stubMap()
+	const map: MapObject = untrack(() => getLevelMap(level.id) ?? stubMap())
 
 	// Mark this as a campaign match (and which level) so the engine layer enables
 	// mid-match save/resume. Set here in the component body — not in `onMount` — so
 	// it is in place before this match's deeply-nested `Game` child mounts and reads
 	// it (child `onMount` runs before this parent's). Cleared on teardown so a later
 	// online/hotseat match on the same page never inherits campaign resume.
-	if (browser) currentCampaignLevelId.set(level.id)
+	if (browser) currentCampaignLevelId.set(untrack(() => level.id))
 	onDestroy(() => {
 		if (browser) currentCampaignLevelId.set(null)
 	})
@@ -114,20 +118,23 @@
 	})
 </script>
 
-<GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
-	<GameStateManager
-		{map}
-		{gameSession}
-		{localTeam}
-		mode="campaign"
-		campaignLevelId={level.id}
-		minimap
-		{onContinue}
-		{onRetry}
-		interactor={socket ? socketSelect(socket, () => map) : undefined}
-		endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-		let:select
-	>
-		<GameBoard {map} {requestRedraw} {select} {campaign} {localTeam} menuHref="/campaign" />
-	</GameStateManager>
+<GameSocket map={() => map} {gameSession}>
+	{#snippet children({ socket, requestRedraw })}
+		<GameStateManager
+			{map}
+			{gameSession}
+			{localTeam}
+			mode="campaign"
+			campaignLevelId={level.id}
+			minimap
+			{onContinue}
+			{onRetry}
+			interactor={socket ? socketSelect(socket, () => map) : undefined}
+			endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+		>
+			{#snippet children({ select })}
+				<GameBoard {map} {requestRedraw} {select} {campaign} {localTeam} menuHref="/campaign" />
+			{/snippet}
+		</GameStateManager>
+	{/snippet}
 </GameSocket>

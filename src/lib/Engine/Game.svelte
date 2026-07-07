@@ -34,15 +34,28 @@
 	import ResumePrompt from '$lib/Campaign/ResumePrompt.svelte'
 	import type { CutsceneScript } from '$lib/Campaign/cutsceneTypes'
 
-	export let map: MapObject
-	export let colorizer: ReturnType<typeof imageColorizer>
-	export let makeImage: ReturnType<typeof createImageLoader>
-	export let select = (x: number, y: number) => {}
-	/** When set, this level is a scripted campaign level (K1 parse output). */
-	export let campaign: CutsceneScript | undefined = undefined
-	/** Map-editor mode: warm every terrain/weather sprite up front so a freshly
-	 * painted type (one not yet present on the map) never renders as a blank tile. */
-	export let editor = false
+	interface Props {
+		map: MapObject
+		colorizer: ReturnType<typeof imageColorizer>
+		makeImage: ReturnType<typeof createImageLoader>
+		select?: any
+		/** When set, this level is a scripted campaign level (K1 parse output). */
+		campaign?: CutsceneScript | undefined
+		/** Map-editor mode: warm every terrain/weather sprite up front so a freshly
+		 * painted type (one not yet present on the map) never renders as a blank tile. */
+		editor?: boolean
+		children?: import('svelte').Snippet<[any]>
+	}
+
+	let {
+		map = $bindable(),
+		colorizer,
+		makeImage,
+		select = (x: number, y: number) => {},
+		campaign = undefined,
+		editor = false,
+		children,
+	}: Props = $props()
 
 	let validTile = (x: number, y: number) => x < map.cols && y < map.rows
 
@@ -55,7 +68,7 @@
 		savedAt: number
 		onResume: () => void
 		onRestart: () => void
-	} = { open: false, turnNumber: 1, savedAt: 0, onResume: () => {}, onRestart: () => {} }
+	} = $state({ open: false, turnNumber: 1, savedAt: 0, onResume: () => {}, onRestart: () => {} })
 
 	const interfacer: InterfaceInteraction = (() => {
 		return {
@@ -324,7 +337,7 @@
 	})
 </script>
 
-<slot {interfacer} {select} {validTile} {renderData}></slot>
+{@render children?.({ interfacer, select, validTile, renderData })}
 
 {#if campaign}
 	<Dialogue />

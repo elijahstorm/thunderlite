@@ -4,7 +4,11 @@
 	import MapThumbnail from './MapThumbnail.svelte'
 	import UserImageAndName from './UserImageAndName.svelte'
 
-	export let map: MapDBData
+	interface Props {
+		map: MapDBData
+	}
+
+	let { map }: Props = $props()
 
 	const formatDate = (date: Date | string) =>
 		new Date(date).toLocaleDateString(undefined, {

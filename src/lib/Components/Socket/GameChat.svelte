@@ -7,10 +7,14 @@
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 
-	/** Game room code. Group chat is scoped to `chat:{session}` — room members only. */
-	export let session: string = ''
-	/** Seat-indexed public profiles for the room, used to attribute messages. */
-	export let roster: (UserDBData | null)[] = []
+	interface Props {
+		/** Game room code. Group chat is scoped to `chat:{session}` — room members only. */
+		session?: string
+		/** Seat-indexed public profiles for the room, used to attribute messages. */
+		roster?: (UserDBData | null)[]
+	}
+
+	let { session = '', roster = [] }: Props = $props()
 
 	type GroupMessage = { source: string; message: string; at: number }
 
@@ -21,18 +25,19 @@
 	const isRealSession = (s: string) => !!s && s !== 'ephemeral' && s !== 'testSession'
 
 	let conn: RealtimeConnection | null = null
-	let currentAuth: string | null = null
+	let currentAuth: string | null = $state(null)
 	let unsubscribeAuth: (() => void) | null = null
-	let messages: GroupMessage[] = []
-	let open = false
-	let unread = 0
-	let draft = ''
-	let scroller: HTMLDivElement | undefined
+	let messages: GroupMessage[] = $state([])
+	let open = $state(false)
+	let unread = $state(0)
+	let draft = $state('')
+	let scroller: HTMLDivElement | undefined = $state()
 
-	$: byAuth = new Map(
-		roster.filter((user): user is UserDBData => !!user).map((user) => [user.auth, user])
+	let byAuth = $derived(
+		new Map(roster.filter((user): user is UserDBData => !!user).map((user) => [user.auth, user]))
 	)
-	const nameFor = (auth: string) => byAuth.get(auth)?.display_name || byAuth.get(auth)?.username || 'Player'
+	const nameFor = (auth: string) =>
+		byAuth.get(auth)?.display_name || byAuth.get(auth)?.username || 'Player'
 
 	let seq = 0
 	const push = (msg: GroupMessage) => {
@@ -104,10 +109,16 @@
 					<button
 						type="button"
 						class="text-muted-foreground hover:text-foreground p-1"
-						on:click={toggle}
+						onclick={toggle}
 						aria-label="Close game chat"
 					>
-						<svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+						<svg
+							class="w-4 h-4"
+							viewBox="0 0 20 20"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
 							<path stroke-linecap="round" d="M5 5l10 10M15 5L5 15" />
 						</svg>
 					</button>
@@ -120,7 +131,7 @@
 								<button
 									type="button"
 									class="flex-shrink-0"
-									on:click={() => msg.source !== currentAuth && openDmWith.set(msg.source)}
+									onclick={() => msg.source !== currentAuth && openDmWith.set(msg.source)}
 									aria-label="Message {nameFor(msg.source)}"
 								>
 									<UserIcon user={byAuth.get(msg.source) ?? null} noClick size={1.75} />
@@ -129,7 +140,7 @@
 									<button
 										type="button"
 										class="text-xs font-medium text-muted-foreground hover:text-foreground"
-										on:click={() => msg.source !== currentAuth && openDmWith.set(msg.source)}
+										onclick={() => msg.source !== currentAuth && openDmWith.set(msg.source)}
 									>
 										{msg.source === currentAuth ? 'You' : nameFor(msg.source)}
 									</button>
@@ -144,7 +155,10 @@
 
 				<form
 					class="flex items-center gap-2 border-t border-border p-2"
-					on:submit|preventDefault={send}
+					onsubmit={(e) => {
+						e.preventDefault()
+						send()
+					}}
 				>
 					<input
 						bind:value={draft}
@@ -166,7 +180,7 @@
 			<button
 				type="button"
 				class="relative flex items-center gap-2 rounded-full border border-border bg-surface shadow-lg px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
-				on:click={toggle}
+				onclick={toggle}
 			>
 				<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
 					<path

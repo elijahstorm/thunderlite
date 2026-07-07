@@ -1,12 +1,16 @@
 <script lang="ts">
 	import type { UserStats } from '$lib/Database/getUserStats'
 
-	export let stats: UserStats
-	export let heading = 'Match record'
+	interface Props {
+		stats: UserStats
+		heading?: string
+	}
 
-	$: games = stats?.games ?? 0
-	$: wins = stats?.wins ?? 0
-	$: winRate = stats?.winRate ?? 0
+	let { stats, heading = 'Match record' }: Props = $props()
+
+	let games = $derived(stats?.games ?? 0)
+	let wins = $derived(stats?.wins ?? 0)
+	let winRate = $derived(stats?.winRate ?? 0)
 </script>
 
 <div class="card p-6 sm:p-8" data-testid="stats-panel">

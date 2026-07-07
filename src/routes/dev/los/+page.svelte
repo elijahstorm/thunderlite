@@ -13,10 +13,10 @@
 	// LocalInteracter, so the board plays entirely client-side (mirrors campaign).
 	const gameSession = 'ephemeral'
 
-	let sceneIndex = 0
-	let mode: OcclusionMode = 'viewer-relative'
-	let fog = true
-	let team = 0
+	let sceneIndex = $state(0)
+	let mode: OcclusionMode = $state('viewer-relative')
+	let fog = $state(true)
+	let team = $state(0)
 
 	const modes: { value: OcclusionMode; label: string }[] = [
 		{ value: 'off', label: 'Off (classic diamond)' },
@@ -24,21 +24,21 @@
 		{ value: 'raycast', label: 'Raycast (eye height)' },
 	]
 
-	$: scene = losScenes[sceneIndex]
+	let scene = $derived(losScenes[sceneIndex])
 
 	// Engine reads these stores live; set them before the board (re)mounts.
-	$: occlusionMode.set(mode)
+	$effect.pre(() => {
+		occlusionMode.set(mode)
+	})
 
 	// MapRender caches fog visibility, so a settings change wouldn't refresh the
 	// board on its own. Fold every setting into a key and rebuild a fresh map +
 	// remount the whole board whenever it changes — a clean recompute each time.
-	$: key = `${scene.id}|${mode}|${fog}|${team}`
-	let map: MapObject
-	let lastKey = ''
-	$: if (key !== lastKey) {
-		lastKey = key
-		map = scene.build()
-	}
+	let key = $derived(`${scene.id}|${mode}|${fog}|${team}`)
+	const map = $derived.by(() => {
+		void key // rebuild a fresh map on any settings change, not just scene
+		return scene.build()
+	})
 </script>
 
 <svelte:head><title>LOS / Height Playground</title></svelte:head>
@@ -62,7 +62,7 @@
 						class="rounded px-2 py-1 text-left text-sm transition-colors {i === sceneIndex
 							? 'bg-yellow-500 font-semibold text-slate-900'
 							: 'bg-slate-800 hover:bg-slate-700'}"
-						on:click={() => (sceneIndex = i)}
+						onclick={() => (sceneIndex = i)}
 					>
 						{s.name}
 					</button>
@@ -117,18 +117,28 @@
 	<!-- Board -->
 	<main class="relative flex-1 overflow-hidden">
 		{#key key}
-			<GameSocket map={() => map} {gameSession} let:socket let:requestRedraw>
-				<GameStateManager
-					{map}
-					{gameSession}
-					localTeam={team}
-					mode="hotseat"
-					interactor={socket ? socketSelect(socket, () => map) : undefined}
-					endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-					let:select
-				>
-					<GameBoard {map} {requestRedraw} {select} fogOfWar={fog} localTeam={team} menuHref="/dev/los" />
-				</GameStateManager>
+			<GameSocket map={() => map} {gameSession}>
+				{#snippet children({ socket, requestRedraw })}
+					<GameStateManager
+						{map}
+						{gameSession}
+						localTeam={team}
+						mode="hotseat"
+						interactor={socket ? socketSelect(socket, () => map) : undefined}
+						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+					>
+						{#snippet children({ select })}
+							<GameBoard
+								{map}
+								{requestRedraw}
+								{select}
+								fogOfWar={fog}
+								localTeam={team}
+								menuHref="/dev/los"
+							/>
+						{/snippet}
+					</GameStateManager>
+				{/snippet}
 			</GameSocket>
 		{/key}
 	</main>

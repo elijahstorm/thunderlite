@@ -3,7 +3,12 @@
 	import { addToast } from 'as-toast'
 	import { gameState } from '../gameState'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
-	import { buildableUnits, canDeployFromFactory, spawnBuiltUnit, type BuildableUnit } from '../build'
+	import {
+		buildableUnits,
+		canDeployFromFactory,
+		spawnBuiltUnit,
+		type BuildableUnit,
+	} from '../build'
 	import { buildableAdjacentTiles } from '../modifiers/builder'
 	import { beginBuildPlacement } from '../Interactor/interactor'
 	import { walletOf } from '../wallet'
@@ -13,53 +18,66 @@
 	import { recordMatchStat } from '../matchStats'
 	import UnitSpritePreview from './UnitSpritePreview.svelte'
 
+	interface Props {
+		map?: MapObject | undefined
+	}
+
+	let { map = undefined }: Props = $props()
+
 	// The unit currently hovered in the grid — its preview cycles through the four
 	// facing directions while pointed at, idle (front-facing still) otherwise.
-	let hoveredType: number | null = null
+	let hoveredType = $state<number | null>(null)
 
-	export let map: MapObject | undefined = undefined
-
-	$: menu = $buildMenuState
-	$: state = $gameState
-	$: currentPlayer = state.players.find((p) => p.team === state.currentTeam)
+	const menu = $derived($buildMenuState)
+	const game = $derived($gameState)
+	const currentPlayer = $derived(game.players.find((p) => p.team === game.currentTeam))
 	// In builder mode the funds come from the Warmachine's own wallet, and it can
 	// build any unit type regardless of which factories the player owns.
-	$: builderUnit =
+	const builderUnit = $derived(
 		menu.open && menu.mode === 'builder' && map && menu.buildingTile != null
 			? (map.layers.units[menu.buildingTile] ?? null)
 			: null
-	$: isBuilder = menu.mode === 'builder'
-	$: budget = isBuilder ? (builderUnit ? walletOf(builderUnit) : 0) : (currentPlayer?.money ?? 0)
+	)
+	const isBuilder = $derived(menu.mode === 'builder')
+	const budget = $derived(
+		isBuilder ? (builderUnit ? walletOf(builderUnit) : 0) : (currentPlayer?.money ?? 0)
+	)
 	// Whether a chosen unit type actually has somewhere to land: for a Warmachine
 	// that's any legal adjacent tile; for a factory it's the factory tile itself
-	// (so a ship needs a Shore factory, and an occupied factory can't build).
-	$: hasSpaceFor = (type: number): boolean => {
+	// (so a ship needs a Shore factory, and an occupied factory can't build). Plain
+	// function (not a derived): it reads `map`/`menu`/`isBuilder` at call time, and
+	// because `buildableUnits` calls it synchronously while `entries` is computed,
+	// those reads are tracked as dependencies of the `entries` derived below.
+	const hasSpaceFor = (type: number): boolean => {
 		if (!map || menu.buildingTile == null) return false
 		return isBuilder
 			? buildableAdjacentTiles(map, menu.buildingTile, type).length > 0
 			: canDeployFromFactory(map, menu.buildingTile, type)
 	}
-	$: entries =
+	const entries = $derived(
 		menu.open && currentPlayer
 			? buildableUnits(
 					currentPlayer,
 					isBuilder ? { budget, ignoreControls: true, hasSpaceFor } : { hasSpaceFor }
 				)
 			: []
+	)
 
 	const typeOrder = ['ground', 'air', 'sea'] as const
 	const typeLabel: Record<(typeof typeOrder)[number], string> = {
 		ground: 'Ground',
 		air: 'Air',
-		sea: 'Sea'
+		sea: 'Sea',
 	}
-	$: columns = typeOrder
-		.map((type) => ({
-			type,
-			label: typeLabel[type],
-			units: entries.filter((entry) => entry.data.type === type)
-		}))
-		.filter((column) => column.units.length > 0)
+	const columns = $derived(
+		typeOrder
+			.map((type) => ({
+				type,
+				label: typeLabel[type],
+				units: entries.filter((entry) => entry.data.type === type),
+			}))
+			.filter((column) => column.units.length > 0)
+	)
 
 	const handleSelect = (entry: BuildableUnit) => {
 		if (!entry.buildable) return
@@ -128,7 +146,7 @@
 					type="button"
 					class="px-2 py-1 rounded bg-neutral-700 text-sm font-mono hover:bg-neutral-600"
 					data-testid="build-menu-cancel"
-					on:click={handleCancel}
+					onclick={handleCancel}
 				>
 					Cancel
 				</button>
@@ -166,13 +184,13 @@
 													? 'Needs a shore factory to launch'
 													: 'No room to deploy'
 												: entry.data.name}
-									on:click={() => handleSelect(entry)}
-									on:mouseenter={() => (hoveredType = entry.type)}
-									on:mouseleave={() => {
+									onclick={() => handleSelect(entry)}
+									onmouseenter={() => (hoveredType = entry.type)}
+									onmouseleave={() => {
 										if (hoveredType === entry.type) hoveredType = null
 									}}
-									on:focus={() => (hoveredType = entry.type)}
-									on:blur={() => {
+									onfocus={() => (hoveredType = entry.type)}
+									onblur={() => {
 										if (hoveredType === entry.type) hoveredType = null
 									}}
 								>

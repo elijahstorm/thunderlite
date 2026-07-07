@@ -6,14 +6,22 @@
 	nor the CPU can act until a choice is made.
 -->
 <script lang="ts">
-	export let open = false
-	export let turnNumber = 1
-	export let savedAt = 0
-	export let onResume: () => void = () => {}
-	export let onRestart: () => void = () => {}
+	interface Props {
+		open?: boolean
+		turnNumber?: number
+		savedAt?: number
+		onResume?: () => void
+		onRestart?: () => void
+	}
 
-	// A friendly "how long ago" so the player recognises the save as theirs.
-	$: ago = savedAt ? relativeTime(savedAt) : ''
+	let {
+		open = false,
+		turnNumber = 1,
+		savedAt = 0,
+		onResume = () => {},
+		onRestart = () => {},
+	}: Props = $props()
+
 	const relativeTime = (ts: number): string => {
 		const seconds = Math.max(0, Math.round((Date.now() - ts) / 1000))
 		if (seconds < 60) return 'moments ago'
@@ -24,6 +32,8 @@
 		const days = Math.round(hours / 24)
 		return `${days} day${days === 1 ? '' : 's'} ago`
 	}
+	// A friendly "how long ago" so the player recognises the save as theirs.
+	let ago = $derived(savedAt ? relativeTime(savedAt) : '')
 </script>
 
 {#if open}
@@ -45,7 +55,7 @@
 					type="button"
 					class="cursor-pointer rounded bg-white px-3 py-2 text-sm font-bold text-black hover:bg-white/90"
 					data-testid="resume-continue"
-					on:click={onResume}
+					onclick={onResume}
 				>
 					Resume
 				</button>
@@ -53,7 +63,7 @@
 					type="button"
 					class="cursor-pointer rounded bg-white/10 px-3 py-2 text-sm hover:bg-white/20"
 					data-testid="resume-restart"
-					on:click={onRestart}
+					onclick={onRestart}
 				>
 					Start over
 				</button>

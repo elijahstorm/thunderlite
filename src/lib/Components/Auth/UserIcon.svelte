@@ -4,21 +4,30 @@
 	import FullProfileCard from '$lib/Components/Widgets/Social/FullProfileCard.svelte'
 	import { browser } from '$app/environment'
 
-	export let auth: string | null = null
-	export let user: UserDBData | null = null
-	export let size: number = 2
-	export let noClick = false
-	// When set, clicking the icon navigates to this route instead of opening the profile popup.
-	export let href: string | null = null
+	interface Props {
+		auth?: string | null
+		user?: UserDBData | null
+		size?: number
+		noClick?: boolean
+		// When set, clicking the icon navigates to this route instead of opening the profile popup.
+		href?: string | null
+	}
 
-	let floatingProfile: HTMLDivElement
-	let shouldFlowLeft = false
-	let shouldFlowUp = false
-	let shouldFlowRight = false
-	let reflow = 0
-	let open = false
-	let style: string
-	$: style = `width: ${size}rem; height: ${size}rem;`
+	let {
+		auth = null,
+		user = $bindable(null),
+		size = 2,
+		noClick = false,
+		href = null,
+	}: Props = $props()
+
+	let floatingProfile = $state<HTMLDivElement>()
+	let shouldFlowLeft = $state(false)
+	let shouldFlowUp = $state(false)
+	let shouldFlowRight = $state(false)
+	let reflow = $state(0)
+	let open = $state(false)
+	let style: string = $derived(`width: ${size}rem; height: ${size}rem;`)
 
 	const openProfile = () => (open = !noClick && !!user?.username && !open)
 
@@ -31,23 +40,25 @@
 				}
 			})
 
-	$: {
+	$effect(() => {
 		if (browser && typeof auth === 'string') {
 			fetchUserData(auth)
 		}
-	}
+	})
 
-	$: {
+	$effect(() => {
 		reflow
 		open
-		const profile = floatingProfile?.getBoundingClientRect()
-		shouldFlowLeft = profile?.x + 120 > floatingProfile?.ownerDocument?.body?.clientWidth
-		shouldFlowUp = profile?.y + 400 > floatingProfile?.ownerDocument?.body?.clientHeight
-		shouldFlowRight = !shouldFlowLeft && profile?.x - 120 < 0
-	}
+		if (!floatingProfile) return
+		const profile = floatingProfile.getBoundingClientRect()
+		const body = floatingProfile.ownerDocument?.body
+		shouldFlowLeft = !!body && profile.x + 120 > body.clientWidth
+		shouldFlowUp = !!body && profile.y + 400 > body.clientHeight
+		shouldFlowRight = !shouldFlowLeft && profile.x - 120 < 0
+	})
 </script>
 
-<svelte:window on:resize={() => (reflow = performance.now())} />
+<svelte:window onresize={() => (reflow = performance.now())} />
 
 <div class="relative">
 	{#if href}
@@ -65,7 +76,7 @@
 			</div>
 		</a>
 	{:else}
-		<button class="contents" disabled={noClick} on:click={openProfile}>
+		<button class="contents" disabled={noClick} onclick={openProfile}>
 			<div
 				bind:this={floatingProfile}
 				class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow"
@@ -85,8 +96,14 @@
 	<div
 		class="fixed inset-0 h-screen w-screen z-50 bg-foreground/10 backdrop-blur-[2px]"
 		class:hidden={!open}
-		on:keydown|stopPropagation={() => (open = false)}
-		on:click|stopPropagation={() => (open = false)}
+		onkeydown={(e) => {
+			e.stopPropagation()
+			open = false
+		}}
+		onclick={(e) => {
+			e.stopPropagation()
+			open = false
+		}}
 		aria-label="Close profile popup modal"
 		role="button"
 		tabindex="0"

@@ -14,15 +14,15 @@
 	// The editable config the sliders bind to. It is NOT applied live — a giant
 	// map costs too much to rebuild on every drag — so edits stage here and only
 	// take effect on "Rebuild" (or picking a preset).
-	let config: StressConfig = { ...DEFAULT_STRESS }
+	let config: StressConfig = $state({ ...DEFAULT_STRESS })
 
-	let map: MapObject | undefined
-	let stats: StressStats | undefined
-	let rebuildKey = 0
-	let localTeam = -1 // default to spectate: CPU-vs-CPU churn is the real stress
-	let fogOfWar = false
-	let building = false
-	let dirty = false
+	let map: MapObject | undefined = $state.raw()
+	let stats: StressStats | undefined = $state()
+	let rebuildKey = $state(0)
+	let localTeam = $state(-1) // default to spectate: CPU-vs-CPU churn is the real stress
+	let fogOfWar = $state(false)
+	let building = $state(false)
+	let dirty = $state(false)
 
 	const rebuild = async () => {
 		building = true
@@ -46,7 +46,7 @@
 	// Build the baseline preset once on mount.
 	applyPreset(STRESS_PRESETS[0].config)
 
-	$: teams = map ? derivePlayersFromMap(map).map((p) => p.team) : []
+	let teams = $derived(map ? derivePlayersFromMap(map).map((p) => p.team) : [])
 
 	// Slider definitions: [key, label, min, max, step].
 	const sliders: [keyof StressConfig, string, number, number, number][] = [
@@ -79,14 +79,16 @@
 			<button
 				class="rounded bg-slate-800 px-2.5 py-1 hover:bg-slate-700"
 				title={p.blurb}
-				on:click={() => applyPreset(p.config)}
+				onclick={() => applyPreset(p.config)}
 			>
 				{p.name}
 			</button>
 		{/each}
 	</div>
 
-	<div class="mb-3 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-sm">
+	<div
+		class="mb-3 flex flex-wrap items-end gap-x-6 gap-y-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-sm"
+	>
 		{#each sliders as [key, label, min, max, step]}
 			<label class="flex flex-col gap-1">
 				<span class="flex justify-between gap-3 text-slate-400">
@@ -99,7 +101,7 @@
 					{max}
 					{step}
 					bind:value={config[key]}
-					on:input={markDirty}
+					oninput={markDirty}
 					class="w-40 accent-yellow-500"
 				/>
 			</label>
@@ -108,7 +110,8 @@
 		<label class="flex flex-col gap-1">
 			<span class="flex justify-between gap-3 text-slate-400">
 				<span>Terrain variety</span>
-				<span class="font-mono tabular-nums text-slate-200">{config.terrainVariety.toFixed(2)}</span>
+				<span class="font-mono tabular-nums text-slate-200">{config.terrainVariety.toFixed(2)}</span
+				>
 			</span>
 			<input
 				type="range"
@@ -116,7 +119,7 @@
 				max="1"
 				step="0.05"
 				bind:value={config.terrainVariety}
-				on:input={markDirty}
+				oninput={markDirty}
 				class="w-40 accent-yellow-500"
 			/>
 		</label>
@@ -126,7 +129,7 @@
 			<input
 				type="number"
 				bind:value={config.seed}
-				on:input={markDirty}
+				oninput={markDirty}
 				class="w-20 rounded bg-slate-700 px-2 py-1 font-mono"
 			/>
 		</label>
@@ -136,7 +139,7 @@
 				? 'bg-yellow-500 text-slate-900 hover:bg-yellow-400'
 				: 'bg-slate-700 hover:bg-slate-600'}"
 			disabled={building}
-			on:click={rebuild}
+			onclick={rebuild}
 		>
 			{building ? 'Building…' : dirty ? 'Rebuild ●' : 'Rebuild'}
 		</button>
@@ -153,7 +156,9 @@
 		<label class="flex items-center gap-2 text-slate-400">
 			<input type="checkbox" bind:checked={fogOfWar} class="accent-yellow-500" />
 			Fog of war
-			<span class="text-xs text-slate-600">(adds per-turn visibility recompute over every unit)</span>
+			<span class="text-xs text-slate-600"
+				>(adds per-turn visibility recompute over every unit)</span
+			>
 		</label>
 	</div>
 
@@ -162,7 +167,9 @@
 			<DevMatch {map} {localTeam} {fogOfWar} {rebuildKey} menuHref="/dev/stress" />
 		{/if}
 		{#if building}
-			<div class="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 text-lg text-slate-200">
+			<div
+				class="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/70 text-lg text-slate-200"
+			>
 				Building {config.cols}×{config.rows}…
 			</div>
 		{/if}

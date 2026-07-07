@@ -1,38 +1,35 @@
 <script lang="ts">
 	import { unitData } from '$lib/GameData/unit'
 	import { terrainData } from '$lib/GameData/terrain'
-	import {
-		COMBAT_TERRAINS,
-		terrainIndex,
-		resolveDuel,
-		damageMatrix,
-	} from '$lib/Dev/combatSim'
+	import { COMBAT_TERRAINS, terrainIndex, resolveDuel, damageMatrix } from '$lib/Dev/combatSim'
 
 	const terrainOptions = COMBAT_TERRAINS.map((name) => ({ name, idx: terrainIndex(name) }))
 
-	let attackerType = 0
-	let defenderType = Math.min(1, unitData.length - 1)
-	let attackerTerrain = terrainOptions[0].idx
-	let defenderTerrain = terrainOptions[0].idx
-	let attackerHp = 1
-	let defenderHp = 1
+	let attackerType = $state(0)
+	let defenderType = $state(Math.min(1, unitData.length - 1))
+	let attackerTerrain = $state(terrainOptions[0].idx)
+	let defenderTerrain = $state(terrainOptions[0].idx)
+	let attackerHp = $state(1)
+	let defenderHp = $state(1)
 
-	$: duel = resolveDuel({
-		attackerType,
-		defenderType,
-		attackerTerrain,
-		defenderTerrain,
-		attackerHp,
-		defenderHp,
-	})
+	let duel = $derived(
+		resolveDuel({
+			attackerType,
+			defenderType,
+			attackerTerrain,
+			defenderTerrain,
+			attackerHp,
+			defenderHp,
+		})
+	)
 
 	// Health bar helper.
 	const pct = (v: number, max: number) => (max > 0 ? Math.round((v / max) * 100) : 0)
 
 	// ── Matrix view ────────────────────────────────────────────────────────────
-	let showMatrix = false
-	let matrixTerrain = terrainOptions[0].idx
-	$: matrix = showMatrix ? damageMatrix(matrixTerrain) : []
+	let showMatrix = $state(false)
+	let matrixTerrain = $state(terrainOptions[0].idx)
+	let matrix = $derived(showMatrix ? damageMatrix(matrixTerrain) : [])
 	// Color a damage cell from cold (low) to hot (lethal) relative to defender max HP.
 	const cellColor = (dmg: number, defMax: number) => {
 		const r = defMax > 0 ? Math.min(1, dmg / defMax) : 0
@@ -50,8 +47,8 @@
 		<h1 class="text-2xl font-bold">Combat Lab</h1>
 		<p class="text-sm text-slate-400">
 			Every number routes through the live <code class="text-slate-300">previewDamage</code> /
-			<code class="text-slate-300">canCounterAttack</code> engine code — matchup, terrain defense,
-			the high-ground bonus and damage modifiers all included.
+			<code class="text-slate-300">canCounterAttack</code> engine code — matchup, terrain defense, the
+			high-ground bonus and damage modifiers all included.
 		</p>
 	</header>
 
@@ -119,7 +116,9 @@
 				<p class="text-xs uppercase tracking-wide text-slate-400">Counter</p>
 				{#if duel.canCounter}
 					<p class="text-2xl font-bold text-sky-300">{duel.counterDamage} dmg</p>
-					<p class="text-xs text-slate-400">attacker → {duel.attackerHealthAfter}/{duel.attackerMax}</p>
+					<p class="text-xs text-slate-400">
+						attacker → {duel.attackerHealthAfter}/{duel.attackerMax}
+					</p>
 					<div class="mt-1 h-2 overflow-hidden rounded bg-slate-700">
 						<div
 							class="h-full bg-red-400 transition-all"
@@ -151,7 +150,7 @@
 		<div class="flex flex-wrap items-center gap-4">
 			<button
 				class="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
-				on:click={() => (showMatrix = !showMatrix)}
+				onclick={() => (showMatrix = !showMatrix)}
 			>
 				{showMatrix ? 'Hide' : 'Show'} full damage matrix
 			</button>
@@ -171,7 +170,8 @@
 				<table class="border-collapse text-xs">
 					<thead>
 						<tr>
-							<th class="sticky left-0 z-10 bg-slate-800 p-2 text-left text-slate-400">atk \ def</th>
+							<th class="sticky left-0 z-10 bg-slate-800 p-2 text-left text-slate-400">atk \ def</th
+							>
 							{#each unitData as u}
 								<th class="whitespace-nowrap bg-slate-800 p-2 text-slate-400" title={u.name}>
 									{u.name.split(' ')[0]}

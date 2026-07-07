@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { gameState } from '../gameState'
 
-	$: state = $gameState
-	$: currentPlayer = state.players.find((p) => p.team === state.currentTeam)
-	$: money = currentPlayer?.money ?? 0
+	let state = $derived($gameState)
+	let currentPlayer = $derived(state.players.find((p) => p.team === state.currentTeam))
+	let money = $derived(currentPlayer?.money ?? 0)
 </script>
 
 <span

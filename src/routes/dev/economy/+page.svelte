@@ -4,21 +4,27 @@
 	import { devScenes } from '$lib/Dev/devScenes'
 	import { derivePlayersFromMap } from '$lib/Engine/gameState'
 
-	let sceneIndex = devScenes.findIndex((s) => s.id === 'economy')
-	if (sceneIndex < 0) sceneIndex = 0
-	$: scene = devScenes[sceneIndex]
+	let sceneIndex = $state(
+		Math.max(
+			0,
+			devScenes.findIndex((s) => s.id === 'economy')
+		)
+	)
+	let scene = $derived(devScenes[sceneIndex])
 
-	let map: MapObject
-	let rebuildKey = 0
-	let localTeam = 0
-	let lastSceneId = ''
-	$: if (scene.id !== lastSceneId) {
-		lastSceneId = scene.id
-		map = scene.build()
-		rebuildKey += 1
-	}
+	let map = $state.raw<MapObject>()
+	let rebuildKey = $state(0)
+	let localTeam = $state(0)
+	let lastSceneId = $state('')
+	$effect(() => {
+		if (scene.id !== lastSceneId) {
+			lastSceneId = scene.id
+			map = scene.build()
+			rebuildKey += 1
+		}
+	})
 
-	$: teams = map ? derivePlayersFromMap(map).map((p) => p.team) : []
+	let teams = $derived(map ? derivePlayersFromMap(map).map((p) => p.team) : [])
 
 	const reset = () => {
 		map = scene.build()
@@ -46,7 +52,7 @@
 					class="rounded px-2.5 py-1 {i === sceneIndex
 						? 'bg-yellow-500 font-semibold text-slate-900'
 						: 'bg-slate-800 hover:bg-slate-700'}"
-					on:click={() => (sceneIndex = i)}
+					onclick={() => (sceneIndex = i)}
 				>
 					{s.name}
 				</button>
@@ -59,14 +65,16 @@
 				<option value={-1}>Spectate (CPU plays all)</option>
 			</select>
 		</label>
-		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" on:click={reset}>
+		<button class="rounded bg-slate-700 px-3 py-1 hover:bg-slate-600" onclick={reset}>
 			Reset scene
 		</button>
 		<span class="text-xs text-slate-500">{scene.blurb}</span>
 	</div>
 
 	<div class="flex flex-wrap gap-4">
-		<div class="relative h-[70vh] min-w-[420px] flex-1 overflow-hidden rounded-lg border border-slate-700">
+		<div
+			class="relative h-[70vh] min-w-[420px] flex-1 overflow-hidden rounded-lg border border-slate-700"
+		>
 			{#if map}
 				<DevMatch {map} {localTeam} {rebuildKey} fogOfWar={false} menuHref="/dev/economy" />
 			{/if}

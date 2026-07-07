@@ -6,12 +6,16 @@
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 
-	export let data: PageData
+	interface Props {
+		data: PageData
+	}
 
-	$: gameData = data.gameData
-	let joinCode = ''
-	let joinStatus: 'idle' | 'sending' | 'error' = 'idle'
-	let joinError = ''
+	let { data }: Props = $props()
+
+	let gameData = $derived(data.gameData)
+	let joinCode = $state('')
+	let joinStatus: 'idle' | 'sending' | 'error' = $state('idle')
+	let joinError = $state('')
 
 	const joinSession = async (session: string) => {
 		if (!session) {
@@ -49,7 +53,7 @@
 
 	const join = () => joinSession(joinCode.trim())
 
-	let leaving = false
+	let leaving = $state(false)
 	const leaveActive = async (session: string) => {
 		if (leaving) return
 		leaving = true
@@ -102,7 +106,7 @@
 					<button
 						type="button"
 						class="btn btn-outline btn-sm"
-						on:click={() => gameData && copyCode(gameData.session)}
+						onclick={() => gameData && copyCode(gameData.session)}
 					>
 						<Icon icon="lucide:copy" width={14} />
 						Copy
@@ -115,7 +119,7 @@
 						type="button"
 						class="btn btn-ghost btn-sm text-destructive"
 						disabled={leaving}
-						on:click={() => gameData && leaveActive(gameData.session)}
+						onclick={() => gameData && leaveActive(gameData.session)}
 					>
 						<Icon icon="lucide:log-out" width={14} />
 						{leaving ? 'Leaving…' : 'Leave game'}
@@ -151,7 +155,13 @@
 				<p class="text-sm text-muted-foreground">Paste a session code shared by another player.</p>
 			</div>
 
-			<form class="flex flex-col sm:flex-row gap-2" on:submit|preventDefault={join}>
+			<form
+				class="flex flex-col sm:flex-row gap-2"
+				onsubmit={(e) => {
+					e.preventDefault()
+					join()
+				}}
+			>
 				<input
 					type="text"
 					bind:value={joinCode}
@@ -197,7 +207,7 @@
 								type="button"
 								class="btn btn-primary btn-sm shrink-0"
 								disabled={joinStatus === 'sending'}
-								on:click={() => joinSession(room.session)}
+								onclick={() => joinSession(room.session)}
 							>
 								<Icon icon="lucide:log-in" width={14} />
 								Join
@@ -206,7 +216,9 @@
 					{/each}
 				</ul>
 			{:else}
-				<p class="text-sm text-muted-foreground">No open games right now. Make one to get started.</p>
+				<p class="text-sm text-muted-foreground">
+					No open games right now. Make one to get started.
+				</p>
 			{/if}
 
 			{#if data.page > 0 || data.hasMore}

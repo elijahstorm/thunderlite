@@ -19,85 +19,18 @@
 		return () => fogOfWarEnabled.set(prevFog)
 	})
 
-	let sceneIndex = 1 // 'skirmish' — the inspector default
-	$: scene = devScenes[sceneIndex]
-	let cpuTeam = 1
-
-	let map: MapObject
-	let lastKey = ''
-	$: key = `${scene.id}`
-	$: if (key !== lastKey) {
-		lastKey = key
-		map = scene.build()
-		selected = firstTeamUnit(map, cpuTeam)
-	}
+	let sceneIndex = $state(1) // 'skirmish' — the inspector default
+	let cpuTeam = $state(1)
 
 	const firstTeamUnit = (m: MapObject, team: number): number | null => {
 		const i = m.layers.units.findIndex((u) => u?.team === team)
 		return i < 0 ? null : i
 	}
-	$: if (map && (selected == null || map.layers.units[selected]?.team !== cpuTeam)) {
-		selected = firstTeamUnit(map, cpuTeam)
-	}
 
-	let selected: number | null = null
+	let selected: number | null = $state(null)
 	type Metric = 'position' | 'threat'
-	let metric: Metric = 'position'
+	let metric = $state<Metric>('position')
 
-	$: unit = selected != null ? map?.layers.units[selected] : null
-
-	$: reach = unit && selected != null ? generateMovementList(map, selected, unit) : []
-
-	// Metric value per reachable tile.
-	$: values = (() => {
-		if (!unit) return new Map<number, number>()
-		const m = new Map<number, number>()
-		for (const t of reach) {
-			m.set(
-				t,
-				metric === 'position'
-					? scorePositionBonus(map, t, unit, cpuTeam)
-					: threatToTile(map, t, unit, cpuTeam)
-			)
-		}
-		return m
-	})()
-
-	$: best = (() => {
-		let bt: number | null = null
-		let bv = -Infinity
-		for (const [t, v] of values) {
-			// For threat, "best" = safest (lowest); for position, highest.
-			const adj = metric === 'threat' ? -v : v
-			if (adj > bv) {
-				bv = adj
-				bt = t
-			}
-		}
-		return bt
-	})()
-
-	// Attack options from the unit's current tile.
-	$: attacks = (() => {
-		if (!unit || selected == null) return []
-		const targets = generateAttackList(map, selected, unit)
-		return targets
-			.map((t) => {
-				const enemy = map.layers.units[t]
-				if (!enemy || enemy.team === cpuTeam) return null
-				const s = scoreAttack(map, unit!, selected!, enemy, t)
-				return { tile: t, enemy, ...s }
-			})
-			.filter((x): x is NonNullable<typeof x> => x !== null)
-			.sort((a, b) => b.score - a.score)
-	})()
-	$: attackTiles = new Set(attacks.map((a) => a.tile))
-
-	// Normalize a metric value to a 0..1 ramp across the reachable set.
-	$: range = (() => {
-		const vs = [...values.values()]
-		return { min: Math.min(...vs), max: Math.max(...vs) }
-	})()
 	const heat = (v: number, min: number, max: number, metric: Metric) => {
 		const span = max - min || 1
 		let r = (v - min) / span // 0 low .. 1 high
@@ -122,6 +55,70 @@
 		const u = map.layers.units[tile]
 		if (u && u.team === cpuTeam) selected = tile
 	}
+	let scene = $derived(devScenes[sceneIndex])
+	const map = $derived(scene.build())
+	$effect(() => {
+		if (map && (selected == null || map.layers.units[selected]?.team !== cpuTeam)) {
+			selected = firstTeamUnit(map, cpuTeam)
+		}
+	})
+	let unit = $derived(selected != null ? map?.layers.units[selected] : null)
+	let reach = $derived(unit && selected != null ? generateMovementList(map, selected, unit) : [])
+	// Metric value per reachable tile.
+	let values = $derived(
+		(() => {
+			if (!unit) return new Map<number, number>()
+			const m = new Map<number, number>()
+			for (const t of reach) {
+				m.set(
+					t,
+					metric === 'position'
+						? scorePositionBonus(map, t, unit, cpuTeam)
+						: threatToTile(map, t, unit, cpuTeam)
+				)
+			}
+			return m
+		})()
+	)
+	let best = $derived(
+		(() => {
+			let bt: number | null = null
+			let bv = -Infinity
+			for (const [t, v] of values) {
+				// For threat, "best" = safest (lowest); for position, highest.
+				const adj = metric === 'threat' ? -v : v
+				if (adj > bv) {
+					bv = adj
+					bt = t
+				}
+			}
+			return bt
+		})()
+	)
+	// Attack options from the unit's current tile.
+	let attacks = $derived(
+		(() => {
+			if (!unit || selected == null) return []
+			const targets = generateAttackList(map, selected, unit)
+			return targets
+				.map((t) => {
+					const enemy = map.layers.units[t]
+					if (!enemy || enemy.team === cpuTeam) return null
+					const s = scoreAttack(map, unit!, selected!, enemy, t)
+					return { tile: t, enemy, ...s }
+				})
+				.filter((x): x is NonNullable<typeof x> => x !== null)
+				.sort((a, b) => b.score - a.score)
+		})()
+	)
+	let attackTiles = $derived(new Set(attacks.map((a) => a.tile)))
+	// Normalize a metric value to a 0..1 ramp across the reachable set.
+	let range = $derived(
+		(() => {
+			const vs = [...values.values()]
+			return { min: Math.min(...vs), max: Math.max(...vs) }
+		})()
+	)
 </script>
 
 <svelte:head><title>ThunderLite — AI Inspector</title></svelte:head>
@@ -132,8 +129,8 @@
 		<h1 class="text-2xl font-bold">AI Inspector</h1>
 		<p class="text-sm text-slate-400">
 			The greedy per-unit scorer, made visible. Select one of the CPU team's units to see where it
-			wants to stand (<code class="text-slate-300">scorePositionBonus</code>), the incoming threat at
-			each tile, and its ranked attack options (<code class="text-slate-300">scoreAttack</code>).
+			wants to stand (<code class="text-slate-300">scorePositionBonus</code>), the incoming threat
+			at each tile, and its ranked attack options (<code class="text-slate-300">scoreAttack</code>).
 		</p>
 	</header>
 
@@ -146,7 +143,7 @@
 							class="rounded px-3 py-1.5 text-sm {i === sceneIndex
 								? 'bg-yellow-500 font-semibold text-slate-900'
 								: 'bg-slate-800 hover:bg-slate-700'}"
-							on:click={() => (sceneIndex = i)}
+							onclick={() => (sceneIndex = i)}
 						>
 							{s.name}
 						</button>
@@ -161,14 +158,16 @@
 				</label>
 				<div class="flex overflow-hidden rounded border border-slate-700 text-sm">
 					<button
-						class="px-3 py-1 {metric === 'position' ? 'bg-slate-200 text-slate-900' : 'bg-slate-800'}"
-						on:click={() => (metric = 'position')}
+						class="px-3 py-1 {metric === 'position'
+							? 'bg-slate-200 text-slate-900'
+							: 'bg-slate-800'}"
+						onclick={() => (metric = 'position')}
 					>
 						Position score
 					</button>
 					<button
 						class="px-3 py-1 {metric === 'threat' ? 'bg-slate-200 text-slate-900' : 'bg-slate-800'}"
-						on:click={() => (metric = 'threat')}
+						onclick={() => (metric = 'threat')}
 					>
 						Incoming threat
 					</button>

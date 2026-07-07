@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let checked: boolean
-	export let label: string
+	interface Props {
+		checked: boolean
+		label: string
+	}
+
+	let { checked = $bindable(), label }: Props = $props()
 </script>
 
 <label class="relative inline-flex items-center cursor-pointer">

@@ -2,13 +2,17 @@
 	import { onDestroy, onMount } from 'svelte'
 	import { unitData } from '$lib/GameData/unit'
 
-	/** Idle sprite sheet for this unit/team (from `spriteStore.units[type][team]`). */
-	export let image: HTMLImageElement | undefined = undefined
-	export let type: number
-	/** Rendered box size in CSS px. */
-	export let size = 40
-	/** When true, slowly cycle through the unit's four facing directions. */
-	export let rotate = false
+	interface Props {
+		/** Idle sprite sheet for this unit/team (from `spriteStore.units[type][team]`). */
+		image?: HTMLImageElement | undefined
+		type: number
+		/** Rendered box size in CSS px. */
+		size?: number
+		/** When true, slowly cycle through the unit's four facing directions. */
+		rotate?: boolean
+	}
+
+	let { image = undefined, type, size = 40, rotate = false }: Props = $props()
 
 	// The idle sheet is laid out columns = facing direction (`state`), rows =
 	// animation frame — identical to the in-game `renderObject` mapping. We only
@@ -16,12 +20,15 @@
 	// (the old build menu stretched the *whole* sheet into the box, slicing the
 	// unit apart).
 	const SPRITE = 60
-	$: meta = unitData[type]
-	$: frameWidth = SPRITE + (meta?.xOffset ?? 0)
-	$: frameHeight = SPRITE + (meta?.yOffset ?? 0)
+	let meta = $derived(unitData[type])
+	let frameWidth = $derived(SPRITE + (meta?.xOffset ?? 0))
+	let frameHeight = $derived(SPRITE + (meta?.yOffset ?? 0))
 
-	let canvas: HTMLCanvasElement | undefined
-	let direction = 0
+	let canvas: HTMLCanvasElement | undefined = $state()
+	let direction = $state(0)
+	// Plain let, not $state: a bookkeeping interval handle. As $state the effect below
+	// read it (`if (!timer)`) and wrote it (`timer = setInterval`), a self-referential
+	// pattern that does needless extra effect runs.
 	let timer: ReturnType<typeof setInterval> | null = null
 
 	const draw = () => {
@@ -55,7 +62,7 @@
 		}
 	}
 
-	$: {
+	$effect(() => {
 		if (rotate) {
 			if (!timer) {
 				timer = setInterval(() => {
@@ -68,16 +75,16 @@
 			direction = 0
 			draw()
 		}
-	}
+	})
 
 	// Redraw when the inputs that affect the frame change. Sprites are normally
 	// preloaded before the build menu opens, but guard the race where the image is
 	// still decoding by redrawing once it finishes.
-	$: {
+	$effect(() => {
 		void [image, frameWidth, frameHeight, size]
 		draw()
 		if (image && !image.complete) image.addEventListener('load', draw, { once: true })
-	}
+	})
 
 	onMount(draw)
 

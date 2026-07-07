@@ -1,19 +1,20 @@
 <script lang="ts">
+	import { untrack } from 'svelte'
 	import { goto } from '$app/navigation'
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
 	import MapCard from '$lib/Components/Widgets/Social/MapCard.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 
-	export let data
-	$: user = data.user
-	$: stats = data.stats
-	$: maps = data.maps ?? []
-	$: isMe = !!data.me && data.me === user.auth
-	$: canAct = !!data.me && !isMe
+	let { data } = $props()
+	let user = $derived(data.user)
+	let stats = $derived(data.stats)
+	let maps = $derived(data.maps ?? [])
+	let isMe = $derived(!!data.me && data.me === user.auth)
+	let canAct = $derived(!!data.me && !isMe)
 
 	// Optimistic local state seeded from the server's relationship snapshot.
-	let relationship = data.user.relationship ?? null
-	let following = data.user.following ?? false
+	let relationship = $state(untrack(() => data.user.relationship ?? null))
+	let following = $state(untrack(() => data.user.following ?? false))
 
 	const message = () => goto(`/chat/${user.auth}`)
 
@@ -39,12 +40,13 @@
 			.catch(() => {})
 	}
 
-	$: friendLabel =
+	let friendLabel = $derived(
 		relationship === 'friends'
 			? 'Friends'
 			: relationship === 'friend-request'
 				? 'Requested'
 				: 'Add friend'
+	)
 </script>
 
 <section class="mx-auto w-full max-w-3xl px-4 py-8 space-y-6">
@@ -66,20 +68,20 @@
 
 	{#if canAct}
 		<div class="flex flex-wrap gap-2">
-			<button type="button" class="btn btn-primary btn-sm" on:click={message}>Message</button>
+			<button type="button" class="btn btn-primary btn-sm" onclick={message}>Message</button>
 			<button
 				type="button"
 				class="btn btn-sm"
 				class:btn-ghost={relationship !== 'friends'}
 				disabled={relationship === 'friends' || relationship === 'friend-request'}
-				on:click={friend}
+				onclick={friend}
 			>
 				{friendLabel}
 			</button>
-			<button type="button" class="btn btn-ghost btn-sm" on:click={toggleFollow}>
+			<button type="button" class="btn btn-ghost btn-sm" onclick={toggleFollow}>
 				{following ? 'Following' : 'Follow'}
 			</button>
-			<button type="button" class="btn btn-ghost btn-sm text-destructive" on:click={block}>
+			<button type="button" class="btn btn-ghost btn-sm text-destructive" onclick={block}>
 				{relationship === 'blocked' ? 'Blocked' : 'Block'}
 			</button>
 		</div>

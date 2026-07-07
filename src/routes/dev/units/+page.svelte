@@ -9,13 +9,13 @@
 	import { sfxForAction } from '$lib/Audio/sfxMap'
 
 	// ── Animation clock — same beat the in-game renderer ticks on ─────────────
-	let frame = 0
+	let frame = $state(0)
 
 	// ── Sprite loading: the exact loader + team colorizer the game uses ───────
-	let makeImage: ReturnType<typeof createImageLoader> | null = null
+	let makeImage: ReturnType<typeof createImageLoader> | null = $state(null)
 	let colorize: ReturnType<typeof imageColorizer> | null = null
 	const spriteCache = new Map<string, string>()
-	let cacheVersion = 0
+	let cacheVersion = $state(0)
 
 	const ensureSprite = (url: string, team: number) => {
 		const key = `${url}|${team}`
@@ -34,21 +34,23 @@
 	// ── Unit viewer state ──────────────────────────────────────────────────────
 	const teams = ['Red', 'Blue', 'Green', 'Yellow', 'Grey']
 	const directions = ['→', '↓', '←', '↑', 'Pose 5', 'Pose 6']
-	let team = 0
-	let direction = 1 // facing down
+	let team = $state(0)
+	let direction = $state(1) // facing down
 
-	$: if (makeImage) {
-		team
-		for (const unit of unitData) {
-			ensureSprite(unit.url, team)
-			if (unit.attackSprite) ensureSprite(unit.attackSprite.url, team)
+	$effect(() => {
+		if (makeImage) {
+			team
+			for (const unit of unitData) {
+				ensureSprite(unit.url, team)
+				if (unit.attackSprite) ensureSprite(unit.attackSprite.url, team)
+			}
+			for (const fx of animationData) ensureSprite(fx.url, 0)
 		}
-		for (const fx of animationData) ensureSprite(fx.url, 0)
-	}
+	})
 
 	const explosion = animationData[ANIMATION_EXPLOSION]
-	let attacking: Record<number, { start: number } | undefined> = {}
-	let exploding: Record<number, { start: number } | undefined> = {}
+	let attacking: Record<number, { start: number } | undefined> = $state({})
+	let exploding: Record<number, { start: number } | undefined> = $state({})
 
 	const playAttack = (index: number) => {
 		const sprite = unitData[index].attackSprite
@@ -132,7 +134,7 @@
 						class="rounded px-2 py-1 {team === i
 							? 'bg-slate-200 text-slate-900'
 							: 'bg-slate-700 hover:bg-slate-600'}"
-						on:click={() => (team = i)}
+						onclick={() => (team = i)}
 					>
 						{name}
 					</button>
@@ -145,7 +147,7 @@
 						class="rounded px-2 py-1 {direction === i
 							? 'bg-slate-200 text-slate-900'
 							: 'bg-slate-700 hover:bg-slate-600'}"
-						on:click={() => (direction = i)}
+						onclick={() => (direction = i)}
 					>
 						{label}
 					</button>
@@ -221,20 +223,20 @@
 						<button
 							class="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600 disabled:opacity-40"
 							disabled={!unit.attackSprite}
-							on:click={() => playAttack(i)}
+							onclick={() => playAttack(i)}
 						>
 							Attack
 						</button>
 						<button
 							class="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600 disabled:opacity-40"
 							disabled={sfxForAction('move', { type: i }) === null}
-							on:click={() => playMoveSfx(i)}
+							onclick={() => playMoveSfx(i)}
 						>
 							Move sfx
 						</button>
 						<button
 							class="rounded bg-slate-700 px-2 py-1 hover:bg-slate-600"
-							on:click={() => playDeath(i)}
+							onclick={() => playDeath(i)}
 						>
 							Die
 						</button>

@@ -9,15 +9,21 @@
 	import MakeGameMapCard from '$lib/Components/Widgets/Social/MakeGameMapCard.svelte'
 	import { dbUsersStore } from '$lib/Stores/dbStores'
 
-	export let data: PageData
-	$: map = data.map
+	interface Props {
+		data: PageData
+	}
+
+	let { data }: Props = $props()
+	let map = $derived(data.map)
 
 	// MakeGameMapCard reads the owner out of the shared user store, so seed it with
 	// the owner the loader resolved (otherwise the avatar/name render blank).
-	$: dbUsersStore.update((store) => ({ ...store, [data.owner.auth]: data.owner }))
+	$effect(() => {
+		dbUsersStore.update((store) => ({ ...store, [data.owner.auth]: data.owner }))
+	})
 
-	let status: 'idle' | 'sending' | 'error' = 'idle'
-	let errorMessage = ''
+	let status: 'idle' | 'sending' | 'error' = $state('idle')
+	let errorMessage = $state('')
 
 	const makeGame = () => {
 		status = 'sending'
@@ -80,7 +86,7 @@
 						</a>
 					{/if}
 					{#if data.signedIn}
-						<button class="btn btn-primary" on:click={makeGame}>
+						<button class="btn btn-primary" onclick={makeGame}>
 							<Icon icon="lucide:rocket" width={14} />
 							Make game
 						</button>

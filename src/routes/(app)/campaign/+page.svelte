@@ -9,14 +9,14 @@
 
 	// SSR renders with only the first level unlocked; the real value is read from
 	// the local progress mirror after mount (localStorage is browser-only).
-	let unlockedOrder = firstLevelOrder
+	let unlockedOrder = $state(firstLevelOrder)
 	onMount(() => {
 		unlockedOrder = getUnlockedOrder(undefined)
 	})
 
 	// Set when the player beat the final level and pressed Continue (see the host
 	// route). Shown as a one-time banner; the grid is still browsable underneath.
-	$: complete = $page.url.searchParams.get('complete') === '1'
+	let complete = $derived($page.url.searchParams.get('complete') === '1')
 </script>
 
 <svelte:head>

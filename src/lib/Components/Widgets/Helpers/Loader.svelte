@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let label: string = ''
-	export let size: number = 32
+	interface Props {
+		label?: string
+		size?: number
+	}
+
+	let { label = '', size = 32 }: Props = $props()
 </script>
 
 <div class="flex flex-col items-center justify-center gap-3 py-6">

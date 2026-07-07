@@ -9,7 +9,7 @@
 
 	const toggle = () => pathDebugEnabled.update((v) => !v)
 
-	let copied = false
+	let copied = $state(false)
 	let copyTimer: ReturnType<typeof setTimeout> | undefined
 
 	const copyState = async () => {
@@ -62,18 +62,18 @@
 		clearTimeout(copyTimer)
 	})
 
-	$: info = $pathDebug
+	let info = $derived($pathDebug)
 </script>
 
 <div class="fixed top-2 right-2 z-[9999] font-mono text-[11px] leading-tight">
 	<div class="flex items-center gap-1">
-		<button class="rounded bg-black/80 px-2 py-1 text-white shadow" on:click={toggle}>
+		<button class="rounded bg-black/80 px-2 py-1 text-white shadow" onclick={toggle}>
 			path debug: {$pathDebugEnabled ? 'ON' : 'off'} (P)
 		</button>
 		{#if $pathDebugEnabled}
 			<button
 				class="rounded px-2 py-1 text-white shadow {copied ? 'bg-green-600' : 'bg-black/80'}"
-				on:click={copyState}
+				onclick={copyState}
 			>
 				{copied ? 'copied!' : 'copy (⌘C)'}
 			</button>

@@ -8,19 +8,22 @@
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import SearchWithTypes from '$lib/Components/Widgets/Forms/SearchWithTypes.svelte'
 
-	export let data: PageData
-	$: maps = data.maps
-	$: users = data.users
-	$: mapTypes = data.mapTypes
+	interface Props {
+		data: PageData
+	}
 
-	let loader = () => {}
-	let hasMore = true
+	let { data }: Props = $props()
+	let maps = $derived(data.maps)
+	let users = $derived(data.users)
+	let mapTypes = $derived(data.mapTypes)
 
-	const createLoader: (
-		props: { detail: { search: string; type: string } },
-		load?: boolean
-	) => void = ({ detail }, load = true) => {
-		const { search, type } = detail
+	let loader = $state(() => {})
+	let hasMore = $state(true)
+
+	const createLoader: (props: { search: string; type: string }, load?: boolean) => void = (
+		{ search, type },
+		load = true
+	) => {
 		let page = -1
 		hasMore = true
 		loader = () =>
@@ -75,7 +78,7 @@
 		}
 	}
 
-	createLoader({ detail: { search: '', type: '' } }, false)
+	createLoader({ search: '', type: '' }, false)
 
 	const updateStore =
 		<T extends object>(data: T[], key = 'id') =>
@@ -87,13 +90,13 @@
 				return store
 			}, store) ?? store
 
-	$: {
+	$effect(() => {
 		dbUsersStore.update(updateStore(users, 'auth'))
 		dbMapsStore.update(updateStore(maps))
-	}
+	})
 </script>
 
-<InfiniteScroll tailwind="max-h-screen h-screen" threshold={600} on:load={loader}>
+<InfiniteScroll tailwind="max-h-screen h-screen" threshold={600} onload={loader}>
 	<ContentWithFooter noFooterOnMobile>
 		<Header />
 
@@ -115,7 +118,7 @@
 					</a>
 				</header>
 
-				<SearchWithTypes on:load={createLoader} types={mapTypes} />
+				<SearchWithTypes onload={createLoader} types={mapTypes} />
 
 				<div class="grid gap-5">
 					{#each maps as map}

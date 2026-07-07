@@ -1,15 +1,26 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte'
 	import type { UIEventHandler } from 'svelte/elements'
 
-	export let tailwind = ''
-	export let threshold = 0
-	export let horizontal = false
-	export let reverse = false
+	interface Props {
+		tailwind?: string
+		threshold?: number
+		horizontal?: boolean
+		reverse?: boolean
+		onload?: () => void
+		children?: import('svelte').Snippet
+	}
 
-	const dispatch = createEventDispatcher()
+	let {
+		tailwind = '',
+		threshold = 0,
+		horizontal = false,
+		reverse = false,
+		onload,
+		children,
+	}: Props = $props()
+
 	let isLoadMore = false
-	let component: HTMLDivElement
+	let component = $state<HTMLDivElement>()
 
 	const scroll: UIEventHandler<HTMLDivElement> = (e) => {
 		if (!e || !e.target) return
@@ -27,7 +38,7 @@
 
 		if (offset <= threshold) {
 			if (!isLoadMore) {
-				dispatch('load')
+				onload?.()
 			}
 			isLoadMore = true
 		} else {
@@ -36,6 +47,6 @@
 	}
 </script>
 
-<div bind:this={component} class="overflow-auto {tailwind}" on:scroll={scroll} on:resize={scroll}>
-	<slot></slot>
+<div bind:this={component} class="overflow-auto {tailwind}" onscroll={scroll} onresize={scroll}>
+	{@render children?.()}
 </div>

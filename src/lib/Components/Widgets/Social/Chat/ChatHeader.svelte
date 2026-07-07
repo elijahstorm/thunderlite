@@ -1,11 +1,13 @@
 <script lang="ts">
 	import UserImageAndName from '../UserImageAndName.svelte'
-	import { createEventDispatcher } from 'svelte'
 
-	export let user: UserDBData
-	export let highlight = false
+	interface Props {
+		user: UserDBData
+		highlight?: boolean
+		ontoggle?: () => void
+	}
 
-	const dispatch = createEventDispatcher()
+	let { user, highlight = false, ontoggle }: Props = $props()
 </script>
 
 <header
@@ -24,7 +26,10 @@
 		type="button"
 		aria-label="Close conversation"
 		class="text-muted-foreground hover:text-foreground rounded-full p-1"
-		on:click|stopPropagation={() => dispatch('toggle')}
+		onclick={(e) => {
+			e.stopPropagation()
+			ontoggle?.()
+		}}
 	>
 		<svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
 			<path stroke-linecap="round" d="M5 5l10 10M15 5L5 15" />

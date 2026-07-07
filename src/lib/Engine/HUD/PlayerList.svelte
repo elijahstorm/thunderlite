@@ -6,13 +6,13 @@
 
 	// Every player's funds, always on screen so they can be compared at a glance.
 	// The active team is highlighted; defeated players are dimmed and struck.
-	$: state = $gameState
-	$: players = [...state.players].sort((a, b) => a.team - b.team)
+	let state = $derived($gameState)
+	let players = $derived([...state.players].sort((a, b) => a.team - b.team))
 
 	// Online matches supply each side's real profile (keyed by team). Prefer the
 	// display name, then the @username, then any engine-set label, and finally the
 	// generic "Player N" for CPU/hotseat sides with no account behind them.
-	$: roster = $playerRoster
+	let roster = $derived($playerRoster)
 	const labelFor = (player: (typeof players)[number], user: UserDBData | undefined): string =>
 		user?.display_name || user?.username || player.name || `Player ${player.team + 1}`
 </script>

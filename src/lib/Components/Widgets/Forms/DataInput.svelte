@@ -1,40 +1,58 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte'
-
-	export let value: string
-	export let id: string
-	export let name: string
 	// Only `textarea` is treated specially — every other value renders as the
-	// regular text input, so this accepts the common HTML input types callers pass.
-	export let type: 'textarea' | 'text' | 'email' | 'password' | 'tel' | 'url' | 'number' = 'text'
-	export let placeholder: string
-	export let label: string = ''
-	export let message: string = ''
-	export let icon: string | undefined = undefined
-	export let showPrivacy: boolean = false
 
-	export let required: boolean = false
-	export let attempted: boolean = false
-	export let invalid: boolean = false
-	export let forceValid: boolean = false
+	interface Props {
+		value: string
+		id: string
+		name: string
+		// regular text input, so this accepts the common HTML input types callers pass.
+		type?: 'textarea' | 'text' | 'email' | 'password' | 'tel' | 'url' | 'number'
+		placeholder: string
+		label?: string
+		message?: string
+		icon?: string | undefined
+		showPrivacy?: boolean
+		required?: boolean
+		attempted?: boolean
+		invalid?: boolean
+		forceValid?: boolean
+		onchange?: (e: Event) => void
+	}
 
-	const dispatch = createEventDispatcher()
+	let {
+		value = $bindable(),
+		id,
+		name,
+		type = 'text',
+		placeholder,
+		label = '',
+		message = '',
+		icon = undefined,
+		showPrivacy = false,
+		required = false,
+		attempted = false,
+		invalid = false,
+		forceValid = false,
+		onchange,
+	}: Props = $props()
 
-	$: stateClass = invalid
-		? 'border-destructive bg-destructive/5'
-		: forceValid
-			? 'border-success bg-success/5'
-			: ''
+	let stateClass = $derived(
+		invalid
+			? 'border-destructive bg-destructive/5'
+			: forceValid
+				? 'border-success bg-success/5'
+				: ''
+	)
 
-	$: labelClass = invalid ? 'text-destructive' : forceValid ? 'text-success' : ''
+	let labelClass = $derived(invalid ? 'text-destructive' : forceValid ? 'text-success' : '')
 
-	$: messageClass = invalid
-		? 'text-destructive'
-		: forceValid
-			? 'text-success'
-			: 'text-muted-foreground'
+	let messageClass = $derived(
+		invalid ? 'text-destructive' : forceValid ? 'text-success' : 'text-muted-foreground'
+	)
 
-	$: attemptedClass = attempted ? 'invalid:border-destructive invalid:bg-destructive/5' : ''
+	let attemptedClass = $derived(
+		attempted ? 'invalid:border-destructive invalid:bg-destructive/5' : ''
+	)
 </script>
 
 <div class="space-y-1.5 mt-5">
@@ -51,7 +69,7 @@
 			{required}
 			{placeholder}
 			bind:value
-			on:change={(e) => dispatch('change', e)}
+			onchange={(e) => onchange?.(e)}
 		></textarea>
 	{:else}
 		<div class="relative">
@@ -70,7 +88,7 @@
 				{placeholder}
 				type="text"
 				bind:value
-				on:change={(e) => dispatch('change', e)}
+				onchange={(e) => onchange?.(e)}
 			/>
 		</div>
 	{/if}

@@ -7,27 +7,32 @@
 	import { isWalletUnit, walletOf } from '../wallet'
 	import ModifierBadges from './ModifierBadges.svelte'
 
-	export let map: MapObject | undefined = undefined
-	/** The viewing team — a reinforcement telegraph is only ever shown to its owner. */
-	export let localTeam: number = 0
+	interface Props {
+		map?: MapObject | undefined
+		/** The viewing team — a reinforcement telegraph is only ever shown to its owner. */
+		localTeam?: number
+	}
 
-	$: tile = $focusedTile
-	$: pinned = $selectedTile !== null
-	$: ground = map && tile != null ? map.layers.ground[tile] : null
-	$: terrain = ground ? terrainData[ground.type] : null
-	$: building = map && tile != null ? map.layers.buildings[tile] : null
-	$: buildingInfo = building ? buildingData[building.type] : null
-	$: sky = map && tile != null ? map.layers.sky[tile] : null
-	$: skyInfo = sky ? skyData[sky.type] : null
-	$: unit = map && tile != null ? map.layers.units[tile] : null
-	$: unitInfo = unit ? unitData[unit.type] : null
-	$: unitHpMax = unitInfo?.health ?? 0
-	$: unitHp = unit?.health ?? unitHpMax
+	let { map = undefined, localTeam = 0 }: Props = $props()
+
+	let tile = $derived($focusedTile)
+	let pinned = $derived($selectedTile !== null)
+	let ground = $derived(map && tile != null ? map.layers.ground[tile] : null)
+	let terrain = $derived(ground ? terrainData[ground.type] : null)
+	let building = $derived(map && tile != null ? map.layers.buildings[tile] : null)
+	let buildingInfo = $derived(building ? buildingData[building.type] : null)
+	let sky = $derived(map && tile != null ? map.layers.sky[tile] : null)
+	let skyInfo = $derived(sky ? skyData[sky.type] : null)
+	let unit = $derived(map && tile != null ? map.layers.units[tile] : null)
+	let unitInfo = $derived(unit ? unitData[unit.type] : null)
+	let unitHpMax = $derived(unitInfo?.health ?? 0)
+	let unitHp = $derived(unit?.health ?? unitHpMax)
 	// Only the owning team sees its own scripted reinforcement (matches the ghost marker).
-	$: telegraph =
+	let telegraph = $derived(
 		map && tile != null && localTeam >= 0
 			? (map.scheduledSpawns?.find((s) => s.tile === tile && s.team === localTeam) ?? null)
 			: null
+	)
 </script>
 
 <div

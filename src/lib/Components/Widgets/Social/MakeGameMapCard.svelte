@@ -2,7 +2,11 @@
 	import { dbUsersStore } from '$lib/Stores/dbStores'
 	import UserImageAndName from './UserImageAndName.svelte'
 
-	export let map: MapDBData
+	interface Props {
+		map: MapDBData
+	}
+
+	let { map }: Props = $props()
 </script>
 
 <section class="space-y-5">
