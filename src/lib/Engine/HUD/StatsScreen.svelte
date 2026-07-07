@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte'
 	import { gameState } from '../gameState'
+	import { playerRoster } from './playerRoster'
 	import { defeatAnimating } from '../defeat'
 	import { onMatchEnd, lastMatchResult, type MatchResult } from '../matchEnd'
 	import type { PlayerMatchStats } from '../matchStats'
@@ -53,14 +54,21 @@
 		return typeof v === 'number' ? v : 0
 	}
 
-	// Player display names come from live game state, keyed by team.
-	$: nameByTeam = new Map($gameState.players.map((p) => [p.team, p.name]))
+	// Prefer the real player's profile name (online roster, keyed by team) and
+	// fall back to the engine's generic label. Keeps the results screen showing
+	// "test02" rather than "Player 2".
+	$: labelFor = (team: number): string => {
+		const user = $playerRoster[team]
+		if (user) return user.display_name || user.username || `Player ${team + 1}`
+		const engineName = $gameState.players.find((p) => p.team === team)?.name
+		return engineName || `Player ${team + 1}`
+	}
 
 	$: isDraw = result?.winner === null || result?.winner === undefined
 	$: localWon = result != null && !isDraw && result.winner === localTeam
 	$: banner = result == null ? '' : isDraw ? 'Draw' : localWon ? 'Victory' : 'Defeat'
 	$: bannerDetail =
-		result == null || isDraw ? 'No winner' : `Player ${(result.winner as number) + 1} wins`
+		result == null || isDraw ? 'No winner' : `${labelFor(result.winner as number)} wins`
 
 	$: isCampaign = result?.mode === 'campaign'
 
@@ -111,9 +119,7 @@
 							data-outcome={player.outcome}
 						>
 							<td class="py-1 pr-3">
-								Player {player.team + 1}{nameByTeam.get(player.team)
-									? ` (${nameByTeam.get(player.team)})`
-									: ''}
+								{labelFor(player.team)}
 							</td>
 							<td class="py-1 pr-3 capitalize">{player.outcome}</td>
 							{#each STAT_COLUMNS as col (col.key)}

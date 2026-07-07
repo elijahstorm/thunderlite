@@ -226,14 +226,20 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 
 	map.layers.units[tile] = null
 	// Footsteps roll *with* the walk, not after it: voice the movement sfx as the
-	// slide starts. The commit below suppresses 'move' so it isn't heard twice.
+	// slide starts.
 	playActionSfx('move', unit)
+	// Relay the move to opponents at the START of our slide so they animate it
+	// concurrently instead of only after our walk finishes. The authoritative state
+	// is applied locally when the slide ends; the relayed action is deduped when its
+	// own echo returns (see GameSocket.locallyEmitted).
+	const moveAction: SerializedAction = { kind: 'move', from: tile, to: finalTile }
+	emitOutgoingAction(moveAction)
 	animateRoute(map, unit, tile, finalTile, route).then(() => {
 		map.layers.units[tile] = unit
 		// A stealth unit that slipped through an enemy jammer's radar mid-route is
 		// logged so the watching CPU "remembers" a cloaked threat is about.
 		recordStealthPassthrough(map, route, unit)
-		commit(map, { kind: 'move', from: tile, to: finalTile }, { suppressSfxActions: ['move'] })
+		applyAction(map, moveAction, { live: true, suppressSfxActions: ['move'] })
 		// Walked into a concealed enemy mid-route: turn over, skip menu / callback.
 		if (collided) return
 		if (callback) {
@@ -315,10 +321,15 @@ const performAttack = (map: MapObject, attackerTile: number, targetTile: number)
 	const attacker = map.layers.units[attackerTile]
 	const target = map.layers.units[targetTile]
 	if (!attacker || !target) return
+	// Relay the attack to opponents at the START of our choreography so they animate
+	// their copy concurrently, rather than waiting out our full swing + counter and
+	// only then starting theirs. State is applied locally at the end of the sequence;
+	// the relayed action is deduped when its echo returns.
+	emitOutgoingAction({ kind: 'attack', from: attackerTile, to: targetTile })
 	// The sequencer plays attack → (target bar / explosion) → counter → (attacker
-	// bar / explosion), committing the authoritative result at the end.
+	// bar / explosion), applying the authoritative result at the end.
 	void animateAttackSequence(map, attackerTile, targetTile, (action, opts) =>
-		commit(map, action, opts)
+		applyAction(map, action, { live: true, ...opts })
 	)
 }
 
