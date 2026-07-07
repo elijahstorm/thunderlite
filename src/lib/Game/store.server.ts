@@ -36,7 +36,7 @@ type RoomRow = {
 	expires_at: number
 	start_at: number | null
 }
-type MemberRow = { user_session: string; seat: number }
+type MemberRow = { user_session: string; seat: number; user_auth?: string | null }
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = { seq: number; user_session: string; action: unknown; ts: number }
 
@@ -51,6 +51,21 @@ async function members(session: string): Promise<string[]> {
 		select: ['user_session', 'seat'],
 	})
 	return rows.map((r) => r.user_session)
+}
+
+/**
+ * Members with their public profile auth, ordered by join seat. `userAuth` is
+ * the `profiles(auth)` id recorded at join; it's null for legacy rows (joined
+ * before the column existed) so the in-game player list falls back to a generic
+ * label for that seat. Powers the seat → username/avatar mapping in `/play`.
+ */
+async function roster(session: string): Promise<{ seat: number; userAuth: string | null }[]> {
+	const rows = await db.find<MemberRow>('game_member', {
+		where: { session },
+		orderBy: { seat: 'asc' },
+		select: ['seat', 'user_auth'],
+	})
+	return rows.map((r) => ({ seat: Number(r.seat), userAuth: r.user_auth ?? null }))
 }
 
 async function isMember(session: string, userSession: string): Promise<boolean> {
@@ -96,11 +111,16 @@ async function setPlayerGame(userSession: string, session: string): Promise<void
  * Create a room for `userSession` on map `mapId` (a map's `public_id`). The
  * creator takes seat 0 and the first turn. Returns the shareable session code.
  */
-async function createRoom(userSession: string, mapId: string): Promise<string> {
+async function createRoom(userSession: string, mapId: string, userAuth: string): Promise<string> {
 	const session = generateKey()
 	const expires_at = now() + ROOM_TTL_MS
 	await db.insert('game_room', { session, map_id: mapId, current_turn: userSession, expires_at })
-	await db.insert('game_member', { session, user_session: userSession, seat: 0 })
+	await db.insert('game_member', {
+		session,
+		user_session: userSession,
+		seat: 0,
+		user_auth: userAuth,
+	})
 	await setPlayerGame(userSession, session)
 	return session
 }
@@ -111,13 +131,14 @@ async function createRoom(userSession: string, mapId: string): Promise<string> {
  * key collapses a re-join to a no-op; the per-attempt seat probe + insert-on-
  * conflict prevents two joiners taking the same seat.
  */
-async function addMember(session: string, userSession: string): Promise<number> {
+async function addMember(session: string, userSession: string, userAuth: string): Promise<number> {
 	for (let attempt = 0; attempt < APPEND_RETRIES; attempt++) {
 		const seat = await db.count('game_member', { session })
 		const inserted = await db.insertIgnoreConflict('game_member', {
 			session,
 			user_session: userSession,
 			seat,
+			user_auth: userAuth,
 		})
 		if (inserted) return seat
 		// Conflict: either we're already a member, or another joiner took `seat`.
@@ -246,6 +267,7 @@ async function events(
 
 export const gameStore = {
 	members,
+	roster,
 	isMember,
 	getRoom,
 	currentGame,

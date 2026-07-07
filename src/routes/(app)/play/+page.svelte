@@ -7,6 +7,7 @@
 	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
 	import { dev } from '$app/environment'
 	import PathDebugPanel from '$lib/Engine/Interactor/Pathing/PathDebugPanel.svelte'
+	import PlayerRosterSync from '$lib/Engine/HUD/PlayerRosterSync.svelte'
 	import { derivePlayersFromMap } from '$lib/Engine/gameState'
 
 	export let data: PageData
@@ -21,10 +22,28 @@
 	// than seats.
 	const localTeamFor = (map: MapObject, s: number): number =>
 		derivePlayersFromMap(map)[s]?.team ?? 0
+
+	// The server sends profiles indexed by join seat; re-key them by team using
+	// that same stable seat → player order so the player list (which speaks in
+	// teams) can look each side up. Any unresolved seat is skipped.
+	const teamRosterFor = (
+		map: MapObject,
+		roster: (UserDBData | null)[] | undefined
+	): Record<number, UserDBData> => {
+		const out: Record<number, UserDBData> = {}
+		if (!roster) return out
+		const derived = derivePlayersFromMap(map)
+		roster.forEach((user, s) => {
+			const team = derived[s]?.team
+			if (user && typeof team === 'number') out[team] = user
+		})
+		return out
+	}
 </script>
 
 <section class="h-screen overflow-clip">
 	<MapLoader {mapHash} let:map>
+		<PlayerRosterSync roster={teamRosterFor(map, data.roster)} />
 		<GameSocket map={() => map} {gameSession} {userSession} let:socket let:requestRedraw>
 			<GameStateManager
 				{userSession}

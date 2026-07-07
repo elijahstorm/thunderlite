@@ -22,7 +22,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@dontcode2/backend": "0.2.3",
+		"@dontcode2/backend": "0.2.4",
 		"@iconify/svelte": "5.2.2",
 		"as-toast": "1.1.0",
 		"base-x": "5.0.1",

@@ -32,7 +32,9 @@ export const POST = async ({ request, locals }) => {
 			throw error(409, 'Game session is full')
 		}
 
-		await gameStore.addMember(session, userSession)
+		// `locals.user` is the DontCode id, which is the player's public
+		// `profiles(auth)` — stored on the seat so `/play` can show their username.
+		await gameStore.addMember(session, userSession, locals.user ?? '')
 		// Guard the seat race: if we tipped the room over capacity, roll back.
 		const count = await gameStore.memberCount(session)
 		if (count > MAX_PLAYERS) {

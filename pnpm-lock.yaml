@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@dontcode2/backend':
-        specifier: 0.2.3
-        version: 0.2.3
+        specifier: 0.2.4
+        version: 0.2.4
       '@iconify/svelte':
         specifier: 5.2.2
         version: 5.2.2(svelte@5.56.4(@typescript-eslint/types@8.62.0))
@@ -197,8 +197,8 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@dontcode2/backend@0.2.3':
-    resolution: {integrity: sha512-9IDuQV6ncZOI0T7hRwQ9RjVtAc7gQF2Ft7EHJZnbfqCtw4L9VPPayxsjVjegiB6bEHRhEvzAZEir9RvmfKMbcg==}
+  '@dontcode2/backend@0.2.4':
+    resolution: {integrity: sha512-0040D9zVhozS8SNqO7fwqtrFDimHEVVDUoJGRm/6YEqfH048j+9y9IHZVbYoo3BWutDgk0xVBvga06Rf02K41A==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -2837,7 +2837,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@dontcode2/backend@0.2.3':
+  '@dontcode2/backend@0.2.4':
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       zod: 3.25.76

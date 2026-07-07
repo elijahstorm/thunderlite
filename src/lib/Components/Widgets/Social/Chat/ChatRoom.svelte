@@ -124,7 +124,7 @@
 		reverse
 		on:load={loadMoreMessage}
 	>
-		{#each parseMessages([...$allMessages, ...$socketMessages]) as messageGroup (messageGroup.key)}
+		{#each parseMessages( [...$allMessages, ...$socketMessages.filter((m) => m.source === target && m.target === source)] ) as messageGroup (messageGroup.key)}
 			<ChatMessageGroups {messageGroup} sourceUser={$sourceUser} targetUser={$targetUser} />
 		{/each}
 	</InfiniteScroll>

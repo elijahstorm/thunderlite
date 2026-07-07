@@ -42,6 +42,10 @@
 		// The sender already rendered its own message locally (see ChatRoom);
 		// drop the copy if the service echoes publishes back to their origin.
 		if (data.source && data.source === currentAuth) return
+		// One global channel carries every user's messages, so drop anything not
+		// addressed to us — otherwise other people's conversations leak into this
+		// client's chat list and open chat room.
+		if (data.target && data.target !== currentAuth) return
 		$socketMessages = [
 			...$socketMessages,
 			{

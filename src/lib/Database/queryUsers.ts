@@ -33,6 +33,7 @@ const query: (type: QueryType) => (
 			if (type === 'public') {
 				candidates = await db.find<UserDBData>('profiles', {
 					where: { auth: { not: me }, private: false, profile_image_url: { not: null } },
+					orderBy: { created_at: 'desc' },
 				})
 			} else {
 				let auths: string[]
@@ -125,7 +126,15 @@ const query: (type: QueryType) => (
 				}
 				const aRank = a.relationship === 'friends' ? 1 : 2
 				const bRank = b.relationship === 'friends' ? 1 : 2
-				return aRank - bRank
+				if (aRank !== bRank) return aRank - bRank
+				// Deterministic tiebreak: Postgres returns candidates in an unstable
+				// scan order, so without this the page window (slice below) shifts
+				// between requests and a user flickers in and out of page 0 whenever
+				// there's no chat history to order by.
+				const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0
+				const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0
+				if (aCreated !== bCreated) return bCreated - aCreated
+				return a.auth < b.auth ? -1 : a.auth > b.auth ? 1 : 0
 			})
 
 			users = users.slice((page ?? 0) * limit, (page ?? 0) * limit + limit)

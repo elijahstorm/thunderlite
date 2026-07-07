@@ -11,7 +11,9 @@ export const POST = async ({ request, locals }) => {
 	if (!(await isValidMapId(mapId))) throw error(400, 'Map with that id does not exist')
 
 	try {
-		const session = await gameStore.createRoom(userSession, mapId)
+		// `locals.user` is the DontCode id, which is the player's public
+		// `profiles(auth)` — stored on the seat so `/play` can show their username.
+		const session = await gameStore.createRoom(userSession, mapId, locals.user ?? '')
 		return json({ session })
 	} catch (msg) {
 		logToErrorDb(msg)
