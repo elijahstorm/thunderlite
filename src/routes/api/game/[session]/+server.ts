@@ -30,11 +30,16 @@ export const GET = async ({ params, locals }) => {
 
 		const full = count >= MAX_PLAYERS
 
-		// Self-heal: a full room that never got its countdown armed (lost arm at
-		// join time) starts ticking now instead of stalling in the lobby forever.
+		// Self-heal the countdown in both directions: a full room that never got
+		// armed starts ticking now; a room that dropped below capacity before it
+		// fired disarms, so a later refill re-arms a fresh 10s instead of resuming
+		// a stale clock.
 		let startAt = room.start_at
 		if (full && startAt == null) {
 			startAt = await gameStore.armStartCountdown(session)
+		} else if (!full && startAt != null) {
+			await gameStore.disarmCountdown(session)
+			startAt = null
 		}
 
 		return json({

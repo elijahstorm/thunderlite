@@ -74,14 +74,15 @@ async function members(session: string): Promise<string[]> {
 async function roster(
 	session: string
 ): Promise<
-	{ seat: number; userAuth: string | null; team: number | null; isAi: boolean }[]
+	{ userSession: string; seat: number; userAuth: string | null; team: number | null; isAi: boolean }[]
 > {
 	const rows = await db.find<MemberRow>('game_member', {
 		where: { session },
 		orderBy: { seat: 'asc' },
-		select: ['seat', 'user_auth', 'team', 'is_ai'],
+		select: ['user_session', 'seat', 'user_auth', 'team', 'is_ai'],
 	})
 	return rows.map((r) => ({
+		userSession: r.user_session,
 		seat: Number(r.seat),
 		userAuth: r.user_auth ?? null,
 		team: r.team == null ? null : Number(r.team),
@@ -177,6 +178,20 @@ async function setPlayerGame(userSession: string, session: string): Promise<void
 	)
 }
 
+/** Drop a player's "current room" pointer, but only if it still points at
+ * `session` (so we never clear a pointer they've since moved to a new room). */
+async function clearPlayerGame(userSession: string, session?: string): Promise<void> {
+	const where = session ? { user_session: userSession, session } : { user_session: userSession }
+	await db.delete('player_game', where)
+}
+
+/** Leave a room: drop membership and the current-room pointer so the player is
+ * free to create or join a fresh game (used by finished/abandoned rooms). */
+async function leaveGame(session: string, userSession: string): Promise<void> {
+	await removeMember(session, userSession)
+	await clearPlayerGame(userSession, session)
+}
+
 /**
  * Create a room for `userSession` on map `mapId` (a map's `public_id`). The
  * creator takes seat 0 and the first turn. Returns the shareable session code.
@@ -223,6 +238,69 @@ async function addMember(session: string, userSession: string, userAuth: string)
 
 async function removeMember(session: string, userSession: string): Promise<void> {
 	await db.delete('game_member', { session, user_session: userSession })
+}
+
+/**
+ * Reserve a seat for a CPU player. Occupies capacity like a human seat (so a
+ * room with a host + AI reads as full and starts). AI members never heartbeat,
+ * so they're exempt from the absence sweep. Returns the AI's synthetic session.
+ */
+async function addAiMember(session: string): Promise<string | null> {
+	for (let attempt = 0; attempt < APPEND_RETRIES; attempt++) {
+		const seat = await db.count('game_member', { session })
+		if (seat >= MAX_PLAYERS) return null
+		const aiSession = `ai-${generateKey()}`
+		const inserted = await db.insertIgnoreConflict('game_member', {
+			session,
+			user_session: aiSession,
+			seat,
+			user_auth: null,
+			is_ai: true,
+		})
+		if (inserted) return aiSession
+	}
+	return null
+}
+
+/** Is this member a CPU seat? */
+async function isAiMember(session: string, userSession: string): Promise<boolean> {
+	const row = await db.findOne<MemberRow>('game_member', {
+		where: { session, user_session: userSession },
+		select: ['is_ai'],
+	})
+	return !!row?.is_ai
+}
+
+/**
+ * The human who drives the room's CPU seats — the lowest-seat non-AI member.
+ * Their client runs the AI's turns and relays the moves (see GameStateManager /
+ * the move endpoint's driver path). Null if there's no human (all-AI room).
+ */
+async function aiDriver(session: string): Promise<string | null> {
+	const rows = await db.find<MemberRow>('game_member', {
+		where: { session },
+		orderBy: { seat: 'asc' },
+		select: ['user_session', 'seat', 'is_ai'],
+	})
+	return rows.find((r) => !r.is_ai)?.user_session ?? null
+}
+
+/**
+ * Lock (or unlock) seat selection to random-only. Locking also clears every
+ * member's chosen team, so assignment happens fresh at start (see
+ * assignTeamsIfNeeded).
+ */
+async function setLockRandom(session: string, lock: boolean): Promise<void> {
+	await db.update('game_room', { session }, { lock_random: lock })
+	if (lock) {
+		const members = await db.find<MemberRow>('game_member', {
+			where: { session },
+			select: ['user_session'],
+		})
+		for (const m of members) {
+			await db.update('game_member', { session, user_session: m.user_session }, { team: null })
+		}
+	}
 }
 
 /** Join `session` if there's room (or already a member); refreshes the pointer. */
@@ -406,6 +484,28 @@ async function startNow(session: string): Promise<number> {
 	return start_at
 }
 
+/** Disarm the countdown (e.g. a player left before it fired) so a later refill
+ * re-arms a FRESH 10s rather than resuming a stale/expired clock. */
+async function disarmCountdown(session: string): Promise<void> {
+	await db.update('game_room', { session }, { start_at: null })
+}
+
+/**
+ * Seed whose turn it is at match start to the member on the ENGINE's first team
+ * (the lowest team number — see initGameStateFromMap's `players[0].team`), not
+ * the room creator. With lobby seat selection the creator may have picked a
+ * later side, so seeding to the creator desynced the server's turn pointer from
+ * the engine (both players ended up driving the first team). Only runs before
+ * any move has been recorded, so it never disturbs a turn already in progress.
+ */
+async function seedFirstTurn(session: string, teams: number[]): Promise<void> {
+	if (!teams.length) return
+	if ((await db.count('game_event', { session })) > 0) return
+	const startingTeam = teams[0]
+	const starter = (await roster(session)).find((m) => m.team === startingTeam)
+	if (starter) await setCurrentTurn(session, starter.userSession)
+}
+
 /** Whose turn it is, or null (only transient before a turn is seeded). */
 async function currentTurn(session: string): Promise<string | null> {
 	const room = await db.findOne<RoomRow>('game_room', {
@@ -486,11 +586,17 @@ export const gameStore = {
 	getRoom,
 	currentGame,
 	setPlayerGame,
+	clearPlayerGame,
+	leaveGame,
 	createRoom,
 	addMember,
 	removeMember,
 	ensureMember,
 	rematchRoom,
+	addAiMember,
+	isAiMember,
+	aiDriver,
+	setLockRandom,
 	memberCount,
 	listPublicRooms,
 	setPublic,
@@ -500,6 +606,8 @@ export const gameStore = {
 	seatOf,
 	armStartCountdown,
 	startNow,
+	disarmCountdown,
+	seedFirstTurn,
 	currentTurn,
 	setCurrentTurn,
 	appendEvent,

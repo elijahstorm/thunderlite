@@ -5,8 +5,7 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapData } from '$lib/Map/hashLoader'
 import { gameStore } from '$lib/Game/store.server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
-import { deriveFromHash } from '$lib/Map/Editor/mapExporter'
-import { derivePlayersFromMap } from '$lib/Engine/gameState'
+import { teamsFromHash } from '$lib/Game/mapTeams'
 
 /** Team-keyed public profiles for the in-game player list. */
 type TeamRoster = Record<number, UserDBData>
@@ -42,12 +41,26 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// this client's team back. This replaces the old client-side re-derivation
 	// that let two players both resolve to team 0.
 	const teams = teamsFromHash(mapHash)
-	if (teams.length) await gameStore.assignTeamsIfNeeded(gameSession, teams)
+	if (teams.length) {
+		await gameStore.assignTeamsIfNeeded(gameSession, teams)
+		// Align the server's turn pointer with the engine's first team before the
+		// first move, so the player on the starting side (not necessarily the host)
+		// actually gets turn one.
+		await gameStore.seedFirstTurn(gameSession, teams)
+	}
 
-	const [localTeam, roster] = await Promise.all([
+	const [localTeam, roster, seats, aiDriver] = await Promise.all([
 		gameStore.teamOf(gameSession, userSession),
 		buildTeamRoster(gameSession, locals.user ?? ''),
+		gameStore.roster(gameSession),
+		gameStore.aiDriver(gameSession),
 	])
+
+	// Teams run by a CPU seat, and whether THIS client is the one that drives them
+	// (the lowest-seat human relays the AI's moves — see GameStateManager).
+	const aiTeams = seats
+		.filter((s) => s.isAi && s.team != null)
+		.map((s) => s.team as number)
 
 	return {
 		userSession,
@@ -59,18 +72,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// Profiles keyed by TEAM (not seat) so the player list keys straight off
 		// the engine's team ids.
 		roster,
+		aiTeams,
+		isAiDriver: aiDriver === userSession,
 		mapHash,
-	}
-}
-
-/** The map's teams in the engine's stable order (ascending). Empty on decode failure. */
-const teamsFromHash = (hash: string): number[] => {
-	if (!hash) return []
-	try {
-		return derivePlayersFromMap(deriveFromHash(hash)).map((player) => player.team)
-	} catch (msg) {
-		logToErrorDb(msg)
-		return []
 	}
 }
 
@@ -103,14 +107,15 @@ const getGameSession = async (userSession: string) => {
 	try {
 		const current = await gameStore.currentGame(userSession)
 		if (!current) {
-			// No active room. In dev, fall back to a fixed local skirmish so hitting
-			// `/play` directly still boots a board. In prod there's nothing to show.
-			// NB: this fallback must only fire when there's genuinely no room —
-			// firing it unconditionally in dev made every client seat 0 on a
-			// non-multiplayer `testSession`, so two lobby players both drove player 1
-			// and never synced.
+			// No active room — e.g. the last match ended (its pointer was cleared) or
+			// the player left. In dev, fall back to a fixed local skirmish so hitting
+			// `/play` directly still boots a board; in prod send them to the rooms hub
+			// instead of a dead-end error.
+			// NB: the dev fallback must only fire when there's genuinely no room —
+			// firing it unconditionally made every client seat 0 on a non-multiplayer
+			// `testSession`, so two lobby players both drove player 1 and never synced.
 			if (dev) return { gameSession: 'testSession', mapId: 'hello', seat: 0 }
-			return {}
+			throw redirect(303, '/rooms')
 		}
 		const seat = await gameStore.seatOf(current.session, userSession)
 		if (seat < 0) {

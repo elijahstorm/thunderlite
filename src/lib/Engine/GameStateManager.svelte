@@ -33,6 +33,10 @@
 	export let interactor: undefined | ReturnType<typeof socketSelect>
 	export let endTurnAction: (() => void) | undefined = undefined
 	export let localTeam: number = 0
+	// Online CPU seats: which teams a CPU plays, and whether THIS client is the
+	// one that drives them (the lowest-seat human relays the AI's moves).
+	export let aiTeams: number[] = []
+	export let isAiDriver: boolean = false
 
 	export const userSession: string = ''
 	export let gameSession: string = ''
@@ -259,7 +263,13 @@
 		// transition: the gate collapses the key to '' (cancelling any in-flight
 		// handle), and when the block ends the block re-fires and schedules the turn.
 		const blocked = $turnTransitionActive || $campaignScriptActive
-		const isCpu = !isMultiplayer && s.phase === 'playing' && s.currentTeam !== localTeam
+		// Single-player: drive every non-local team. Online: only the designated
+		// driver runs CPU seats, and only for the teams that are actually CPUs.
+		const isCpu =
+			s.phase === 'playing' &&
+			(!isMultiplayer
+				? s.currentTeam !== localTeam
+				: isAiDriver && aiTeams.includes(s.currentTeam))
 		const key = isCpu && !blocked ? `${s.currentTeam}:${s.turnNumber}` : ''
 		if (key !== lastCpuKey) {
 			lastCpuKey = key

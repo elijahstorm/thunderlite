@@ -2,7 +2,7 @@
 	import type { PageData } from './$types'
 	import { onDestroy, onMount } from 'svelte'
 	import { browser } from '$app/environment'
-	import { goto } from '$app/navigation'
+	import { goto, invalidateAll } from '$app/navigation'
 	import Icon from '@iconify/svelte'
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
@@ -19,9 +19,55 @@
 	let count = data.count
 	let startAt: number | null = data.startAt
 	const maxPlayers = data.maxPlayers
-	const isHost = data.isHost
-	const seat = data.seat
-	const seatSlots = Array.from({ length: maxPlayers }, (_, i) => i)
+	$: isHost = data.isHost
+	$: teams = data.teams
+	$: members = data.members
+	$: memberByTeam = new Map(members.filter((m) => m.team != null).map((m) => [m.team, m]))
+	$: randomMembers = members.filter((m) => m.team == null)
+
+	// Side labels/colours by team index (0 = red, 1 = blue, …).
+	const SIDE = [
+		{ name: 'Red', dot: 'bg-red-500' },
+		{ name: 'Blue', dot: 'bg-blue-500' },
+		{ name: 'Green', dot: 'bg-green-500' },
+		{ name: 'Yellow', dot: 'bg-amber-400' },
+	]
+	const sideOf = (team: number) => SIDE[team] ?? { name: `Side ${team + 1}`, dot: 'bg-muted' }
+	const nameOf = (m: (typeof members)[number]) =>
+		m.isAi ? 'CPU' : m.isMe ? 'You' : m.user?.display_name || m.user?.username || 'Player'
+
+	let lobbyBusy = false
+	let lobbyError = ''
+
+	const lobbyAction = async (body: Record<string, unknown>) => {
+		if (lobbyBusy) return
+		lobbyBusy = true
+		lobbyError = ''
+		try {
+			const res = await fetch(`/api/game/${data.session}/lobby`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body),
+			})
+			if (!res.ok) {
+				const err = (await res.json().catch(() => null)) as { message?: string } | null
+				throw new Error(err?.message ?? 'Could not update the lobby')
+			}
+			await invalidateAll()
+		} catch (err) {
+			lobbyError = err instanceof Error ? err.message : 'Could not update the lobby'
+		} finally {
+			lobbyBusy = false
+		}
+	}
+
+	const takeSide = (team: number) => lobbyAction({ action: 'pick', team })
+	const goRandom = () => lobbyAction({ action: 'pick', team: null })
+	const addAi = (team: number | null) => lobbyAction({ action: 'addAi', team })
+	const removeMember = (target: string) => lobbyAction({ action: 'remove', target })
+	const assign = (target: string, team: number | null) =>
+		lobbyAction({ action: 'assign', target, team })
+	const toggleLock = () => lobbyAction({ action: 'lock', lock: !data.lockRandom })
 
 	// Recomputed on a fast ticker so the countdown reads down smoothly.
 	let now = Date.now()
@@ -45,9 +91,19 @@
 	$: if (startAt != null && now >= startAt) launch()
 
 	const applyState = (state: { count?: number; startAt?: number | null }) => {
-		if (typeof state.count === 'number') count = state.count
-		// Never un-arm a countdown that's already running on this client.
-		if (state.startAt != null) startAt = state.startAt
+		// A change in occupancy means seats/teams may have changed too — re-run the
+		// loader so every client sees the same side assignments without a reload.
+		if (typeof state.count === 'number' && state.count !== count) {
+			count = state.count
+			if (browser) void invalidateAll()
+		}
+		if (state.startAt != null) {
+			startAt = state.startAt
+		} else if ((state.count ?? count) < maxPlayers) {
+			// Room emptied before the countdown fired — clear it so a later refill
+			// starts a fresh 10s instead of the stale value resuming.
+			startAt = null
+		}
 	}
 
 	const poll = async () => {
@@ -108,7 +164,12 @@
 		c.subscribe(`game:${data.session}`, (message: RealtimeMessage) => {
 			const lobby = (message.payload as { lobby?: { count?: number; startAt?: number | null } })
 				?.lobby
-			if (lobby) applyState(lobby)
+			if (lobby) {
+				applyState(lobby)
+				// Any lobby push may carry a seat/side change (pick/assign/lock) that
+				// doesn't move the count — refresh so it shows immediately.
+				if (browser) void invalidateAll()
+			}
 		})
 		c.open()
 			.then(() => (conn = c))
@@ -157,48 +218,137 @@
 			</div>
 		</section>
 
+		{#if data.thumbnail}
+			<section class="card overflow-hidden">
+				<div class="max-h-72 overflow-auto bg-surface-2">
+					<img src={data.thumbnail} alt="{data.mapName} preview" class="w-full object-contain" />
+				</div>
+				<div class="px-4 py-2 text-xs text-muted-foreground">
+					{data.mapName} — scroll to look around the map
+				</div>
+			</section>
+		{/if}
+
 		<section class="card p-6 sm:p-8 space-y-5">
 			<div class="flex items-center justify-between gap-4">
-				<h2 class="text-lg font-semibold tracking-tight text-foreground">Players</h2>
+				<h2 class="text-lg font-semibold tracking-tight text-foreground">Sides</h2>
 				<span class="text-sm text-muted-foreground font-mono">{count} / {maxPlayers}</span>
 			</div>
 
+			{#if isHost}
+				<label class="flex items-center gap-2 text-sm text-muted-foreground">
+					<input
+						type="checkbox"
+						checked={data.lockRandom}
+						disabled={lobbyBusy}
+						on:change={toggleLock}
+					/>
+					Lock all seats to random (no one picks a side)
+				</label>
+			{/if}
+
 			<ul class="space-y-2" data-testid="lobby-seats">
-				{#each seatSlots as i (i)}
-					{@const player = data.roster?.[i] ?? null}
-					<li
-						class="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
-						class:opacity-50={i >= count}
-					>
-						{#if player}
-							<UserIcon user={player} noClick size={1.75} />
+				{#each teams as team (team)}
+					{@const holder = memberByTeam.get(team)}
+					<li class="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-sm">
+						<span class="w-2.5 h-2.5 rounded-full shrink-0 {sideOf(team).dot}"></span>
+						<span class="font-medium text-foreground w-14 shrink-0">{sideOf(team).name}</span>
+
+						{#if holder}
+							{#if holder.isAi}
+								<Icon icon="lucide:bot" width={16} class="text-muted-foreground" />
+							{:else if holder.user}
+								<UserIcon user={holder.user} noClick size={1.5} />
+							{/if}
+							{#if holder.user && !holder.isMe}
+								<button
+									type="button"
+									class="text-foreground hover:underline"
+									on:click={() => holder.user && openDmWith.set(holder.user.auth)}
+								>
+									{nameOf(holder)}
+								</button>
+							{:else}
+								<span class="text-foreground">{nameOf(holder)}</span>
+							{/if}
+
+							<span class="ml-auto flex items-center gap-2">
+								{#if holder.isMe}
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs"
+										disabled={lobbyBusy}
+										on:click={goRandom}>Go random</button
+									>
+								{/if}
+								{#if isHost && !holder.isMe}
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs text-destructive"
+										disabled={lobbyBusy}
+										on:click={() => removeMember(holder.userSession)}
+									>
+										{holder.isAi ? 'Remove AI' : 'Kick'}
+									</button>
+								{/if}
+							</span>
 						{:else}
-							<Icon
-								icon={i < count ? 'lucide:user-check' : 'lucide:user'}
-								width={16}
-								class={i < count ? 'text-foreground' : 'text-muted-foreground'}
-							/>
-						{/if}
-						{#if player && i !== seat}
-							<button
-								type="button"
-								class="text-foreground hover:underline"
-								on:click={() => openDmWith.set(player.auth)}
-							>
-								{player.display_name || player.username}
-							</button>
-						{:else}
-							<span class="text-foreground">
-								{player?.display_name || player?.username || (i === 0 ? 'Host' : `Player ${i + 1}`)}
-								{#if i === seat}<span class="text-muted-foreground">(you)</span>{/if}
+							<span class="ml-auto flex items-center gap-2">
+								<button
+									type="button"
+									class="btn btn-outline btn-xs"
+									disabled={lobbyBusy || (data.lockRandom && !isHost)}
+									on:click={() => takeSide(team)}
+								>
+									Take side
+								</button>
+								{#if isHost && count < maxPlayers}
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs"
+										disabled={lobbyBusy}
+										on:click={() => addAi(team)}
+									>
+										<Icon icon="lucide:bot" width={13} /> Add AI
+									</button>
+								{/if}
 							</span>
 						{/if}
-						<span class="ml-auto text-xs text-muted-foreground">
-							{i < count ? 'Ready' : 'Waiting…'}
-						</span>
 					</li>
 				{/each}
 			</ul>
+
+			{#if randomMembers.length}
+				<div class="space-y-2">
+					<p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Random</p>
+					{#each randomMembers as m (m.userSession)}
+						<div class="flex items-center gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
+							{#if m.isAi}
+								<Icon icon="lucide:bot" width={16} class="text-muted-foreground" />
+							{:else if m.user}
+								<UserIcon user={m.user} noClick size={1.5} />
+							{/if}
+							<span class="text-foreground">{nameOf(m)}</span>
+							<span class="ml-auto flex items-center gap-2">
+								{#if isHost && !m.isMe}
+									<button
+										type="button"
+										class="btn btn-ghost btn-xs text-destructive"
+										disabled={lobbyBusy}
+										on:click={() => removeMember(m.userSession)}
+									>
+										{m.isAi ? 'Remove AI' : 'Kick'}
+									</button>
+								{/if}
+							</span>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if lobbyError}
+				<p class="text-sm text-destructive">{lobbyError}</p>
+			{/if}
 
 			{#if full && remainingSecs != null}
 				<div

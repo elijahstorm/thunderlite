@@ -19,6 +19,7 @@ import {
 import { buildingData } from '../../src/lib/GameData/building'
 
 const AIR_CONTROL = buildingData.findIndex((b) => b.name === 'Air Control')
+const SEA_CONTROL = buildingData.findIndex((b) => b.name === 'Sea Control')
 const CITY = buildingData.findIndex((b) => b.name === 'City')
 
 const STRIKE_COMMANDO = unitData.findIndex((u) => u.name === 'Strike Commando')
@@ -147,6 +148,8 @@ describe('transport — load and unload', () => {
 		const tile = tileXY(5, 2, 2)
 		map.layers.ground[tile] = { type: SHORE, state: 0 }
 		map.layers.units[tile] = unit(SCORPION_TANK, 0)
+		// shipping out requires the team to hold a Sea Control building
+		map.layers.buildings[tileXY(5, 0, 0)] = { type: SEA_CONTROL, state: 0, team: 0 }
 		expect(canShipOut(map, tile)).toBe(true)
 	})
 
@@ -163,6 +166,7 @@ describe('transport — load and unload', () => {
 		map.layers.ground[tile] = { type: SHORE, state: 0 }
 		const tank = unit(SCORPION_TANK, 0, 35)
 		map.layers.units[tile] = tank
+		map.layers.buildings[tileXY(5, 0, 0)] = { type: SEA_CONTROL, state: 0, team: 0 }
 
 		const result = shipOut(map, tile)
 		expect(result.ok).toBe(true)

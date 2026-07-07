@@ -6,6 +6,7 @@ import { generateAttackList } from '../../src/lib/Engine/Interactor/Pathing/atta
 import { unitThreatTiles } from '../../src/lib/Engine/Interactor/Pathing/threat'
 import { validTerrain } from '../../src/lib/Engine/Interactor/Pathing/movement'
 import { canShipOut } from '../../src/lib/Engine/modifiers/transport'
+import { buildingData } from '../../src/lib/GameData/building'
 
 const unitIndex = (name: string) => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -26,6 +27,7 @@ const HILLS = terrainIndex('Hills')
 const SHORE = terrainIndex('Shore')
 const BRIDGE = terrainIndex('Bridge')
 const HIGH_BRIDGE = terrainIndex('High Bridge')
+const SEA_CONTROL = buildingData.findIndex((b) => b.name === 'Sea Control')
 
 const ground = (type: number): GroundObject => ({ type, state: 0 })
 const unit = (type: number, team = 0): UnitObject => ({
@@ -109,6 +111,8 @@ describe('Port — embark trigger keys off the terrain modifier', () => {
 		const map = makeMap(cols, 5)
 		const tile = xy(cols, 2, 2)
 		map.layers.units[tile] = unit(SCORPION_TANK, 0)
+		// shipping out requires the team to hold a Sea Control building
+		map.layers.buildings[xy(cols, 0, 0)] = { type: SEA_CONTROL, state: 0, team: 0 }
 
 		map.layers.ground[tile] = ground(SHORE) // Port
 		expect(canShipOut(map, tile)).toBe(true)

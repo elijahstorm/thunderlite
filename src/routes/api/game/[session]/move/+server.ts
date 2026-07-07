@@ -38,17 +38,30 @@ export const POST = async ({ request, params, locals }) => {
 		// (or malicious) could resign someone else. Not gated on whose turn it is:
 		// you can give up any time.
 		let toRecord = action
+		// The event is normally recorded under the sender. The exception is a CPU
+		// seat's turn: its designated human driver (the lowest-seat human) relays
+		// the AI's moves, and those are recorded under the AI so turn rotation and
+		// the log stay honest.
+		let actor = userSession
 		if (action.kind === 'surrender') {
 			const myTeam = await gameStore.teamOf(session, userSession)
 			if (myTeam != null) toRecord = { ...action, team: myTeam }
 		} else if (current && current !== userSession) {
-			throw error(403, 'Not your turn')
+			const [currentIsAi, driver] = await Promise.all([
+				gameStore.isAiMember(session, current),
+				gameStore.aiDriver(session),
+			])
+			if (currentIsAi && driver === userSession) {
+				actor = current
+			} else {
+				throw error(403, 'Not your turn')
+			}
 		}
 
-		const event = await gameStore.appendEvent(session, userSession, toRecord)
+		const event = await gameStore.appendEvent(session, actor, toRecord)
 
 		if (action.kind === 'end-turn' && members.length > 1) {
-			const idx = members.indexOf(userSession)
+			const idx = members.indexOf(actor)
 			const nextIdx = (idx + 1) % members.length
 			await gameStore.setCurrentTurn(session, members[nextIdx])
 		}

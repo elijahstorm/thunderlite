@@ -116,6 +116,11 @@ export const POST = async ({ request, params, locals }) => {
 			outcome,
 		})
 
+		// The match is over — release this player's "current room" pointer so the
+		// finished game stops showing as their active session and they can start a
+		// new one. Only clears if it still points here (a rematch already moved it).
+		if (mode === 'online') await gameStore.clearPlayerGame(userSession, session)
+
 		return json({ matchId, outcome })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg

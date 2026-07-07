@@ -11,7 +11,7 @@
 			<Icon icon="lucide:arrow-right" width={14} />
 		</a>
 	{:else}
-		<UserIcon auth={$userAuth} />
+		<UserIcon auth={$userAuth} href="/me" />
 		<a
 			href="/logout"
 			class="btn btn-ghost btn-sm text-muted-foreground hover:text-foreground"

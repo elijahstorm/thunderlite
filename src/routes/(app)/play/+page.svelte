@@ -20,6 +20,9 @@
 	$: localTeam = data.localTeam ?? 0
 	// Server sends profiles already keyed by team.
 	$: teamRoster = data.roster ?? {}
+	// Online CPU seats + whether this client drives them.
+	$: aiTeams = data.aiTeams ?? []
+	$: isAiDriver = data.isAiDriver ?? false
 </script>
 
 <section class="h-screen overflow-clip">
@@ -32,12 +35,21 @@
 				{map}
 				minimap
 				{localTeam}
+				{aiTeams}
+				{isAiDriver}
 				fogOfWar={map.fog ?? true}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 				let:select
 			>
-				<GameBoard {map} {requestRedraw} {select} fogOfWar={map.fog ?? true} menuHref="/rooms" />
+				<GameBoard
+					{map}
+					{requestRedraw}
+					{select}
+					{localTeam}
+					fogOfWar={map.fog ?? true}
+					menuHref="/rooms"
+				/>
 			</GameStateManager>
 		</GameSocket>
 	</MapLoader>

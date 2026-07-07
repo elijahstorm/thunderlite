@@ -17,6 +17,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		'/api/chat',
 		'/api/user',
 		'/api/upload',
+		'/api/pro',
 	]
 
 	// Resolve the signed-in user once per request from the access_token cookie.

@@ -9,6 +9,7 @@ const STRIKE_COMMANDO = unitData.findIndex((u) => u.name === 'Strike Commando')
 const SCORPION_TANK = unitData.findIndex((u) => u.name === 'Scorpion Tank')
 const WARMACHINE = unitData.findIndex((u) => u.name === 'Warmachine')
 const CITY = buildingData.findIndex((b) => b.name === 'City')
+const SEA_CONTROL = buildingData.findIndex((b) => b.name === 'Sea Control')
 const PLAINS = terrainData.findIndex((t) => t.name === 'Plains')
 const ENRICHED_ORE = terrainData.findIndex((t) => t.name === 'Enriched Ore Deposit')
 const SHORE = terrainData.findIndex((t) => t.name === 'Shore')
@@ -116,6 +117,8 @@ describe('computeAvailableActions', () => {
 		const tank = unit(SCORPION_TANK, 0)
 		map.layers.ground[12] = { type: SHORE, state: 0 }
 		map.layers.units[12] = tank
+		// shipping out requires the team to hold a Sea Control building
+		map.layers.buildings[0] = { type: SEA_CONTROL, state: 0, team: 0 }
 		const items = computeAvailableActions({ map, tile: 12, unit: tank })
 		expect(ids(items)).toContain('ship_out')
 	})

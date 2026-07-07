@@ -8,6 +8,8 @@
 	export let user: UserDBData | null = null
 	export let size: number = 2
 	export let noClick = false
+	// When set, clicking the icon navigates to this route instead of opening the profile popup.
+	export let href: string | null = null
 
 	let floatingProfile: HTMLDivElement
 	let shouldFlowLeft = false
@@ -48,17 +50,37 @@
 <svelte:window on:resize={() => (reflow = performance.now())} />
 
 <div class="relative">
-	<button class="contents" disabled={noClick} on:click={openProfile}>
-		<div
-			bind:this={floatingProfile}
-			class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow"
-			class:cursor-pointer={!noClick}
-			class:cursor-default={noClick}
-			{style}
-		>
-			<FallbackImage src={user?.profile_image_url} alt="{user?.display_name ?? 'user'} profile" cover />
-		</div>
-	</button>
+	{#if href}
+		<a class="contents" {href} aria-label="{user?.display_name ?? 'user'} profile">
+			<div
+				bind:this={floatingProfile}
+				class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow cursor-pointer"
+				{style}
+			>
+				<FallbackImage
+					src={user?.profile_image_url}
+					alt="{user?.display_name ?? 'user'} profile"
+					cover
+				/>
+			</div>
+		</a>
+	{:else}
+		<button class="contents" disabled={noClick} on:click={openProfile}>
+			<div
+				bind:this={floatingProfile}
+				class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow"
+				class:cursor-pointer={!noClick}
+				class:cursor-default={noClick}
+				{style}
+			>
+				<FallbackImage
+					src={user?.profile_image_url}
+					alt="{user?.display_name ?? 'user'} profile"
+					cover
+				/>
+			</div>
+		</button>
+	{/if}
 
 	<div
 		class="fixed inset-0 h-screen w-screen z-50 bg-foreground/10 backdrop-blur-[2px]"

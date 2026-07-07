@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types'
 	import { browser } from '$app/environment'
-	import { goto } from '$app/navigation'
+	import { goto, invalidateAll } from '$app/navigation'
 	import Icon from '@iconify/svelte'
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
@@ -48,6 +48,18 @@
 	}
 
 	const join = () => joinSession(joinCode.trim())
+
+	let leaving = false
+	const leaveActive = async (session: string) => {
+		if (leaving) return
+		leaving = true
+		try {
+			await fetch(`/api/game/${session}/leave`, { method: 'POST' }).catch(() => {})
+			await invalidateAll()
+		} finally {
+			leaving = false
+		}
+	}
 
 	const copyCode = async (code: string) => {
 		if (!browser || !navigator.clipboard) return
@@ -99,6 +111,15 @@
 						<Icon icon="lucide:play" width={14} />
 						Go to lobby
 					</a>
+					<button
+						type="button"
+						class="btn btn-ghost btn-sm text-destructive"
+						disabled={leaving}
+						on:click={() => gameData && leaveActive(gameData.session)}
+					>
+						<Icon icon="lucide:log-out" width={14} />
+						{leaving ? 'Leaving…' : 'Leave game'}
+					</button>
 				</div>
 
 				<p class="text-xs text-muted-foreground">
