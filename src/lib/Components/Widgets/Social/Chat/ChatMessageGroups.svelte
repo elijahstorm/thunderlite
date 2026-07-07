@@ -36,7 +36,9 @@
 
 {#if sourceUser && targetUser && (messageGroup.user === sourceUser.auth || messageGroup.user === targetUser.auth)}
 	{@const mine = messageGroup.user === sourceUser.auth}
-	<div class="flex items-end gap-2" class:justify-end={mine} class:flex-row-reverse={mine}>
+	<!-- `mine` uses row-reverse (default justify-start) so the group packs to the
+	right; combining it with justify-end would cancel out and push left. -->
+	<div class="flex items-end gap-2" class:flex-row-reverse={mine}>
 		<div class="flex-shrink-0">
 			<UserIcon user={mine ? sourceUser : targetUser} noClick size={1.75} />
 		</div>

@@ -5,6 +5,11 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapData } from '$lib/Map/hashLoader'
 import { gameStore } from '$lib/Game/store.server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
+import { deriveFromHash } from '$lib/Map/Editor/mapExporter'
+import { derivePlayersFromMap } from '$lib/Engine/gameState'
+
+/** Team-keyed public profiles for the in-game player list. */
+type TeamRoster = Record<number, UserDBData>
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const userSession = locals.session
@@ -21,63 +26,76 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			gameSession: 'ephemeral',
 			mapHash: '',
 			seat: 0,
-			roster: [] as (UserDBData | null)[],
+			localTeam: 0,
+			roster: {} as TeamRoster,
 		}
 	}
 
 	const { gameSession, mapId, seat } = await getGameSession(userSession)
 	if (!gameSession || !mapId) throw error(403, 'No game session found')
 
-	// Independent reads — the map blob and the seat roster don't depend on each
-	// other, so resolve them together rather than back to back.
-	const [mapData, roster] = await Promise.all([
-		getMapData(mapId),
-		buildRoster(gameSession, locals.user ?? ''),
+	const { mapHash } = await getMapData(mapId)
+
+	// The team a client commands is authoritative and server-owned. Derive the
+	// map's stable team order, assign any unassigned member a team by seat order
+	// (idempotent — a member who chose a team in the lobby keeps it), then read
+	// this client's team back. This replaces the old client-side re-derivation
+	// that let two players both resolve to team 0.
+	const teams = teamsFromHash(mapHash)
+	if (teams.length) await gameStore.assignTeamsIfNeeded(gameSession, teams)
+
+	const [localTeam, roster] = await Promise.all([
+		gameStore.teamOf(gameSession, userSession),
+		buildTeamRoster(gameSession, locals.user ?? ''),
 	])
 
 	return {
 		userSession,
 		gameSession,
-		// The join seat (0 = host) selects which side this client commands — the
-		// engine derives sides from the map in a stable order, so seat N drives
-		// player N. Without it both clients defaulted to team 0.
 		seat,
-		// Public profiles indexed by seat, so the in-game player list can show
-		// usernames + avatars. The client maps seat → team (same stable order the
-		// seat wiring uses) to key it by team. Null for an unresolvable seat.
+		// Authoritative: the side this client commands. Falls back to the seat's
+		// team only if assignment somehow didn't land (e.g. a map with no teams).
+		localTeam: localTeam ?? teams[seat] ?? 0,
+		// Profiles keyed by TEAM (not seat) so the player list keys straight off
+		// the engine's team ids.
 		roster,
-		...mapData,
+		mapHash,
+	}
+}
+
+/** The map's teams in the engine's stable order (ascending). Empty on decode failure. */
+const teamsFromHash = (hash: string): number[] => {
+	if (!hash) return []
+	try {
+		return derivePlayersFromMap(deriveFromHash(hash)).map((player) => player.team)
+	} catch (msg) {
+		logToErrorDb(msg)
+		return []
 	}
 }
 
 /**
- * Seat-ordered public profiles for the room's players. Index = seat; a seat with
- * no recorded/resolvable profile (a legacy row, or a member whose profile was
- * removed) is null, and the player list falls back to "Player N" for it.
+ * Team-keyed public profiles for the room's players, using each member's
+ * server-assigned team. A team with no resolvable profile (AI seat, legacy row,
+ * or a removed profile) is simply absent, and the player list falls back to a
+ * generic label for it.
  */
-const buildRoster = async (
-	gameSession: string,
-	me: string
-): Promise<(UserDBData | null)[]> => {
-	// The dev `testSession` has no member rows — surface the signed-in user as
-	// seat 0 so the list still shows a real name/avatar while testing locally.
-	if (gameSession === 'testSession') {
-		if (!me) return [null]
-		const [user] = await queryUsersByAuth([me], me)
-		return [user ?? null]
-	}
-
+const buildTeamRoster = async (gameSession: string, me: string): Promise<TeamRoster> => {
 	try {
 		const seats = await gameStore.roster(gameSession)
 		const auths = seats.map((s) => s.userAuth).filter((a): a is string => !!a)
 		const byAuth = new Map((await queryUsersByAuth(auths, me)).map((u) => [u.auth, u]))
-		return [...seats]
-			.sort((a, b) => a.seat - b.seat)
-			.map((s) => (s.userAuth ? (byAuth.get(s.userAuth) ?? null) : null))
+		const out: TeamRoster = {}
+		for (const seat of seats) {
+			if (seat.team == null || !seat.userAuth) continue
+			const user = byAuth.get(seat.userAuth)
+			if (user) out[seat.team] = user
+		}
+		return out
 	} catch (msg) {
 		// A roster failure must never take down the match — degrade to "Player N".
 		logToErrorDb(msg)
-		return []
+		return {}
 	}
 }
 

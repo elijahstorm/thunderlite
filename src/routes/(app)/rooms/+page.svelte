@@ -13,8 +13,7 @@
 	let joinStatus: 'idle' | 'sending' | 'error' = 'idle'
 	let joinError = ''
 
-	const join = async () => {
-		const session = joinCode.trim()
+	const joinSession = async (session: string) => {
 		if (!session) {
 			joinStatus = 'error'
 			joinError = 'Please enter a session code'
@@ -47,6 +46,8 @@
 			joinError = err instanceof Error ? err.message : 'Could not join game session'
 		}
 	}
+
+	const join = () => joinSession(joinCode.trim())
 
 	const copyCode = async (code: string) => {
 		if (!browser || !navigator.clipboard) return
@@ -150,6 +151,65 @@
 					<Icon icon="lucide:circle-x" width={16} class="mt-0.5 shrink-0" />
 					{joinError}
 				</p>
+			{/if}
+		</section>
+
+		<section class="card p-6 sm:p-8 space-y-5">
+			<div class="space-y-1">
+				<h2 class="text-lg font-semibold tracking-tight text-foreground">Open games</h2>
+				<p class="text-sm text-muted-foreground">
+					Public lobbies waiting for a player. Jump into one to fill it.
+				</p>
+			</div>
+
+			{#if data.openRooms?.length}
+				<ul class="divide-y divide-border">
+					{#each data.openRooms as room (room.session)}
+						<li class="flex items-center justify-between gap-3 py-3">
+							<div class="min-w-0">
+								<p class="text-sm font-medium text-foreground truncate">{room.mapName}</p>
+								<p class="text-xs text-muted-foreground font-mono">
+									{room.count}/{room.maxPlayers} · {room.session}
+								</p>
+							</div>
+							<button
+								type="button"
+								class="btn btn-primary btn-sm shrink-0"
+								disabled={joinStatus === 'sending'}
+								on:click={() => joinSession(room.session)}
+							>
+								<Icon icon="lucide:log-in" width={14} />
+								Join
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="text-sm text-muted-foreground">No open games right now. Make one to get started.</p>
+			{/if}
+
+			{#if data.page > 0 || data.hasMore}
+				<div class="flex items-center justify-between pt-1">
+					<a
+						class="btn btn-outline btn-sm"
+						class:pointer-events-none={data.page === 0}
+						class:opacity-50={data.page === 0}
+						href="/rooms?page={Math.max(0, data.page - 1)}"
+					>
+						<Icon icon="lucide:chevron-left" width={14} />
+						Newer
+					</a>
+					<span class="text-xs text-muted-foreground">Page {data.page + 1}</span>
+					<a
+						class="btn btn-outline btn-sm"
+						class:pointer-events-none={!data.hasMore}
+						class:opacity-50={!data.hasMore}
+						href="/rooms?page={data.page + 1}"
+					>
+						Older
+						<Icon icon="lucide:chevron-right" width={14} />
+					</a>
+				</div>
 			{/if}
 		</section>
 	</div>

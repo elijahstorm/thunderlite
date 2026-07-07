@@ -14,6 +14,7 @@ import { CreateMatches } from './create_matches.sql'
 import { CreateMatchPlayers } from './create_match_players.sql'
 import { CreateCampaignProgress } from './create_campaign_progress.sql'
 import { CreateGameRoom } from './create_game_room.sql'
+import { CreateGameRoomSettings } from './create_game_room_settings.sql'
 import { CreateGameMember } from './create_game_member.sql'
 import { CreateGameEvent } from './create_game_event.sql'
 import { CreatePlayerGame } from './create_player_game.sql'
@@ -43,6 +44,7 @@ export const consolidatedSchema = [
 	CreateMatchPlayers,
 	CreateCampaignProgress,
 	CreateGameRoom,
+	CreateGameRoomSettings,
 	CreateGameMember,
 	CreateGameEvent,
 	CreatePlayerGame,

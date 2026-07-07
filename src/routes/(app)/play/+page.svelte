@@ -9,49 +9,29 @@
 	import PathDebugPanel from '$lib/Engine/Interactor/Pathing/PathDebugPanel.svelte'
 	import PlayerRosterSync from '$lib/Engine/HUD/PlayerRosterSync.svelte'
 	import GameChat from '$lib/Components/Socket/GameChat.svelte'
-	import { derivePlayersFromMap } from '$lib/Engine/gameState'
 
 	export let data: PageData
 	$: userSession = data.userSession
 	$: gameSession = data.gameSession
 	$: mapHash = data.mapHash
-	$: seat = data.seat ?? 0
-
-	// Map the join seat to the side this client commands. The engine derives
-	// players from the board in a stable (team-number) order, and turns rotate by
-	// seat, so seat N is player N. Falls back to team 0 for a map with fewer sides
-	// than seats.
-	const localTeamFor = (map: MapObject, s: number): number =>
-		derivePlayersFromMap(map)[s]?.team ?? 0
-
-	// The server sends profiles indexed by join seat; re-key them by team using
-	// that same stable seat → player order so the player list (which speaks in
-	// teams) can look each side up. Any unresolved seat is skipped.
-	const teamRosterFor = (
-		map: MapObject,
-		roster: (UserDBData | null)[] | undefined
-	): Record<number, UserDBData> => {
-		const out: Record<number, UserDBData> = {}
-		if (!roster) return out
-		const derived = derivePlayersFromMap(map)
-		roster.forEach((user, s) => {
-			const team = derived[s]?.team
-			if (user && typeof team === 'number') out[team] = user
-		})
-		return out
-	}
+	// Authoritative side this client commands, resolved + assigned server-side
+	// (see +page.server.ts). Replaces the old per-client re-derivation that let
+	// both players end up as team 0.
+	$: localTeam = data.localTeam ?? 0
+	// Server sends profiles already keyed by team.
+	$: teamRoster = data.roster ?? {}
 </script>
 
 <section class="h-screen overflow-clip">
 	<MapLoader {mapHash} let:map>
-		<PlayerRosterSync roster={teamRosterFor(map, data.roster)} />
+		<PlayerRosterSync roster={teamRoster} />
 		<GameSocket map={() => map} {gameSession} {userSession} let:socket let:requestRedraw>
 			<GameStateManager
 				{userSession}
 				{gameSession}
 				{map}
 				minimap
-				localTeam={localTeamFor(map, seat)}
+				{localTeam}
 				fogOfWar={map.fog ?? true}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
@@ -63,7 +43,7 @@
 	</MapLoader>
 
 	<!-- Realtime group chat for this room; click a name to open a private DM. -->
-	<GameChat session={gameSession} roster={data.roster ?? []} />
+	<GameChat session={gameSession} roster={Object.values(teamRoster)} />
 
 	<!-- DEV TOOL — movement/pathfinding diagnostics. dev-only (stripped from prod). -->
 	{#if dev}

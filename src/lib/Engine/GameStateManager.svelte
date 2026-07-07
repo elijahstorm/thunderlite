@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte'
+	import { goto } from '$app/navigation'
 	import type { socketSelect } from '$lib/Components/Socket/socket'
 	import { gameState, initGameStateFromMap } from './gameState'
 	import { emitMatchEnd, resetMatchEnd, buildMatchResult, type MatchMode } from './matchEnd'
@@ -9,6 +10,7 @@
 	import { registerCampaignProgress } from '$lib/Campaign/progress'
 	import { endTurn } from './turnLoop'
 	import { applyAction } from './applyAction'
+	import { outgoingActions } from './outgoingActions'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
 	import { teamHasPendingActions } from './pendingActions'
@@ -53,6 +55,12 @@
 	// Pause between the local player's last action finishing and the turn
 	// auto-ending, so the flip to the next side isn't too quick to register.
 	const AUTO_END_TURN_DELAY_MS = 500
+
+	// Online anti-stall: a human turn auto-ends after this long with no action,
+	// so an idle/absent player can't freeze the match. Any committed action
+	// (move/build/attack/capture) resets it; a countdown warning shows near the end.
+	const TURN_TIMEOUT_MS = 30_000
+	const TURN_WARN_SECONDS = 10
 
 	const isMultiplayer =
 		gameSession !== '' && gameSession !== 'ephemeral' && gameSession !== 'testSession'
@@ -207,10 +215,24 @@
 		endTurn({ map })
 	}
 
-	// Rematch (hotseat/online) — replay the same board from scratch: restore the
-	// board to its pre-match snapshot, then re-seed game state and clear the
-	// J1/J2 trackers so a new match-end can fire and re-count.
-	const handleRematch = () => {
+	// Rematch. Online: spin up (or join) a fresh lobby for the same map and send
+	// the player there, so the old opponents aren't required to return — each
+	// player who hits rematch lands in the same new room. Hotseat/campaign: replay
+	// the same board in place (restore the pre-match snapshot, re-seed, clear the
+	// J1/J2 trackers so a new match-end can fire and re-count).
+	const handleRematch = async () => {
+		if (isMultiplayer && gameSession) {
+			try {
+				const res = await fetch(`/api/game/${gameSession}/rematch`, { method: 'POST' })
+				const body = (await res.json().catch(() => null)) as { session?: string } | null
+				if (res.ok && body?.session) {
+					await goto(`/rooms/${body.session}`)
+					return
+				}
+			} catch {
+				// Fall through to an in-place restart if the rematch lobby couldn't be set up.
+			}
+		}
 		if (!map) return
 		if (initialLayers) map.layers = structuredClone(initialLayers)
 		map.route = []
@@ -310,6 +332,30 @@
 		}
 	}
 
+	// --- Online turn timeout (anti-stall) ---------------------------------------
+	// Only in online multiplayer: a human who sits idle (or leaves) would freeze
+	// the match for everyone, so their turn auto-ends after TURN_TIMEOUT_MS. Any
+	// committed action refreshes the clock; a countdown warns near the end.
+	let turnExpiresAt = 0
+	let turnNow = 0
+	let turnTimer: ReturnType<typeof setInterval> | null = null
+	let timedOutTurnKey = ''
+	let armedTurnKey = ''
+	let outgoingResetUnsub: (() => void) | null = null
+
+	$: myOnlineTurn =
+		isMultiplayer && $gameState.phase === 'playing' && $gameState.currentTeam === localTeam
+	$: turnSecondsLeft = turnExpiresAt ? Math.max(0, Math.ceil((turnExpiresAt - turnNow) / 1000)) : 0
+
+	// (Re)arm the deadline the moment my online turn begins.
+	$: {
+		const key = myOnlineTurn ? `${$gameState.currentTeam}:${$gameState.turnNumber}` : ''
+		if (key !== armedTurnKey) {
+			armedTurnKey = key
+			turnExpiresAt = key && typeof window !== 'undefined' ? Date.now() + TURN_TIMEOUT_MS : 0
+		}
+	}
+
 	// Music director: keyed to game phase. In single-player every opponent is a
 	// CPU, so its turns play the "thinking" theme; in multiplayer they're human.
 	let musicDirector: MusicDirector | null = null
@@ -329,6 +375,22 @@
 			isCpuTeam: () => !isMultiplayer,
 		})
 		musicDirector.start()
+
+		// Any committed local action (not the end-turn itself) refreshes the timeout.
+		outgoingResetUnsub = outgoingActions.subscribe((action) => {
+			if (action && action.kind !== 'end-turn' && myOnlineTurn) {
+				turnExpiresAt = Date.now() + TURN_TIMEOUT_MS
+			}
+		})
+		// Tick the countdown and fire the auto-end once past the deadline.
+		turnTimer = setInterval(() => {
+			turnNow = Date.now()
+			if (myOnlineTurn && turnExpiresAt && turnNow >= turnExpiresAt && timedOutTurnKey !== armedTurnKey) {
+				timedOutTurnKey = armedTurnKey
+				handleEndTurn()
+			}
+		}, 500)
+
 		return () => {
 			musicDirector?.stop()
 			musicDirector = null
@@ -338,6 +400,8 @@
 	onDestroy(() => {
 		if (cpuHandle) cpuHandle.cancel()
 		if (autoEndTimer) clearTimeout(autoEndTimer)
+		if (turnTimer) clearInterval(turnTimer)
+		if (outgoingResetUnsub) outgoingResetUnsub()
 		weatherAudio.clear()
 		offRecordMatch?.()
 		offCampaignProgress?.()
@@ -345,6 +409,18 @@
 </script>
 
 <slot {select}></slot>
+
+{#if myOnlineTurn && turnSecondsLeft > 0 && turnSecondsLeft <= TURN_WARN_SECONDS}
+	<div
+		class="fixed top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none rounded-full px-4 py-2 text-sm font-semibold shadow-lg"
+		class:bg-amber-500={turnSecondsLeft > 5}
+		class:bg-red-600={turnSecondsLeft <= 5}
+		class:text-white={true}
+		data-testid="turn-timeout-warning"
+	>
+		Your turn ends in {turnSecondsLeft}s
+	</div>
+{/if}
 
 <HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} cpuOpponent={!isMultiplayer} />
 <BuildMenu {map} />

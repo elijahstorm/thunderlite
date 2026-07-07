@@ -33,11 +33,19 @@ export const POST = async ({ request, params, locals }) => {
 			throw error(403, 'Not a member of this game session')
 		}
 
-		if (current && current !== userSession) {
+		// A surrender is always attributed to the SENDER's own team, never the
+		// team the client claimed — otherwise a client whose local team is wrong
+		// (or malicious) could resign someone else. Not gated on whose turn it is:
+		// you can give up any time.
+		let toRecord = action
+		if (action.kind === 'surrender') {
+			const myTeam = await gameStore.teamOf(session, userSession)
+			if (myTeam != null) toRecord = { ...action, team: myTeam }
+		} else if (current && current !== userSession) {
 			throw error(403, 'Not your turn')
 		}
 
-		const event = await gameStore.appendEvent(session, userSession, action)
+		const event = await gameStore.appendEvent(session, userSession, toRecord)
 
 		if (action.kind === 'end-turn' && members.length > 1) {
 			const idx = members.indexOf(userSession)

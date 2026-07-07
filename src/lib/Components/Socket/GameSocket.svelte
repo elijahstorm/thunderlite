@@ -22,6 +22,10 @@
 	// With a live websocket, polling drops to a slow reconciliation pass that
 	// only exists to catch a push the fire-and-forget channel lost.
 	const CONNECTED_POLL_EVERY_TICKS = 20
+	// Presence ping — keeps our `last_seen` fresh so the server doesn't auto-resign
+	// us, and drives the sweep that resigns an opponent who left. Independent of the
+	// event poll, which throttles to ~30s once realtime is connected.
+	const HEARTBEAT_INTERVAL = 10_000
 
 	const isMultiplayer = (): boolean => {
 		if (!gameSession) return false
@@ -33,6 +37,7 @@
 	let multiplayer = false
 	let lastEventId = -1
 	let pollTimer: ReturnType<typeof setInterval> | null = null
+	let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 	let pollTick = 0
 	let realtimeConn: RealtimeConnection | null = null
 	let realtimeUp = false
@@ -208,6 +213,10 @@
 		void relay(action)
 	}
 
+	const heartbeat = () => {
+		void fetch(`/api/game/${gameSession}/heartbeat`, { method: 'POST' }).catch(() => {})
+	}
+
 	onMount(() => {
 		if (!browser) return
 		multiplayer = isMultiplayer()
@@ -219,10 +228,15 @@
 			pollTimer = setInterval(pollTimerTick, POLL_INTERVAL)
 		})
 		void connectRealtime()
+		// Presence: ping immediately, then on a steady interval, so leaving the
+		// page stops the pings and the server can auto-resign us after the grace.
+		heartbeat()
+		heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL)
 	})
 
 	onDestroy(() => {
 		if (pollTimer) clearInterval(pollTimer)
+		if (heartbeatTimer) clearInterval(heartbeatTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
 		if (outgoingUnsubscribe) outgoingUnsubscribe()
 		realtimeConn?.close()

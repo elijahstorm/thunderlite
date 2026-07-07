@@ -21,8 +21,14 @@ create table if not exists game_member (
     user_session text not null,
     user_auth text,
     seat int not null,
+    team int,
+    is_ai boolean default false,
+    last_seen bigint,
     primary key (session, user_session)
 );
 
 alter table game_member add column if not exists user_auth text;
+alter table game_member add column if not exists team int;
+alter table game_member add column if not exists is_ai boolean default false;
+alter table game_member add column if not exists last_seen bigint;
 `

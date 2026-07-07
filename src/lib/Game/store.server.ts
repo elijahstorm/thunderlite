@@ -19,13 +19,15 @@
  * room/pointer past its expiry as absent. Abandoned rows linger until then;
  * a periodic sweep can be added later but is not required for correctness.
  */
-import { db } from '$lib/dontcode/server'
+import { db, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
 export const MAX_PLAYERS = 2
 /** How long the lobby counts down once the room is full before it opens `/play`. */
 export const LOBBY_COUNTDOWN_MS = 10_000
+/** A player gone from `/play` for this long (no heartbeat) is auto-resigned. */
+export const LEAVE_GRACE_MS = 30_000
 const ROOM_TTL_MS = 1000 * 60 * 60 * 24
 const APPEND_RETRIES = 8
 
@@ -35,8 +37,18 @@ type RoomRow = {
 	current_turn: string | null
 	expires_at: number
 	start_at: number | null
+	is_public?: boolean | null
+	lock_random?: boolean | null
+	rematch_session?: string | null
 }
-type MemberRow = { user_session: string; seat: number; user_auth?: string | null }
+type MemberRow = {
+	user_session: string
+	seat: number
+	user_auth?: string | null
+	team?: number | null
+	is_ai?: boolean | null
+	last_seen?: number | null
+}
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = { seq: number; user_session: string; action: unknown; ts: number }
 
@@ -59,13 +71,71 @@ async function members(session: string): Promise<string[]> {
  * before the column existed) so the in-game player list falls back to a generic
  * label for that seat. Powers the seat → username/avatar mapping in `/play`.
  */
-async function roster(session: string): Promise<{ seat: number; userAuth: string | null }[]> {
+async function roster(
+	session: string
+): Promise<
+	{ seat: number; userAuth: string | null; team: number | null; isAi: boolean }[]
+> {
 	const rows = await db.find<MemberRow>('game_member', {
 		where: { session },
 		orderBy: { seat: 'asc' },
-		select: ['seat', 'user_auth'],
+		select: ['seat', 'user_auth', 'team', 'is_ai'],
 	})
-	return rows.map((r) => ({ seat: Number(r.seat), userAuth: r.user_auth ?? null }))
+	return rows.map((r) => ({
+		seat: Number(r.seat),
+		userAuth: r.user_auth ?? null,
+		team: r.team == null ? null : Number(r.team),
+		isAi: !!r.is_ai,
+	}))
+}
+
+/** The team a member has been assigned in this room, or null if unassigned. */
+async function teamOf(session: string, userSession: string): Promise<number | null> {
+	const row = await db.findOne<MemberRow>('game_member', {
+		where: { session, user_session: userSession },
+		select: ['team'],
+	})
+	return row && row.team != null ? Number(row.team) : null
+}
+
+/** Explicitly set (or clear) a member's team — used by lobby seat selection. */
+async function setMemberTeam(
+	session: string,
+	userSession: string,
+	team: number | null
+): Promise<void> {
+	await db.update('game_member', { session, user_session: userSession }, { team })
+}
+
+/**
+ * Team assignment is authoritative and server-owned. Any member still without a
+ * team (joined before picking, or picked "random") is given the next of `teams`
+ * — the map's stable team order — not already claimed, in seat order. Idempotent:
+ * a member with a team keeps it, so this is safe to call on every /play load and
+ * whenever the lobby releases. This is what stops two clients both driving team 0
+ * (each client used to re-derive its own team from the map and could collide).
+ */
+async function assignTeamsIfNeeded(session: string, teams: number[]): Promise<void> {
+	const rows = await db.find<MemberRow>('game_member', {
+		where: { session },
+		orderBy: { seat: 'asc' },
+		select: ['user_session', 'seat', 'team'],
+	})
+	const taken = new Set<number>(
+		rows.map((r) => r.team).filter((t): t is number => t != null).map(Number)
+	)
+	let cursor = 0
+	const nextFreeTeam = (): number | null => {
+		while (cursor < teams.length && taken.has(teams[cursor])) cursor++
+		return cursor < teams.length ? teams[cursor++] : null
+	}
+	for (const row of rows) {
+		if (row.team != null) continue
+		const team = nextFreeTeam()
+		if (team == null) break
+		taken.add(team)
+		await db.update('game_member', { session, user_session: row.user_session }, { team })
+	}
 }
 
 async function isMember(session: string, userSession: string): Promise<boolean> {
@@ -155,8 +225,149 @@ async function removeMember(session: string, userSession: string): Promise<void>
 	await db.delete('game_member', { session, user_session: userSession })
 }
 
+/** Join `session` if there's room (or already a member); refreshes the pointer. */
+async function ensureMember(
+	session: string,
+	userSession: string,
+	userAuth: string
+): Promise<boolean> {
+	if (await isMember(session, userSession)) {
+		await setPlayerGame(userSession, session)
+		return true
+	}
+	if ((await memberCount(session)) >= MAX_PLAYERS) return false
+	await addMember(session, userSession, userAuth)
+	await setPlayerGame(userSession, session)
+	return true
+}
+
+/**
+ * The fresh lobby a finished match rematches into. Created once (first caller
+ * hosts it); everyone else who hits rematch joins that same new room. Same map,
+ * new room — so the old opponents aren't required to return. Returns the new
+ * session, or null if the finished room is gone.
+ */
+async function rematchRoom(
+	session: string,
+	userSession: string,
+	userAuth: string
+): Promise<string | null> {
+	const room = await getRoom(session)
+	if (!room) return null
+
+	if (room.rematch_session) {
+		const existing = await getRoom(room.rematch_session)
+		if (existing) {
+			await ensureMember(existing.session, userSession, userAuth)
+			return existing.session
+		}
+	}
+
+	const next = await createRoom(userSession, room.map_id, userAuth)
+	await db.update('game_room', { session }, { rematch_session: next })
+	// Lost a race with another rematcher? Prefer the room that landed first.
+	const after = await getRoom(session)
+	if (after?.rematch_session && after.rematch_session !== next) {
+		const winner = await getRoom(after.rematch_session)
+		if (winner) {
+			await ensureMember(winner.session, userSession, userAuth)
+			return winner.session
+		}
+	}
+	return next
+}
+
 async function memberCount(session: string): Promise<number> {
 	return db.count('game_member', { session })
+}
+
+/**
+ * A page of joinable public rooms: still filling (start_at null → not counting
+ * down / not started), not expired, with at least a host and a free seat.
+ * Newest first (by expiry, which tracks creation since TTL is fixed).
+ */
+async function listPublicRooms(
+	page: number,
+	pageSize: number
+): Promise<{ rooms: { session: string; mapId: string; count: number; maxPlayers: number }[]; hasMore: boolean }> {
+	const rows = await db.find<RoomRow & { is_public?: boolean | null }>('game_room', {
+		where: { is_public: true, start_at: null },
+		orderBy: { expires_at: 'desc' },
+		limit: pageSize + 1,
+		offset: Math.max(0, page) * pageSize,
+	})
+	const live = rows.filter((r) => !expired(r.expires_at))
+	const hasMore = live.length > pageSize
+	const pageRooms = live.slice(0, pageSize)
+	const counts = await Promise.all(pageRooms.map((r) => memberCount(r.session)))
+	const rooms = pageRooms
+		.map((r, i) => ({
+			session: r.session,
+			mapId: r.map_id,
+			count: counts[i],
+			maxPlayers: MAX_PLAYERS,
+		}))
+		// Only rooms that have a host and a free seat are joinable from the browser.
+		.filter((r) => r.count > 0 && r.count < MAX_PLAYERS)
+	return { rooms, hasMore }
+}
+
+/** Toggle a room's visibility in the public browser. */
+async function setPublic(session: string, isPublic: boolean): Promise<void> {
+	await db.update('game_room', { session }, { is_public: isPublic })
+}
+
+/** Heartbeat: record that `userSession` is still present in the match. */
+async function touchMember(session: string, userSession: string): Promise<void> {
+	await db.update('game_member', { session, user_session: userSession }, { last_seen: now() })
+}
+
+/**
+ * Auto-resign anyone (other than the caller) who left the match and hasn't
+ * checked in for LEAVE_GRACE_MS. The surrender is authored server-side from
+ * their assigned team; the member is then removed so it fires exactly once, and
+ * the turn is handed to the caller if it was the absentee's. Best-effort: this
+ * is driven off the present player's heartbeat, so it never blocks anything.
+ * Returns true if a resign was recorded.
+ */
+async function sweepAbsent(session: string, poller: string): Promise<boolean> {
+	try {
+		const stale = (await staleMembers(session, now() - LEAVE_GRACE_MS)).filter(
+			(m) => m.userSession !== poller
+		)
+		if (stale.length === 0) return false
+		const current = await currentTurn(session)
+		for (const member of stale) {
+			if (member.team != null) {
+				const event = await appendEvent(session, member.userSession, {
+					kind: 'surrender',
+					team: member.team,
+				})
+				await realtime.tryPublish(`game:${session}`, { event })
+			}
+			await removeMember(session, member.userSession)
+			if (current === member.userSession) await setCurrentTurn(session, poller)
+		}
+		return true
+	} catch {
+		return false
+	}
+}
+
+/**
+ * Members who last checked in before `cutoff` — i.e. left the match and didn't
+ * come back. Members who never heartbeated (last_seen null) are excluded, so a
+ * player who hasn't opened /play yet is never auto-resigned.
+ */
+async function staleMembers(
+	session: string,
+	cutoff: number
+): Promise<{ userSession: string; team: number | null }[]> {
+	const rows = await db.find<MemberRow>('game_member', {
+		where: { session, last_seen: { lt: cutoff } },
+		select: ['user_session', 'team'],
+	})
+	return rows.map((r) => ({ userSession: r.user_session, team: r.team == null ? null : Number(r.team) }))
 }
 
 /** The player's join seat (0 = creator/host), or -1 if not a member. */
@@ -268,6 +479,9 @@ async function events(
 export const gameStore = {
 	members,
 	roster,
+	teamOf,
+	setMemberTeam,
+	assignTeamsIfNeeded,
 	isMember,
 	getRoom,
 	currentGame,
@@ -275,7 +489,14 @@ export const gameStore = {
 	createRoom,
 	addMember,
 	removeMember,
+	ensureMember,
+	rematchRoom,
 	memberCount,
+	listPublicRooms,
+	setPublic,
+	touchMember,
+	staleMembers,
+	sweepAbsent,
 	seatOf,
 	armStartCountdown,
 	startNow,
