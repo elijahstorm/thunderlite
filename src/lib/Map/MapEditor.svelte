@@ -12,10 +12,16 @@
 	import MapThumbnail from '$lib/Components/Widgets/Social/MapThumbnail.svelte'
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
-	import { mapStore, playMapStore } from './mapStore'
+	import { activeMapIdStore, mapStore, playMapStore } from './mapStore'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
-	import { clearDraft, loadDraft, saveDraft } from './Editor/editorDraft'
+	import {
+		clearDraft,
+		clearLastActiveMapId,
+		getLastActiveMapId,
+		loadDraft,
+		saveDraft,
+	} from './Editor/editorDraft'
 	import { publishMap, shareLink } from './Editor/mapShare'
 	import { renderMapThumbnail } from './Editor/mapThumbnail'
 	import { skyData } from '$lib/GameData/sky'
@@ -64,8 +70,17 @@
 	// spinner and we never fire a second overlapping upload from a double-click.
 	let saving = $state(false)
 	let sharing = $state(false)
+	// The custom "you're about to overwrite a saved map" confirmation. `resolveOverwrite`
+	// is the pending promise resolver the modal's buttons call.
+	let confirmOverwriteOpen = $state(false)
+	let resolveOverwrite: ((ok: boolean) => void) | null = null
 	// The saved map's id, adopted on first save so later saves update in place.
-	let currentMapId: string | undefined = $state(untrack(() => mapId))
+	// On a bare-route remount that resumed the in-memory board (e.g. bounced back
+	// from Play, or reopened /editor), re-adopt the id that board was linked to so
+	// a save updates the same row instead of forking a duplicate.
+	let currentMapId: string | undefined = $state(
+		untrack(() => mapId ?? ($mapStore != null ? $activeMapIdStore : undefined))
+	)
 	// The passenger a placed transport carries (a unit type), or null for empty.
 	// Persists across placements so several loaded transports drop without reselecting.
 	let cargoType: number | null = $state(null)
@@ -79,14 +94,27 @@
 	/** Brushes that place a team-owned object (so the team picker is shown). */
 	const teamedBrush = (brush: Brush) => brush === 'units' || brush === 'buildings'
 
-	untrack(() => {
-		map.filters = {
+	// The editor shows every palette entry, so its filters return the full index
+	// range (unlike a played map, which filters to placed types). Reapplied after
+	// any `map` reassignment (recovery / new / resize) since those come from the
+	// exporter, whose default filters would hide unplaced palette entries.
+	const applyEditorFilters = (target: MapObject) => {
+		target.filters = {
 			ground: () => Array.from({ length: terrainData.length }, (_, index) => index),
 			sky: () => Array.from({ length: skyData.length }, (_, index) => index),
 			units: () => Array.from({ length: unitData.length }, (_, index) => index),
 			buildings: () => Array.from({ length: buildingData.length }, (_, index) => index),
 		}
-	})
+		return target
+	}
+	untrack(() => applyEditorFilters(map))
+
+	// A brand-new empty board with its own fresh layer arrays. `deriveFromHash()`
+	// alone would share the module-level empty template's arrays, so a second new
+	// map in the same session would inherit the first's edits — round-trip through
+	// the hash to guarantee independent arrays.
+	const freshEmptyMap = () =>
+		applyEditorFilters(deriveFromHash(mapHasher(deriveFromHash(undefined))))
 
 	let type = $derived(
 		editType === 'units'
@@ -239,8 +267,34 @@
 		return result.id
 	}
 
+	// A re-save overwrites the saved row in place, so confirm it first with our own
+	// dialog (never the browser's blocking confirm()). Resolves true to proceed.
+	// A first save (no id yet) creates a fresh map and needs no confirmation.
+	const confirmSave = (): Promise<boolean> => {
+		if (!currentMapId) return Promise.resolve(true)
+		return new Promise((resolve) => {
+			resolveOverwrite = resolve
+			confirmOverwriteOpen = true
+		})
+	}
+	const answerOverwrite = (ok: boolean) => {
+		confirmOverwriteOpen = false
+		resolveOverwrite?.(ok)
+		resolveOverwrite = null
+	}
+	// Dismissing the dialog any other way (X button, Esc) counts as a cancel, so a
+	// waiting save never hangs. answerOverwrite already nulls the resolver first, so
+	// this can't double-resolve a button press.
+	$effect(() => {
+		if (!confirmOverwriteOpen && resolveOverwrite) {
+			resolveOverwrite(false)
+			resolveOverwrite = null
+		}
+	})
+
 	const saveMap = async () => {
 		if (saving || sharing) return
+		if (!(await confirmSave())) return
 		saving = true
 		try {
 			if (await persist()) addToast('Saved to your maps')
@@ -250,6 +304,7 @@
 	}
 	const shareMap = async () => {
 		if (saving || sharing) return
+		if (!(await confirmSave())) return
 		sharing = true
 		try {
 			const id = await persist()
@@ -257,6 +312,23 @@
 		} finally {
 			sharing = false
 		}
+	}
+
+	// Start a brand-new, empty map. Drop the in-memory link and the shared `new`
+	// draft / last-active pointer so nothing is recovered into it, then hard-reset
+	// the board — a save from here mints a new row rather than overwriting the last.
+	const newMap = () => {
+		if (saving || sharing) return
+		mapStore.set(null)
+		activeMapIdStore.set(undefined)
+		clearDraft(undefined)
+		clearLastActiveMapId()
+		currentMapId = undefined
+		map = freshEmptyMap()
+		commitEdit()
+		// Reflect the fresh-start intent in the URL so a reload stays blank instead
+		// of reopening the last map (the ?new guard in onMount).
+		goto('/editor?new', { replaceState: true, noScroll: true, keepFocus: true })
 	}
 	// Open the Load picker and (lazily, once) pull the user's own library. The
 	// listing rows carry no map_data, so picking one navigates to /editor/<id>
@@ -326,6 +398,9 @@
 
 	$effect.pre(() => {
 		mapStore.set(map)
+		// Keep the in-memory link in step with the board so a bare-route remount
+		// (see currentMapId's initializer) re-adopts the right saved map.
+		activeMapIdStore.set(currentMapId)
 	})
 
 	// Continuously back the working draft up to localStorage (debounced) so an
@@ -351,10 +426,38 @@
 	// this editing context — but only when it actually differs from what we'd
 	// otherwise show, so a clean reload doesn't nag with a recovery toast.
 	onMount(() => {
+		// An explicit "New map" (?new) always wins: wipe any in-memory link and the
+		// shared `new` backup so this board is a clean slate that saves as a new row.
+		if (new URLSearchParams(window.location.search).has('new')) {
+			mapStore.set(null)
+			activeMapIdStore.set(undefined)
+			clearDraft(undefined)
+			clearLastActiveMapId()
+			currentMapId = undefined
+			// The board initialized from the (now-stale) in-memory map on this remount;
+			// swap in a blank one unless it already is blank (avoids a needless repaint).
+			if (mapHasher(map) !== mapHasher(deriveFromHash(undefined))) {
+				map = freshEmptyMap()
+			}
+			return
+		}
 		if (resumedFromMemory) return
+		// A blank editor (bare /editor, no in-progress `new` draft) reopens the last
+		// saved map the user was editing, so their edits keep flowing to that same
+		// row instead of forking a duplicate on the next save.
+		if (!mapId && !loadDraft(undefined)) {
+			const lastId = getLastActiveMapId()
+			if (lastId) {
+				goto(`/editor/${lastId}`, { replaceState: true })
+				return
+			}
+		}
 		const recovered = loadDraft(currentMapId)
 		if (recovered && recovered.hash !== mapHasher(map)) {
-			map = recovered.map
+			map = applyEditorFilters(recovered.map)
+			// A recovered draft may know the saved map it belongs to; re-link so a
+			// save updates it rather than creating a duplicate.
+			if (recovered.mapId && !currentMapId) currentMapId = recovered.mapId
 			addToast('Recovered unsaved changes from your last session')
 		}
 	})
@@ -390,6 +493,15 @@
 		</div>
 
 		<div class="flex items-center gap-1">
+			<button
+				type="button"
+				onclick={newMap}
+				title="Start a new, empty map"
+				class="btn btn-ghost btn-sm"
+			>
+				<Icon icon="fluent:document-add-24-filled" width="16" height="16" />
+				<span class="hidden lg:inline">New</span>
+			</button>
 			<button
 				type="button"
 				onclick={openLoad}
@@ -576,6 +688,32 @@
 		<button type="button" onclick={() => (openLoadModal = false)} class="btn btn-primary ml-auto">
 			<Icon icon="mdi:close" width="16" height="16" />
 			Close
+		</button>
+	{/snippet}
+</Modal>
+
+<Modal title="Overwrite saved map?" bind:open={confirmOverwriteOpen} size="sm">
+	<div class="flex items-start gap-3">
+		<span
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600"
+		>
+			<Icon icon="mdi:content-save-alert" width="20" height="20" />
+		</span>
+		<p class="text-sm text-muted-foreground">
+			This will update your map
+			<span class="font-semibold text-foreground">{map?.title?.trim() || 'Untitled map'}</span>
+			in the database, replacing what's currently saved. This can't be undone.
+		</p>
+	</div>
+
+	{#snippet footer()}
+		<button type="button" onclick={() => answerOverwrite(false)} class="btn btn-ghost">
+			<Icon icon="mdi:close" width="16" height="16" />
+			Cancel
+		</button>
+		<button type="button" onclick={() => answerOverwrite(true)} class="btn btn-primary ml-auto">
+			<Icon icon="mdi:content-save" width="16" height="16" />
+			Overwrite
 		</button>
 	{/snippet}
 </Modal>

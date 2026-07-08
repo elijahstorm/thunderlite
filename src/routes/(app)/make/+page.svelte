@@ -20,11 +20,18 @@
 	let loader = $state(() => {})
 	let hasMore = $state(true)
 
-	const createLoader: (props: { search: string; type: string }, load?: boolean) => void = (
-		{ search, type },
-		load = true
-	) => {
-		let page = -1
+	const createLoader: (
+		props: { search: string; type: string },
+		load?: boolean,
+		startPage?: number
+	) => void = ({ search, type }, load = true, startPage = 0) => {
+		// `startPage` lets the initial mount continue from page 1: the server load
+		// already handed us page 0, so paginating from 0 again would re-fetch and
+		// duplicate that first batch. A fresh search/filter starts back at page 0.
+		let page = startPage - 1
+		// A freshly (re)created loader replaces the list on its first response;
+		// later pages append. Flipped to false after the first successful page.
+		let replace = load
 		hasMore = true
 		loader = () =>
 			hasMore &&
@@ -43,27 +50,21 @@
 					}
 					if (data.users) {
 						dbUsersStore.update(updateStore(data.users, 'auth'))
-						users = [
-							...users,
-							...data.users.map((user: UserDBData) => ({
-								...user,
-								created_at: new Date(user.created_at),
-							})),
-						]
-					}
-					if (search || type) {
-						maps = []
+						const incoming = data.users.map((user: UserDBData) => ({
+							...user,
+							created_at: new Date(user.created_at),
+						}))
+						users = replace ? incoming : [...users, ...incoming]
 					}
 					if (data.maps) {
 						dbMapsStore.update(updateStore(data.maps))
-						maps = [
-							...maps,
-							...data.maps.map((map: MapDBData) => ({
-								...map,
-								created_at: new Date(map.created_at),
-								updated_at: new Date(map.updated_at),
-							})),
-						]
+						const incoming = data.maps.map((map: MapDBData) => ({
+							...map,
+							created_at: new Date(map.created_at),
+							updated_at: new Date(map.updated_at),
+						}))
+						maps = replace ? incoming : [...maps, ...incoming]
+						replace = false
 						if (data.maps.length < 10) {
 							hasMore = false
 						}
@@ -78,7 +79,9 @@
 		}
 	}
 
-	createLoader({ search: '', type: '' }, false)
+	// The server load already provided page 0; hand the scroll loader page 1 so it
+	// extends the list rather than re-fetching and duplicating that first page.
+	createLoader({ search: '', type: '' }, false, 1)
 
 	const updateStore =
 		<T extends object>(data: T[], key = 'id') =>
@@ -112,7 +115,7 @@
 							Pick a map to start a new game with, or build your own.
 						</p>
 					</div>
-					<a href="/editor" class="btn btn-outline">
+					<a href="/editor?new" class="btn btn-outline">
 						<Icon icon="lucide:hammer" width={14} />
 						Create a map
 					</a>
@@ -121,7 +124,7 @@
 				<SearchWithTypes onload={createLoader} types={mapTypes} />
 
 				<div class="grid gap-5">
-					{#each maps as map}
+					{#each maps as map (map.public_id)}
 						<a
 							href="/map/{map.public_id}"
 							class="block w-full text-left rounded-xl outline-none transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:-translate-y-0.5"
