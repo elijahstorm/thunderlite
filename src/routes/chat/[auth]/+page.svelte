@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation'
+	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 	import ChatSocket from '$lib/Components/Socket/ChatSocket.svelte'
 	import ChatRoom from '$lib/Components/Widgets/Social/Chat/ChatRoom.svelte'
 
@@ -18,4 +19,8 @@
 			/>
 		{/snippet}
 	</ChatSocket>
+
+	<div class="flex justify-center py-2">
+		<PoweredByDontCode variant="inline" />
+	</div>
 </section>

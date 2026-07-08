@@ -27,6 +27,35 @@
 </script>
 
 <Casing>
+	<a
+		href="https://www.dontcode.co"
+		target="_blank"
+		rel="noopener noreferrer"
+		class="group mt-4 flex items-center gap-4 rounded-2xl border border-border bg-accent/40 p-4 sm:p-5 transition-colors hover:bg-accent/60 hover:border-border-strong"
+	>
+		<img
+			src="/images/logo/dontcode-mascot.svg"
+			alt="DontCode mascot"
+			class="h-14 w-14 sm:h-16 sm:w-16 shrink-0"
+		/>
+		<div class="min-w-0 flex-1">
+			<p class="font-semibold text-foreground">Made with DontCode</p>
+			<p class="text-sm text-muted-foreground leading-relaxed">
+				This free service is supported and sponsored in full by DontCode.
+			</p>
+		</div>
+		<span
+			class="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-primary shrink-0"
+		>
+			Visit DontCode
+			<Icon
+				icon="lucide:arrow-right"
+				width={16}
+				class="transition-transform group-hover:translate-x-0.5"
+			/>
+		</span>
+	</a>
+
 	<section class="max-w-3xl mx-auto py-8 space-y-6">
 		<p class="section-eyebrow">About ThunderLite</p>
 		<h1 class="text-4xl sm:text-5xl font-semibold tracking-tight text-foreground leading-tight">
@@ -77,6 +106,47 @@
 				Build a map
 			</a>
 			<a href="/make" class="btn btn-outline">Browse community maps</a>
+		</div>
+	</section>
+
+	<section class="max-w-3xl mx-auto py-8">
+		<div class="card p-6 sm:p-8 space-y-5">
+			<div class="flex items-center gap-4">
+				<img
+					src="/images/logo/dontcode-mascot.svg"
+					alt="DontCode mascot"
+					class="h-16 w-16 shrink-0"
+				/>
+				<div>
+					<p class="section-eyebrow">Powered by</p>
+					<h2 class="text-2xl font-semibold tracking-tight text-foreground">DontCode</h2>
+				</div>
+			</div>
+			<div class="space-y-4 text-muted-foreground leading-relaxed">
+				<p>
+					ThunderLite is supported and sponsored in full by
+					<a href="https://www.dontcode.co" target="_blank" rel="noopener noreferrer" class="link"
+						>DontCode</a
+					>. It runs the accounts, database, and realtime multiplayer that keep the game online, so
+					ThunderLite can stay free with no ads and no monetization.
+				</p>
+				<p>
+					DontCode is a platform for building and shipping full-stack apps fast. If you are curious
+					about how ThunderLite is put together, or want to build something of your own, it is a
+					great place to start.
+				</p>
+			</div>
+			<div class="pt-1">
+				<a
+					href="https://www.dontcode.co"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="btn btn-primary"
+				>
+					Visit DontCode
+					<Icon icon="lucide:arrow-up-right" width={16} />
+				</a>
+			</div>
 		</div>
 	</section>
 </Casing>

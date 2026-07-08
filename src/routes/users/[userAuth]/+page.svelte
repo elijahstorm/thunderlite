@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte'
 	import { goto } from '$app/navigation'
+	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
 	import MapCard from '$lib/Components/Widgets/Social/MapCard.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
@@ -108,4 +109,8 @@
 			</div>
 		{/if}
 	</section>
+
+	<div class="pt-4 border-t border-border">
+		<PoweredByDontCode variant="footer" />
+	</div>
 </section>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Logo from '$lib/Components/Branding/Logo.svelte'
+	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 	import Icon from '@iconify/svelte'
 
 	interface Props {
@@ -22,7 +23,7 @@
 
 	const highlights = [
 		{ icon: 'lucide:swords', label: 'Turn-based tactical combat' },
-		{ icon: 'lucide:users', label: 'Async multiplayer with friends' },
+		{ icon: 'lucide:users', label: 'Live multiplayer with friends' },
 		{ icon: 'lucide:hammer', label: 'Design and share custom maps' },
 	]
 </script>
@@ -38,7 +39,7 @@
 		<div class="relative flex flex-col justify-between p-12 lg:p-16 w-full">
 			<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
 				<div class="brightness-0 invert">
-					<Logo width={140} height={36} />
+					<Logo height={36} />
 				</div>
 			</a>
 
@@ -65,16 +66,29 @@
 				</ul>
 			</div>
 
-			<p class="text-xs text-primary-foreground/60">
-				© {new Date().getFullYear()} ThunderLite
-			</p>
+			<div class="space-y-1">
+				<p class="text-xs text-primary-foreground/60">
+					© {new Date().getFullYear()} ThunderLite
+				</p>
+				<p class="text-xs text-primary-foreground/60">
+					Made with
+					<a
+						href="https://www.dontcode.co"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="underline underline-offset-2 hover:text-primary-foreground"
+					>
+						DontCode
+					</a>, who supports and sponsors this free service in full.
+				</p>
+			</div>
 		</div>
 	</aside>
 
 	<main class="flex-1 flex flex-col bg-background overflow-y-auto">
 		<header class="md:hidden flex items-center justify-center py-6 border-b border-border">
 			<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
-				<Logo width={120} height={30} />
+				<Logo height={30} />
 			</a>
 		</header>
 		<div class="flex-1 flex items-center justify-center px-6 py-10 md:py-16">

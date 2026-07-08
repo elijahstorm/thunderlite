@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment'
+	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 	import ChatSocket from '$lib/Components/Socket/ChatSocket.svelte'
 	import ChatList from '$lib/Components/Widgets/Social/Chat/ChatList.svelte'
 	import ChatRoom from '$lib/Components/Widgets/Social/Chat/ChatRoom.svelte'
@@ -39,6 +40,10 @@
 </script>
 
 {@render children?.()}
+
+<div class="fixed bottom-3 left-3 z-40 hidden sm:block">
+	<PoweredByDontCode variant="badge" />
+</div>
 
 <ChatSocket>
 	{#snippet children({ socketMessages })}

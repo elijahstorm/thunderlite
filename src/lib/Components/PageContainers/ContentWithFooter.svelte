@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Logo from '$lib/Components/Branding/Logo.svelte'
+	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 
 	interface Props {
 		noFooterOnMobile?: boolean
@@ -57,7 +58,7 @@
 			<div class="grid gap-10 md:grid-cols-12">
 				<div class="md:col-span-4 space-y-5">
 					<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
-						<Logo width={130} height={32} />
+						<Logo height={32} />
 					</a>
 					<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
 						A browser-based recreation of Battalion: Arena, with turn-based tactics in the Advance
@@ -72,7 +73,7 @@
 								class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-border-strong transition-colors"
 								aria-label={link.label}
 							>
-								<img class="w-4 h-4 dark:invert" src="/images/icons/github-mark-white.svg" alt="" />
+								<img class="w-4 h-4 dark:invert" src="/images/icons/github-mark.svg" alt="" />
 							</a>
 						{/each}
 					</div>
@@ -108,6 +109,10 @@
 				<p class="text-xs text-muted-foreground">
 					Built by <a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>.
 				</p>
+			</div>
+
+			<div class="mt-4 pt-4 border-t border-border">
+				<PoweredByDontCode variant="footer" />
 			</div>
 		</div>
 	</footer>

@@ -49,7 +49,7 @@
 		{/if}
 
 		<a href={logoLink} class="flex items-center" aria-label="ThunderLite home">
-			<Logo width={130} height={34} />
+			<Logo height={34} />
 		</a>
 
 		<nav class="hidden md:flex items-center gap-1 ml-6">

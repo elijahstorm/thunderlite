@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1366" height="1366" viewBox="0 0 1366 1366">
+<style>
+@keyframes talk-insight-animation {
+  0%   { transform: translateX(0); }
+  10%  { transform: translateX(-50px); }
+  20%  { transform: translateX(0); }
+  30%  { transform: translateX(30px); }
+  40%  { transform: translateX(0); }
+  60%  { transform: translateX(-30px); }
+  70%  { transform: translateX(0); }
+  85%  { transform: translateX(50px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes whisker-animation {
+  0%   { transform: translateX(0); }
+  10%  { transform: translateX(-15px); }
+  20%  { transform: translateX(0); }
+  30%  { transform: translateX(10px); }
+  40%  { transform: translateX(0); }
+  60%  { transform: translateX(-10px); }
+  70%  { transform: translateX(0); }
+  85%  { transform: translateX(15px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes blink-animation {
+  0%, 29%, 71%, 100% {
+    opacity: 1;
+  }
+  30%, 70% {
+    opacity: 0;
+  }
+}
+
+@keyframes open-eyes-animation {
+  0%, 29%, 71%, 100% {
+    opacity: 0;
+  }
+  30%, 70% {
+    opacity: 1;
+  }
+}
+
+.talk-insight-face {
+  animation: talk-insight-animation 6s ease-in-out infinite;
+}
+
+.blink {
+  animation: talk-insight-animation 6s ease-in-out infinite, blink-animation 6s linear infinite;
+}
+
+.open-eyes {
+  animation: talk-insight-animation 6s ease-in-out infinite, open-eyes-animation 6s linear infinite;
+}
+
+.whisker-shift {
+  animation: whisker-animation 6s ease-in-out infinite;
+}
+</style>
+
+<!-- Dark ear (left/top) -->
+<path d="M523.86942,331.87748c-7.74136-77.41365-42.45096-137.22147-69.67291-178.05494C407.77168,84.18434,321.72704-26.51152,225.24346,25.48462c-67.75839,36.51597-98.91204,110.12003-123.32507,178.98398C39.6673,380.06567,8.55772,557.18974,43.8877,742.18443c159.99395-136.76902,319.98777-273.53793,479.98172-410.30695Z" fill="#21a4a0" stroke="#221714" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+
+<!-- Body with lighter ear (right) -->
+<path d="M1321.2584,556.38506c-9.35763-79.67123-147.27498-124.50225-216.76594-147.09117-55.38032-18.00177-137.04698-37.66442-240.45581-39.004-117.73824-66.96349-239.53394-68.65508-293.71739-69.37897-66.50326-.8888-253.97439-3.39406-402.56531,139.34953C23.21624,579.11053,14.5721,760.18904,12.92114,811.8592c-1.61174,50.45391-4.24221,202.59482,100.64133,340.63219,155.44235,204.57796,413.51862,202.45779,456.7568,201.28266,70.07357-1.9047,269.33623-20.1758,410.30695-185.79937,97.54306-114.60123,117.50104-241.34555,122.40997-301.7827,34.41212-19.36639,73.15293-46.73193,109.83925-85.29933,52.75741-55.4616,75.18757-106.66066,92.89969-147.09117,12.15821-27.75206,18.23897-53.9557,15.48328-77.41641Z" fill="#b2dbcc" stroke="#221714" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+
+<!-- Closed/thinking eyes — gentle downward arcs (visible ~58% of cycle) -->
+<g class="blink">
+  <path d="M202,692 Q342,742 482,692" fill="none" stroke="#221714" stroke-width="55" stroke-linecap="round"/>
+  <path d="M659,692 Q799,742 939,692" fill="none" stroke="#221714" stroke-width="55" stroke-linecap="round"/>
+</g>
+
+<!-- Open eyes — full whites, pupils, shine (visible ~42% of cycle) -->
+<g class="open-eyes">
+  <!-- Eye whites -->
+  <path d="M1034.8177,695.73459c.48492,14.12032,2.21785,113.22752-77.41641,178.05773-55.72207,45.3633-117.59034,46.51529-131.60789,46.44984-81.01057-.37777-133.27137-48.73113-147.09117-61.93312-68.02641-64.98579-69.63815-149.01961-69.67477-162.57445-.04997-18.48397.8543-87.90193,54.19148-147.09117,7.83413-8.69363,67.95919-73.20077,162.57445-69.67477,70.95008,2.64406,117.48828,41.91195,131.60789,54.19148,72.56382,63.10708,76.99079,150.18164,77.41641,162.57445Z" fill="#fff" stroke="#221714" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M531.61106,703.33906c.48492-14.12032,2.21785-113.22752-77.41641-178.05773-55.72207-45.3633-117.59034-46.51529-131.60789-46.44984-81.01057.37777-133.27137,48.73113-147.09117,61.93312-68.02641,64.98579-69.63815,149.01961-69.67477,162.57445-.04997,18.48397.8543,87.90193,54.19148,147.09117,7.83413,8.69363,67.95919,73.20077,162.57445,69.67477,70.95008-2.64406,117.48828-41.91195,131.60789-54.19148,72.56382-63.10708,76.99079-150.18164,77.41641-162.57445Z" fill="#fff" stroke="#221714" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Pupils -->
+  <circle cx="798.69766" cy="691.86377" r="154.83281" fill="#221714"/>
+  <circle cx="341.94087" cy="691.86377" r="154.83281" fill="#221714"/>
+  <!-- Shine spots -->
+  <ellipse cx="838.81872" cy="632.81646" rx="51.6778" ry="75.29806" transform="translate(-45.05206 1201.01181) rotate(-69.7663)" fill="#fff"/>
+  <ellipse cx="382.06193" cy="632.81646" rx="51.6778" ry="75.29806" transform="translate(-343.83945 772.44159) rotate(-69.7663)" fill="#fff"/>
+</g>
+
+<!-- Nose/mouth dots (shift with eyes) -->
+<g class="talk-insight-face">
+  <ellipse cx="430.96973" cy="989.91693" rx="19.3541" ry="34.83738" transform="translate(-614.68555 1258.7579) rotate(-80.89227)" fill="#221714"/>
+  <ellipse cx="663.21895" cy="989.91693" rx="34.83738" ry="19.3541" transform="translate(-148.33372 117.46225) rotate(-9.10773)" fill="#221714"/>
+  <ellipse cx="547.09434" cy="1005.40021" rx="34.83738" ry="19.3541" fill="#221714"/>
+</g>
+
+<!-- Whiskers (subdued movement ~30% of eye shift) -->
+<g class="whisker-shift">
+  <path d="M40.01688,931.85463c30.96656-10.32227,61.93312-20.6443,92.89969-30.96656v54.19148c9.58899-3.37681,22.77816-6.86064,38.7082-7.74164,23.52119-1.30083,42.51311,3.6537,54.19148,7.74164" fill="none" stroke="#21a4a0" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M225.81626,1024.75431c-21.57763,8.19005-45.03621,18.33537-69.67477,30.96656-19.87333,10.18807-37.93476,20.67099-54.19148,30.96656" fill="none" stroke="#21a4a0" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M985.20427,1108.95036c-16.08462-22.76546-32.16936-45.53076-48.25398-68.29622-9.13706,12.42845-18.27401,24.85673-27.41107,37.28517-4.88942-7.17362-12.20174-16.24192-22.7164-24.90579-15.52522-12.79246-31.09825-18.99008-41.20104-22.08461" fill="none" stroke="#21a4a0" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M850.74323,968.40085c30.22425-6.92958,64.28498-12.90587,101.97165-16.70422,30.39769-3.06396,59.20871-4.3133,85.97363-4.35872" fill="none" stroke="#21a4a0" stroke-width="15.48" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

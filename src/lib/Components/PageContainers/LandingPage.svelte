@@ -17,7 +17,7 @@
 		},
 		{
 			icon: 'lucide:users',
-			title: 'Async multiplayer',
+			title: 'Live multiplayer',
 			body: 'Share a session code with a friend. Take your turn whenever; your opponent picks up where you left off.',
 		},
 		{
@@ -96,7 +96,7 @@
 					</span>
 					<span class="flex items-center gap-1.5">
 						<Icon icon="lucide:check" width={14} class="text-primary" />
-						Async multiplayer
+						Live multiplayer
 					</span>
 				</div>
 			</div>
