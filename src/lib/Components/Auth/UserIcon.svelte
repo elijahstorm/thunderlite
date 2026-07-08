@@ -75,13 +75,26 @@
 				/>
 			</div>
 		</a>
+	{:else if noClick}
+		<!-- Presentational only: render a plain element so this icon can safely sit
+			 inside an interactive parent (e.g. a chat row button) without nesting
+			 <button> elements, which is invalid HTML and breaks hydration. -->
+		<div
+			bind:this={floatingProfile}
+			class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border transition-shadow cursor-default"
+			{style}
+		>
+			<FallbackImage
+				src={user?.profile_image_url}
+				alt="{user?.display_name ?? 'user'} profile"
+				cover
+			/>
+		</div>
 	{:else}
-		<button class="contents" disabled={noClick} onclick={openProfile}>
+		<button class="contents" onclick={openProfile}>
 			<div
 				bind:this={floatingProfile}
-				class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow"
-				class:cursor-pointer={!noClick}
-				class:cursor-default={noClick}
+				class="rounded-full overflow-hidden bg-surface-2 ring-1 ring-border hover:ring-border-strong transition-shadow cursor-pointer"
 				{style}
 			>
 				<FallbackImage

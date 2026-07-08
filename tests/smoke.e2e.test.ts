@@ -8,7 +8,7 @@ test('smoke test', async ({ page }) => {
 test('editor page has working editor', async ({ page }) => {
 	await page.goto('/editor')
 	await expect(page.getByRole('button', { name: 'save' })).toBeVisible()
-	await expect(page.getByRole('button', { name: 'open' })).toBeVisible()
+	await expect(page.getByRole('button', { name: 'load' })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'share' })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'play' })).toBeVisible()
 	await expect(page.getByRole('button', { name: 'options' })).toBeVisible()
