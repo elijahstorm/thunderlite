@@ -1,8 +1,9 @@
-import { error, json } from '@sveltejs/kit'
+import { error, isHttpError, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { readJsonBody } from '$lib/dontcode/cookies'
 import { PLANS } from '$lib/Pro/plans'
 import { confirmSubscription } from '$lib/Pro/subscription.server'
+import { dontCodeCheckoutPayload } from '$lib/Pro/checkoutError'
 import { notify } from '$lib/Notifications/email.server'
 import { proActivated } from '$lib/Notifications/templates'
 
@@ -34,9 +35,17 @@ export const POST = async ({ locals, request }) => {
 		})
 
 		return json({ status: 'ok', subscription })
-	} catch (msg) {
-		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+	} catch (err) {
+		// Forward an actionable gateway error (e.g. 402 BANK_ACCOUNT_REQUIRED)
+		// before anything else — a DontCodeError also carries a `status`, so it
+		// must be handled ahead of the generic HttpError re-throw below.
+		const forwarded = dontCodeCheckoutPayload(err)
+		if (forwarded) {
+			logToErrorDb(err)
+			return json(forwarded.body, { status: forwarded.status })
+		}
+		if (isHttpError(err)) throw err
+		logToErrorDb(err)
 		throw error(500, 'Could not confirm subscription')
 	}
 }

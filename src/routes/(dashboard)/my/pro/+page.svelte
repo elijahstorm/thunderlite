@@ -65,7 +65,10 @@
 				plan: selectedPlan,
 				method: selectedMethod,
 			})
-			if (!reserveRes.ok) throw new Error(`Could not start checkout (${reserveRes.status})`)
+			if (!reserveRes.ok) {
+				const body = await reserveRes.json().catch(() => null)
+				throw new Error(body?.message ?? `Could not start checkout (${reserveRes.status})`)
+			}
 			const { reservation } = await reserveRes.json()
 
 			// Lazy import so the PortOne browser SDK never loads server-side.
@@ -84,7 +87,10 @@
 				subscriptionId: reservation.subscriptionId,
 				billingKey: issued.billingKey,
 			})
-			if (!confirmRes.ok) throw new Error(`Could not confirm (${confirmRes.status})`)
+			if (!confirmRes.ok) {
+				const body = await confirmRes.json().catch(() => null)
+				throw new Error(body?.message ?? `Could not confirm (${confirmRes.status})`)
+			}
 
 			addToast('Welcome to ThunderLite Pro!')
 			checkoutOpen = false
