@@ -21,6 +21,9 @@
 	let selectedMethod: ProPaymentMethod = $state('card')
 	let checkoutOpen = $state(false)
 	let processing = $state(false)
+	// Checkout errors surface inside the modal, not as a toast — a toast renders
+	// behind the provider popup and the modal, so the user would never see it.
+	let checkoutError = $state<string | null>(null)
 
 	let plan = $derived(PLANS[selectedPlan])
 
@@ -42,6 +45,7 @@
 
 	const openCheckout = (planId: PlanId) => {
 		selectedPlan = planId
+		checkoutError = null
 		checkoutOpen = true
 	}
 
@@ -55,6 +59,7 @@
 	const submitCheckout = async () => {
 		if (processing) return
 		processing = true
+		checkoutError = null
 		try {
 			const reserveRes = await post('/api/pro/subscribe/reserve', {
 				plan: selectedPlan,
@@ -85,7 +90,7 @@
 			checkoutOpen = false
 			await invalidateAll()
 		} catch (err) {
-			addToast(`Checkout failed. ${err instanceof Error ? err.message : err}`, 'warn')
+			checkoutError = err instanceof Error ? err.message : String(err)
 		} finally {
 			processing = false
 		}
@@ -317,10 +322,22 @@
 				</p>
 			</div>
 
+			{#if checkoutError}
+				<div
+					class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+					role="alert"
+				>
+					<Icon icon="lucide:circle-alert" width={14} class="mt-0.5 shrink-0" />
+					<span>{checkoutError}</span>
+				</div>
+			{/if}
+
 			<button class="btn btn-primary w-full" onclick={submitCheckout} disabled={processing}>
 				{#if processing}
 					<Icon icon="lucide:loader-circle" class="animate-spin" width={16} />
 					Processing…
+				{:else if checkoutError}
+					Try again · {formatPrice(plan.priceCents)}/{plan.interval}
 				{:else}
 					Continue · {formatPrice(plan.priceCents)}/{plan.interval}
 				{/if}
