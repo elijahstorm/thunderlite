@@ -1,14 +1,11 @@
 import { redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { getSubscriptionView } from '$lib/Pro/subscription.server'
-
-export const prerender = false
+import { getPrefs } from '$lib/Notifications/email.server'
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
 		throw redirect(303, `/login?redirectTo=${encodeURIComponent(url.pathname)}`)
 	}
-
-	const subscription = await getSubscriptionView(locals.user).catch(() => null)
-	return { subscription }
+	const prefs = await getPrefs(locals.user).catch(() => null)
+	return { prefs }
 }

@@ -1,6 +1,8 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db, realtime } from '$lib/dontcode/server'
+import { notify, profileName, rememberEmail } from '$lib/Notifications/email.server'
+import { newMessage } from '$lib/Notifications/templates'
 
 export const POST = async ({ params, request, locals }) => {
 	const message = (await request.formData()).get('chat-input')?.toString()
@@ -29,6 +31,19 @@ export const POST = async ({ params, request, locals }) => {
 		target,
 		message,
 		created_at: new Date().toISOString(),
+	})
+
+	// Email the recipient, at most once per sender per hour so an active chat
+	// does not turn into a flood of emails. The realtime push above is the
+	// primary channel; this catches recipients who are away.
+	const hourBucket = new Date().toISOString().slice(0, 13)
+	const preview = message.length > 140 ? `${message.slice(0, 140)}…` : message
+	await rememberEmail(source, locals.userEmail)
+	await notify({
+		userAuth: target,
+		category: 'social',
+		dedupKey: `dm:${source}:${target}:${hourBucket}`,
+		content: newMessage(await profileName(source), preview),
 	})
 
 	return json({ status })

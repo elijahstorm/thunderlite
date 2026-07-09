@@ -1,118 +1,122 @@
 /**
- * Server-side Pro subscription ledger. Reads and mutates the `subscriptions`
- * table through the DontCode `db` adapter. The DontCode platform has no billing
- * service, so there is no external payment provider to reconcile against — the
- * row here is the whole truth. Everything is "test mode": activating a
- * subscription records a period but never charges a card.
+ * Server-side Pro subscription logic, backed by the DontCode payments gateway.
+ *
+ * The gateway is the source of truth: it settles charges through PortOne and
+ * runs recurring renewals itself, so there is no local ledger and no scheduler
+ * here. We reserve → confirm a subscription through the split billing-key flow,
+ * then only read whether it is live. Everything maps to the app's existing
+ * `SubscriptionView` so the dashboard UI is unchanged.
+ *
+ * The acting user is the DontCode user id (`locals.user`), which is exactly the
+ * `userId` the payments API keys subscriptions by.
  */
-import { db } from '$lib/dontcode/server'
-import { PLANS, type PlanId, type SubscriptionStatus, type SubscriptionView } from './plans'
+import {
+	payments,
+	type BillingPlan,
+	type PaymentMethod,
+	type ReserveSubscriptionResult,
+	type Subscription as SdkSubscription,
+} from '$lib/dontcode/server'
+import { chargeFor } from './money.server'
+import { PLANS, isPlanId, type PlanId, type SubscriptionView } from './plans'
 
 export type { SubscriptionView } from './plans'
 
-export interface Subscription {
-	user_auth: string
-	plan: PlanId
-	status: SubscriptionStatus
-	provider: string
-	price_cents: number
-	interval: 'month' | 'year'
-	started_at: string
-	current_period_end: string | null
-	cancel_at_period_end: boolean
-	canceled_at: string | null
-	updated_at: string
-}
+const sdkInterval = (interval: 'month' | 'year'): 'monthly' | 'yearly' =>
+	interval === 'year' ? 'yearly' : 'monthly'
 
-const nowIso = () => new Date().toISOString()
-
-const periodEnd = (interval: 'month' | 'year'): string => {
-	const end = new Date()
-	if (interval === 'year') end.setFullYear(end.getFullYear() + 1)
-	else end.setMonth(end.getMonth() + 1)
-	return end.toISOString()
-}
-
-export async function getSubscription(userAuth: string): Promise<Subscription | null> {
-	return db.findOne<Subscription>('subscriptions', { where: { user_auth: userAuth } })
-}
-
-/** Whether a subscription grants Pro right now (active, or canceled-but-not-lapsed). */
-export function subscriptionIsPro(sub: Subscription | null): boolean {
-	if (!sub) return false
-	if (sub.status === 'active') return true
-	// Canceled: still Pro until the paid period runs out.
-	if (sub.current_period_end) return new Date(sub.current_period_end).getTime() > Date.now()
-	return false
-}
-
-export function toView(sub: Subscription | null): SubscriptionView | null {
-	if (!sub) return null
-	return {
-		plan: sub.plan,
-		status: sub.status,
-		priceCents: sub.price_cents,
-		interval: sub.interval,
-		currentPeriodEnd: sub.current_period_end,
-		cancelAtPeriodEnd: sub.cancel_at_period_end,
-		isPro: subscriptionIsPro(sub),
-	}
-}
-
-/**
- * Start (or restart) a subscription on `planId`. Idempotent per user: a second
- * call overwrites the existing row, which also covers re-subscribing after a
- * cancellation. Returns the resulting subscription.
- */
-export async function activateSubscription(
-	userAuth: string,
-	planId: PlanId
-): Promise<Subscription> {
+/** Build the `BillingPlan` for a reservation, converting price to the method's currency. */
+function billingPlanFor(planId: PlanId, method: PaymentMethod): BillingPlan {
 	const plan = PLANS[planId]
-	const now = nowIso()
-	const record = {
-		user_auth: userAuth,
-		plan: plan.id,
-		status: 'active' as const,
-		provider: 'test',
-		price_cents: plan.priceCents,
-		interval: plan.interval,
-		started_at: now,
-		current_period_end: periodEnd(plan.interval),
-		cancel_at_period_end: false,
-		canceled_at: null,
-		updated_at: now,
+	const { amount, currency } = chargeFor(method, plan.priceCents)
+	return {
+		id: plan.id,
+		name: `ThunderLite Pro ${plan.label}`,
+		amount,
+		interval: sdkInterval(plan.interval),
+		currency,
 	}
-	await db.upsert('subscriptions', { user_auth: userAuth }, record)
-	return record as Subscription
+}
+
+/** A subscription grants Pro while active/trialing, or canceled-but-not-yet-lapsed. */
+function isLive(sub: SdkSubscription): boolean {
+	if (sub.status === 'active' || sub.status === 'trialing') return true
+	// Soft-canceled or past_due: still Pro until the paid period actually ends.
+	return new Date(sub.currentPeriodEnd).getTime() > Date.now()
+}
+
+/** Map the gateway subscription onto the public view the browser already renders. */
+export function toView(sub: SdkSubscription | null): SubscriptionView | null {
+	if (!sub) return null
+	const planId: PlanId = isPlanId(sub.planId) ? sub.planId : 'monthly'
+	const plan = PLANS[planId]
+	return {
+		plan: planId,
+		status: sub.status === 'active' || sub.status === 'trialing' ? 'active' : 'canceled',
+		priceCents: plan.priceCents,
+		interval: plan.interval,
+		currentPeriodEnd: sub.currentPeriodEnd ?? null,
+		cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+		isPro: isLive(sub),
+	}
+}
+
+/** The current subscription view for a user (or null when never subscribed). */
+export async function getSubscriptionView(userAuth: string): Promise<SubscriptionView | null> {
+	const sub = await payments.getSubscription(userAuth)
+	return toView(sub)
+}
+
+/** Authoritative Pro gate — use this to unlock features, not the view's `isPro`. */
+export function userIsPro(userAuth: string): Promise<boolean> {
+	return payments.hasActiveSubscription(userAuth)
 }
 
 /**
- * Cancel at period end: the user keeps Pro until `current_period_end`, then it
- * lapses. Marks the row canceled and stamps `canceled_at`. No-op if there is no
- * subscription. Returns the updated view (or null if nothing to cancel).
+ * Split flow step 1: reserve a subscription and return the popup config the
+ * browser needs to issue a billing key.
  */
-export async function cancelSubscription(userAuth: string): Promise<Subscription | null> {
-	const existing = await getSubscription(userAuth)
-	if (!existing) return null
-	const now = nowIso()
-	await db.update(
-		'subscriptions',
-		{ user_auth: userAuth },
-		{ status: 'canceled', cancel_at_period_end: true, canceled_at: now, updated_at: now }
-	)
-	return { ...existing, status: 'canceled', cancel_at_period_end: true, canceled_at: now }
+export function reserveSubscription(
+	userAuth: string,
+	planId: PlanId,
+	method: PaymentMethod
+): Promise<ReserveSubscriptionResult> {
+	return payments.reserveSubscription({
+		plan: billingPlanFor(planId, method),
+		userId: userAuth,
+		method,
+	})
 }
 
-/** Undo a pending cancellation — flip an active-but-canceling sub back to active. */
-export async function resumeSubscription(userAuth: string): Promise<Subscription | null> {
-	const existing = await getSubscription(userAuth)
-	if (!existing) return null
-	const now = nowIso()
-	await db.update(
-		'subscriptions',
-		{ user_auth: userAuth },
-		{ status: 'active', cancel_at_period_end: false, canceled_at: null, updated_at: now }
-	)
-	return { ...existing, status: 'active', cancel_at_period_end: false, canceled_at: null }
+/** Split flow step 2: persist the browser-issued billing key and activate. */
+export async function confirmSubscription(
+	subscriptionId: string,
+	billingKey: string
+): Promise<SubscriptionView | null> {
+	const sub = await payments.confirmSubscription({ subscriptionId, billingKey })
+	return toView(sub)
+}
+
+/** Release a reserved subscription whose popup was dismissed. Best-effort. */
+export async function abortSubscription(subscriptionId: string): Promise<void> {
+	await payments.abortSubscription(subscriptionId)
+}
+
+/**
+ * Cancel at period end: the user keeps Pro until `currentPeriodEnd`, then it
+ * lapses. No-op (returns null) when there is nothing to cancel.
+ */
+export async function cancelSubscription(userAuth: string): Promise<SubscriptionView | null> {
+	const sub = await payments.getSubscription(userAuth)
+	if (!sub) return null
+	const updated = await payments.cancelSubscription(sub, { atPeriodEnd: true })
+	return toView(updated)
+}
+
+/** Undo a pending cancellation — flip a canceling subscription back to active. */
+export async function resumeSubscription(userAuth: string): Promise<SubscriptionView | null> {
+	const sub = await payments.getSubscription(userAuth)
+	if (!sub) return null
+	const updated = await payments.updateSubscriptionStatus(sub, 'active')
+	return toView(updated)
 }

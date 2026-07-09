@@ -1,13 +1,38 @@
 /**
  * ThunderLite Pro plan catalog — shared by the checkout UI and the server so
- * the price a user sees is the price the server records. Pro is currently a
- * "test mode" subscription: it exercises the full billing lifecycle but gates
- * no features, so these numbers exist to make the payment flow feel real, not
- * to unlock anything.
+ * the price a user sees is the price the server records. Prices are authored in
+ * USD cents; the DontCode payments gateway is the source of truth for who is
+ * subscribed, and `money.server.ts` converts these to the charge currency for
+ * the chosen provider (KRW for the easy-pay rails, USD for card).
  */
 
 export type PlanId = 'monthly' | 'yearly'
 export type BillingInterval = 'month' | 'year'
+
+/**
+ * Payment rails the checkout offers. Mirrors the SDK's `PaymentMethod` union;
+ * kept here so the client (which must not import server code) can render the
+ * picker. `card` settles in USD, the easy-pay rails in KRW.
+ */
+export type ProPaymentMethod = 'card' | 'kakaopay' | 'tosspay' | 'naverpay'
+
+export const PAYMENT_METHODS: { id: ProPaymentMethod; label: string; icon: string }[] = [
+	{ id: 'card', label: 'Card', icon: 'lucide:credit-card' },
+	{ id: 'kakaopay', label: 'KakaoPay', icon: 'lucide:message-circle' },
+	{ id: 'tosspay', label: 'TossPay', icon: 'lucide:wallet' },
+	{ id: 'naverpay', label: 'NaverPay', icon: 'lucide:badge-dollar-sign' },
+]
+
+export const isPaymentMethod = (value: unknown): value is ProPaymentMethod =>
+	value === 'card' || value === 'kakaopay' || value === 'tosspay' || value === 'naverpay'
+
+/** SDK feature keys a Pro subscription grants. Checked with `payments.hasFeature`. */
+export const PRO_FEATURES = {
+	persistentInventory: 'persistent_inventory',
+	unlimitedMaps: 'unlimited_maps',
+	priorityMatchmaking: 'priority_matchmaking',
+	supporter: 'supporter',
+} as const
 
 export interface Plan {
 	id: PlanId

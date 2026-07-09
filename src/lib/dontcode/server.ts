@@ -24,9 +24,27 @@
  *   DONTCODE_API_KEY  — this project's API key (dc_…)
  */
 import { env } from '$env/dynamic/private'
-import { dontcode, isDontCodeError, type DontCodeClient } from '@dontcode2/backend'
+import {
+	dontcode,
+	isDontCodeError,
+	type DontCodeClient,
+	type BillingPlan,
+	type PaymentMethod,
+	type ReserveSubscriptionResult,
+	type SendEmailInput,
+	type SendEmailResult,
+	type Subscription,
+	type SubscriptionStatus,
+} from '@dontcode2/backend'
 
 export { DontCodeError, isDontCodeError } from '@dontcode2/backend'
+export type {
+	BillingPlan,
+	PaymentMethod,
+	ReserveSubscriptionResult,
+	Subscription,
+	SubscriptionStatus,
+} from '@dontcode2/backend'
 
 /** Lazily-built singleton client — env is validated on first use, not import. */
 let _client: DontCodeClient | undefined
@@ -356,5 +374,99 @@ export const realtime = {
 	/** Who is currently connected to a channel. */
 	presence(channel: string): Promise<{ id: string; identity?: string }[]> {
 		return client().realtime.presence(channel)
+	},
+}
+
+// ── Payments ──────────────────────────────────────────────────────────────
+// Server control plane over `/api/v1/payments`. The DontCode gateway settles
+// the charge through PortOne and runs recurring renewals itself — the app
+// never holds card data or a scheduler. We reserve a subscription, the browser
+// issues a billing key in the provider popup, we confirm it, and thereafter we
+// only *read* whether the subscription is live and entitled. The acting user is
+// the DontCode user id (`locals.user`), passed explicitly. Never call from the
+// browser: these carry the project API key.
+
+export const payments = {
+	/** Split flow step 1: reserve a subscription and get the popup config. */
+	reserveSubscription(params: {
+		plan: BillingPlan
+		userId: string
+		method: PaymentMethod
+	}): Promise<ReserveSubscriptionResult> {
+		return client().payments.reserveSubscription(params)
+	},
+
+	/** Split flow step 2: persist the browser-issued billing key and activate. */
+	confirmSubscription(params: {
+		subscriptionId: string
+		billingKey: string
+	}): Promise<Subscription> {
+		return client().payments.confirmSubscription(params)
+	},
+
+	/** Split flow: release a reserved subscription whose popup was dismissed. */
+	abortSubscription(subscriptionId: string): Promise<void> {
+		return client().payments.abortSubscription({ subscriptionId })
+	},
+
+	/** The first live subscription for a user, or null. */
+	getSubscription(userId: string): Promise<Subscription | null> {
+		return client().payments.getSubscription(userId)
+	},
+
+	/** Authoritative "is this user Pro right now" check. */
+	hasActiveSubscription(userId: string, planId?: string): Promise<boolean> {
+		return client().payments.hasActiveSubscription(userId, planId)
+	},
+
+	/** Whether the user's active subscriptions grant `featureKey`. */
+	hasFeature(userId: string, featureKey: string): Promise<boolean> {
+		return client().payments.hasFeature(userId, featureKey)
+	},
+
+	/** Soft cancel (access through period end) by default. */
+	cancelSubscription(
+		subscription: Subscription,
+		options?: { atPeriodEnd?: boolean }
+	): Promise<Subscription> {
+		return client().payments.cancelSubscription(subscription, options)
+	},
+
+	/** Manually transition status — used to undo a pending cancellation. */
+	updateSubscriptionStatus(
+		subscription: Subscription,
+		status: SubscriptionStatus
+	): Promise<Subscription> {
+		return client().payments.updateSubscriptionStatus(subscription, status)
+	},
+
+	/** Register / upsert the project's plan + feature catalog (seed script). */
+	definePlans: (
+		...args: Parameters<DontCodeClient['payments']['definePlans']>
+	): ReturnType<DontCodeClient['payments']['definePlans']> => client().payments.definePlans(...args),
+	defineFeatures: (
+		...args: Parameters<DontCodeClient['payments']['defineFeatures']>
+	): ReturnType<DontCodeClient['payments']['defineFeatures']> =>
+		client().payments.defineFeatures(...args),
+	setPlanFeatures: (
+		...args: Parameters<DontCodeClient['payments']['setPlanFeatures']>
+	): ReturnType<DontCodeClient['payments']['setPlanFeatures']> =>
+		client().payments.setPlanFeatures(...args),
+	listPlans: (
+		...args: Parameters<DontCodeClient['payments']['listPlans']>
+	): ReturnType<DontCodeClient['payments']['listPlans']> => client().payments.listPlans(...args),
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────
+// Transactional email over `/api/v1/notifications`. Content is GitHub-flavored
+// Markdown (`markdownText`) — there is no template system. The mock gateway
+// (`pnpm mock`) logs sends without delivering, so this is safe to exercise
+// locally. Higher-level dedup, preferences, and templating live in
+// `$lib/Notifications/email.server`.
+
+export const notifications = {
+	/** Send one transactional email. Check `.success` before assuming delivery. */
+	sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+		return client().notifications.email.send(input)
 	},
 }

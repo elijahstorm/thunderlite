@@ -1,6 +1,8 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db } from '$lib/dontcode/server'
+import { notify, profileName, rememberEmail } from '$lib/Notifications/email.server'
+import { newFollower } from '$lib/Notifications/templates'
 
 export const POST = async ({ params, locals }) => {
 	const { userAuth } = params
@@ -17,6 +19,15 @@ export const POST = async ({ params, locals }) => {
 		logToErrorDb(msg)
 		throw error(500, 'Invalid target auth string')
 	}
+
+	// Notify the followed user. Best-effort, deduped so a re-follow stays quiet.
+	await rememberEmail(source, locals.userEmail)
+	await notify({
+		userAuth: target,
+		category: 'social',
+		dedupKey: `follow:${source}:${target}`,
+		content: newFollower(await profileName(source)),
+	})
 
 	return json({ status })
 }

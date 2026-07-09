@@ -18,7 +18,8 @@ import { CreateGameRoomSettings } from './create_game_room_settings.sql'
 import { CreateGameMember } from './create_game_member.sql'
 import { CreateGameEvent } from './create_game_event.sql'
 import { CreatePlayerGame } from './create_player_game.sql'
-import { CreateSubscriptions } from './create_subscriptions.sql'
+import { CreateEmailLog } from './create_email_log.sql'
+import { CreateNotificationPrefs } from './create_notification_prefs.sql'
 
 /**
  * The full app schema as ONE consolidated SQL script for the DontCode
@@ -49,7 +50,8 @@ export const consolidatedSchema = [
 	CreateGameMember,
 	CreateGameEvent,
 	CreatePlayerGame,
-	CreateSubscriptions,
+	CreateEmailLog,
+	CreateNotificationPrefs,
 ]
 	.map((statement) => statement.trim())
 	.join('\n\n')
@@ -75,7 +77,8 @@ export const appTables = [
 	'game_member',
 	'game_event',
 	'player_game',
-	'subscriptions',
+	'email_log',
+	'notification_prefs',
 ] as const
 
 /**

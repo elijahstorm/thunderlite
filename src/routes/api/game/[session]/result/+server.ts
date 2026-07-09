@@ -2,6 +2,8 @@ import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db } from '$lib/dontcode/server'
 import { gameStore } from '$lib/Game/store.server'
+import { notify, profileName, rememberEmail } from '$lib/Notifications/email.server'
+import { matchResult } from '$lib/Notifications/templates'
 
 /**
  * POST /api/game/[session]/result — persist a finished match (J3).
@@ -120,6 +122,24 @@ export const POST = async ({ request, params, locals }) => {
 		// finished game stops showing as their active session and they can start a
 		// new one. Only clears if it still points here (a rematch already moved it).
 		if (mode === 'online') await gameStore.clearPlayerGame(userSession, session)
+
+		// Match summary email. Each participant records their own result row, so
+		// this reaches every player once (deduped per match + player). For online
+		// play we name an opponent; hot-seat / campaign has none.
+		let opponentName: string | null = null
+		if (mode === 'online') {
+			const others = await gameStore.roster(session)
+			const other = others.find((m) => m.userAuth && m.userAuth !== userAuth && !m.isAi)
+			if (other?.userAuth) opponentName = await profileName(other.userAuth)
+		}
+		await rememberEmail(userAuth, locals.userEmail)
+		await notify({
+			userAuth,
+			category: 'game',
+			dedupKey: `match-result:${matchId}:${userAuth}`,
+			email: locals.userEmail,
+			content: matchResult(outcome, opponentName),
+		})
 
 		return json({ matchId, outcome })
 	} catch (msg) {

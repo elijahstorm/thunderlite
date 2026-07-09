@@ -2,7 +2,15 @@
 	import Icon from '@iconify/svelte'
 	import { addToast } from 'as-toast'
 	import { invalidateAll } from '$app/navigation'
-	import { PLANS, PERKS, formatPrice, type PlanId, type SubscriptionView } from '$lib/Pro/plans'
+	import {
+		PLANS,
+		PERKS,
+		PAYMENT_METHODS,
+		formatPrice,
+		type PlanId,
+		type ProPaymentMethod,
+		type SubscriptionView,
+	} from '$lib/Pro/plans'
 
 	let { data } = $props()
 
@@ -10,17 +18,18 @@
 	let isPro = $derived(subscription?.isPro ?? false)
 
 	let selectedPlan: PlanId = $state('monthly')
+	let selectedMethod: ProPaymentMethod = $state('card')
 	let checkoutOpen = $state(false)
 	let processing = $state(false)
 
-	// Test-mode card fields. These never leave the browser — the server records
-	// only the chosen plan. They exist so the payment flow can be exercised.
-	let cardName = $state('')
-	let cardNumber = $state('')
-	let cardExpiry = $state('')
-	let cardCvc = $state('')
-
 	let plan = $derived(PLANS[selectedPlan])
+
+	const post = (path: string, body?: unknown) =>
+		fetch(path, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: body ? JSON.stringify(body) : undefined,
+		})
 
 	const formatDate = (iso: string | null) =>
 		iso
@@ -41,34 +50,42 @@
 		checkoutOpen = false
 	}
 
-	// Prefill obviously-fake test values so the flow is one click to try.
-	const fillTestCard = () => {
-		cardName = 'Test Player'
-		cardNumber = '4242 4242 4242 4242'
-		cardExpiry = '12 / 34'
-		cardCvc = '123'
-	}
-
-	const cardComplete = () =>
-		cardName.trim() && cardNumber.trim() && cardExpiry.trim() && cardCvc.trim()
-
+	// Real billing via the DontCode payments gateway (PortOne): reserve a
+	// subscription, issue a billing key in the provider popup, then confirm it.
 	const submitCheckout = async () => {
-		if (!cardComplete() || processing) return
+		if (processing) return
 		processing = true
 		try {
-			// Simulate the round-trip to a payment processor.
-			await new Promise((resolve) => setTimeout(resolve, 900))
-			const response = await fetch('/api/pro/subscribe', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ plan: selectedPlan }),
+			const reserveRes = await post('/api/pro/subscribe/reserve', {
+				plan: selectedPlan,
+				method: selectedMethod,
 			})
-			if (!response.ok) throw new Error(`HTTP ${response.status}`)
+			if (!reserveRes.ok) throw new Error(`Could not start checkout (${reserveRes.status})`)
+			const { reservation } = await reserveRes.json()
+
+			// Lazy import so the PortOne browser SDK never loads server-side.
+			const { issueBillingKey } = await import('$lib/Pro/portone')
+			const issued = await issueBillingKey(reservation, selectedMethod)
+
+			if ('error' in issued) {
+				// Popup dismissed or failed — release the half-open reservation.
+				await post('/api/pro/subscribe/abort', {
+					subscriptionId: reservation.subscriptionId,
+				})
+				throw new Error(issued.error)
+			}
+
+			const confirmRes = await post('/api/pro/subscribe/confirm', {
+				subscriptionId: reservation.subscriptionId,
+				billingKey: issued.billingKey,
+			})
+			if (!confirmRes.ok) throw new Error(`Could not confirm (${confirmRes.status})`)
+
 			addToast('Welcome to ThunderLite Pro!')
 			checkoutOpen = false
 			await invalidateAll()
 		} catch (err) {
-			addToast(`Payment failed. ${err}`, 'warn')
+			addToast(`Checkout failed. ${err instanceof Error ? err.message : err}`, 'warn')
 		} finally {
 			processing = false
 		}
@@ -171,9 +188,8 @@
 			</div>
 
 			<p class="text-xs text-muted-foreground flex items-center gap-1.5">
-				<Icon icon="lucide:flask-conical" width={13} />
-				Test mode. No real charge is made. Pro currently unlocks nothing; it exists to exercise the billing
-				flow.
+				<Icon icon="lucide:shield-check" width={13} />
+				Billing is handled securely by our payment provider. Manage or cancel any time.
 			</p>
 		</div>
 	{:else}
@@ -224,8 +240,8 @@
 
 			<div class="flex flex-wrap items-center justify-between gap-3">
 				<p class="text-xs text-muted-foreground flex items-center gap-1.5">
-					<Icon icon="lucide:flask-conical" width={13} />
-					Test mode. No real charge is made.
+					<Icon icon="lucide:shield-check" width={13} />
+					Secure checkout. Cancel any time.
 				</p>
 				<button class="btn btn-primary" onclick={() => openCheckout(selectedPlan)}>
 					Subscribe · {formatPrice(plan.priceCents)}/{plan.interval}
@@ -236,7 +252,7 @@
 </section>
 
 {#if checkoutOpen}
-	<!-- Simulated checkout. Card details stay in the browser. -->
+	<!-- Checkout: pick a method, then authorize a billing key in the provider popup. -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-sm"
 		onclick={closeCheckout}
@@ -273,70 +289,40 @@
 			<div
 				class="flex items-center gap-2 rounded-md bg-secondary/10 px-3 py-2 text-xs text-secondary"
 			>
-				<Icon icon="lucide:flask-conical" width={14} />
-				Test mode. This won't charge a real card.
-				<button class="ml-auto underline hover:no-underline" type="button" onclick={fillTestCard}>
-					Use test card
-				</button>
+				<Icon icon="lucide:lock" width={14} />
+				Secure checkout. You'll authorize payment with your provider in the next step.
 			</div>
 
-			<div class="space-y-3">
-				<label class="block">
-					<span class="text-xs font-medium text-muted-foreground">Name on card</span>
-					<input
-						class="input mt-1 w-full"
-						type="text"
-						autocomplete="cc-name"
-						bind:value={cardName}
-						placeholder="Test Player"
-					/>
-				</label>
-				<label class="block">
-					<span class="text-xs font-medium text-muted-foreground">Card number</span>
-					<input
-						class="input mt-1 w-full"
-						type="text"
-						inputmode="numeric"
-						autocomplete="cc-number"
-						bind:value={cardNumber}
-						placeholder="4242 4242 4242 4242"
-					/>
-				</label>
-				<div class="grid grid-cols-2 gap-3">
-					<label class="block">
-						<span class="text-xs font-medium text-muted-foreground">Expiry</span>
-						<input
-							class="input mt-1 w-full"
-							type="text"
-							autocomplete="cc-exp"
-							bind:value={cardExpiry}
-							placeholder="MM / YY"
-						/>
-					</label>
-					<label class="block">
-						<span class="text-xs font-medium text-muted-foreground">CVC</span>
-						<input
-							class="input mt-1 w-full"
-							type="text"
-							inputmode="numeric"
-							autocomplete="cc-csc"
-							bind:value={cardCvc}
-							placeholder="123"
-						/>
-					</label>
+			<div class="space-y-2">
+				<span class="text-xs font-medium text-muted-foreground">Payment method</span>
+				<div class="grid grid-cols-2 gap-2">
+					{#each PAYMENT_METHODS as method (method.id)}
+						<button
+							type="button"
+							class="flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors"
+							class:border-secondary={selectedMethod === method.id}
+							class:bg-accent={selectedMethod === method.id}
+							class:border-border={selectedMethod !== method.id}
+							class:hover:bg-muted={selectedMethod !== method.id}
+							onclick={() => (selectedMethod = method.id)}
+							disabled={processing}
+						>
+							<Icon icon={method.icon} width={16} />
+							{method.label}
+						</button>
+					{/each}
 				</div>
+				<p class="text-[11px] text-muted-foreground">
+					Card is billed in USD. KakaoPay, TossPay and NaverPay are billed in KRW at today's rate.
+				</p>
 			</div>
 
-			<button
-				class="btn btn-primary w-full"
-				onclick={submitCheckout}
-				disabled={processing || !cardComplete()}
-			>
+			<button class="btn btn-primary w-full" onclick={submitCheckout} disabled={processing}>
 				{#if processing}
 					<Icon icon="lucide:loader-circle" class="animate-spin" width={16} />
 					Processing…
 				{:else}
-					Pay {formatPrice(plan.priceCents)}
+					Continue · {formatPrice(plan.priceCents)}/{plan.interval}
 				{/if}
 			</button>
 		</div>
