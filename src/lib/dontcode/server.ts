@@ -273,6 +273,11 @@ export const storage = {
 		const { url } = await client().storage.public.getUrl(path)
 		return { key: path, url }
 	},
+
+	/** Delete files from the project's public storage. */
+	removePublic(paths: string[]): Promise<{ deleted: number }> {
+		return client().storage.public.remove(paths)
+	},
 }
 
 // ── KV cache ────────────────────────────────────────────────────────────────
@@ -443,7 +448,8 @@ export const payments = {
 	/** Register / upsert the project's plan + feature catalog (seed script). */
 	definePlans: (
 		...args: Parameters<DontCodeClient['payments']['definePlans']>
-	): ReturnType<DontCodeClient['payments']['definePlans']> => client().payments.definePlans(...args),
+	): ReturnType<DontCodeClient['payments']['definePlans']> =>
+		client().payments.definePlans(...args),
 	defineFeatures: (
 		...args: Parameters<DontCodeClient['payments']['defineFeatures']>
 	): ReturnType<DontCodeClient['payments']['defineFeatures']> =>

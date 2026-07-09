@@ -9,6 +9,7 @@
 	let { data }: Props = $props()
 	let mapHash = $derived(data.mapHash)
 	let mapId = $derived(data.mapId)
+	let mapName = $derived(data.mapName)
 </script>
 
-<MapEditor {mapHash} {mapId} />
+<MapEditor {mapHash} {mapId} {mapName} />

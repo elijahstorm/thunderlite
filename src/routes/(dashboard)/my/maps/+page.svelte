@@ -1,7 +1,11 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte'
+	import { invalidateAll } from '$app/navigation'
+	import { addToast } from 'as-toast'
+	import { Modal } from 'flowbite-svelte'
 	import type { PageData } from './$types'
 	import MapThumbnail from '$lib/Components/Widgets/Social/MapThumbnail.svelte'
+	import { deleteMap } from '$lib/Map/Editor/mapDelete'
 
 	interface Props {
 		data: PageData
@@ -10,6 +14,32 @@
 	let { data }: Props = $props()
 	let maps = $derived(data.maps)
 	let atLimit = $derived(data.remaining <= 0)
+
+	// The map awaiting the user's confirmation in the Delete modal.
+	let deleteTarget: MapDBData | null = $state(null)
+	let confirmDeleteOpen = $state(false)
+	let deleting = $state(false)
+
+	const askDelete = (map: MapDBData) => {
+		deleteTarget = map
+		confirmDeleteOpen = true
+	}
+	const removeMap = async () => {
+		const target = deleteTarget
+		if (!target || deleting) return
+		deleting = true
+		try {
+			if (await deleteMap(target.public_id)) {
+				addToast('Map deleted')
+				confirmDeleteOpen = false
+				deleteTarget = null
+				// Re-run the load so the listing and the remaining-quota count refresh.
+				await invalidateAll()
+			}
+		} finally {
+			deleting = false
+		}
+	}
 
 	const formatDate = (date: Date | string) =>
 		new Date(date).toLocaleDateString(undefined, {
@@ -94,6 +124,15 @@
 								<Icon icon="lucide:external-link" width={13} />
 								Open
 							</a>
+							<button
+								type="button"
+								onclick={() => askDelete(map)}
+								class="btn btn-ghost btn-sm shrink-0 text-destructive"
+								title="Delete map"
+								aria-label={`Delete ${map.name ?? 'Unnamed map'}`}
+							>
+								<Icon icon="lucide:trash-2" width={13} />
+							</button>
 						</div>
 					</div>
 				</article>
@@ -101,3 +140,38 @@
 		</div>
 	{/if}
 </section>
+
+<Modal title="Delete map?" bind:open={confirmDeleteOpen} size="sm">
+	<div class="flex items-start gap-3">
+		<span
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive"
+		>
+			<Icon icon="lucide:trash-2" width="18" height="18" />
+		</span>
+		<p class="text-sm text-muted-foreground">
+			This will permanently remove
+			<span class="font-semibold text-foreground">{deleteTarget?.name ?? 'Unnamed map'}</span>
+			from your library. Its share link will stop working. This can't be undone.
+		</p>
+	</div>
+
+	{#snippet footer()}
+		<button type="button" onclick={() => (confirmDeleteOpen = false)} class="btn btn-ghost">
+			<Icon icon="mdi:close" width="16" height="16" />
+			Cancel
+		</button>
+		<button
+			type="button"
+			onclick={removeMap}
+			disabled={deleting}
+			class="btn btn-destructive ml-auto"
+		>
+			{#if deleting}
+				<Icon icon="mdi:loading" width="16" height="16" class="animate-spin" />
+			{:else}
+				<Icon icon="lucide:trash-2" width="16" height="16" />
+			{/if}
+			Delete
+		</button>
+	{/snippet}
+</Modal>

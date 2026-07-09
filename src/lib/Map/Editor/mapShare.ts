@@ -47,7 +47,7 @@ export const shareLink = async (id: string, name: string) => {
 
 	if (navigator.share) {
 		try {
-			await navigator.share({ title: name, text: 'A game!', url })
+			await navigator.share({ title: name, url })
 			addToast('Shared successfully')
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') return

@@ -9,12 +9,12 @@ import { db } from '$lib/dontcode/server'
  * everything the play/editor pages need.
  */
 export const getMapData = async (mapId: string) => {
-	let map: { map_data: string; status: string } | null
+	let map: { map_data: string; name: string; status: string } | null
 
 	try {
-		map = await db.findOne<{ map_data: string; status: string }>('maps', {
+		map = await db.findOne<{ map_data: string; name: string; status: string }>('maps', {
 			where: { public_id: mapId },
-			select: ['map_data', 'status'],
+			select: ['map_data', 'name', 'status'],
 		})
 	} catch (msg) {
 		logToErrorDb(msg)
@@ -25,7 +25,9 @@ export const getMapData = async (mapId: string) => {
 		throw error(400, { message: 'No map with that link found.' })
 	}
 
-	return { mapHash: map.map_data }
+	// `name` rides alongside the blob because the compact hash deliberately omits
+	// the title (see mapExporter#filter) — it lives only in this column.
+	return { mapHash: map.map_data, mapName: map.name }
 }
 
 export const isValidMapId = async (mapId: string) => {

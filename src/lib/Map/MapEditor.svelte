@@ -23,6 +23,7 @@
 		saveDraft,
 	} from './Editor/editorDraft'
 	import { publishMap, shareLink } from './Editor/mapShare'
+	import { deleteMap } from './Editor/mapDelete'
 	import { renderMapThumbnail } from './Editor/mapThumbnail'
 	import { skyData } from '$lib/GameData/sky'
 	import { buildingData } from '$lib/GameData/building'
@@ -40,9 +41,12 @@
 		mapHash?: string | undefined
 		// edits. New maps start undefined and adopt the id their first save mints.
 		mapId?: string | undefined
+		// The saved map's display name (`maps.name`). The compact hash omits the
+		// title (see mapExporter#filter), so it rides in separately.
+		mapName?: string | undefined
 	}
 
-	let { mapHash = undefined, mapId = undefined }: Props = $props()
+	let { mapHash = undefined, mapId = undefined, mapName = undefined }: Props = $props()
 
 	const maxTeamAmount = 4
 	const size = 64
@@ -59,6 +63,11 @@
 	let myMaps: MapDBData[] = $state([])
 	let loadingMaps = $state(false)
 	let loadError = $state('')
+	// Deleting a map from the Load picker: `deleteTarget` is the row awaiting
+	// the user's confirmation in the Delete modal.
+	let deleteTarget: MapDBData | null = $state(null)
+	let confirmDeleteOpen = $state(false)
+	let deletingMap = $state(false)
 	let editType = $state<Brush>('ground')
 	let unitType = $state(0)
 	let groundType = $state(0)
@@ -84,7 +93,15 @@
 	// The passenger a placed transport carries (a unit type), or null for empty.
 	// Persists across placements so several loaded transports drop without reselecting.
 	let cargoType: number | null = $state(null)
-	let map: MapObject = $state.raw(untrack(() => $mapStore ?? deriveFromHash(mapHash)))
+	let map: MapObject = $state.raw(
+		untrack(() => {
+			const initial = $mapStore ?? deriveFromHash(mapHash)
+			// A board freshly derived from a saved map's hash has no title (the hash
+			// omits it), so adopt the DB name; a resumed in-memory board keeps its own.
+			if (!$mapStore && mapName) initial.title = mapName
+			return initial
+		})
+	)
 	// Whether we arrived here mid-session with a live draft still in memory (e.g.
 	// bounced back from the Play page). That in-memory map is always the freshest
 	// copy, so we must never clobber it with a (possibly older) localStorage
@@ -362,6 +379,28 @@
 		}
 		saveDraft(map, currentMapId)
 		window.location.href = `/editor/${id}`
+	}
+
+	// Delete a saved map from the Load picker (never the one being edited — its
+	// card hides the trash button). Success drops it from the listing in place.
+	const askDeleteMap = (target: MapDBData) => {
+		deleteTarget = target
+		confirmDeleteOpen = true
+	}
+	const removeMap = async () => {
+		const target = deleteTarget
+		if (!target || deletingMap) return
+		deletingMap = true
+		try {
+			if (await deleteMap(target.public_id)) {
+				myMaps = myMaps.filter((m) => m.public_id !== target.public_id)
+				addToast('Map deleted')
+				confirmDeleteOpen = false
+				deleteTarget = null
+			}
+		} finally {
+			deletingMap = false
+		}
 	}
 
 	const playMap = async () => {
@@ -657,24 +696,37 @@
 		{:else}
 			<div class="grid max-h-[60vh] gap-3 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
 				{#each myMaps as m (m.public_id)}
-					<button
-						type="button"
-						onclick={() => loadMap(m.public_id)}
-						disabled={m.public_id === currentMapId}
-						class="card flex flex-col overflow-hidden text-left transition-shadow enabled:hover:shadow-md disabled:cursor-default disabled:opacity-60"
-					>
-						<div class="aspect-video bg-surface-2">
-							<MapThumbnail map={m} />
-						</div>
-						<div class="flex items-center justify-between gap-2 p-2.5">
-							<span class="truncate text-sm font-semibold tracking-tight text-foreground">
-								{m.name ?? 'Untitled map'}
-							</span>
-							{#if m.public_id === currentMapId}
-								<span class="chip shrink-0 text-[10px] tracking-wide uppercase">Editing</span>
-							{/if}
-						</div>
-					</button>
+					<div class="relative">
+						<button
+							type="button"
+							onclick={() => loadMap(m.public_id)}
+							disabled={m.public_id === currentMapId}
+							class="card flex w-full flex-col overflow-hidden text-left transition-shadow enabled:hover:shadow-md disabled:cursor-default disabled:opacity-60"
+						>
+							<div class="aspect-video bg-surface-2">
+								<MapThumbnail map={m} />
+							</div>
+							<div class="flex items-center justify-between gap-2 p-2.5">
+								<span class="truncate text-sm font-semibold tracking-tight text-foreground">
+									{m.name ?? 'Untitled map'}
+								</span>
+								{#if m.public_id === currentMapId}
+									<span class="chip shrink-0 text-[10px] tracking-wide uppercase">Editing</span>
+								{/if}
+							</div>
+						</button>
+						{#if m.public_id !== currentMapId}
+							<button
+								type="button"
+								onclick={() => askDeleteMap(m)}
+								class="btn btn-ghost btn-sm absolute top-2 right-2 bg-surface/80 text-destructive backdrop-blur-sm"
+								title="Delete map"
+								aria-label={`Delete ${m.name ?? 'Untitled map'}`}
+							>
+								<Icon icon="lucide:trash-2" width="14" height="14" />
+							</button>
+						{/if}
+					</div>
 				{/each}
 			</div>
 		{/if}
@@ -688,6 +740,41 @@
 		<button type="button" onclick={() => (openLoadModal = false)} class="btn btn-primary ml-auto">
 			<Icon icon="mdi:close" width="16" height="16" />
 			Close
+		</button>
+	{/snippet}
+</Modal>
+
+<Modal title="Delete map?" bind:open={confirmDeleteOpen} size="sm">
+	<div class="flex items-start gap-3">
+		<span
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive"
+		>
+			<Icon icon="lucide:trash-2" width="18" height="18" />
+		</span>
+		<p class="text-sm text-muted-foreground">
+			This will permanently remove
+			<span class="font-semibold text-foreground">{deleteTarget?.name ?? 'Untitled map'}</span>
+			from your library. Its share link will stop working. This can't be undone.
+		</p>
+	</div>
+
+	{#snippet footer()}
+		<button type="button" onclick={() => (confirmDeleteOpen = false)} class="btn btn-ghost">
+			<Icon icon="mdi:close" width="16" height="16" />
+			Cancel
+		</button>
+		<button
+			type="button"
+			onclick={removeMap}
+			disabled={deletingMap}
+			class="btn btn-destructive ml-auto"
+		>
+			{#if deletingMap}
+				<Icon icon="mdi:loading" width="16" height="16" class="animate-spin" />
+			{:else}
+				<Icon icon="lucide:trash-2" width="16" height="16" />
+			{/if}
+			Delete
 		</button>
 	{/snippet}
 </Modal>
