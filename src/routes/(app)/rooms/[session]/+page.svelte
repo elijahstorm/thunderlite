@@ -8,6 +8,7 @@
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import GameChat from '$lib/Components/Socket/GameChat.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import { cachedImage } from '$lib/Storage/cachedImage'
 	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 
@@ -229,7 +230,11 @@
 		{#if data.thumbnail}
 			<section class="card overflow-hidden">
 				<div class="max-h-72 overflow-auto bg-surface-2">
-					<img src={data.thumbnail} alt="{data.mapName} preview" class="w-full object-contain" />
+					<img
+						src={cachedImage(data.thumbnail)}
+						alt="{data.mapName} preview"
+						class="w-full object-contain"
+					/>
 				</div>
 				<div class="px-4 py-2 text-xs text-muted-foreground">
 					{data.mapName} — scroll to look around the map

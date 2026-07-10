@@ -2,6 +2,7 @@
 	import type { PageData } from './$types'
 	import Icon from '@iconify/svelte'
 	import MapCard from '$lib/Components/Widgets/Social/MapCard.svelte'
+	import MapCardSkeleton from '$lib/Components/Feedback/MapCardSkeleton.svelte'
 	import { dbMapsStore, dbUsersStore } from '$lib/Stores/dbStores'
 	import InfiniteScroll from '$lib/Components/Widgets/Helpers/InfiniteScroll.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
@@ -13,9 +14,49 @@
 	}
 
 	let { data }: Props = $props()
-	let maps = $derived(data.maps)
-	let users = $derived(data.users)
-	let mapTypes = $derived(data.mapTypes)
+
+	// `data.listing` / `data.mapTypes` are streamed promises (see +page.server.ts):
+	// the shell renders instantly and these flush in a beat later. Seed local,
+	// mutable state from them so the infinite-scroll loader can keep appending.
+	let maps = $state<MapDBData[]>([])
+	let users = $state<UserDBData[]>([])
+	let mapTypes = $state<string[]>([])
+	let listingReady = $state(false)
+	let listingError = $state(false)
+
+	$effect(() => {
+		let cancelled = false
+
+		data.listing
+			.then((res) => {
+				if (cancelled) return
+				maps = res.maps.map((map: MapDBData) => ({
+					...map,
+					created_at: new Date(map.created_at),
+					updated_at: new Date(map.updated_at),
+				}))
+				users = res.users.map((user: UserDBData) => ({
+					...user,
+					created_at: new Date(user.created_at),
+				}))
+				listingReady = true
+			})
+			.catch(() => {
+				if (cancelled) return
+				listingError = true
+				listingReady = true
+			})
+
+		data.mapTypes
+			.then((types) => {
+				if (!cancelled) mapTypes = types
+			})
+			.catch(() => {})
+
+		return () => {
+			cancelled = true
+		}
+	})
 
 	let loader = $state(() => {})
 	let hasMore = $state(true)
@@ -123,25 +164,37 @@
 
 				<SearchWithTypes onload={createLoader} types={mapTypes} />
 
-				<div class="grid gap-5">
-					{#each maps as map (map.public_id)}
-						<a
-							href="/map/{map.public_id}"
-							class="block w-full text-left rounded-xl outline-none transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:-translate-y-0.5"
-						>
-							<MapCard {map} />
-						</a>
-					{/each}
-				</div>
+				{#if !listingReady}
+					<div class="grid gap-5">
+						{#each Array.from({ length: 4 }) as _, i (i)}
+							<MapCardSkeleton />
+						{/each}
+					</div>
+				{:else if listingError}
+					<div class="card p-10 text-center text-sm text-destructive">
+						We couldn't load the maps. Please refresh and try again.
+					</div>
+				{:else}
+					<div class="grid gap-5">
+						{#each maps as map (map.public_id)}
+							<a
+								href="/map/{map.public_id}"
+								class="block w-full text-left rounded-xl outline-none transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:-translate-y-0.5"
+							>
+								<MapCard {map} />
+							</a>
+						{/each}
+					</div>
 
-				{#if !maps?.length}
-					<div class="card p-10 text-center text-sm text-muted-foreground">
-						No maps matched your search. Try broadening your filters.
-					</div>
-				{:else if !hasMore}
-					<div class="card p-6 text-center text-sm text-muted-foreground border-dashed">
-						You've reached the end of the list. Pick a map and get into a game.
-					</div>
+					{#if !maps?.length}
+						<div class="card p-10 text-center text-sm text-muted-foreground">
+							No maps matched your search. Try broadening your filters.
+						</div>
+					{:else if !hasMore}
+						<div class="card p-6 text-center text-sm text-muted-foreground border-dashed">
+							You've reached the end of the list. Pick a map and get into a game.
+						</div>
+					{/if}
 				{/if}
 			</div>
 		</div>

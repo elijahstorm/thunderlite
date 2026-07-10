@@ -40,7 +40,11 @@
 
 	const finishLogin = async () => {
 		await refreshSession()
-		redirectAfterLogin(page.url.searchParams.get('redirectTo'))
+		// Await the navigation so the submit button stays in its loading state
+		// until /onboarding is actually on screen. Without this the button
+		// snaps back to "Sign in" while the redirect target loads, leaving the
+		// form sitting there with no sign that anything is happening.
+		await redirectAfterLogin(page.url.searchParams.get('redirectTo'))
 	}
 
 	const submitSignup = async () => {

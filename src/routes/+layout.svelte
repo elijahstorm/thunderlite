@@ -3,6 +3,7 @@
 	import { Toasts } from 'as-toast'
 	import { browser } from '$app/environment'
 	import { initSession } from '$lib/dontcode/client'
+	import NavigationProgress from '$lib/Components/Feedback/NavigationProgress.svelte'
 	import '../app.css'
 
 	interface Props {
@@ -45,6 +46,8 @@
 		<link href={googleFonts} rel="stylesheet" />
 	{/if}
 </svelte:head>
+
+<NavigationProgress />
 
 {@render children?.()}
 

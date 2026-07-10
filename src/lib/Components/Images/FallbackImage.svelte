@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cachedImage } from '$lib/Storage/cachedImage'
+
 	interface Props {
 		fallback?: string
 		src?: string | null | undefined
@@ -21,7 +23,10 @@
 		}
 	})
 
-	let resolvedSrc = $derived((!failed && (src || fallback)) || null)
+	// Route public-storage URLs through the caching proxy so repeat renders hit
+	// cache instead of re-signing the upstream 302 every time. No-op for other
+	// hosts (data URIs, the local mock gateway, the built-in fallback).
+	let resolvedSrc = $derived((!failed && (cachedImage(src) || fallback)) || null)
 
 	let classList: string = $derived(`w-full h-full ${tailwind}`)
 </script>

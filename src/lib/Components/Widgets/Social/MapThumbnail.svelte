@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cachedImage } from '$lib/Storage/cachedImage'
+
 	interface Props {
 		map: MapDBData
 	}
@@ -10,7 +12,7 @@
 	{#if map.thumbnail}
 		<img
 			class="h-full w-full object-cover"
-			src={map.thumbnail}
+			src={cachedImage(map.thumbnail)}
 			alt="{map.name ?? 'Map'} thumbnail"
 		/>
 	{/if}

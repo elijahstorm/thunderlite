@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { dbUsersStore } from '$lib/Stores/dbStores'
+	import { cachedImage } from '$lib/Storage/cachedImage'
 	import UserImageAndName from './UserImageAndName.svelte'
 
 	interface Props {
@@ -15,7 +16,7 @@
 	<div class="grid gap-5 md:grid-cols-2">
 		<div class="rounded-xl overflow-hidden border border-border bg-surface-2 aspect-video">
 			<img
-				src={map.thumbnail}
+				src={cachedImage(map.thumbnail)}
 				alt="Map {map.name}"
 				class="h-full w-full object-cover"
 				height="400"

@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"dontcode": {
+			"command": "npx",
+			"args": ["-y", "-p", "@dontcode2/backend", "dontcode", "mcp"]
+		}
+	}
+}

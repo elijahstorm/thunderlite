@@ -166,22 +166,28 @@ export const queryMaps: (
 					{ entity_id: number }[],
 				])
 
-		const [[mapTypes, infoMorphs, likes, shares], users] = await Promise.all([
-			detailsPromise,
+		// The info lookup depends only on info_morph_map (from the details wave),
+		// not on the owner hydration — so chain it onto details and let it run
+		// concurrently with queryUsersByAuth rather than after both complete.
+		const detailsWithInfo = detailsPromise.then(async ([mapTypes, infoMorphs, likes, shares]) => {
+			const infoIds = [
+				...new Set(infoMorphs.map((morph) => morph.info_id).filter((id) => id !== null)),
+			]
+			const infos = infoIds.length
+				? await db.find<{ id: number; info: string; color: string }>('info', {
+						where: { id: { in: infoIds } },
+					})
+				: []
+			return { mapTypes, infoMorphs, likes, shares, infos }
+		})
+
+		const [{ mapTypes, infoMorphs, likes, shares, infos }, users] = await Promise.all([
+			detailsWithInfo,
 			queryUsersByAuth(
 				rows.map((map) => map.owner_auth),
 				me
 			),
 		])
-
-		const infoIds = [
-			...new Set(infoMorphs.map((morph) => morph.info_id).filter((id) => id !== null)),
-		]
-		const infos = infoIds.length
-			? await db.find<{ id: number; info: string; color: string }>('info', {
-					where: { id: { in: infoIds } },
-				})
-			: []
 
 		const typeTexts = new Map(mapTypes.map((mapType) => [mapType.id, mapType.text]))
 		const infosById = new Map(infos.map((info) => [info.id, info]))
