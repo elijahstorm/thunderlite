@@ -356,10 +356,10 @@
 				"type": 0
 			},
 			{
-				"type": 2
+				"type": 0
 			},
 			{
-				"type": 2
+				"type": 0
 			},
 			{
 				"type": 11
@@ -404,7 +404,7 @@
 				"type": 11
 			},
 			{
-				"type": 3
+				"type": 0
 			},
 			{
 				"type": 11
@@ -573,24 +573,6 @@
 				"l": 38
 			},
 			{
-				"type": 0,
-				"team": 1,
-				"l": 39,
-				"health": 15
-			},
-			{
-				"type": 0,
-				"team": 1,
-				"l": 68,
-				"health": 15
-			},
-			{
-				"type": 0,
-				"team": 1,
-				"l": 83,
-				"health": 20
-			},
-			{
 				"type": 2,
 				"team": 1,
 				"l": 70,
@@ -617,7 +599,7 @@
 				"type": 0,
 				"team": 1,
 				"l": 118,
-				"health": 10
+				"health": 1
 			}
 		],
 		"buildings": [

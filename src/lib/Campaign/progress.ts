@@ -83,12 +83,13 @@ const writeOrder = (user: CampaignUser, order: number, storage: StorageLike | nu
 
 /**
  * The highest campaign order the player has unlocked. A fresh account or
- * signed-out player has only the first level unlocked.
+ * signed-out player has only the first level unlocked. In dev (`pnpm dev`)
+ * every level is unlocked so any map can be play-tested directly.
  */
 export const getUnlockedOrder = (
 	user: CampaignUser,
 	storage: StorageLike | null = defaultStorage()
-): number => readOrder(user, storage)
+): number => (import.meta.env.DEV ? lastLevelOrder : readOrder(user, storage))
 
 /** Whether a specific level is unlocked for the player. */
 export const isUnlocked = (

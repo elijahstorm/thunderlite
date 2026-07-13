@@ -19,17 +19,17 @@ move: 8,3
 talk Kael: "Armor forward. Push them off the bridge and into the river."
 add unit: 1,"Scorpion Tank",13,3
 add unit: 1,"Strike Commando",13,2
-hurt unit: 13,2,20
+hurt unit: 13,2,30
 talk Vance: "His reserves are rolling up, some of them half-wrecked already. Hold the line and make every one of them pay to cross."
 </turn>
 
 <turn 1,1>
 move: 9,4
 talk Kael: "Throw the wounded forward too. Every rifle on that bridge. Bury them in bodies."
-add unit: 1,"Strike Commando",13,4
-hurt unit: 13,4,15
+add unit: 1,"Scorpion Tank",13,4
+hurt unit: 13,4,45
 add unit: 1,"Strike Commando",12,3
-hurt unit: 12,3,15
+hurt unit: 12,3,25
 talk Reyes: "He's spending his injured like ammunition. The bridge will hold if we keep our heads. Now's the time to slip away if we've found our gap."
 </turn>
 
