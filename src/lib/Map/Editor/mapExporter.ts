@@ -1,7 +1,7 @@
 import baseX from 'base-x'
 import { KEY_SOURCE } from '$lib/Security/keys'
 
-export const mapHasher = (map: MapProcesser) => hash(mapExporter(map))
+export const mapHasher = (map: MapProcesser) => hash(exportMapData(map))
 
 export const deriveFromHash = (hash?: string, existing: MapProcesser = EMPTY_MAP) =>
 	({
@@ -55,7 +55,12 @@ const hash = (content: string) => base62.encode(new TextEncoder().encode(content
 const unhash = (content?: string) =>
 	content ? new TextDecoder().decode(base62.decode(content)) : undefined
 
-const mapExporter = (map: MapProcesser) => JSON.stringify(filter(map))
+// The board serialized to the compact editor JSON shape (same payload `mapHasher`
+// feeds into base62). This step is linear in map size, so callers that only need
+// to persist/compare/clone a board locally should use this directly and skip the
+// O(n^2) base62 (un)hash entirely — that encode is only needed for URL/DB-safe
+// share hashes, not for localStorage drafts or in-memory clones.
+export const exportMapData = (map: MapProcesser) => JSON.stringify(filter(map))
 
 const mapImporter = (content?: string) => (content ? process(JSON.parse(content)) : {})
 

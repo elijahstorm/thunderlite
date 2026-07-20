@@ -1,11 +1,18 @@
 import { browser } from '$app/environment'
-import { deriveFromHash, mapHasher } from './mapExporter'
+import { deriveFromData, exportMapData } from './mapExporter'
 
 /**
  * Crash-safety autosave for the map editor. The working draft is serialized to
- * the same compact base62 hash the exporter already produces and stashed in
- * localStorage, so an accidental reload or a browser crash can't lose unsaved
- * work — it's recovered the next time that editing context opens.
+ * the compact editor JSON and stashed in localStorage, so an accidental reload
+ * or a browser crash can't lose unsaved work — it's recovered the next time that
+ * editing context opens.
+ *
+ * The draft is stored as raw JSON, NOT the base62 map hash: base62 exists only
+ * to make share hashes URL/DB-safe, and its encode/decode are O(n^2) in map
+ * size (base-x big-integer conversion). localStorage holds strings fine, so
+ * paying that quadratic cost on every debounced autosave — and again on
+ * recovery — froze the editor to a crash on larger boards (~40x40 up). JSON is
+ * linear both ways.
  *
  * Drafts are keyed by the map's saved id (or a shared `new` slot for a map that
  * hasn't been saved yet), so editing two different maps never clobbers the
@@ -14,7 +21,10 @@ import { deriveFromHash, mapHasher } from './mapExporter'
  * rather than throwing into the editor.
  */
 
-const KEY = 'thunderlite:editor-drafts:v1'
+// v2: drafts now store the map's JSON (`data`) rather than the base62 hash. Old
+// v1 entries (base62 strings under `hash`) are simply ignored — a stale
+// crash-recovery backup is non-durable by design, so abandoning it costs nothing.
+const KEY = 'thunderlite:editor-drafts:v2'
 // A standalone pointer to the last saved map the user was editing. Lets a blank
 // editor (the bare /editor route) reopen that map so edits keep flowing to the
 // same row instead of forking a duplicate on the next save.
@@ -24,9 +34,9 @@ const NEW_SLOT = 'new'
 const slot = (id?: string) => id ?? NEW_SLOT
 
 // `mapId` links a draft back to its saved map (`public_id`) so a recovered draft
-// keeps saving in place. The compact map hash omits the title (see
+// keeps saving in place. The serialized map (`data`) omits the title (see
 // mapExporter#filter), so it rides along here and is restored on recovery.
-type Draft = { hash: string; title: string; savedAt: number; mapId?: string }
+type Draft = { data: string; title: string; savedAt: number; mapId?: string }
 type Drafts = Record<string, Draft>
 
 const readAll = (): Drafts => {
@@ -48,21 +58,22 @@ const writeAll = (drafts: Drafts) => {
 
 /**
  * The recovered map for this editing context, or null when there's no backup
- * (or it can't be parsed). `hash` is returned alongside so the caller can cheaply
- * tell whether the draft actually differs from what it's about to load.
+ * (or it can't be parsed). `data` (the serialized JSON) is returned alongside so
+ * the caller can cheaply tell whether the draft actually differs from what it's
+ * about to load — compare it against `exportMapData(currentMap)`.
  */
 export const loadDraft = (
 	id?: string
-): { map: MapObject; hash: string; savedAt: number; mapId?: string } | null => {
+): { map: MapObject; data: string; savedAt: number; mapId?: string } | null => {
 	if (!browser) return null
 	const draft = readAll()[slot(id)]
-	if (!draft) return null
+	if (!draft || !draft.data) return null
 	try {
-		const map = deriveFromHash(draft.hash)
-		// The hash doesn't carry the title, so restore it or a recovered map would
-		// come back as the exporter's placeholder name.
+		const map = deriveFromData(JSON.parse(draft.data))
+		// The serialized data doesn't carry the title, so restore it or a recovered
+		// map would come back as the exporter's placeholder name.
 		if (draft.title) map.title = draft.title
-		return { map, hash: draft.hash, savedAt: draft.savedAt, mapId: draft.mapId }
+		return { map, data: draft.data, savedAt: draft.savedAt, mapId: draft.mapId }
 	} catch {
 		return null
 	}
@@ -72,7 +83,7 @@ export const saveDraft = (map: MapObject, id?: string) => {
 	if (!browser) return
 	const drafts = readAll()
 	drafts[slot(id)] = {
-		hash: mapHasher(map),
+		data: exportMapData(map),
 		title: map.title ?? '',
 		savedAt: Date.now(),
 		mapId: id,

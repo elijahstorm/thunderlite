@@ -14,7 +14,8 @@
 	import { unitData } from '$lib/GameData/unit'
 	import { activeMapIdStore, mapStore, playMapStore } from './mapStore'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
-	import { deriveFromHash, mapHasher } from './Editor/mapExporter'
+	import { deriveFromHash, deriveFromData, exportMapData } from './Editor/mapExporter'
+	import { mapHasherAsync } from './Editor/mapHashAsync'
 	import {
 		clearDraft,
 		clearLastActiveMapId,
@@ -131,7 +132,7 @@
 	// map in the same session would inherit the first's edits — round-trip through
 	// the hash to guarantee independent arrays.
 	const freshEmptyMap = () =>
-		applyEditorFilters(deriveFromHash(mapHasher(deriveFromHash(undefined))))
+		applyEditorFilters(deriveFromData(JSON.parse(exportMapData(deriveFromHash(undefined)))))
 
 	let type = $derived(
 		editType === 'units'
@@ -268,7 +269,7 @@
 			addToast('Map preview is still loading — try again in a moment.', 'warn')
 			return null
 		}
-		const result = await publishMap(mapHasher(map), thumbnail, {
+		const result = await publishMap(await mapHasherAsync(map), thumbnail, {
 			id: currentMapId,
 			name: map?.title ?? 'Untitled map',
 		})
@@ -409,7 +410,7 @@
 		// Hand a deep clone (round-tripped through the serializer) to the play page
 		// so gameplay mutations never leak back into the editor draft. The board
 		// rides in the client store across navigation — nothing in the URL.
-		playMapStore.set(deriveFromHash(mapHasher(map)))
+		playMapStore.set(deriveFromData(JSON.parse(exportMapData(map))))
 		await goto(`/play?ephemeral=1`)
 	}
 
@@ -475,7 +476,7 @@
 			currentMapId = undefined
 			// The board initialized from the (now-stale) in-memory map on this remount;
 			// swap in a blank one unless it already is blank (avoids a needless repaint).
-			if (mapHasher(map) !== mapHasher(deriveFromHash(undefined))) {
+			if (exportMapData(map) !== exportMapData(deriveFromHash(undefined))) {
 				map = freshEmptyMap()
 			}
 			return
@@ -492,7 +493,7 @@
 			}
 		}
 		const recovered = loadDraft(currentMapId)
-		if (recovered && recovered.hash !== mapHasher(map)) {
+		if (recovered && recovered.data !== exportMapData(map)) {
 			map = applyEditorFilters(recovered.map)
 			// A recovered draft may know the saved map it belongs to; re-link so a
 			// save updates it rather than creating a duplicate.
