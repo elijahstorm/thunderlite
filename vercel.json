@@ -1,5 +1,8 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "regions": ["icn1"],
-    "crons": [{ "path": "/api/cron/prune-messages", "schedule": "0 3 * * *" }]
+	"$schema": "https://openapi.vercel.sh/vercel.json",
+	"regions": ["icn1"],
+	"crons": [
+		{ "path": "/api/cron/prune-messages", "schedule": "0 3 * * *" },
+		{ "path": "/api/cron/expire-turns", "schedule": "0 * * * *" }
+	]
 }

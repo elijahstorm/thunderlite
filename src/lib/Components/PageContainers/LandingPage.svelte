@@ -11,19 +11,34 @@
 
 	const features = [
 		{
-			icon: 'lucide:swords',
-			title: 'Turn-based tactics',
-			body: 'Plan every move. Terrain, line-of-sight, and unit synergy decide the battle, not reflexes.',
+			icon: 'lucide:brain-circuit',
+			title: 'An AI that pays attention',
+			body: 'The CPU reads the battlefield and reacts to what it sees you do during a match, instead of running one fixed pattern you can learn once and exploit forever.',
+		},
+		{
+			icon: 'lucide:map',
+			title: 'Maps up to 500×500',
+			body: 'The original engine capped out around 20×20 tiles. ThunderLite keeps 100×100 battles smooth, with a tested ceiling of 500×500 fully loaded with units and buildings.',
+		},
+		{
+			icon: 'lucide:cloud-rain-wind',
+			title: 'Weather and terrain that matter',
+			body: 'Height and line-of-sight decide what you can see and hit. Storms roll in mid-match and change movement, cover, and the air war.',
 		},
 		{
 			icon: 'lucide:users',
-			title: 'Live multiplayer',
-			body: 'Share a session code with a friend. Take your turn whenever; your opponent picks up where you left off.',
+			title: 'Multiplayer at your pace',
+			body: 'Share a room code and play live in one sitting with turn timers, or trade turns whenever you are both free. Games stay in sync either way.',
 		},
 		{
 			icon: 'lucide:hammer',
-			title: 'Built-in map editor',
-			body: 'Paint terrain, place HQs, save and share. Every map becomes a new puzzle for the community.',
+			title: 'A real map editor',
+			body: 'Paint terrain, place units and HQs, and script events for custom scenarios. Save, publish, and browse what the community builds.',
+		},
+		{
+			icon: 'lucide:flag',
+			title: 'Jump in without an account',
+			body: 'The single player campaign runs right in your browser, no signup needed. Make an account when you want to play online or publish maps.',
 		},
 	]
 </script>
@@ -55,7 +70,9 @@
 
 				<p class="text-lg text-muted-foreground max-w-xl leading-relaxed">
 					ThunderLite is a love letter to Battalion: Arena, a turn-based tactics game in the Advance
-					Wars family. Play live in the browser, design your own maps, and challenge your friends.
+					Wars family. Rebuilt from the ground up: a CPU that reacts to how you play, maps far
+					beyond the original's limits, weather that changes the fight, and multiplayer that holds
+					up.
 				</p>
 
 				<div class="flex flex-wrap items-center gap-3 pt-2">
@@ -85,7 +102,7 @@
 					</a>
 				</div>
 
-				<div class="flex items-center gap-6 pt-6 text-xs text-muted-foreground">
+				<div class="flex flex-wrap items-center gap-x-6 gap-y-2 pt-6 text-xs text-muted-foreground">
 					<span class="flex items-center gap-1.5">
 						<Icon icon="lucide:check" width={14} class="text-primary" />
 						Free to play
@@ -96,7 +113,15 @@
 					</span>
 					<span class="flex items-center gap-1.5">
 						<Icon icon="lucide:check" width={14} class="text-primary" />
+						Single player without an account
+					</span>
+					<span class="flex items-center gap-1.5">
+						<Icon icon="lucide:check" width={14} class="text-primary" />
 						Live multiplayer
+					</span>
+					<span class="flex items-center gap-1.5">
+						<Icon icon="lucide:check" width={14} class="text-primary" />
+						Maps up to 500×500
 					</span>
 				</div>
 			</div>
@@ -125,7 +150,18 @@
 			</div>
 		</div>
 
-		<div class="mt-24 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+		<div class="mt-24 max-w-2xl space-y-3">
+			<p class="section-eyebrow">Why ThunderLite</p>
+			<h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+				Rebuilt, not just revived.
+			</h2>
+			<p class="text-muted-foreground leading-relaxed">
+				Everything worth keeping from the original is here. Everything that used to frustrate got
+				rebuilt.
+			</p>
+		</div>
+
+		<div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 			{#each features as f (f.title)}
 				<div class="card p-6">
 					<div

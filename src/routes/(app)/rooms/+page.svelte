@@ -5,6 +5,7 @@
 	import Icon from '@iconify/svelte'
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
+	import { formatTimeLeft, formatTurnTimeout } from '$lib/Game/asyncConfig'
 
 	interface Props {
 		data: PageData
@@ -13,6 +14,17 @@
 	let { data }: Props = $props()
 
 	let gameData = $derived(data.gameData)
+	let asyncGames = $derived(data.myAsyncGames ?? [])
+
+	const opponentName = (g: (typeof asyncGames)[number]) =>
+		g.opponent?.display_name || g.opponent?.username || (g.started ? 'Opponent' : null)
+
+	const asyncStatus = (g: (typeof asyncGames)[number]): string => {
+		if (!g.started) return 'Waiting for an opponent to join'
+		const left = g.turnDeadline != null ? formatTimeLeft(g.turnDeadline - Date.now()) : null
+		if (g.yourTurn) return left ? `Your move · ${left} left` : 'Your move'
+		return left ? `Their move · ${left} left` : 'Their move'
+	}
 	let joinCode = $state('')
 	let joinStatus: 'idle' | 'sending' | 'error' = $state('idle')
 	let joinError = $state('')
@@ -149,6 +161,50 @@
 			</section>
 		{/if}
 
+		{#if asyncGames.length}
+			<section class="card p-6 sm:p-8 space-y-5" data-testid="async-games">
+				<div class="space-y-1">
+					<h2 class="text-lg font-semibold tracking-tight text-foreground">Your async games</h2>
+					<p class="text-sm text-muted-foreground">
+						Games played over days. You get an email whenever it is your move.
+					</p>
+				</div>
+
+				<ul class="divide-y divide-border">
+					{#each asyncGames as game (game.session)}
+						<li class="flex items-center justify-between gap-3 py-3">
+							<div class="min-w-0">
+								<p class="text-sm font-medium text-foreground truncate">
+									{game.mapName}
+									{#if opponentName(game)}
+										<span class="text-muted-foreground font-normal">
+											vs {opponentName(game)}
+										</span>
+									{/if}
+								</p>
+								<p
+									class="text-xs font-mono {game.yourTurn
+										? 'text-primary'
+										: 'text-muted-foreground'}"
+								>
+									{asyncStatus(game)} · {formatTurnTimeout(game.turnTimeoutMs)}/turn
+								</p>
+							</div>
+							<button
+								type="button"
+								class="btn btn-sm shrink-0 {game.yourTurn ? 'btn-primary' : 'btn-outline'}"
+								disabled={joinStatus === 'sending'}
+								onclick={() => joinSession(game.session)}
+							>
+								<Icon icon="lucide:play" width={14} />
+								{game.yourTurn ? 'Take turn' : 'Open'}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/if}
+
 		<section class="card p-6 sm:p-8 space-y-5">
 			<div class="space-y-1">
 				<h2 class="text-lg font-semibold tracking-tight text-foreground">Join a game</h2>
@@ -198,7 +254,19 @@
 					{#each data.openRooms as room (room.session)}
 						<li class="flex items-center justify-between gap-3 py-3">
 							<div class="min-w-0">
-								<p class="text-sm font-medium text-foreground truncate">{room.mapName}</p>
+								<p class="text-sm font-medium text-foreground truncate">
+									{room.mapName}
+									{#if room.mode === 'async'}
+										<span
+											class="ml-1 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[11px] font-medium px-2 py-0.5 align-middle"
+										>
+											<Icon icon="lucide:hourglass" width={10} />
+											Async{room.turnTimeoutMs != null
+												? ` · ${formatTurnTimeout(room.turnTimeoutMs)}/turn`
+												: ''}
+										</span>
+									{/if}
+								</p>
 								<p class="text-xs text-muted-foreground font-mono">
 									{room.count}/{room.maxPlayers} · {room.session}
 								</p>

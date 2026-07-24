@@ -5,10 +5,9 @@
  * draw partial credit, a loss a small participation award) and is kept pure and
  * tunable here so the numbers can move without touching persistence or UI.
  *
- * This is also the agreed home for **PvP elo** when ranked play lands. The J
- * epic only ships the simple casual points below; the elo seam at the bottom is
- * intentionally a clearly-marked stub so persistence and the stats panel already
- * have a place to read a rating from.
+ * This is also the home for **PvP elo**: the pure rating math lives at the
+ * bottom, persistence reads/writes `user_stats.elo`, and online 1v1 results
+ * apply it at settlement (matchSettlement.server.ts).
  */
 
 export type MatchOutcome = 'win' | 'loss' | 'draw'
@@ -36,24 +35,47 @@ export const levelForPoints = (points: number): number => {
 	return Math.floor(points / POINTS_PER_LEVEL) + 1
 }
 
-// === PvP elo seam ===========================================================
-// Ranked elo will live alongside the casual points above so a player's row has
-// both a casual level and a competitive rating. The J epic does not compute elo
-// yet; this is the documented stub future ranked work fills in.
+// === PvP elo ================================================================
+// Ranked elo lives alongside the casual points above so a player's row has
+// both a casual level and a competitive rating. Ratings persist in
+// `user_stats.elo` and are settled server-side when an online 1v1 match locks
+// its winner (see matchSettlement.server.ts).
 export const DEFAULT_ELO = 1200
+
+/** Standard rating-difference K factor. Tunable. */
+export const ELO_K = 32
 
 /**
  * Elo rating change for player A after a game against B. `score` is A's result:
- * 1 win, 0.5 draw, 0 loss. Returns 0 today — wire the standard expected-score
- * formula here when ranked play ships.
+ * 1 win, 0.5 draw, 0 loss. Standard expected-score formula, rounded to the
+ * nearest whole point.
  */
 export const eloDelta = (
-	_ratingA: number,
-	_ratingB: number,
-	_score: 0 | 0.5 | 1,
-	_k = 32
+	ratingA: number,
+	ratingB: number,
+	score: 0 | 0.5 | 1,
+	k = ELO_K
 ): number => {
-	// TODO(PvP): const expected = 1 / (1 + 10 ** ((ratingB - ratingA) / 400))
-	//            return Math.round(k * (score - expected))
-	return 0
+	const expected = 1 / (1 + 10 ** ((ratingB - ratingA) / 400))
+	return Math.round(k * (score - expected))
+}
+
+export type EloUpdate = { before: number; delta: number }
+
+/**
+ * Both sides' rating updates for a finished 1v1, from A's score. B's delta is
+ * the exact negation of A's (not independently rounded), so a match is always
+ * zero-sum and the ladder never leaks or mints points to rounding.
+ */
+export const eloUpdatesFor1v1 = (
+	ratingA: number,
+	ratingB: number,
+	scoreA: 0 | 0.5 | 1,
+	k = ELO_K
+): [EloUpdate, EloUpdate] => {
+	const delta = eloDelta(ratingA, ratingB, scoreA, k)
+	return [
+		{ before: ratingA, delta },
+		{ before: ratingB, delta: -delta },
+	]
 }

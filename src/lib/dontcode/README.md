@@ -3,7 +3,7 @@
 Everything ThunderLite knows about the DontCode platform lives in this
 directory — nothing elsewhere in the app talks to the platform directly.
 The platform contract is consumed through the official
-[`@dontcode2/backend`](https://backend.dontcode.co/en/docs/byoc) SDK; the
+[`dontcode`](https://backend.dontcode.co/en/docs/byoc) SDK; the
 files here are thin app-shaped adapters over it, not hand-rolled HTTP.
 
 | File         | Wraps / role                              | Surface                                                    |

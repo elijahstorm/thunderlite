@@ -2,7 +2,7 @@
 #
 # `docker compose up` now brings up BOTH — you no longer run `pnpm mock` on the
 # host. Auth, database, storage, KV cache, and realtime pub/sub are all served
-# by the `mock` container (@dontcode2/backend >= 0.2.4).
+# by the `mock` container (dontcode >= 0.2.4).
 #
 # Ports follow a `localhost:1<port>` convention so they never collide with a
 # host-side `pnpm dev`/`pnpm mock`:

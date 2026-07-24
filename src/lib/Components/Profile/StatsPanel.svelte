@@ -14,16 +14,24 @@
 </script>
 
 <div class="card p-6 sm:p-8" data-testid="stats-panel">
-	<header class="mb-4">
-		<p class="section-eyebrow">{heading}</p>
-		<h2
-			class="mt-1 text-xl font-semibold tracking-tight text-foreground"
-			data-testid="stats-summary"
-		>
-			{games}
-			{games === 1 ? 'game' : 'games'}, {wins}
-			{wins === 1 ? 'win' : 'wins'}, {winRate}% win-rate
-		</h2>
+	<header class="mb-4 flex flex-wrap items-start justify-between gap-3">
+		<div>
+			<p class="section-eyebrow">{heading}</p>
+			<h2
+				class="mt-1 text-xl font-semibold tracking-tight text-foreground"
+				data-testid="stats-summary"
+			>
+				{games}
+				{games === 1 ? 'game' : 'games'}, {wins}
+				{wins === 1 ? 'win' : 'wins'}, {winRate}% win-rate
+			</h2>
+		</div>
+		<div class="text-right" data-testid="stat-elo" title="Ranked rating from online 1v1 games">
+			<p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Rating</p>
+			<p class="text-xl font-semibold tabular-nums text-foreground">
+				{stats?.elo ?? 'Unrated'}
+			</p>
+		</div>
 	</header>
 
 	<dl class="grid grid-cols-2 gap-4 sm:grid-cols-3 text-sm">

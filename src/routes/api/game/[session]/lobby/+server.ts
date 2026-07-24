@@ -81,6 +81,12 @@ export const POST = async ({ request, params, locals }) => {
 			}
 			case 'addAi': {
 				requireHost()
+				// CPU seats are live-only: the AI's turns are driven by an open human
+				// client, so in an async room an offline driver would let the AI's
+				// turn clock expire and gift the host a free win.
+				if (room.mode === 'async') {
+					throw error(400, 'CPU seats are not available in async games')
+				}
 				if ((await gameStore.memberCount(session)) >= MAX_PLAYERS) {
 					throw error(409, 'The room is full')
 				}

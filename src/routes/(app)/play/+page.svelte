@@ -33,7 +33,13 @@
 	<MapLoader {mapHash}>
 		{#snippet children({ map })}
 			<PlayerRosterSync roster={teamRoster} />
-			<GameSocket map={() => map} {gameSession} {userSession}>
+			<GameSocket
+				map={() => map}
+				{gameSession}
+				{userSession}
+				asyncGame={data.asyncGame ?? false}
+				turnDeadline={data.turnDeadline ?? null}
+			>
 				{#snippet children({ socket, requestRedraw })}
 					<GameStateManager
 						{userSession}

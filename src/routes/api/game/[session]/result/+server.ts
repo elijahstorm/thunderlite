@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db } from '$lib/dontcode/server'
 import { gameStore } from '$lib/Game/store.server'
+import { settleOnlineMatch } from '$lib/Game/matchSettlement.server'
 import { notify, profileName, rememberEmail } from '$lib/Notifications/email.server'
 import { matchResult } from '$lib/Notifications/templates'
 
@@ -24,6 +25,10 @@ import { matchResult } from '$lib/Notifications/templates'
  * Idempotent: the `matches.session_id` unique constraint collapses repeat
  * online POSTs to one match row, and `match_players (match_id, user_auth)`
  * collapses repeat per-player POSTs to one player row.
+ *
+ * The winner-locking writer additionally settles the match once (see
+ * matchSettlement.server.ts): player rows for every human seat and elo for
+ * rated 1v1s, so absent opponents still get their result recorded.
  */
 
 type Outcome = 'win' | 'loss' | 'draw'
@@ -73,12 +78,21 @@ export const POST = async ({ request, params, locals }) => {
 				throw error(403, 'Not a member of this game session')
 			}
 
+			// The played map, read from the room row (which outlives its logical
+			// TTL) and pinned onto the match so the replay viewer can rebuild the
+			// board long after the room itself is gone.
+			const room = await db.findOne<{ map_id: string | null }>('game_room', {
+				where: { session },
+				select: ['map_id'],
+			})
+
 			// The first writer locks the winner: their row carries the
 			// authoritative `winner_team`. A later writer hits the `session_id`
 			// unique constraint, reads that row back, and records the same winner.
 			const inserted = await db.insertIgnoreConflict('matches', {
 				session_id: session,
 				map_sha: mapSha,
+				map_id: room?.map_id ?? null,
 				mode,
 				winner_team: claimedWinner,
 				turns,
@@ -86,11 +100,22 @@ export const POST = async ({ request, params, locals }) => {
 			if (inserted) {
 				matchId = inserted.id as number | undefined
 				winnerTeam = claimedWinner
+				// Winner locked by THIS writer — settle once: history rows for every
+				// human seat and elo for rated 1v1s. Best-effort; a settlement failure
+				// must not 500 an already-recorded result (the caller's own row still
+				// lands via the insert below, and stats degrade to unrated).
+				if (typeof matchId === 'number') {
+					try {
+						await settleOnlineMatch({ matchId, session, winnerTeam })
+					} catch (msg) {
+						logToErrorDb(msg)
+					}
+				}
 			} else {
-				const existing = await db.findOne<{ id: number; winner_team: number | null }>(
-					'matches',
-					{ where: { session_id: session }, select: ['id', 'winner_team'] }
-				)
+				const existing = await db.findOne<{ id: number; winner_team: number | null }>('matches', {
+					where: { session_id: session },
+					select: ['id', 'winner_team'],
+				})
 				matchId = existing?.id
 				winnerTeam = existing ? (existing.winner_team ?? null) : null
 			}
@@ -122,6 +147,9 @@ export const POST = async ({ request, params, locals }) => {
 		// finished game stops showing as their active session and they can start a
 		// new one. Only clears if it still points here (a rematch already moved it).
 		if (mode === 'online') await gameStore.clearPlayerGame(userSession, session)
+		// An async room also stops its turn clock now, so the deadline enforcement
+		// (cron and lazy checks) never resigns anyone in an already-decided game.
+		if (mode === 'online') await gameStore.finishAsyncRoom(session)
 
 		// Match summary email. Each participant records their own result row, so
 		// this reaches every player once (deduped per match + player). For online

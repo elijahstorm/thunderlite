@@ -21,14 +21,24 @@
  */
 import { db, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
+import { clampAsyncTimeout, type GameMode } from '$lib/Game/asyncConfig'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
 export const MAX_PLAYERS = 2
 /** How long the lobby counts down once the room is full before it opens `/play`. */
 export const LOBBY_COUNTDOWN_MS = 10_000
-/** A player gone from `/play` for this long (no heartbeat) is auto-resigned. */
+/** A player gone from `/play` for this long (no heartbeat) is auto-resigned.
+ * Live rooms only — async players are EXPECTED to be gone between turns. */
 export const LEAVE_GRACE_MS = 30_000
 const ROOM_TTL_MS = 1000 * 60 * 60 * 24
+const DAY_MS = 1000 * 60 * 60 * 24
+/** How long an async lobby may sit waiting for an opponent before it expires. */
+const ASYNC_LOBBY_TTL_MS = 7 * DAY_MS
+/** An async room outlives its current turn deadline by this much, so a finished
+ * or timed-out game stays visitable (result screen, rematch) for a while. */
+const ASYNC_ROOM_GRACE_MS = 7 * DAY_MS
+/** Retention for an async room once its match resolved. */
+const ASYNC_FINISHED_TTL_MS = 7 * DAY_MS
 const APPEND_RETRIES = 8
 
 type RoomRow = {
@@ -40,6 +50,24 @@ type RoomRow = {
 	is_public?: boolean | null
 	lock_random?: boolean | null
 	rematch_session?: string | null
+	mode?: GameMode | null
+	turn_timeout_ms?: number | null
+	turn_deadline?: number | null
+}
+
+/** A room created with mode 'async' — turns carry multi-day deadlines. */
+const isAsyncRoom = (room: RoomRow | null): room is RoomRow => !!room && room.mode === 'async'
+
+/** A room whose lobby released (start_at set and reached). */
+const hasStarted = (room: RoomRow): boolean =>
+	room.start_at != null && Number(room.start_at) <= now()
+
+export type AsyncResignResult = {
+	resigned: { userSession: string; userAuth: string | null; team: number }
+	next: { userSession: string; userAuth: string | null; team: number | null } | null
+	gameOver: boolean
+	eventId: number
+	turnDeadline: number | null
 }
 type MemberRow = {
 	user_session: string
@@ -74,7 +102,13 @@ async function members(session: string): Promise<string[]> {
 async function roster(
 	session: string
 ): Promise<
-	{ userSession: string; seat: number; userAuth: string | null; team: number | null; isAi: boolean }[]
+	{
+		userSession: string
+		seat: number
+		userAuth: string | null
+		team: number | null
+		isAi: boolean
+	}[]
 > {
 	const rows = await db.find<MemberRow>('game_member', {
 		where: { session },
@@ -123,7 +157,10 @@ async function assignTeamsIfNeeded(session: string, teams: number[]): Promise<vo
 		select: ['user_session', 'seat', 'team'],
 	})
 	const taken = new Set<number>(
-		rows.map((r) => r.team).filter((t): t is number => t != null).map(Number)
+		rows
+			.map((r) => r.team)
+			.filter((t): t is number => t != null)
+			.map(Number)
 	)
 	let cursor = 0
 	const nextFreeTeam = (): number | null => {
@@ -195,11 +232,29 @@ async function leaveGame(session: string, userSession: string): Promise<void> {
 /**
  * Create a room for `userSession` on map `mapId` (a map's `public_id`). The
  * creator takes seat 0 and the first turn. Returns the shareable session code.
+ *
+ * `opts.mode` picks live (default) or async play at creation; it is immutable
+ * afterwards. Async rooms store the host's per-turn clock (clamped to the
+ * allowed range) and get a week to find an opponent instead of the live 24h.
  */
-async function createRoom(userSession: string, mapId: string, userAuth: string): Promise<string> {
+async function createRoom(
+	userSession: string,
+	mapId: string,
+	userAuth: string,
+	opts?: { mode?: GameMode; turnTimeoutMs?: number | null }
+): Promise<string> {
 	const session = generateKey()
-	const expires_at = now() + ROOM_TTL_MS
-	await db.insert('game_room', { session, map_id: mapId, current_turn: userSession, expires_at })
+	const mode: GameMode = opts?.mode === 'async' ? 'async' : 'live'
+	const turn_timeout_ms = mode === 'async' ? clampAsyncTimeout(opts?.turnTimeoutMs) : null
+	const expires_at = now() + (mode === 'async' ? ASYNC_LOBBY_TTL_MS : ROOM_TTL_MS)
+	await db.insert('game_room', {
+		session,
+		map_id: mapId,
+		current_turn: userSession,
+		expires_at,
+		mode,
+		turn_timeout_ms,
+	})
 	await db.insert('game_member', {
 		session,
 		user_session: userSession,
@@ -341,7 +396,12 @@ async function rematchRoom(
 		}
 	}
 
-	const next = await createRoom(userSession, room.map_id, userAuth)
+	// A rematch keeps the original room's format: an async game rematches into
+	// an async lobby with the same per-turn clock.
+	const next = await createRoom(userSession, room.map_id, userAuth, {
+		mode: isAsyncRoom(room) ? 'async' : 'live',
+		turnTimeoutMs: room.turn_timeout_ms ?? null,
+	})
 	await db.update('game_room', { session }, { rematch_session: next })
 	// Lost a race with another rematcher? Prefer the room that landed first.
 	const after = await getRoom(session)
@@ -367,7 +427,17 @@ async function memberCount(session: string): Promise<number> {
 async function listPublicRooms(
 	page: number,
 	pageSize: number
-): Promise<{ rooms: { session: string; mapId: string; count: number; maxPlayers: number }[]; hasMore: boolean }> {
+): Promise<{
+	rooms: {
+		session: string
+		mapId: string
+		count: number
+		maxPlayers: number
+		mode: GameMode
+		turnTimeoutMs: number | null
+	}[]
+	hasMore: boolean
+}> {
 	const rows = await db.find<RoomRow & { is_public?: boolean | null }>('game_room', {
 		where: { is_public: true, start_at: null },
 		orderBy: { expires_at: 'desc' },
@@ -384,6 +454,9 @@ async function listPublicRooms(
 			mapId: r.map_id,
 			count: counts[i],
 			maxPlayers: MAX_PLAYERS,
+			// Surfaced in the browser so a joiner knows the pace they sign up for.
+			mode: (r.mode === 'async' ? 'async' : 'live') as GameMode,
+			turnTimeoutMs: r.turn_timeout_ms == null ? null : Number(r.turn_timeout_ms),
 		}))
 		// Only rooms that have a host and a free seat are joinable from the browser.
 		.filter((r) => r.count > 0 && r.count < MAX_PLAYERS)
@@ -445,7 +518,10 @@ async function staleMembers(
 		where: { session, last_seen: { lt: cutoff } },
 		select: ['user_session', 'team'],
 	})
-	return rows.map((r) => ({ userSession: r.user_session, team: r.team == null ? null : Number(r.team) }))
+	return rows.map((r) => ({
+		userSession: r.user_session,
+		team: r.team == null ? null : Number(r.team),
+	}))
 }
 
 /** The player's join seat (0 = creator/host), or -1 if not a member. */
@@ -470,7 +546,7 @@ async function armStartCountdown(session: string): Promise<number | null> {
 	if (room.start_at != null) return Number(room.start_at)
 	const start_at = now() + LOBBY_COUNTDOWN_MS
 	try {
-		await db.update('game_room', { session }, { start_at })
+		await db.update('game_room', { session }, { start_at, ...startPatch(room, start_at) })
 		return start_at
 	} catch {
 		return null
@@ -480,14 +556,25 @@ async function armStartCountdown(session: string): Promise<number | null> {
 /** Host skip: pull the handoff forward to now so the lobby opens `/play` at once. */
 async function startNow(session: string): Promise<number> {
 	const start_at = now()
-	await db.update('game_room', { session }, { start_at })
+	const room = await getRoom(session)
+	await db.update('game_room', { session }, { start_at, ...startPatch(room, start_at) })
 	return start_at
 }
 
+/** The async first-turn clock, armed alongside `start_at`: the deadline runs
+ * from game start whether or not the first player ever shows up, and the room's
+ * TTL is pushed out so a multi-day game outlives the live 24h window. */
+const startPatch = (room: RoomRow | null, start_at: number): Record<string, unknown> => {
+	if (!isAsyncRoom(room)) return {}
+	const turn_deadline = start_at + clampAsyncTimeout(room.turn_timeout_ms)
+	return { turn_deadline, expires_at: turn_deadline + ASYNC_ROOM_GRACE_MS }
+}
+
 /** Disarm the countdown (e.g. a player left before it fired) so a later refill
- * re-arms a FRESH 10s rather than resuming a stale/expired clock. */
+ * re-arms a FRESH 10s rather than resuming a stale/expired clock. Also drops a
+ * first-turn deadline armed with it (no-op for live rooms). */
 async function disarmCountdown(session: string): Promise<void> {
-	await db.update('game_room', { session }, { start_at: null })
+	await db.update('game_room', { session }, { start_at: null, turn_deadline: null })
 }
 
 /**
@@ -498,12 +585,19 @@ async function disarmCountdown(session: string): Promise<void> {
  * the engine (both players ended up driving the first team). Only runs before
  * any move has been recorded, so it never disturbs a turn already in progress.
  */
-async function seedFirstTurn(session: string, teams: number[]): Promise<void> {
-	if (!teams.length) return
-	if ((await db.count('game_event', { session })) > 0) return
+async function seedFirstTurn(
+	session: string,
+	teams: number[]
+): Promise<{ userSession: string; userAuth: string | null } | null> {
+	if (!teams.length) return null
+	if ((await db.count('game_event', { session })) > 0) return null
 	const startingTeam = teams[0]
 	const starter = (await roster(session)).find((m) => m.team === startingTeam)
-	if (starter) await setCurrentTurn(session, starter.userSession)
+	if (!starter) return null
+	await setCurrentTurn(session, starter.userSession)
+	// Hand the starter back so the async flow can email them "your move" when
+	// somebody ELSE's /play load is what released the game.
+	return { userSession: starter.userSession, userAuth: starter.userAuth }
 }
 
 /** Whose turn it is, or null (only transient before a turn is seeded). */
@@ -576,6 +670,319 @@ async function events(
 	}
 }
 
+// ── Async (correspondence) play ───────────────────────────────────────────────
+// Async rooms reuse the whole live pipeline (event log, turn pointer, replay);
+// what differs is time: turns carry a multi-day deadline, a missed deadline is
+// an auto-resign, and the room's TTL tracks the deadline instead of a fixed 24h.
+
+/** True once a match row exists — the game resolved and results were recorded. */
+async function matchRecorded(session: string): Promise<boolean> {
+	const row = await db.findOne<{ id: number }>('matches', {
+		where: { session_id: session },
+		select: ['id'],
+	})
+	return row !== null
+}
+
+/** Seats plus the teams already out of the game (surrender events in the log).
+ * The log is the source of truth for "who is still in" server-side — the
+ * engine's hasLost lives only in clients. */
+async function asyncStanding(
+	session: string
+): Promise<{ seats: Awaited<ReturnType<typeof roster>>; surrendered: Set<number> }> {
+	const [seats, log] = await Promise.all([roster(session), events(session, -1)])
+	const surrendered = new Set<number>()
+	for (const e of log.events) {
+		if (e.action?.kind === 'surrender' && typeof e.action.team === 'number') {
+			surrendered.add(e.action.team)
+		}
+	}
+	return { seats, surrendered }
+}
+
+/** The next still-in member after `fromUserSession` in seat rotation order,
+ * excluding `fromUserSession` itself. Mirrors the move endpoint's rotation. */
+const nextActiveAfter = (
+	seats: Awaited<ReturnType<typeof roster>>,
+	fromUserSession: string,
+	surrendered: Set<number>
+) => {
+	const idx = seats.findIndex((m) => m.userSession === fromUserSession)
+	const ordered = idx >= 0 ? [...seats.slice(idx + 1), ...seats.slice(0, idx)] : seats
+	return (
+		ordered.find(
+			(m) => m.userSession !== fromUserSession && m.team != null && !surrendered.has(m.team)
+		) ?? null
+	)
+}
+
+/** Re-arm the turn clock after an end-turn: the next player gets the room's
+ * full per-turn allowance, and the room's TTL follows the new deadline. */
+async function resetTurnDeadline(session: string, roomIn?: RoomRow | null): Promise<number | null> {
+	const room = roomIn ?? (await getRoom(session))
+	if (!isAsyncRoom(room)) return null
+	const turn_deadline = now() + clampAsyncTimeout(room.turn_timeout_ms)
+	await db.update(
+		'game_room',
+		{ session },
+		{ turn_deadline, expires_at: turn_deadline + ASYNC_ROOM_GRACE_MS }
+	)
+	return turn_deadline
+}
+
+/** The match resolved (result recorded): stop the clock, keep the room around
+ * long enough for both players to see the result and rematch. */
+async function finishAsyncRoom(session: string): Promise<void> {
+	const room = await getRoom(session)
+	if (!isAsyncRoom(room)) return
+	await db.update(
+		'game_room',
+		{ session },
+		{ turn_deadline: null, expires_at: now() + ASYNC_FINISHED_TTL_MS }
+	)
+}
+
+/**
+ * The async auto-resign: if the current player's turn deadline has passed,
+ * record a surrender on their behalf and hand the turn (with a fresh clock) to
+ * the next player still in the game.
+ *
+ * Called lazily from the hot game endpoints (move / events / heartbeat) and by
+ * the hourly cron, so it must be safe under concurrency: the conditional
+ * update on `turn_deadline` is the claim — whichever enforcer flips it off its
+ * old value proceeds, everyone else sees count 0 and backs off. Returns what
+ * happened so callers can notify the players, or null when there was nothing
+ * to enforce (or another enforcer got there first).
+ */
+async function enforceTurnDeadline(
+	session: string,
+	roomIn?: RoomRow | null
+): Promise<AsyncResignResult | null> {
+	const room = roomIn ?? (await getRoom(session))
+	if (!isAsyncRoom(room) || !hasStarted(room)) return null
+	const deadline = room.turn_deadline == null ? null : Number(room.turn_deadline)
+	if (deadline == null || now() < deadline) return null
+
+	// A recorded match means the game already resolved through normal play;
+	// the leftover clock is stale, so drop it instead of resigning anyone.
+	if (await matchRecorded(session)) {
+		await db.update('game_room', { session }, { turn_deadline: null })
+		return null
+	}
+
+	const { seats, surrendered } = await asyncStanding(session)
+	const member = seats.find((m) => m.userSession === room.current_turn)
+	if (!member || member.team == null || surrendered.has(member.team)) {
+		// Nothing enforceable: the member left (their resign was recorded on the
+		// way out) or never had a side. Clear the clock so this stops refiring.
+		await db.update('game_room', { session }, { turn_deadline: null })
+		return null
+	}
+
+	const stillIn = new Set(surrendered)
+	stillIn.add(member.team)
+	const next = nextActiveAfter(seats, member.userSession, stillIn)
+	const survivors = seats.filter(
+		(m) => m.userSession !== member.userSession && m.team != null && !surrendered.has(m.team)
+	)
+	const gameOver = survivors.length <= 1
+	const turn_deadline = gameOver ? null : now() + clampAsyncTimeout(room.turn_timeout_ms)
+
+	const { count } = await db.update(
+		'game_room',
+		{ session, turn_deadline: deadline },
+		{
+			turn_deadline,
+			current_turn: next?.userSession ?? member.userSession,
+			expires_at: (turn_deadline ?? now()) + ASYNC_ROOM_GRACE_MS,
+		}
+	)
+	if (count === 0) return null
+
+	const event = await appendEvent(session, member.userSession, {
+		kind: 'surrender',
+		team: member.team,
+	})
+	await realtime.tryPublish(`game:${session}`, { event })
+
+	return {
+		resigned: { userSession: member.userSession, userAuth: member.userAuth, team: member.team },
+		next: next ? { userSession: next.userSession, userAuth: next.userAuth, team: next.team } : null,
+		gameOver,
+		eventId: event.id,
+		turnDeadline: turn_deadline,
+	}
+}
+
+/**
+ * Settle the room's turn pointer and clock after a surrender already sits in
+ * the event log (a manual in-game resign, or a resign-on-leave). Without this,
+ * an async room whose CURRENT player surrendered would keep ticking toward an
+ * unenforceable deadline while the offline opponent never learns the game
+ * ended. Returns who plays next and whether the match is decided, or null when
+ * the room isn't a started async game.
+ */
+async function settleAsyncAfterSurrender(
+	session: string,
+	resignedUserSession: string,
+	roomIn?: RoomRow | null
+): Promise<{
+	next: { userSession: string; userAuth: string | null; team: number | null } | null
+	gameOver: boolean
+} | null> {
+	const room = roomIn ?? (await getRoom(session))
+	if (!isAsyncRoom(room) || !hasStarted(room)) return null
+
+	// The fresh surrender is already in the log, so it is in `surrendered` here.
+	const { seats, surrendered } = await asyncStanding(session)
+	const next = nextActiveAfter(seats, resignedUserSession, surrendered)
+	const survivors = seats.filter((m) => m.team != null && !surrendered.has(m.team))
+	const gameOver = survivors.length <= 1
+
+	const patch: Record<string, unknown> = gameOver
+		? { turn_deadline: null, expires_at: now() + ASYNC_FINISHED_TTL_MS }
+		: {}
+	// Only hand the turn over when the resignee held it (or the game is decided);
+	// an off-turn surrender must not steal the current player's turn.
+	if (next && (gameOver || room.current_turn === resignedUserSession)) {
+		patch.current_turn = next.userSession
+		if (!gameOver) {
+			const turn_deadline = now() + clampAsyncTimeout(room.turn_timeout_ms)
+			patch.turn_deadline = turn_deadline
+			patch.expires_at = turn_deadline + ASYNC_ROOM_GRACE_MS
+		}
+	}
+	if (Object.keys(patch).length) await db.update('game_room', { session }, patch)
+
+	return {
+		next: next ? { userSession: next.userSession, userAuth: next.userAuth, team: next.team } : null,
+		gameOver,
+	}
+}
+
+/**
+ * A player explicitly leaving a STARTED async game resigns it on the way out.
+ * Without this, leaving would delete their seat and the deadline enforcement
+ * would have no team to resign — the opponent's game could never resolve.
+ * Live rooms don't need it (the heartbeat sweep resigns absentees). Returns
+ * the recorded surrender's settlement, or null if there was nothing to resign.
+ */
+async function resignAsyncMember(
+	session: string,
+	userSession: string
+): Promise<{
+	eventId: number
+	team: number
+	userAuth: string | null
+	next: { userSession: string; userAuth: string | null; team: number | null } | null
+	gameOver: boolean
+} | null> {
+	const room = await getRoom(session)
+	if (!isAsyncRoom(room) || !hasStarted(room)) return null
+	if (await matchRecorded(session)) return null
+
+	const { seats, surrendered } = await asyncStanding(session)
+	const member = seats.find((m) => m.userSession === userSession)
+	if (!member || member.team == null || surrendered.has(member.team)) return null
+
+	const event = await appendEvent(session, userSession, {
+		kind: 'surrender',
+		team: member.team,
+	})
+	await realtime.tryPublish(`game:${session}`, { event })
+
+	const settled = await settleAsyncAfterSurrender(session, userSession, room)
+	return {
+		eventId: event.id,
+		team: member.team,
+		userAuth: member.userAuth,
+		next: settled?.next ?? null,
+		gameOver: settled?.gameOver ?? true,
+	}
+}
+
+export type AsyncGameSummary = {
+	session: string
+	mapId: string
+	started: boolean
+	yourTurn: boolean
+	turnDeadline: number | null
+	turnTimeoutMs: number
+	opponentAuth: string | null
+}
+
+/**
+ * Every unresolved async game this player has a seat in — the "your async
+ * games" list. Unlike live play (one pointer in `player_game`), a player can
+ * have many async games running at once; this enumerates them via their
+ * `game_member` rows. Games whose match was recorded are omitted.
+ */
+async function listMyAsyncGames(userSession: string): Promise<AsyncGameSummary[]> {
+	const memberships = await db.find<{ session: string }>('game_member', {
+		where: { user_session: userSession },
+		select: ['session'],
+	})
+	if (memberships.length === 0) return []
+	const sessions = [...new Set(memberships.map((m) => m.session))]
+
+	const rooms = (
+		await db.find<RoomRow>('game_room', {
+			where: { session: { in: sessions }, mode: 'async' },
+		})
+	).filter((r) => !expired(r.expires_at))
+	if (rooms.length === 0) return []
+	const roomSessions = rooms.map((r) => r.session)
+
+	// One pass for opponents and one for resolved matches, across all rooms.
+	const [allSeats, recorded] = await Promise.all([
+		db.find<MemberRow & { session: string }>('game_member', {
+			where: { session: { in: roomSessions } },
+			orderBy: { seat: 'asc' },
+			select: ['session', 'user_session', 'seat', 'user_auth'],
+		}),
+		db.find<{ session_id: string }>('matches', {
+			where: { session_id: { in: roomSessions } },
+			select: ['session_id'],
+		}),
+	])
+	const finished = new Set(recorded.map((m) => m.session_id))
+	const opponentBySession = new Map<string, string | null>()
+	for (const seat of allSeats) {
+		if (seat.user_session === userSession) continue
+		if (!opponentBySession.has(seat.session)) {
+			opponentBySession.set(seat.session, seat.user_auth ?? null)
+		}
+	}
+
+	return rooms
+		.filter((r) => !finished.has(r.session))
+		.map((r) => ({
+			session: r.session,
+			mapId: r.map_id,
+			started: hasStarted(r),
+			yourTurn: hasStarted(r) && r.current_turn === userSession,
+			turnDeadline: r.turn_deadline == null ? null : Number(r.turn_deadline),
+			turnTimeoutMs: clampAsyncTimeout(r.turn_timeout_ms),
+			opponentAuth: opponentBySession.get(r.session) ?? null,
+		}))
+		.sort((a, b) => {
+			// Your-turn games first, then by soonest deadline.
+			if (a.yourTurn !== b.yourTurn) return a.yourTurn ? -1 : 1
+			return (a.turnDeadline ?? Infinity) - (b.turnDeadline ?? Infinity)
+		})
+}
+
+/** Started async rooms whose current turn deadline has passed — the cron's
+ * work list. Oldest deadline first; capped so one run stays bounded. */
+async function expiredAsyncTurns(limit = 50): Promise<RoomRow[]> {
+	const rows = await db.find<RoomRow>('game_room', {
+		where: { mode: 'async', turn_deadline: { lt: now() } },
+		orderBy: { turn_deadline: 'asc' },
+		limit,
+	})
+	return rows.filter((r) => !expired(r.expires_at) && hasStarted(r))
+}
+
 export const gameStore = {
 	members,
 	roster,
@@ -612,4 +1019,12 @@ export const gameStore = {
 	setCurrentTurn,
 	appendEvent,
 	events,
+	matchRecorded,
+	resetTurnDeadline,
+	finishAsyncRoom,
+	enforceTurnDeadline,
+	settleAsyncAfterSurrender,
+	resignAsyncMember,
+	listMyAsyncGames,
+	expiredAsyncTurns,
 }

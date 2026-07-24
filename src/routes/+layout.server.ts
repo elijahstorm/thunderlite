@@ -12,7 +12,7 @@ interface SiteConfig {
 // The site must render either way; KV only overrides copy, it never gates it.
 const DEFAULT_CONFIG: SiteConfig = {
 	title: 'ThunderLite',
-	desc: 'Turn-based tactics. Build, capture, and outmaneuver — in your browser.',
+	desc: 'A free browser rebuild of Battalion: Arena. Turn-based tactics with an adaptive CPU, weather, maps up to 500x500, a scriptable map editor, and live multiplayer.',
 	googleFonts: '',
 }
 

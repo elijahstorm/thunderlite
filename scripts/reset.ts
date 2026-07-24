@@ -11,7 +11,7 @@
  * you type the host to confirm (use --force only when you're certain).
  */
 import { createInterface } from 'node:readline/promises'
-import { isDontCodeError } from '@dontcode2/backend'
+import { isDontCodeError } from 'dontcode'
 import { consolidatedSchema, dropAllTablesSql } from '../src/lib/Migrations/list'
 import { loadEnv, makeClient } from './_dontcode'
 

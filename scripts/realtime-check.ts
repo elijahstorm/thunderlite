@@ -17,7 +17,7 @@
  * mock (`pnpm mock`) the token mint fails and this check fails by design.
  * Uses Node's built-in WebSocket (Node 22+), no extra deps.
  */
-import { isDontCodeError } from '@dontcode2/backend'
+import { isDontCodeError } from 'dontcode'
 import { loadEnv, makeClient } from './_dontcode'
 
 const args = process.argv.slice(2)

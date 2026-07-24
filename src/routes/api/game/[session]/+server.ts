@@ -37,7 +37,10 @@ export const GET = async ({ params, locals }) => {
 		let startAt = room.start_at
 		if (full && startAt == null) {
 			startAt = await gameStore.armStartCountdown(session)
-		} else if (!full && startAt != null) {
+		} else if (!full && startAt != null && Number(startAt) > Date.now()) {
+			// Only a countdown that hasn't fired disarms. A room past its start_at
+			// is an in-progress match (e.g. one seat resigned away) — resetting it
+			// would throw the surviving player back into a lobby state.
 			await gameStore.disarmCountdown(session)
 			startAt = null
 		}

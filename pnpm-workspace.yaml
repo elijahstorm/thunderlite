@@ -5,4 +5,4 @@ allowBuilds:
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
-  - '@dontcode2/*'
+  - 'dontcode'

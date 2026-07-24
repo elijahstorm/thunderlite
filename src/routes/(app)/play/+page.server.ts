@@ -6,6 +6,8 @@ import { getMapData } from '$lib/Map/hashLoader'
 import { gameStore } from '$lib/Game/store.server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
 import { teamsFromHash } from '$lib/Game/mapTeams'
+import { notifyAsyncYourTurn } from '$lib/Game/asyncNotify.server'
+import { clampAsyncTimeout } from '$lib/Game/asyncConfig'
 
 /** Team-keyed public profiles for the in-game player list. */
 type TeamRoster = Record<number, UserDBData>
@@ -27,13 +29,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			seat: 0,
 			localTeam: 0,
 			roster: {} as TeamRoster,
+			asyncGame: false,
+			turnDeadline: null,
+			turnTimeoutMs: null,
 		}
 	}
 
-	const { gameSession, mapId, seat } = await getGameSession(userSession)
+	const { gameSession, mapId, seat, room } = await getGameSession(userSession)
 	if (!gameSession || !mapId) throw error(403, 'No game session found')
 
 	const { mapHash } = await getMapData(mapId)
+	const asyncGame = room?.mode === 'async'
 
 	// The team a client commands is authoritative and server-owned. Derive the
 	// map's stable team order, assign any unassigned member a team by seat order
@@ -46,7 +52,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// Align the server's turn pointer with the engine's first team before the
 		// first move, so the player on the starting side (not necessarily the host)
 		// actually gets turn one.
-		await gameStore.seedFirstTurn(gameSession, teams)
+		const starter = await gameStore.seedFirstTurn(gameSession, teams)
+		// Async: the game may be released by the OTHER player's load (the host can
+		// be offline when the lobby fills). If the first move belongs to someone
+		// who isn't here, email them — deduped, so repeat loads send it once.
+		if (asyncGame && starter && starter.userSession !== userSession) {
+			await notifyAsyncYourTurn({
+				session: gameSession,
+				eventId: 'seed',
+				nextUserAuth: starter.userAuth,
+				opponentAuth: null,
+				turnTimeoutMs: clampAsyncTimeout(room?.turn_timeout_ms),
+			})
+		}
 	}
 
 	const [localTeam, roster, seats, aiDriver] = await Promise.all([
@@ -58,9 +76,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Teams run by a CPU seat, and whether THIS client is the one that drives them
 	// (the lowest-seat human relays the AI's moves — see GameStateManager).
-	const aiTeams = seats
-		.filter((s) => s.isAi && s.team != null)
-		.map((s) => s.team as number)
+	const aiTeams = seats.filter((s) => s.isAi && s.team != null).map((s) => s.team as number)
 
 	return {
 		userSession,
@@ -75,6 +91,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		aiTeams,
 		isAiDriver: aiDriver === userSession,
 		mapHash,
+		// Async turn clock, for the in-game countdown chip. The event poll keeps
+		// the deadline fresh after this initial value.
+		asyncGame,
+		turnDeadline: room?.turn_deadline == null ? null : Number(room.turn_deadline),
+		turnTimeoutMs: room?.turn_timeout_ms == null ? null : Number(room.turn_timeout_ms),
 	}
 }
 
@@ -114,7 +135,7 @@ const getGameSession = async (userSession: string) => {
 			// NB: the dev fallback must only fire when there's genuinely no room —
 			// firing it unconditionally made every client seat 0 on a non-multiplayer
 			// `testSession`, so two lobby players both drove player 1 and never synced.
-			if (dev) return { gameSession: 'testSession', mapId: 'hello', seat: 0 }
+			if (dev) return { gameSession: 'testSession', mapId: 'hello', seat: 0, room: null }
 			throw redirect(303, '/rooms')
 		}
 		const seat = await gameStore.seatOf(current.session, userSession)
@@ -129,7 +150,7 @@ const getGameSession = async (userSession: string) => {
 		if (!room || room.start_at == null || room.start_at > Date.now()) {
 			throw redirect(303, `/rooms/${current.session}`)
 		}
-		return { gameSession: current.session, mapId: current.mapId, seat }
+		return { gameSession: current.session, mapId: current.mapId, seat, room }
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		logToErrorDb(msg)

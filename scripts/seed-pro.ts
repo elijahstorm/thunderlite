@@ -9,7 +9,7 @@
  * Idempotent: definePlans / defineFeatures are upserts keyed by the stable
  * plan_id / feature_key, so re-running only reconciles.
  */
-import { isDontCodeError } from '@dontcode2/backend'
+import { isDontCodeError } from 'dontcode'
 import {
 	catalogPlans,
 	catalogFeatures,

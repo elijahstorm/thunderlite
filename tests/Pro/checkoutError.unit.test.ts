@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { DontCodeError } from '@dontcode2/backend'
+import { DontCodeError } from 'dontcode'
 import { dontCodeCheckoutPayload } from '../../src/lib/Pro/checkoutError'
 
 describe('dontCodeCheckoutPayload', () => {

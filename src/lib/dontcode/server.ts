@@ -6,7 +6,7 @@
  * over HTTP with this project's private API key. How those services work
  * internally is not our concern — we only depend on the public contract.
  *
- * This module is a thin adapter over the official `@dontcode2/backend` SDK
+ * This module is a thin adapter over the official `dontcode` SDK
  * (see https://backend.dontcode.co/en/docs/byoc). The SDK speaks the v1
  * gateway directly, so we no longer hand-roll fetch calls; this file only
  * shapes the SDK's API into the call sites the rest of the app already uses
@@ -35,16 +35,16 @@ import {
 	type SendEmailResult,
 	type Subscription,
 	type SubscriptionStatus,
-} from '@dontcode2/backend'
+} from 'dontcode'
 
-export { DontCodeError, isDontCodeError } from '@dontcode2/backend'
+export { DontCodeError, isDontCodeError } from 'dontcode'
 export type {
 	BillingPlan,
 	PaymentMethod,
 	ReserveSubscriptionResult,
 	Subscription,
 	SubscriptionStatus,
-} from '@dontcode2/backend'
+} from 'dontcode'
 
 /** Lazily-built singleton client — env is validated on first use, not import. */
 let _client: DontCodeClient | undefined

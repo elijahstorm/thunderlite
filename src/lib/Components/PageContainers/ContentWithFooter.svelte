@@ -29,8 +29,12 @@
 			],
 		},
 		{
-			title: 'Company',
-			links: [{ href: '/about', label: 'About' }],
+			title: 'Project',
+			links: [
+				{ href: '/about', label: 'About' },
+				{ href: 'https://github.com/elijahstorm/thunderlite/issues', label: 'Report a bug' },
+				{ href: 'https://github.com/elijahstorm/thunderlite', label: 'Source on GitHub' },
+			],
 		},
 		{
 			title: 'Legal',
@@ -61,8 +65,8 @@
 						<Logo height={32} />
 					</a>
 					<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
-						A browser-based recreation of Battalion: Arena, with turn-based tactics in the Advance
-						Wars tradition.
+						A free browser rebuild of Battalion: Arena. Turn-based tactics in the Advance Wars
+						tradition, with an adaptive CPU, weather, and maps up to 500×500.
 					</p>
 					<div class="flex items-center gap-3 pt-1">
 						{#each socialLinks as link (link.href)}

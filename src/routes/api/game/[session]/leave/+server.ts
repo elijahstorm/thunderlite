@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { gameStore } from '$lib/Game/store.server'
+import { notifyAsyncResignation } from '$lib/Game/asyncNotify.server'
 
 /**
  * Leave a room: drop this player's membership and their "current room" pointer,
@@ -15,6 +16,18 @@ export const POST = async ({ params, locals }) => {
 	if (!session) throw error(400, 'Missing session')
 
 	try {
+		// Walking out of a STARTED async game is a resignation, recorded before
+		// the seat is dropped: enforcement needs the member's team to exist, and
+		// the offline opponent needs the game to resolve (and to hear about it).
+		const resigned = await gameStore.resignAsyncMember(session, userSession)
+		if (resigned?.gameOver && resigned.next) {
+			await notifyAsyncResignation({
+				session,
+				eventId: resigned.eventId,
+				resignedUserAuth: resigned.userAuth,
+				opponentUserAuth: resigned.next.userAuth,
+			})
+		}
 		await gameStore.leaveGame(session, userSession)
 		return json({ ok: true })
 	} catch (msg) {

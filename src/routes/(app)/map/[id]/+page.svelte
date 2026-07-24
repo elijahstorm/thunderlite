@@ -8,6 +8,11 @@
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import MakeGameMapCard from '$lib/Components/Widgets/Social/MakeGameMapCard.svelte'
 	import { dbUsersStore } from '$lib/Stores/dbStores'
+	import {
+		ASYNC_TURN_TIMEOUT_DEFAULT_MS,
+		ASYNC_TURN_TIMEOUT_PRESETS,
+		type GameMode,
+	} from '$lib/Game/asyncConfig'
 
 	interface Props {
 		data: PageData
@@ -25,6 +30,11 @@
 	let status: 'idle' | 'sending' | 'error' = $state('idle')
 	let errorMessage = $state('')
 
+	// Host-chosen game format: live plays out in one websocket sitting; async
+	// spreads turns over days, each with the per-turn clock picked here.
+	let gameMode: GameMode = $state('live')
+	let turnTimeoutMs = $state(ASYNC_TURN_TIMEOUT_DEFAULT_MS)
+
 	const makeGame = () => {
 		status = 'sending'
 		fetch('/api/game', {
@@ -33,7 +43,11 @@
 				'Content-Type': 'application/json',
 				'x-sveltekit-action': 'true',
 			},
-			body: JSON.stringify({ mapId: map.public_id }),
+			body: JSON.stringify({
+				mapId: map.public_id,
+				mode: gameMode,
+				turnTimeoutMs: gameMode === 'async' ? turnTimeoutMs : undefined,
+			}),
 		})
 			.then((response) => response.json())
 			.then((session) => {
@@ -73,6 +87,62 @@
 					<Icon icon="lucide:circle-x" width={16} class="mt-0.5 shrink-0" />
 					{errorMessage}
 				</p>
+			{/if}
+
+			{#if data.signedIn && status !== 'sending'}
+				<fieldset class="space-y-3">
+					<legend class="text-sm font-medium text-foreground">Game type</legend>
+					<div class="grid sm:grid-cols-2 gap-2" data-testid="game-mode-picker">
+						<label
+							class="flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors {gameMode ===
+							'live'
+								? 'border-primary bg-primary/5'
+								: 'border-border hover:bg-muted/50'}"
+						>
+							<input type="radio" class="mt-1" bind:group={gameMode} value="live" />
+							<span>
+								<span class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+									<Icon icon="lucide:zap" width={14} />
+									Live
+								</span>
+								<span class="block text-xs text-muted-foreground mt-0.5">
+									Play in one sitting. Both players stay online.
+								</span>
+							</span>
+						</label>
+						<label
+							class="flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors {gameMode ===
+							'async'
+								? 'border-primary bg-primary/5'
+								: 'border-border hover:bg-muted/50'}"
+						>
+							<input type="radio" class="mt-1" bind:group={gameMode} value="async" />
+							<span>
+								<span class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+									<Icon icon="lucide:hourglass" width={14} />
+									Async
+								</span>
+								<span class="block text-xs text-muted-foreground mt-0.5">
+									Take turns over days. You get an email when it is your move.
+								</span>
+							</span>
+						</label>
+					</div>
+
+					{#if gameMode === 'async'}
+						<label class="flex flex-wrap items-center gap-2 text-sm text-foreground">
+							Time per turn
+							<select class="input w-auto" bind:value={turnTimeoutMs} data-testid="turn-timeout">
+								{#each ASYNC_TURN_TIMEOUT_PRESETS as preset (preset.ms)}
+									<option value={preset.ms}>{preset.label}</option>
+								{/each}
+							</select>
+						</label>
+						<p class="text-xs text-muted-foreground">
+							A player who does not finish their turn in time is resigned automatically.
+						</p>
+					{/if}
+				</fieldset>
 			{/if}
 
 			{#if status === 'sending'}

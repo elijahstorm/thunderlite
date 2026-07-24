@@ -1,6 +1,8 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { gameStore } from '$lib/Game/store.server'
+import { notifyAsyncTimeout } from '$lib/Game/asyncNotify.server'
+import { clampAsyncTimeout } from '$lib/Game/asyncConfig'
 
 /**
  * Presence heartbeat for an in-match player, pinged by GameSocket while on
@@ -8,6 +10,10 @@ import { gameStore } from '$lib/Game/store.server'
  * stopped checking in (left and didn't return) — auto-resigning them so an
  * abandoned match can't stall forever. Runs on its own short interval rather
  * than the event poll, which throttles to ~30s once realtime is connected.
+ *
+ * Async rooms skip the presence sweep entirely: being gone between turns is
+ * the whole point of async play, so absence never means abandonment there.
+ * Their timeout is the turn deadline instead, enforced here lazily too.
  */
 export const POST = async ({ params, locals }) => {
 	const userSession = locals.session
@@ -20,6 +26,14 @@ export const POST = async ({ params, locals }) => {
 			return json({ ok: false })
 		}
 		await gameStore.touchMember(session, userSession)
+		const room = await gameStore.getRoom(session)
+		if (room?.mode === 'async') {
+			const enforced = await gameStore.enforceTurnDeadline(session, room)
+			if (enforced) {
+				await notifyAsyncTimeout(session, enforced, clampAsyncTimeout(room.turn_timeout_ms))
+			}
+			return json({ ok: true, resigned: !!enforced })
+		}
 		const resigned = await gameStore.sweepAbsent(session, userSession)
 		return json({ ok: true, resigned })
 	} catch (msg) {

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte'
+	import { onDestroy, onMount, untrack } from 'svelte'
 	import { browser } from '$app/environment'
 	import LocalInteracter from '$lib/Engine/Interactor/LocalInteracter.svelte'
 	import {
@@ -11,16 +11,21 @@
 	import { animateRemoteAction } from '$lib/Engine/remoteAnimate'
 	import { outgoingActions } from '$lib/Engine/outgoingActions'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
+	import { formatTimeLeft } from '$lib/Game/asyncConfig'
 	import { fly } from 'svelte/transition'
 
 	interface Props {
 		map: () => MapObject | undefined
 		gameSession?: string
 		userSession?: string
+		/** Async (correspondence) room: show the turn clock and skip live-only UX. */
+		asyncGame?: boolean
+		/** Initial turn deadline from the loader; the event poll keeps it fresh. */
+		turnDeadline?: number | null
 		children?: import('svelte').Snippet<[any]>
 	}
 
-	let { map, gameSession = '', children }: Props = $props()
+	let { map, gameSession = '', asyncGame = false, turnDeadline = null, children }: Props = $props()
 
 	const POLL_INTERVAL = 1500
 	// With a live websocket, polling drops to a slow reconciliation pass that
@@ -50,6 +55,14 @@
 	let wrongTurn = $state(false)
 	let wrongTurnTimer: ReturnType<typeof setTimeout> | null = null
 	const locallyEmitted = new Set<string>()
+
+	// Async turn clock: the deadline the current player must END their turn by.
+	// Seeded from the loader (initial value only — polls own it after that),
+	// refreshed by every poll/move response; a ticker re-renders the countdown.
+	let deadline: number | null = $state(untrack(() => turnDeadline))
+	let clockNow = $state(Date.now())
+	let clockTimer: ReturnType<typeof setInterval> | null = null
+	const deadlineLeftMs = $derived(deadline != null ? deadline - clockNow : null)
 
 	// Opponent actions applied through a serial queue so their move/attack slides
 	// play one at a time instead of overlapping. `caughtUp` gates animation: the
@@ -116,8 +129,12 @@
 		try {
 			const res = await fetch(`/api/game/${gameSession}/events?since=${lastEventId}`)
 			if (!res.ok) return
-			const data = (await res.json()) as { events?: GameEvent[] }
+			const data = (await res.json()) as {
+				events?: GameEvent[]
+				turnDeadline?: number | null
+			}
 			if (!data?.events) return
+			if (asyncGame && data.turnDeadline !== undefined) deadline = data.turnDeadline
 			for (const evt of data.events) {
 				if (!applyEvent(evt, false)) break
 			}
@@ -186,10 +203,13 @@
 				return
 			}
 			if (!res.ok) return
-			const result = (await res.json()) as { event?: GameEvent }
+			const result = (await res.json()) as { event?: GameEvent; turnDeadline?: number | null }
 			if (result?.event && typeof result.event.id === 'number') {
 				lastEventId = Math.max(lastEventId, result.event.id)
 			}
+			// An end-turn hands the fresh allowance to the opponent — reflect it
+			// right away instead of waiting for the next poll.
+			if (asyncGame && result?.turnDeadline !== undefined) deadline = result.turnDeadline
 		} catch {
 			// network errors swallowed; polling will pick up the canonical state.
 		}
@@ -234,14 +254,18 @@
 		void connectRealtime()
 		// Presence: ping immediately, then on a steady interval, so leaving the
 		// page stops the pings and the server can auto-resign us after the grace.
+		// (For async rooms the server skips the absence sweep — the ping only
+		// keeps last_seen fresh and drives the lazy deadline check.)
 		heartbeat()
 		heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL)
+		if (asyncGame) clockTimer = setInterval(() => (clockNow = Date.now()), 1000)
 	})
 
 	onDestroy(() => {
 		if (pollTimer) clearInterval(pollTimer)
 		if (heartbeatTimer) clearInterval(heartbeatTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
+		if (clockTimer) clearInterval(clockTimer)
 		if (outgoingUnsubscribe) outgoingUnsubscribe()
 		realtimeConn?.close()
 	})
@@ -251,6 +275,23 @@
 
 {#if multiplayer}
 	{@render children?.({ socket, requestRedraw })}
+	{#if asyncGame && deadlineLeftMs != null}
+		<div
+			class="fixed top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-full shadow z-40 pointer-events-none {deadlineLeftMs <
+			3 * 60 * 60 * 1000
+				? 'bg-red-600 text-white'
+				: 'bg-black/70 text-white'}"
+			data-testid="turn-clock"
+			title="Time left to finish the current turn"
+		>
+			<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true">
+				<path
+					d="M6 2h12v2l-4.5 4.5a2 2 0 0 0 0 3L18 16v2h.5a1 1 0 1 1 0 2h-13a1 1 0 1 1 0-2H6v-2l4.5-4.5a2 2 0 0 0 0-3L6 4V2z"
+				/>
+			</svg>
+			{formatTimeLeft(deadlineLeftMs)}
+		</div>
+	{/if}
 	{#if wrongTurn}
 		<div
 			class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm font-mono px-4 py-2 rounded shadow-lg z-50 pointer-events-none"

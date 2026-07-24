@@ -1,4 +1,4 @@
-import { isDontCodeError } from '@dontcode2/backend'
+import { isDontCodeError } from 'dontcode'
 
 /**
  * Shape returned to the browser when a checkout step fails with a DontCode

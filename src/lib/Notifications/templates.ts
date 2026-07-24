@@ -14,8 +14,7 @@ export interface EmailContent {
 
 const signoff = '\n\nSee you on the battlefield,\nThe ThunderLite team'
 
-const prefsFooter =
-	'\n\n---\n\nYou can change which emails you get from Settings in ThunderLite.'
+const prefsFooter = '\n\n---\n\nYou can change which emails you get from Settings in ThunderLite.'
 
 const formatDate = (iso: string | null): string =>
 	iso
@@ -88,11 +87,7 @@ export const matchResult = (
 ): EmailContent => {
 	const vs = opponentName ? ` against ${opponentName}` : ''
 	const headline =
-		outcome === 'win'
-			? 'Victory!'
-			: outcome === 'loss'
-				? 'Hard-fought loss'
-				: 'It ended in a draw'
+		outcome === 'win' ? 'Victory!' : outcome === 'loss' ? 'Hard-fought loss' : 'It ended in a draw'
 	const line =
 		outcome === 'win'
 			? `You won your match${vs}. Well played.`
@@ -112,4 +107,49 @@ export const yourTurn = (opponentName: string | null): EmailContent => ({
 	markdownText: `# Your move
 
 ${opponentName ? `**${opponentName}** has moved. ` : ''}It is your turn in your ThunderLite match. Jump back in when you are ready.${prefsFooter}`,
+})
+
+// ── Async (correspondence) games ─────────────────────────────────────────────
+
+/** It is your turn in an async match; `timeLabel` is the per-turn clock, e.g. '3 days'. */
+export const asyncYourTurn = (opponentName: string | null, timeLabel: string): EmailContent => ({
+	subject: 'Your move in your async ThunderLite match',
+	markdownText: `# Your move
+
+${opponentName ? `**${opponentName}** finished their turn. ` : ''}It is your turn in your async ThunderLite match.
+
+You have **${timeLabel}** to finish your turn. If the clock runs out, the match is resigned automatically.${signoff}${prefsFooter}`,
+})
+
+/** Sent to the player whose turn clock ran out. */
+export const asyncAutoResigned = (
+	opponentName: string | null,
+	timeLabel: string
+): EmailContent => ({
+	subject: 'Your async match timed out',
+	markdownText: `# Out of time
+
+Your turn clock of **${timeLabel}** ran out, so your async ThunderLite match${opponentName ? ` against **${opponentName}**` : ''} was resigned automatically.
+
+Up for another? Start a fresh game any time.${signoff}${prefsFooter}`,
+})
+
+/** Sent to the opponent when a player resigned an async match by hand. */
+export const asyncOpponentResigned = (opponentName: string | null): EmailContent => ({
+	subject: 'Your opponent resigned your async match',
+	markdownText: `# Victory by resignation
+
+${opponentName ? `**${opponentName}**` : 'Your opponent'} resigned your async ThunderLite match, so the win is yours.
+
+Jump back in to see the final board or start a rematch.${signoff}${prefsFooter}`,
+})
+
+/** Sent to the opponent when the current player's clock ran out. */
+export const asyncOpponentTimedOut = (opponentName: string | null): EmailContent => ({
+	subject: 'You won your async match on time',
+	markdownText: `# Victory on time
+
+${opponentName ? `**${opponentName}**` : 'Your opponent'} ran out of time in your async ThunderLite match, so the win is yours.
+
+Jump back in to see the final board or start a rematch.${signoff}${prefsFooter}`,
 })

@@ -11,7 +11,7 @@
  * NOTE: KV is served by the hosted gateway only — against the local mock
  * (`pnpm mock`) every read is a miss and this check fails by design.
  */
-import { isDontCodeError } from '@dontcode2/backend'
+import { isDontCodeError } from 'dontcode'
 import { loadEnv, makeClient } from './_dontcode'
 
 const args = process.argv.slice(2)
@@ -26,7 +26,7 @@ const kv = client.cache
 // makes the KV entry explicit so it can be edited without a deploy.
 const SITE_CONFIG = {
 	title: 'ThunderLite',
-	desc: 'Turn-based tactics. Build, capture, and outmaneuver — in your browser.',
+	desc: 'A free browser rebuild of Battalion: Arena. Turn-based tactics with an adaptive CPU, weather, maps up to 500x500, a scriptable map editor, and live multiplayer.',
 	googleFonts: '',
 }
 

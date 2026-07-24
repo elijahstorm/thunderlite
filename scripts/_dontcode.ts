@@ -9,7 +9,7 @@
  * deciding which database is touched is the creds you load here, so point dev
  * runs at a separate DontCode dev project.
  */
-import { dontcode, type DontCodeClient } from '@dontcode2/backend'
+import { dontcode, type DontCodeClient } from 'dontcode'
 
 /**
  * Load DONTCODE_* from an env file into `process.env`. Defaults to `.env.local`;

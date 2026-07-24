@@ -93,8 +93,28 @@
 			stack that just runs.
 		</p>
 		<p>
-			It is built and maintained by one person, in the open. There is no monetization, no tracking
-			beyond the basics required to keep the lights on, and no plan to introduce either.
+			I rebuilt it rather than just porting it, because a few things always bugged me about the
+			original. The biggest was the AI: the CPU ran a fixed pattern, so after a handful of games you
+			were not fighting an opponent anymore, just executing a routine against one. ThunderLite's CPU
+			reads the battlefield and reacts to what it actually observes you doing over the course of a
+			match, so it takes much longer to feel solved.
+		</p>
+		<p>
+			Map size was the second wall. The original engine struggled past roughly 20×20 tiles.
+			ThunderLite comfortably runs 100×100 battles and has been pushed to 500×500 fully populated
+			with units and buildings. Big maps change how the game plays: real fronts, real flanks, real
+			logistics.
+		</p>
+		<p>
+			And multiplayer needed to stop breaking. Matches now run on DontCode's hosted database and
+			realtime infrastructure, so a game you start actually finishes: live sessions stay in sync,
+			and async games keep waiting until both players come back. DontCode's support is also a big
+			part of why all of this can stay free to play.
+		</p>
+		<p>
+			It is built and maintained by one person, in the open. It is free to play, with no ads and no
+			tracking beyond the basics required to keep the lights on. If something breaks or you have an
+			idea, tell me on GitHub. I read everything.
 		</p>
 		<div class="pt-2 flex flex-wrap items-center gap-3">
 			<a href="/login" class="btn btn-primary">
@@ -106,6 +126,15 @@
 				Build a map
 			</a>
 			<a href="/make" class="btn btn-outline">Browse community maps</a>
+			<a
+				href="https://github.com/elijahstorm/thunderlite/issues"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="btn btn-outline"
+			>
+				<Icon icon="lucide:bug" width={16} />
+				Report a bug
+			</a>
 		</div>
 	</section>
 
@@ -128,7 +157,7 @@
 					<a href="https://www.dontcode.co" target="_blank" rel="noopener noreferrer" class="link"
 						>DontCode</a
 					>. It runs the accounts, database, and realtime multiplayer that keep the game online, so
-					ThunderLite can stay free with no ads and no monetization.
+					ThunderLite can stay free to play with no ads.
 				</p>
 				<p>
 					DontCode is a platform for building and shipping full-stack apps fast. If you are curious

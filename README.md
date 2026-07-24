@@ -1,6 +1,8 @@
 # ThunderLite
 
-A browser-based recreation of **Battalion: Arena** (Urban Squall) — a turn-based tactics game in the Advance Wars family. Built with SvelteKit, deployed on Vercel, and running on the **DontCode developer platform**: auth, database, file storage, KV cache, and realtime pub/sub are DontCode services reached over HTTP (and WebSocket) with a project API key — no local auth stack, no Postgres connection string, no Redis, no self-hosted socket server.
+A browser-based rebuild of **Battalion: Arena** (Urban Squall) — a turn-based tactics game in the Advance Wars family. Free to play, no install. The rebuild goes well past the original: a CPU opponent that reacts to the battlefield and to what it observes the player doing, map sizes far beyond the original's ~20×20 (100×100 plays smoothly; stress-tested far larger), live and async multiplayer over shareable room codes, a weather system that affects movement and air combat, and a map editor with a scripting engine plus a community map browser.
+
+Built with SvelteKit, deployed on Vercel, and running on the **DontCode developer platform**: auth, database, file storage, KV cache, and realtime pub/sub are DontCode services reached over HTTP (and WebSocket) with a project API key — no local auth stack, no Postgres connection string, no Redis, no self-hosted socket server. DontCode's hosted infrastructure is what keeps multiplayer reliable and the game free for everyone.
 
 See [cards/00-PROJECT-MISSION.md](cards/00-PROJECT-MISSION.md) for the full design north star.
 

@@ -11,12 +11,18 @@
 	import { cachedImage } from '$lib/Storage/cachedImage'
 	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
+	import { formatTurnTimeout } from '$lib/Game/asyncConfig'
 
 	interface Props {
 		data: PageData
 	}
 
 	let { data }: Props = $props()
+
+	const isAsync = $derived(data.mode === 'async')
+	const turnClockLabel = $derived(
+		data.turnTimeoutMs != null ? formatTurnTimeout(data.turnTimeoutMs) : null
+	)
 
 	const POLL_INTERVAL = 1500
 	const TICK_INTERVAL = 250
@@ -203,6 +209,27 @@
 				{isHost ? 'You created this room.' : 'You joined this room.'} Map
 				<span class="font-mono">{data.mapId}</span>
 			</p>
+			<p class="mt-2 flex flex-wrap items-center gap-2" data-testid="lobby-mode">
+				{#if isAsync}
+					<span
+						class="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs font-medium px-2.5 py-1"
+					>
+						<Icon icon="lucide:hourglass" width={12} />
+						Async game{turnClockLabel ? ` · ${turnClockLabel} per turn` : ''}
+					</span>
+					<span class="text-xs text-muted-foreground">
+						Play at your own pace. You get an email when it is your move, and a turn left unfinished
+						past the clock is resigned automatically.
+					</span>
+				{:else}
+					<span
+						class="inline-flex items-center gap-1.5 rounded-full bg-muted text-muted-foreground text-xs font-medium px-2.5 py-1"
+					>
+						<Icon icon="lucide:zap" width={12} />
+						Live game
+					</span>
+				{/if}
+			</p>
 		</header>
 
 		<section class="card p-6 sm:p-8 space-y-5">
@@ -315,7 +342,9 @@
 								>
 									Take side
 								</button>
-								{#if isHost && count < maxPlayers}
+								{#if isHost && count < maxPlayers && !isAsync}
+									<!-- CPU seats are live-only: an async AI turn would just time out
+									     whenever its human driver is offline. -->
 									<button
 										type="button"
 										class="btn btn-ghost btn-xs"

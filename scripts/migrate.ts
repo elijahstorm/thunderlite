@@ -9,7 +9,7 @@
  *
  * No HTTP surface, no mutating GET, no `dev`-flag landmine — see ./_dontcode.ts.
  */
-import { isDontCodeError } from '@dontcode2/backend'
+import { isDontCodeError } from 'dontcode'
 import { consolidatedSchema } from '../src/lib/Migrations/list'
 import { loadEnv, makeClient } from './_dontcode'
 

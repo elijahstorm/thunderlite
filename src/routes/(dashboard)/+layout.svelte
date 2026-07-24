@@ -24,6 +24,7 @@
 			title: 'Account',
 			items: [
 				{ href: '/me', label: 'Profile', icon: 'lucide:user' },
+				{ href: '/my/games', label: 'My Games', icon: 'lucide:swords' },
 				{
 					href: '/my/items',
 					label: 'My Items',

@@ -5,6 +5,7 @@
 	import DataInput from '$lib/Components/Widgets/Forms/DataInput.svelte'
 	import ImageUploader from '$lib/Components/Widgets/Forms/ImageUploader.svelte'
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
+	import MatchHistoryList from '$lib/Components/Profile/MatchHistoryList.svelte'
 	import { addToast } from 'as-toast'
 
 	let { data, form } = $props()
@@ -121,6 +122,20 @@
 
 	<StatsPanel {stats} heading="Your record" />
 </section>
+
+{#if data.recentGames?.length}
+	<section>
+		<header class="mb-4 flex flex-wrap items-end justify-between gap-3">
+			<div>
+				<p class="section-eyebrow">Battle log</p>
+				<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">Recent games</h2>
+			</div>
+			<a class="link text-sm" href="/my/games">View all {data.totalGames}</a>
+		</header>
+
+		<MatchHistoryList entries={data.recentGames} />
+	</section>
+{/if}
 
 <section>
 	<header class="mb-4">

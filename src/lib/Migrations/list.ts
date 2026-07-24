@@ -12,11 +12,13 @@ import { CreateFollows } from './create_follows.sql'
 import { CreateMessages } from './create_messages.sql'
 import { CreateMatches } from './create_matches.sql'
 import { CreateMatchPlayers } from './create_match_players.sql'
+import { CreateMatchHistory } from './create_match_history.sql'
 import { CreateCampaignProgress } from './create_campaign_progress.sql'
 import { CreateGameRoom } from './create_game_room.sql'
 import { CreateGameRoomSettings } from './create_game_room_settings.sql'
 import { CreateGameMember } from './create_game_member.sql'
 import { CreateGameEvent } from './create_game_event.sql'
+import { CreateGameAsync } from './create_game_async.sql'
 import { CreatePlayerGame } from './create_player_game.sql'
 import { CreateEmailLog } from './create_email_log.sql'
 import { CreateNotificationPrefs } from './create_notification_prefs.sql'
@@ -44,11 +46,15 @@ export const consolidatedSchema = [
 	CreateMessages,
 	CreateMatches,
 	CreateMatchPlayers,
+	// After CreateMatchPlayers: its alters target matches + match_players.
+	CreateMatchHistory,
 	CreateCampaignProgress,
 	CreateGameRoom,
 	CreateGameRoomSettings,
 	CreateGameMember,
 	CreateGameEvent,
+	// After CreateGameMember: its index targets game_member.
+	CreateGameAsync,
 	CreatePlayerGame,
 	CreateEmailLog,
 	CreateNotificationPrefs,

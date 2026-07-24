@@ -82,10 +82,16 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		count,
 		maxPlayers: MAX_PLAYERS,
 		startAt: room.start_at ?? null,
+		// Host-chosen at creation, immutable after: 'live' or 'async', plus the
+		// async per-turn clock for the lobby copy.
+		mode: room.mode === 'async' ? ('async' as const) : ('live' as const),
+		turnTimeoutMs: room.turn_timeout_ms == null ? null : Number(room.turn_timeout_ms),
 		teams,
 		lockRandom: !!room.lock_random,
 		members,
 		// Seat-indexed profiles kept for the group chat (author names).
-		roster: [...seats].sort((a, b) => a.seat - b.seat).map((s) => (s.userAuth ? (byAuth.get(s.userAuth) ?? null) : null)),
+		roster: [...seats]
+			.sort((a, b) => a.seat - b.seat)
+			.map((s) => (s.userAuth ? (byAuth.get(s.userAuth) ?? null) : null)),
 	}
 }

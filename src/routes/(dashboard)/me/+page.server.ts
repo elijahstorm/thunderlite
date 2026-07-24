@@ -7,6 +7,7 @@ import { error, fail } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { validate } from '$lib/Database/validators'
 import { getUserStats } from '$lib/Database/getUserStats'
+import { getMatchHistory } from '$lib/Database/getMatchHistory'
 import { db } from '$lib/dontcode/server'
 
 export const prerender = false
@@ -15,14 +16,15 @@ export const ssr = false
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) throw error(403, 'You are not logged in')
 
-	// The profile fetch and the match-stats fetch are independent, so run them in
-	// one barrier. `getUserStats` is defensive (a brand-new account with no match
-	// rows returns zeros), and a profile lookup failure means "no account yet" —
-	// caught below to bootstrap one — so swallow it here rather than rejecting the
-	// whole barrier.
-	let [user, stats] = await Promise.all([
+	// The profile fetch, the match-stats fetch, and the recent-games strip are
+	// independent, so run them in one barrier. `getUserStats` / `getMatchHistory`
+	// are defensive (a brand-new account returns zeros / an empty page), and a
+	// profile lookup failure means "no account yet" — caught below to bootstrap
+	// one — so swallow it here rather than rejecting the whole barrier.
+	let [user, stats, recent] = await Promise.all([
 		getUserDBDataFromAuth(locals.user).catch(() => null),
 		getUserStats(locals.user),
+		getMatchHistory(locals.user, { limit: 5 }),
 	])
 
 	if (!user) {
@@ -42,7 +44,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	}
 
-	return { user, stats }
+	return { user, stats, recentGames: recent.entries, totalGames: recent.total }
 }
 
 export const actions = {

@@ -21,6 +21,13 @@ export type UserStats = {
 	winRate: number
 	points: number
 	level: number
+	/**
+	 * PvP ladder rating from `user_stats.elo`, or null for a player with no
+	 * rated game yet. Not derivable from outcome rows (the ladder moves by
+	 * opponent strength), so `computeStats` always leaves it null and the DB
+	 * wrapper fills it in.
+	 */
+	elo: number | null
 }
 
 /** A zeroed record — what a brand-new account (no matches) shows. */
@@ -32,6 +39,7 @@ export const emptyStats = (): UserStats => ({
 	winRate: 0,
 	points: 0,
 	level: levelForPoints(0),
+	elo: null,
 })
 
 /**
@@ -54,7 +62,7 @@ export const computeStats = (rows: MatchPlayerRow[]): UserStats => {
 	const games = wins + losses + draws
 	const winRate = games === 0 ? 0 : Math.round((wins / games) * 100)
 
-	return { games, wins, losses, draws, winRate, points, level: levelForPoints(points) }
+	return { games, wins, losses, draws, winRate, points, level: levelForPoints(points), elo: null }
 }
 
 /**
@@ -66,11 +74,19 @@ export const getUserStats = async (auth: string): Promise<UserStats> => {
 	if (!auth) return emptyStats()
 
 	try {
-		const rows = await db.find<MatchPlayerRow>('match_players', {
-			where: { user_auth: auth },
-			select: ['outcome'],
-		})
-		return computeStats(rows)
+		// Outcome rows and the ladder rating live in different tables and don't
+		// depend on each other — fetch both in one barrier.
+		const [rows, ladder] = await Promise.all([
+			db.find<MatchPlayerRow>('match_players', {
+				where: { user_auth: auth },
+				select: ['outcome'],
+			}),
+			db.findOne<{ elo: number | null }>('user_stats', {
+				where: { user_auth: auth },
+				select: ['elo'],
+			}),
+		])
+		return { ...computeStats(rows), elo: ladder?.elo == null ? null : Number(ladder.elo) }
 	} catch (msg) {
 		logToErrorDb(msg)
 		return emptyStats()
