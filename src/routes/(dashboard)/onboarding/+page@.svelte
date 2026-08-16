@@ -18,6 +18,14 @@
 	let updated = $state<UserDBData>()
 	let usernameTaken = $state(false)
 
+	// Declared before `resetForm` so its eager call below can read them. As `let`
+	// bindings for `$derived`, referencing them earlier hits the temporal dead
+	// zone and throws on mount (Cannot access 'auth' before initialization),
+	// which crashed onboarding for every new/incomplete account.
+	let user = $derived(data.user)
+	let auth = $derived(data.auth ?? '')
+	let redirectTo = $derived(data.redirectTo ?? '/make')
+
 	const resetForm = (data = {}) =>
 		(updated = {
 			...{
@@ -45,9 +53,6 @@
 		)
 	}
 
-	let user = $derived(data.user)
-	let auth = $derived(data.auth ?? '')
-	let redirectTo = $derived(data.redirectTo ?? '/make')
 	const errors: { [key: string]: string } = $derived(
 		Object.entries(form?.errors ?? {}).reduce(
 			(carry, [dataName, e]) => ({ ...carry, [dataName]: (e as string[])[0] }),
