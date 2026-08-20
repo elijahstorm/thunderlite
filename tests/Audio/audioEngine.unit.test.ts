@@ -125,11 +125,11 @@ describe('audio state machine (pure)', () => {
 	it('records the active track per single-active channel', () => {
 		let state = createAudioState()
 		expect(state.active.music).toBeNull()
-		state = withActiveTrack(state, 'music', 'game/player')
-		expect(state.active.music).toBe('game/player')
+		state = withActiveTrack(state, 'music', 'game/win')
+		expect(state.active.music).toBe('game/win')
 		expect(state.active.env).toBeNull()
-		state = withActiveTrack(state, 'music', 'game/enemy')
-		expect(state.active.music).toBe('game/enemy')
+		state = withActiveTrack(state, 'music', 'game/lose')
+		expect(state.active.music).toBe('game/lose')
 	})
 
 	it('multiplies master × channel volume for effective gain', () => {
@@ -164,7 +164,7 @@ describe('audio state machine (pure)', () => {
 	})
 
 	it('settingsFromState drops runtime active-track info', () => {
-		const state = withActiveTrack(createAudioState(), 'music', 'game/player')
+		const state = withActiveTrack(createAudioState(), 'music', 'game/win')
 		expect(settingsFromState(state)).not.toHaveProperty('active')
 	})
 })
@@ -174,38 +174,38 @@ describe('audio state machine (pure)', () => {
 describe('music channel (single-active)', () => {
 	it('loops the requested track', () => {
 		const { engine, created } = makeEngine()
-		engine.playMusic('game/player')
-		expect(engine.getActiveTrack('music')).toBe('game/player')
+		engine.playMusic('game/win')
+		expect(engine.getActiveTrack('music')).toBe('game/win')
 		const playing = created.filter((e) => !e.paused)
 		expect(playing).toHaveLength(1)
 		expect(playing[0].loop).toBe(true)
-		expect(playing[0].src).toContain('player')
+		expect(playing[0].src).toContain('win')
 	})
 
 	it('swaps tracks with no overlap', () => {
 		const { engine, created } = makeEngine()
-		engine.playMusic('game/player')
-		const first = created.find((e) => e.src.includes('player'))!
-		engine.playMusic('game/enemy')
+		engine.playMusic('game/win')
+		const first = created.find((e) => e.src.includes('win'))!
+		engine.playMusic('game/lose')
 
-		expect(engine.getActiveTrack('music')).toBe('game/enemy')
+		expect(engine.getActiveTrack('music')).toBe('game/lose')
 		expect(first.paused).toBe(true) // old track stopped
 		const playing = created.filter((e) => !e.paused)
 		expect(playing).toHaveLength(1) // exactly one music element sounding
-		expect(playing[0].src).toContain('enemy')
+		expect(playing[0].src).toContain('lose')
 	})
 
 	it('does not restart the same track when replayed', () => {
 		const { engine, created } = makeEngine()
-		engine.playMusic('game/player')
+		engine.playMusic('game/win')
 		expect(created).toHaveLength(1)
-		engine.playMusic('game/player')
+		engine.playMusic('game/win')
 		expect(created).toHaveLength(1) // reused, not re-created
 	})
 
 	it('stopMusic clears the active track', () => {
 		const { engine, created } = makeEngine()
-		engine.playMusic('game/player')
+		engine.playMusic('game/win')
 		engine.stopMusic()
 		expect(engine.getActiveTrack('music')).toBeNull()
 		expect(created.every((e) => e.paused)).toBe(true)
@@ -235,12 +235,12 @@ describe('sfx channel (pooled, overlapping)', () => {
 describe('cross-channel muting', () => {
 	it('muting music silences music while sfx keeps playing', () => {
 		const { engine, created } = makeEngine()
-		engine.playMusic('game/player')
+		engine.playMusic('game/win')
 		engine.playSfx('explosion')
 
 		engine.setMute('music', true)
 
-		const music = created.find((e) => e.src.includes('player'))!
+		const music = created.find((e) => e.src.includes('win'))!
 		const sfx = created.find((e) => e.src.includes('explosion'))!
 		expect(music.volume).toBe(0)
 		expect(sfx.paused).toBe(false)
@@ -267,18 +267,18 @@ function mutedSettings(): AudioSettings {
 describe('master-muted playback suppression', () => {
 	it('does not autostart music or sfx when starting muted', () => {
 		const { engine, created } = makeEngine(mutedSettings())
-		engine.playMusic('game/player')
+		engine.playMusic('game/win')
 		engine.playSfx('explosion')
 
 		// The looping track is primed (element exists, src/active recorded) but
 		// never played, so no audio session is grabbed.
-		expect(engine.getActiveTrack('music')).toBe('game/player')
+		expect(engine.getActiveTrack('music')).toBe('game/win')
 		expect(created.every((e) => e.paused)).toBe(true)
 	})
 
 	it('keeps music stems primed but silent and unplayed when muted', () => {
 		const { engine, created } = makeStemEngine(mutedSettings())
-		engine.startMusicStems(['game/intro', 'game/player'])
+		engine.startMusicStems(['layers/bed', 'layers/pulse'])
 
 		expect(created).toHaveLength(2)
 		for (const el of created) {
@@ -289,7 +289,7 @@ describe('master-muted playback suppression', () => {
 
 	it('resumes the primed track and stems once sound is turned back on', () => {
 		const { engine, created } = makeEngine(mutedSettings())
-		engine.startMusicStems(['game/player'])
+		engine.startMusicStems(['layers/bed'])
 		engine.playEnv('weather/rain')
 		expect(created.every((e) => e.paused)).toBe(true)
 
@@ -314,7 +314,7 @@ describe('master-muted playback suppression', () => {
 // ── Music stem layer (adaptive crossfade) ───────────────────────────────────────
 
 describe('music stem layer', () => {
-	const STEMS = ['game/intro', 'game/player', 'game/enemy'] as const
+	const STEMS = ['layers/bed', 'layers/pulse', 'layers/bass'] as const
 
 	it('starts every stem looping, in lockstep, at gain 0', () => {
 		const { engine, created } = makeStemEngine()
@@ -332,10 +332,10 @@ describe('music stem layer', () => {
 	it('snaps to the target mix when fadeMs is 0', () => {
 		const { engine, created } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('player'))!
-		const enemy = created.find((e) => e.src.includes('enemy'))!
+		const player = created.find((e) => e.src.includes('bed'))!
+		const enemy = created.find((e) => e.src.includes('bass'))!
 		const channelVol = effectiveVolume(engine.getState(), 'music')
 		expect(player.volume).toBeCloseTo(channelVol)
 		expect(enemy.volume).toBe(0)
@@ -344,13 +344,13 @@ describe('music stem layer', () => {
 	it('crossfades stem gains over time without restarting any stem', () => {
 		const { engine, created, clock } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('player'))!
-		const enemy = created.find((e) => e.src.includes('enemy'))!
+		const player = created.find((e) => e.src.includes('bed'))!
+		const enemy = created.find((e) => e.src.includes('bass'))!
 
 		// Now flip to the enemy theme with a real fade
-		engine.setMusicMix({ 'game/enemy': 1 }, { fadeMs: 1000 })
+		engine.setMusicMix({ 'layers/bass': 1 }, { fadeMs: 1000 })
 
 		// Halfway through, both should be roughly equally loud (linear ramp)
 		clock.advance(500)
@@ -372,9 +372,9 @@ describe('music stem layer', () => {
 	it('re-targeting mid-fade continues smoothly from the current gain', () => {
 		const { engine, created, clock } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('player'))!
+		const player = created.find((e) => e.src.includes('bed'))!
 
 		// Start fading player out toward 0
 		engine.setMusicMix({}, { fadeMs: 1000 })
@@ -385,7 +385,7 @@ describe('music stem layer', () => {
 		expect(midGain).toBeCloseTo(0.6, 2) // 40% faded
 
 		// Reverse direction — re-target player back to 1
-		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 1000 })
+		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 1000 })
 		clock.advance(0)
 		clock.tick()
 		// Just after re-target, still near the current 0.6 (no jump)
@@ -404,9 +404,9 @@ describe('music stem layer', () => {
 	it('master mute silences every stem', () => {
 		const { engine, created } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'game/player': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('player'))!
+		const player = created.find((e) => e.src.includes('bed'))!
 		expect(player.volume).toBeGreaterThan(0)
 
 		engine.setMasterMute(true)

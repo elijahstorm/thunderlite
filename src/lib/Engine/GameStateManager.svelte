@@ -21,6 +21,7 @@
 	import { reopenMenuFromPeek, openInPlaceMenu, resetInteraction } from './Interactor/interactor'
 	import { animateTeamDefeat } from './defeat'
 	import { MusicDirector } from '$lib/Audio/musicDirector'
+	import { seedFromString } from '$lib/Audio/musicVariation'
 	import { weatherAudio, weatherForMap } from '$lib/Audio/weatherAudio'
 	import HUDRoot from './HUD/HUDRoot.svelte'
 	import BuildMenu from './HUD/BuildMenu.svelte'
@@ -413,6 +414,14 @@
 		musicDirector = new MusicDirector({
 			localTeam,
 			isCpuTeam: () => !isMultiplayer,
+			// Must match the phrase length the bed layers were rendered at, or
+			// re-arrangements drift off the bar line. See
+			// scripts/audio/gen-demo-layers.sh; update both together when real
+			// layers land.
+			phraseSeconds: 8,
+			// Stable per-match seed so a replay arranges itself the way the live
+			// match did, rather than rolling a fresh set of variations.
+			seed: seedFromString(gameSession || campaignLevelId || 'local'),
 		})
 		musicDirector.start()
 

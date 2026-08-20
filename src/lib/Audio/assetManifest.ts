@@ -11,16 +11,36 @@ export type AudioChannel = 'music' | 'sfx' | 'env'
 
 const ROOT = '/game/sounds'
 
-/** Mood-aware looping music tracks (single-active `music` channel). */
+/**
+ * Music tracks on the single-active `music` channel.
+ *
+ * Two distinct kinds live here:
+ *
+ *  - `layers/*` are the adaptive bed — same length, tempo and key, started
+ *    together and mixed by gain alone (see `musicVariation.ts`). These are the
+ *    only entries the stem layer ever loads.
+ *  - everything else is a one-shot sting or a standalone screen loop, played
+ *    through the single-active path.
+ *
+ * The legacy `game/{player,enemy,ally,thinking,inactive}` mood tracks are gone:
+ * they were finished mixes of differing lengths, so looping them together could
+ * never stay phase-locked, and only one was ever audible at a time. `game/intro`
+ * survives as a sting, which is what its 6-second one-shot always was.
+ */
 export const musicManifest: Record<string, string> = {
+	// Adaptive bed — cumulative intensity stack, sparsest first.
+	'layers/bed': `${ROOT}/music/layers/bed`,
+	'layers/pulse': `${ROOT}/music/layers/pulse`,
+	'layers/bass': `${ROOT}/music/layers/bass`,
+	'layers/melody': `${ROOT}/music/layers/melody`,
+	// Adaptive bed — independent color layers.
+	'layers/accent': `${ROOT}/music/layers/accent`,
+	'layers/texture': `${ROOT}/music/layers/texture`,
+	// One-shot stings.
 	'game/intro': `${ROOT}/music/game/intro`,
-	'game/player': `${ROOT}/music/game/player`,
-	'game/enemy': `${ROOT}/music/game/enemy`,
-	'game/ally': `${ROOT}/music/game/ally`,
-	'game/thinking': `${ROOT}/music/game/thinking`,
-	'game/inactive': `${ROOT}/music/game/inactive`,
 	'game/win': `${ROOT}/music/game/win`,
 	'game/lose': `${ROOT}/music/game/lose`,
+	// Standalone screen loops.
 	'intro-theme': `${ROOT}/music/intro theme`,
 }
 

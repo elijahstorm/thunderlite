@@ -320,6 +320,22 @@ export class AudioEngine {
 		return out
 	}
 
+	/**
+	 * Playback position of the stem bed in seconds, or `null` when it is not
+	 * running. Every stem is started in lockstep and shares a length, so any one
+	 * of them speaks for the whole bed and we just read the first.
+	 *
+	 * `null` while suppressed (muted) is intentional: it tells the phrase clock to
+	 * re-baseline rather than to interpret the resume as a huge forward jump.
+	 */
+	getMusicPosition(): number | null {
+		for (const stem of this.musicStems.values()) {
+			if (stem.el.paused) return null
+			return stem.el.currentTime
+		}
+		return null
+	}
+
 	/** Pause and discard every loaded stem. Cancels any in-flight fade. */
 	stopMusicStems(): void {
 		this.cancelFade()

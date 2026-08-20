@@ -3,14 +3,15 @@ import { describe, it, expect } from 'vitest'
 import { writable } from 'svelte/store'
 import {
 	MUSIC_STEMS,
+	moodForState,
 	musicMixForState,
 	stingForState,
 	MusicDirector,
 	type MusicState,
-	type MusicStemId,
-	type MusicStingId,
 	type MusicTrackId,
+	type PhraseSource,
 } from '../../src/lib/Audio/musicDirector'
+import { FATIGUE_PHRASES, MUSIC_LAYERS, layerTrackId } from '../../src/lib/Audio/musicVariation'
 import type { MusicMix, MusicMixOptions, PlaySingleOptions } from '../../src/lib/Audio/audioEngine'
 import type { GameState } from '../../src/lib/Engine/gameState'
 
@@ -22,67 +23,67 @@ const base = (overrides: Partial<MusicState> = {}): MusicState => ({
 	...overrides,
 })
 
-/** The stem the mix raises to full gain (or `null` if no stem is active). */
-function activeStem(mix: MusicMix): string | null {
-	for (const [name, gain] of Object.entries(mix)) if (gain >= 1) return name
-	return null
-}
+describe('MUSIC_STEMS', () => {
+	it('is exactly the bed layers, so the engine loads nothing else', () => {
+		expect(MUSIC_STEMS).toEqual(MUSIC_LAYERS.map(layerTrackId))
+	})
+})
 
-describe('musicMixForState (pure)', () => {
-	it('raises the local player stem on the local turn', () => {
-		expect(activeStem(musicMixForState(base({ currentTeam: 0 }), 0))).toBe('game/player')
+describe('moodForState (pure)', () => {
+	it('plays the player mood on the local turn', () => {
+		expect(moodForState(base({ currentTeam: 0 }), 0)).toBe('player')
 	})
 
-	it('raises the enemy stem on an opponent turn (2 teams)', () => {
-		expect(activeStem(musicMixForState(base({ currentTeam: 1 }), 0))).toBe('game/enemy')
+	it('plays the enemy mood on an opponent turn (2 teams)', () => {
+		expect(moodForState(base({ currentTeam: 1 }), 0)).toBe('enemy')
 	})
 
-	it('raises the thinking stem while an opponent CPU computes', () => {
-		expect(activeStem(musicMixForState(base({ currentTeam: 1, cpuThinking: true }), 0))).toBe(
-			'game/thinking'
-		)
+	it('plays the thinking mood while an opponent CPU computes', () => {
+		expect(moodForState(base({ currentTeam: 1, cpuThinking: true }), 0)).toBe('thinking')
 	})
 
-	it('returns to the enemy stem once the CPU has acted', () => {
-		expect(activeStem(musicMixForState(base({ currentTeam: 1, cpuThinking: false }), 0))).toBe(
-			'game/enemy'
-		)
+	it('returns to the enemy mood once the CPU has acted', () => {
+		expect(moodForState(base({ currentTeam: 1, cpuThinking: false }), 0)).toBe('enemy')
 	})
 
-	it('raises the ally stem for a non-local allied team (teams > 2)', () => {
-		const state = base({ currentTeam: 1, allies: [1] })
-		expect(activeStem(musicMixForState(state, 0))).toBe('game/ally')
+	it('plays the ally mood for a non-local allied team (teams > 2)', () => {
+		expect(moodForState(base({ currentTeam: 1, allies: [1] }), 0)).toBe('ally')
 	})
 
-	it('raises the enemy stem for a non-local, non-allied team (teams > 2)', () => {
-		const state = base({ currentTeam: 2, allies: [1] })
-		expect(activeStem(musicMixForState(state, 0))).toBe('game/enemy')
+	it('plays the enemy mood for a non-local, non-allied team (teams > 2)', () => {
+		expect(moodForState(base({ currentTeam: 2, allies: [1] }), 0)).toBe('enemy')
 	})
 
-	it('raises the intro stem when intro is set, over any turn theme', () => {
-		expect(activeStem(musicMixForState(base({ currentTeam: 0, intro: true }), 0))).toBe(
-			'game/intro'
-		)
-		expect(activeStem(musicMixForState(base({ currentTeam: 1, intro: true }), 0))).toBe(
-			'game/intro'
-		)
+	it('rests the bed under the intro, over any turn mood', () => {
+		expect(moodForState(base({ currentTeam: 0, intro: true }), 0)).toBe('rest')
+		expect(moodForState(base({ currentTeam: 1, intro: true }), 0)).toBe('rest')
 	})
 
-	it('raises the inactive stem on inactivity, over the local turn theme', () => {
-		expect(activeStem(musicMixForState(base({ currentTeam: 0, inactive: true }), 0))).toBe(
-			'game/inactive'
-		)
+	it('lets the hurry warning outrank even the local turn', () => {
+		expect(moodForState(base({ currentTeam: 0, inactive: true }), 0)).toBe('hurry')
 	})
 
-	it('silences every stem on game over (the sting plays separately)', () => {
-		expect(musicMixForState(base({ phase: 'gameOver', winner: 0 }), 0)).toEqual({})
+	it('rests on a caller-declared lull', () => {
+		expect(moodForState(base({ currentTeam: 0, resting: true }), 0)).toBe('rest')
+	})
+
+	it('lets the hurry warning outrank a lull', () => {
+		expect(moodForState(base({ resting: true, inactive: true }), 0)).toBe('hurry')
+	})
+
+	it('goes silent on game over so the sting owns the moment', () => {
+		expect(moodForState(base({ phase: 'gameOver', winner: 0 }), 0)).toBe('silent')
 		expect(musicMixForState(base({ phase: 'gameOver', winner: 1 }), 0)).toEqual({})
 	})
 })
 
 describe('stingForState (pure)', () => {
-	it('returns no sting while the match is in progress', () => {
+	it('returns no sting while the match is quietly in progress', () => {
 		expect(stingForState(base({ currentTeam: 0 }), 0)).toBeNull()
+	})
+
+	it('plays the intro sting over the opening', () => {
+		expect(stingForState(base({ intro: true }), 0)).toBe('game/intro')
 	})
 
 	it('plays the win sting for the winner on game over', () => {
@@ -95,6 +96,10 @@ describe('stingForState (pure)', () => {
 
 	it('plays the lose sting on a draw (no winner)', () => {
 		expect(stingForState(base({ phase: 'gameOver', winner: undefined }), 0)).toBe('game/lose')
+	})
+
+	it('lets game over outrank a still-set intro flag', () => {
+		expect(stingForState(base({ phase: 'gameOver', winner: 0, intro: true }), 0)).toBe('game/win')
 	})
 })
 
@@ -113,24 +118,26 @@ const makeGameState = (overrides: Partial<GameState> = {}): GameState => ({
 })
 
 type StingCall = { track: MusicTrackId; loop: boolean }
+type MixCall = { mix: MusicMix; fadeMs: number | undefined }
 
 const recorder = () => {
-	const stemStarts: MusicStemId[][] = []
-	const mixes: MusicMix[] = []
+	const stemStarts: string[][] = []
+	const mixCalls: MixCall[] = []
 	const stings: StingCall[] = []
 	let stopStems = 0
 	let stopSting = 0
 	return {
 		stemStarts,
-		mixes,
+		mixCalls,
 		stings,
+		mixes: () => mixCalls.map((c) => c.mix),
 		stopStemsCount: () => stopStems,
 		stopStingCount: () => stopSting,
-		startMusicStems: (names: readonly MusicStemId[]) => {
+		startMusicStems: (names: readonly string[]) => {
 			stemStarts.push([...names])
 		},
-		setMusicMix: (mix: MusicMix, _opts?: MusicMixOptions) => {
-			mixes.push(mix)
+		setMusicMix: (mix: MusicMix, opts?: MusicMixOptions) => {
+			mixCalls.push({ mix, fadeMs: opts?.fadeMs })
 		},
 		stopMusicStems: () => {
 			stopStems++
@@ -144,27 +151,73 @@ const recorder = () => {
 	}
 }
 
+/** A phrase source the test advances by hand. */
+const fakePhrases = () => {
+	let emit: ((phrase: number) => void) | null = null
+	let phrase = 0
+	let started = 0
+	let stopped = 0
+	let resets = 0
+	return {
+		startedCount: () => started,
+		stoppedCount: () => stopped,
+		resetCount: () => resets,
+		/** Advance the clock `n` phrases and notify the director each time. */
+		advance(n = 1) {
+			for (let i = 0; i < n; i++) emit?.(++phrase)
+		},
+		source(onPhrase: (phrase: number) => void): PhraseSource {
+			emit = onPhrase
+			return {
+				start: () => {
+					started++
+				},
+				stop: () => {
+					stopped++
+				},
+				reset: () => {
+					resets++
+					phrase = 0
+				},
+				current: () => phrase,
+			}
+		},
+	}
+}
+
+/** Distinct mixes in call order, as sorted layer-id lists. */
+const shapes = (mixes: MusicMix[]) => mixes.map((m) => Object.keys(m).sort().join('+'))
+
 describe('MusicDirector (subscription shell)', () => {
-	it('starts every looping stem in lockstep on start()', () => {
+	it('starts every bed layer in lockstep on start()', () => {
 		const store = writable(makeGameState({ currentTeam: 0 }))
 		const rec = recorder()
-		const director = new MusicDirector({ localTeam: 0, store, ...rec })
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+		})
 
 		director.start()
 		expect(rec.stemStarts).toHaveLength(1)
 		expect(rec.stemStarts[0]).toEqual([...MUSIC_STEMS])
+		expect(clock.startedCount()).toBe(1)
 		director.stop()
 	})
 
-	it('mixes up the intro stem at turn 1, then crossfades to the turn theme', () => {
+	it('plays the intro sting at turn 1 and rests the bed beneath it', () => {
 		const store = writable(makeGameState({ turnNumber: 1, currentTeam: 0 }))
 		const rec = recorder()
+		const clock = fakePhrases()
 		let introCb: (() => void) | null = null
 
 		const director = new MusicDirector({
 			localTeam: 0,
 			store,
 			...rec,
+			phraseSource: clock.source,
 			setTimer: (fn) => {
 				introCb = fn
 				return 1 as unknown as ReturnType<typeof setTimeout>
@@ -173,89 +226,262 @@ describe('MusicDirector (subscription shell)', () => {
 		})
 
 		director.start()
-		expect(rec.mixes.at(-1)).toEqual({ 'game/intro': 1 })
+		expect(director.currentMood()).toBe('rest')
+		expect(rec.stings).toEqual([{ track: 'game/intro', loop: false }])
 
 		introCb!()
-		expect(rec.mixes.at(-1)).toEqual({ 'game/player': 1 })
-
+		expect(director.currentMood()).toBe('player')
 		director.stop()
 	})
 
-	it('crossfades stem mixes on turn changes — never re-starting stems', () => {
+	it('re-arranges on turn changes without ever restarting a layer', () => {
 		const store = writable(makeGameState({ currentTeam: 0 }))
 		const rec = recorder()
-		const director = new MusicDirector({ localTeam: 0, store, ...rec })
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+		})
 
 		director.start()
+		expect(director.currentMood()).toBe('player')
 		store.set(makeGameState({ currentTeam: 1 }))
-		store.set(makeGameState({ currentTeam: 1 })) // store update, same desired mix
+		expect(director.currentMood()).toBe('enemy')
 		store.set(makeGameState({ currentTeam: 0 }))
+		expect(director.currentMood()).toBe('player')
 
-		const stems = rec.mixes.map(activeStem)
-		expect(stems).toEqual(['game/player', 'game/enemy', 'game/enemy', 'game/player'])
-
-		// Stems are started exactly once — transitions never re-initialise them.
+		// Layers are started exactly once — a mood change is only ever a gain move.
 		expect(rec.stemStarts).toHaveLength(1)
 		director.stop()
 	})
 
-	it('crossfades to thinking for a CPU opponent then back to the enemy stem', () => {
-		const store = writable(makeGameState({ currentTeam: 0 }))
+	it('drops a store update that would not change what you hear', () => {
+		// The old director re-crossfaded on every store tick. A no-op fade is
+		// audible when it interrupts one already in flight.
+		const store = writable(makeGameState({ currentTeam: 1 }))
 		const rec = recorder()
+		const clock = fakePhrases()
 		const director = new MusicDirector({
 			localTeam: 0,
 			store,
-			isCpuTeam: () => true,
 			...rec,
+			phraseSource: clock.source,
 		})
 
 		director.start()
-		store.set(makeGameState({ currentTeam: 1 })) // CPU turn, nothing acted → thinking
-		store.set(makeGameState({ currentTeam: 1, actedTiles: new Set([5]) })) // CPU acted
-
-		expect(rec.mixes.map(activeStem)).toEqual(['game/player', 'game/thinking', 'game/enemy'])
+		const before = rec.mixCalls.length
+		store.set(makeGameState({ currentTeam: 1 }))
+		store.set(makeGameState({ currentTeam: 1 }))
+		expect(rec.mixCalls.length).toBe(before)
 		director.stop()
 	})
 
-	it('silences every stem on game over and triggers the win sting', () => {
+	it('re-arranges the same mood as the phrase clock advances', () => {
+		// The whole point: sitting in one mood must not sound identical forever.
+		const store = writable(makeGameState({ currentTeam: 1 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			phrasesPerVariation: 1,
+			seed: 5,
+		})
+
+		director.start()
+		clock.advance(8)
+		expect(director.currentMood()).toBe('enemy')
+		expect(new Set(shapes(rec.mixes())).size).toBeGreaterThan(1)
+		director.stop()
+	})
+
+	it('fades a mood change quickly and a re-arrangement slowly', () => {
+		// A turn flip is news. A re-arrangement inside one mood should slide under
+		// the player's attention instead of announcing itself.
 		const store = writable(makeGameState({ currentTeam: 0 }))
 		const rec = recorder()
-		const director = new MusicDirector({ localTeam: 0, store, ...rec })
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			phrasesPerVariation: 1,
+			fadeMs: 800,
+			variationFadeMs: 2500,
+			seed: 3,
+		})
+
+		director.start()
+		expect(rec.mixCalls.at(-1)!.fadeMs).toBe(800) // initial mood
+
+		const beforeVariation = rec.mixCalls.length
+		clock.advance(4)
+		const variationFades = rec.mixCalls.slice(beforeVariation).map((c) => c.fadeMs)
+		expect(variationFades.length).toBeGreaterThan(0)
+		expect(new Set(variationFades)).toEqual(new Set([2500]))
+
+		store.set(makeGameState({ currentTeam: 1 }))
+		expect(rec.mixCalls.at(-1)!.fadeMs).toBe(800)
+		director.stop()
+	})
+
+	it('thins the bed out when one mood grinds on', () => {
+		// A long CPU turn should sag, so that your own turn coming back lands.
+		const store = writable(makeGameState({ currentTeam: 1 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			phrasesPerVariation: 1,
+			seed: 2,
+		})
+
+		director.start()
+		const opening = rec.mixCalls.at(-1)!.mix
+		clock.advance(FATIGUE_PHRASES * 3)
+		const grinding = rec.mixCalls.at(-1)!.mix
+
+		expect(Math.max(...Object.values(grinding))).toBeLessThan(Math.max(...Object.values(opening)))
+		director.stop()
+	})
+
+	it('brings a returning mood back at full strength', () => {
+		// Dwell restarts on a mood change, so a mood does not inherit the fatigue
+		// of its previous outing — otherwise the bed would only ever decay.
+		const store = writable(makeGameState({ currentTeam: 1 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			phrasesPerVariation: 1,
+			seed: 4,
+		})
+
+		director.start()
+		clock.advance(FATIGUE_PHRASES * 3)
+		const tired = Math.max(...Object.values(rec.mixCalls.at(-1)!.mix))
+
+		store.set(makeGameState({ currentTeam: 0 })) // local turn: fresh mood
+		store.set(makeGameState({ currentTeam: 1 })) // and back to the enemy
+		const revived = Math.max(...Object.values(rec.mixCalls.at(-1)!.mix))
+
+		expect(revived).toBeGreaterThan(tired)
+		director.stop()
+	})
+
+	it('pulls the bed back on a declared lull and restores it after', () => {
+		const store = writable(makeGameState({ currentTeam: 0 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+		})
+
+		director.start()
+		const full = rec.mixCalls.at(-1)!.mix
+		director.setResting(true)
+		const resting = rec.mixCalls.at(-1)!.mix
+		expect(Object.keys(resting).length).toBeLessThan(Object.keys(full).length)
+
+		director.setResting(false)
+		expect(director.currentMood()).toBe('player')
+		director.stop()
+	})
+
+	it('opens the bed up on the hurry warning and keeps it open', () => {
+		const store = writable(makeGameState({ currentTeam: 0 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			phrasesPerVariation: 1,
+		})
+
+		director.start()
+		director.setInactive(true)
+		expect(director.currentMood()).toBe('hurry')
+		const urgent = Math.max(...Object.values(rec.mixCalls.at(-1)!.mix))
+
+		// Fatigue must not fade out a warning.
+		clock.advance(FATIGUE_PHRASES * 4)
+		expect(Math.max(...Object.values(rec.mixCalls.at(-1)!.mix))).toBe(urgent)
+		director.stop()
+	})
+
+	it('silences the bed and plays the sting on game over', () => {
+		const store = writable(makeGameState({ currentTeam: 0 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+		})
 
 		director.start()
 		store.set(makeGameState({ phase: 'gameOver', winner: 0 }))
-
-		expect(rec.mixes.at(-1)).toEqual({})
-		const last = rec.stings.at(-1) as StingCall
-		expect(last).toEqual({ track: 'game/win' as MusicStingId, loop: false })
+		expect(rec.mixCalls.at(-1)!.mix).toEqual({})
+		expect(rec.stings.at(-1)).toEqual({ track: 'game/win', loop: false })
 		director.stop()
 	})
 
-	it('plays the lose sting for the losing local player', () => {
+	it('releases the store, the clock and the bed on stop()', () => {
 		const store = writable(makeGameState({ currentTeam: 0 }))
 		const rec = recorder()
-		const director = new MusicDirector({ localTeam: 0, store, ...rec })
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+		})
 
 		director.start()
-		store.set(makeGameState({ phase: 'gameOver', winner: 1 }))
-
-		expect(rec.stings.at(-1)).toEqual({ track: 'game/lose', loop: false })
 		director.stop()
-	})
 
-	it('tears down stems and sting channel on stop()', () => {
-		const store = writable(makeGameState({ currentTeam: 0 }))
-		const rec = recorder()
-		const director = new MusicDirector({ localTeam: 0, store, ...rec })
+		expect(rec.stopStemsCount()).toBe(1)
+		expect(rec.stopStingCount()).toBe(1)
+		expect(clock.stoppedCount()).toBe(1)
 
-		director.start()
-		const mixesBefore = rec.mixes.length
-		director.stop()
-		expect(rec.stopStemsCount()).toBeGreaterThan(0)
-		expect(rec.stopStingCount()).toBeGreaterThan(0)
-
-		// further store changes are ignored once stopped
+		const after = rec.mixCalls.length
 		store.set(makeGameState({ currentTeam: 1 }))
-		expect(rec.mixes.length).toBe(mixesBefore)
+		expect(rec.mixCalls.length).toBe(after)
+		expect(director.currentMood()).toBeNull()
+	})
+
+	it('ignores a second start()', () => {
+		const store = writable(makeGameState({ currentTeam: 0 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+		})
+
+		director.start()
+		director.start()
+		expect(rec.stemStarts).toHaveLength(1)
+		expect(clock.startedCount()).toBe(1)
+		director.stop()
 	})
 })

@@ -6,54 +6,49 @@ import {
 	type MusicMixOptions,
 	type PlaySingleOptions,
 } from '$lib/Audio/audioEngine'
+import { MusicClock } from '$lib/Audio/musicClock'
+import { MUSIC_LAYERS, layerTrackId, mixForMood, type MusicMood } from '$lib/Audio/musicVariation'
 
 /**
- * Music director — drives the adaptive music stem layer in time with the game
- * phase. Every looping stem (intro, player, enemy, ally, thinking, inactive)
- * is started together and kept playing for the lifetime of the match; the
- * director only moves per-stem target gains and the audio engine crossfades
- * them. Because the stems share a BPM and key and are started in lockstep,
- * transitions feel musical instead of sounding like an abrupt cut.
+ * Music director — drives the adaptive music bed in time with the game.
  *
- * Win / lose stings are non-looping one-shots and travel a separate path
- * (`playMusic` on the engine), so they aren't part of the synced stem layer.
+ * The bed is a stack of instrumental layers (not mood tracks) all looping in
+ * lockstep; the director never starts or stops one, it only moves gains and lets
+ * the engine crossfade. Two inputs decide those gains:
  *
- * The decisions are pure functions (`musicMixForState`, `stingForState`) so
- * every phase branch is unit-testable without real audio. The side-effecting
- * `MusicDirector` is a thin shell that derives the phase flags from the game
- * store and applies them via the engine.
+ *  1. GAME PHASE → a mood (`moodForState`). Whose turn it is, whether the CPU is
+ *     thinking, whether the hurry timer has fired.
+ *  2. THE PHRASE CLOCK → a variation index and a dwell count, which re-arrange
+ *     the mood on musical boundaries so the same mood does not sound identical
+ *     the tenth time you hear it (`mixForMood`).
+ *
+ * The second input is the point of the whole subsystem. Phase alone gives you a
+ * state readout: six moods, one loop each, identical on every repeat, which is
+ * how you end up muting your own game. Layering the clock on top means a long
+ * enemy turn audibly sags (fatigue thins the arrangement) and your own turn
+ * snapping back to the full band reads as an event.
+ *
+ * Stings (intro, win, lose) are non-looping one-shots on a separate channel, so
+ * they are free to sit over the bed rather than replacing it.
+ *
+ * The decisions are pure functions (`moodForState`, `musicMixForState`,
+ * `stingForState`) so every branch is unit-testable without real audio. The
+ * side-effecting `MusicDirector` is a thin shell over them, and every dependency
+ * (store, engine calls, phrase source, timers) is injectable.
  */
 
-/** Logical music track ids understood by the audio manifest (`game/*`). */
-export type MusicTrackId =
-	| 'game/intro'
-	| 'game/player'
-	| 'game/enemy'
-	| 'game/ally'
-	| 'game/thinking'
-	| 'game/inactive'
-	| 'game/win'
-	| 'game/lose'
+/** Non-looping one-shots. Not part of the bed. */
+export type MusicStingId = 'game/intro' | 'game/win' | 'game/lose'
 
-/** Looping stems started in lockstep and crossfaded by the director. */
-export const MUSIC_STEMS: readonly MusicTrackId[] = [
-	'game/intro',
-	'game/player',
-	'game/enemy',
-	'game/ally',
-	'game/thinking',
-	'game/inactive',
-] as const
+/** Any logical music id the director can ask the engine for. */
+export type MusicTrackId = MusicStingId
 
-/** Logical stems for the looping stem layer (no win/lose). */
-export type MusicStemId = (typeof MUSIC_STEMS)[number]
-
-/** One-shot stings (non-looping, not part of the stem layer). */
-export type MusicStingId = 'game/win' | 'game/lose'
+/** Manifest ids of the bed layers, stack first then color. */
+export const MUSIC_STEMS: readonly string[] = MUSIC_LAYERS.map(layerTrackId)
 
 /**
- * The minimal slice of state the track mapping needs, decoupled from the
- * concrete game store so it can be exercised in isolation.
+ * The minimal slice of state the mood mapping needs, decoupled from the concrete
+ * game store so it can be exercised in isolation.
  */
 export interface MusicState {
 	phase: GamePhase
@@ -62,46 +57,74 @@ export interface MusicState {
 	winner?: number
 	/** Teams allied with the local player (non-local). Relevant when teams > 2. */
 	allies?: readonly number[]
-	/** The intro sting is still playing before settling into the turn theme. */
+	/** The intro sting is still playing before the bed settles into the turn mood. */
 	intro?: boolean
 	/** The active (opponent) CPU is still computing its move. */
 	cpuThinking?: boolean
-	/** The inactivity / hurry timer has fired. Gated until H2 wires a timer. */
+	/** The inactivity / hurry timer has fired. */
 	inactive?: boolean
+	/** Caller-driven lull (long animation, between-turn pause) — pull the bed back. */
+	resting?: boolean
 }
 
 /**
- * Pure phase → stem-gain mix. No side effects. Stems missing from the result
- * are interpreted as gain 0 by the engine. Exactly one stem is at full gain
- * at a time, but because every stem keeps looping in the background the
- * transition between them is a clean crossfade rather than a track restart.
+ * Pure phase → mood. No side effects.
  *
  * Precedence, highest first:
- *  1. terminal game-over — all stems silent (the sting plays separately)
- *  2. intro sting layer (game just started)
- *  3. inactivity / hurry warning (overrides the local turn theme)
- *  4. local player's own turn theme
- *  5. CPU "thinking" while an opponent computes its move
- *  6. ally / enemy turn theme
+ *  1. terminal game-over — bed silent, the sting owns the moment
+ *  2. intro — bed sits back under the intro sting
+ *  3. inactivity / hurry warning — overrides even the local turn
+ *  4. caller-declared lull
+ *  5. the local player's own turn
+ *  6. CPU still computing an opponent move
+ *  7. ally / enemy turn
  */
-export function musicMixForState(state: MusicState, localTeam: number): MusicMix {
-	if (state.phase === 'gameOver') return {}
-	if (state.intro) return { 'game/intro': 1 }
-	if (state.inactive) return { 'game/inactive': 1 }
-	if (state.currentTeam === localTeam) return { 'game/player': 1 }
-	if (state.cpuThinking) return { 'game/thinking': 1 }
-	if (state.allies?.includes(state.currentTeam)) return { 'game/ally': 1 }
-	return { 'game/enemy': 1 }
+export function moodForState(state: MusicState, localTeam: number): MusicMood {
+	if (state.phase === 'gameOver') return 'silent'
+	if (state.intro) return 'rest'
+	if (state.inactive) return 'hurry'
+	if (state.resting) return 'rest'
+	if (state.currentTeam === localTeam) return 'player'
+	if (state.cpuThinking) return 'thinking'
+	if (state.allies?.includes(state.currentTeam)) return 'ally'
+	return 'enemy'
 }
 
 /**
- * Pure phase → sting decision. Returns the non-looping sting to play (or
- * `null` for "stop any sting"). Whoever owns playback fades the stem layer
- * down alongside the sting.
+ * Pure (state, clock position) → per-layer gains. `variation` and `dwell` come
+ * from the phrase clock; passing 0 for both yields the mood's opening
+ * arrangement, which is what a caller wants when it has no clock yet.
+ */
+export function musicMixForState(
+	state: MusicState,
+	localTeam: number,
+	variation = 0,
+	dwell = 0,
+	seed = 0
+): MusicMix {
+	return mixForMood(moodForState(state, localTeam), variation, dwell, seed)
+}
+
+/**
+ * Pure phase → sting decision. Returns the non-looping sting to play (or `null`
+ * for "stop any sting").
  */
 export function stingForState(state: MusicState, localTeam: number): MusicStingId | null {
-	if (state.phase !== 'gameOver') return null
-	return state.winner === localTeam ? 'game/win' : 'game/lose'
+	if (state.phase === 'gameOver') return state.winner === localTeam ? 'game/win' : 'game/lose'
+	if (state.intro) return 'game/intro'
+	return null
+}
+
+/**
+ * A source of musical phrase edges. The director only needs to start it, stop
+ * it, and ask where it is; tests supply a fake that fires on demand.
+ */
+export interface PhraseSource {
+	start(): void
+	stop(): void
+	reset(): void
+	/** Monotonic phrase count so far. */
+	current(): number
 }
 
 type TimerHandle = ReturnType<typeof setTimeout>
@@ -112,26 +135,45 @@ export interface MusicDirectorOptions {
 	/** Teams allied with the local player (for >2 team matches). */
 	allies?: readonly number[]
 	/**
-	 * Whether a team is CPU-controlled — drives the "thinking" theme. Defaults
-	 * to never (hot-seat: every opponent is human, so no thinking loop).
+	 * Whether a team is CPU-controlled — drives the "thinking" mood. Defaults to
+	 * never (hot-seat: every opponent is human, so no thinking lull).
 	 */
 	isCpuTeam?: (team: number) => boolean
 	/** Game state source. Defaults to the shared `gameState` store. */
 	store?: Readable<GameState>
-	/** Start the synced stem layer. Defaults to the shared audio engine. */
-	startMusicStems?: (names: readonly MusicStemId[]) => void
-	/** Apply a stem mix (crossfaded). Defaults to the shared audio engine. */
+	/** Start the synced bed. Defaults to the shared audio engine. */
+	startMusicStems?: (names: readonly string[]) => void
+	/** Apply a layer mix (crossfaded). Defaults to the shared audio engine. */
 	setMusicMix?: (mix: MusicMix, opts?: MusicMixOptions) => void
-	/** Tear down the stem layer. Defaults to the shared audio engine. */
+	/** Tear down the bed. Defaults to the shared audio engine. */
 	stopMusicStems?: () => void
 	/** Play a one-shot sting. Defaults to the shared audio engine. */
 	playMusic?: (track: MusicTrackId, opts?: PlaySingleOptions) => void
 	/** Stop the one-shot sting channel. Defaults to the shared audio engine. */
 	stopMusic?: () => void
-	/** Intro sting duration before settling into the turn theme (ms). */
+	/** Intro sting duration before the bed settles into the turn mood (ms). */
 	introMs?: number
-	/** Crossfade duration between stem mixes (ms). */
+	/** Crossfade for a mood change — short, so turn flips feel responsive. */
 	fadeMs?: number
+	/**
+	 * Crossfade for a variation change within one mood. Deliberately long: a
+	 * re-arrangement should breathe, not announce itself as a switch.
+	 */
+	variationFadeMs?: number
+	/**
+	 * Seconds of audio per phrase. Set this to the pack's actual phrase length
+	 * (loop seconds ÷ phrases per loop) so re-arrangements land on a bar line.
+	 */
+	phraseSeconds?: number
+	/** Phrases to hold an arrangement before rolling the next one. */
+	phrasesPerVariation?: number
+	/**
+	 * Arrangement seed. Same seed + same phase timeline → same arrangement, which
+	 * is what lets a replay sound like the match it is replaying.
+	 */
+	seed?: number
+	/** Phrase-edge source factory. Defaults to a clock over the audio engine. */
+	phraseSource?: (onPhrase: (phrase: number) => void) => PhraseSource
 	/** Injectable timer (testing). Defaults to `setTimeout`. */
 	setTimer?: (fn: () => void, ms: number) => TimerHandle
 	/** Injectable timer clear (testing). Defaults to `clearTimeout`. */
@@ -140,24 +182,40 @@ export interface MusicDirectorOptions {
 
 const DEFAULT_INTRO_MS = 3500
 const DEFAULT_FADE_MS = 800
+const DEFAULT_VARIATION_FADE_MS = 2500
+const DEFAULT_PHRASE_SECONDS = 8
+const DEFAULT_PHRASES_PER_VARIATION = 2
+
+/** True when two mixes would sound identical, so we can skip a pointless fade. */
+function sameMix(a: MusicMix, b: MusicMix | null): boolean {
+	if (b === null) return false
+	const aKeys = Object.keys(a)
+	const bKeys = Object.keys(b)
+	if (aKeys.length !== bKeys.length) return false
+	return aKeys.every((k) => a[k] === b[k])
+}
 
 /**
- * Subscribes to the game store and drives the music stem layer. Construct one,
- * call `start()`, and `stop()` on teardown. All dependencies are injectable so
- * the director can run headless under vitest.
+ * Subscribes to the game store and drives the music bed. Construct one, call
+ * `start()`, and `stop()` on teardown. All dependencies are injectable so the
+ * director can run headless under vitest.
  */
 export class MusicDirector {
 	private readonly localTeam: number
 	private readonly allies: readonly number[]
 	private readonly isCpuTeam: (team: number) => boolean
 	private readonly store: Readable<GameState>
-	private readonly startStems: (names: readonly MusicStemId[]) => void
+	private readonly startStems: (names: readonly string[]) => void
 	private readonly applyMix: (mix: MusicMix, opts?: MusicMixOptions) => void
 	private readonly stopStems: () => void
 	private readonly playMusic: (track: MusicTrackId, opts?: PlaySingleOptions) => void
 	private readonly stopMusic: () => void
 	private readonly introMs: number
 	private readonly fadeMs: number
+	private readonly variationFadeMs: number
+	private readonly phrasesPerVariation: number
+	private readonly seed: number
+	private readonly clock: PhraseSource
 	private readonly setTimer: (fn: () => void, ms: number) => TimerHandle
 	private readonly clearTimer: (handle: TimerHandle) => void
 
@@ -165,7 +223,16 @@ export class MusicDirector {
 	private introTimer: TimerHandle | null = null
 	private intro = false
 	private inactive = false
+	private resting = false
 	private currentSting: MusicStingId | null = null
+
+	/** Monotonic phrase count from the clock. */
+	private phrase = 0
+	/** Mood currently playing, and the phrase it started on (for fatigue). */
+	private mood: MusicMood | null = null
+	private moodStartPhrase = 0
+	/** Last mix handed to the engine, so identical re-computes are dropped. */
+	private lastMix: MusicMix | null = null
 
 	constructor(opts: MusicDirectorOptions = {}) {
 		this.localTeam = opts.localTeam ?? 0
@@ -179,19 +246,44 @@ export class MusicDirector {
 		this.stopMusic = opts.stopMusic ?? (() => audioEngine.stopMusic())
 		this.introMs = opts.introMs ?? DEFAULT_INTRO_MS
 		this.fadeMs = opts.fadeMs ?? DEFAULT_FADE_MS
+		this.variationFadeMs = opts.variationFadeMs ?? DEFAULT_VARIATION_FADE_MS
+		this.phrasesPerVariation = Math.max(
+			1,
+			opts.phrasesPerVariation ?? DEFAULT_PHRASES_PER_VARIATION
+		)
+		this.seed = opts.seed ?? 0
+
+		const onPhrase = (phrase: number): void => {
+			this.phrase = phrase
+			this.sync()
+		}
+		this.clock =
+			opts.phraseSource?.(onPhrase) ??
+			new MusicClock({
+				phraseSeconds: opts.phraseSeconds ?? DEFAULT_PHRASE_SECONDS,
+				position: () => audioEngine.getMusicPosition(),
+				onPhrase,
+			})
+
 		this.setTimer = opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms))
 		this.clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h))
 	}
 
 	/**
-	 * Begin driving music. Starts every looping stem in lockstep (silent), then
-	 * mixes up the first state's stem. On a fresh match (turn 1) the intro stem
-	 * leads for `introMs` before crossfading into the turn theme.
+	 * Begin driving music. Starts every layer in lockstep (silent), starts the
+	 * phrase clock, then mixes up the first arrangement. On a fresh match (turn 1)
+	 * the intro sting plays over a held-back bed for `introMs`.
 	 */
 	start(): void {
 		if (this.unsubscribe) return
 
 		this.startStems(MUSIC_STEMS)
+		this.clock.reset()
+		this.phrase = 0
+		this.mood = null
+		this.moodStartPhrase = 0
+		this.lastMix = null
+		this.clock.start()
 
 		const initial = get(this.store)
 		if (initial.phase === 'playing' && initial.turnNumber === 1) {
@@ -207,7 +299,7 @@ export class MusicDirector {
 		this.unsubscribe = this.store.subscribe(() => this.sync())
 	}
 
-	/** Stop driving music and release the subscription / timer. */
+	/** Stop driving music and release the subscription, clock and timer. */
 	stop(): void {
 		if (this.introTimer !== null) {
 			this.clearTimer(this.introTimer)
@@ -217,22 +309,40 @@ export class MusicDirector {
 			this.unsubscribe()
 			this.unsubscribe = null
 		}
+		this.clock.stop()
+		this.clock.reset()
 		this.intro = false
 		this.inactive = false
+		this.resting = false
 		this.currentSting = null
+		this.mood = null
+		this.lastMix = null
 		this.stopStems()
 		this.stopMusic()
 	}
 
-	/**
-	 * Set the inactivity / hurry-warning flag. Wired from the H-series inactivity
-	 * timer once it exists (see H2); a no-op effect on music until then.
-	 * TODO(H2): drive this from the move-relay inactivity timeout.
-	 */
+	/** Set the inactivity / hurry-warning flag. */
 	setInactive(inactive: boolean): void {
 		if (this.inactive === inactive) return
 		this.inactive = inactive
 		this.sync()
+	}
+
+	/**
+	 * Declare a lull — a long attack animation, a between-turn pause, anything
+	 * where the bed should get out of the way. Rest is not a fallback state; it is
+	 * the thing that makes the next full arrangement land, so callers should reach
+	 * for it liberally.
+	 */
+	setResting(resting: boolean): void {
+		if (this.resting === resting) return
+		this.resting = resting
+		this.sync()
+	}
+
+	/** The mood currently playing (for the audio dev page / tests). */
+	currentMood(): MusicMood | null {
+		return this.mood
 	}
 
 	/** Build the music-relevant view of the current game state. */
@@ -247,14 +357,34 @@ export class MusicDirector {
 			allies: this.allies,
 			intro: this.intro,
 			inactive: this.inactive,
+			resting: this.resting,
 			cpuThinking,
 		}
 	}
 
-	/** Recompute the desired mix + sting and apply both. */
+	/** Recompute the desired arrangement + sting and apply both. */
 	private sync(): void {
 		const snap = this.snapshot(get(this.store))
-		this.applyMix(musicMixForState(snap, this.localTeam), { fadeMs: this.fadeMs })
+
+		const mood = moodForState(snap, this.localTeam)
+		const moodChanged = mood !== this.mood
+		if (moodChanged) {
+			this.mood = mood
+			// Dwell restarts, so a mood returning after a break comes back at full
+			// strength rather than inheriting the fatigue of its last outing.
+			this.moodStartPhrase = this.phrase
+		}
+
+		const dwell = this.phrase - this.moodStartPhrase
+		const variation = Math.floor(this.phrase / this.phrasesPerVariation)
+		const mix = mixForMood(mood, variation, dwell, this.seed)
+
+		// A mood change is news and fades fast; a re-arrangement inside one mood
+		// should slide under the player's attention, so it gets the long fade.
+		if (!sameMix(mix, this.lastMix)) {
+			this.lastMix = mix
+			this.applyMix(mix, { fadeMs: moodChanged ? this.fadeMs : this.variationFadeMs })
+		}
 
 		const sting = stingForState(snap, this.localTeam)
 		if (sting === this.currentSting) return
