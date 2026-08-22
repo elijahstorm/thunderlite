@@ -1,70 +1,49 @@
 import type { MusicMix } from '$lib/Audio/audioEngine'
+import type { MusicPack } from '$lib/Audio/musicPacks'
 
 /**
  * Adaptive music variation — the pure half of the "stop being repetitive"
  * machinery.
  *
- * The music bed is a stack of instrumental LAYERS, not a set of mood tracks.
- * Every layer is the same length, tempo and key, and they all loop together in
- * lockstep (see `audioEngine.startMusicStems`). Two independent dials shape what
- * you actually hear:
+ * A pack (see `musicPacks.ts`) is one composition delivered as independent
+ * stems, all looping in lockstep. Every stem is safe to raise or drop in any
+ * combination, so an arrangement is just a choice of subset:
  *
- *  - INTENSITY — how deep into the ordered stack we go. `MUSIC_STACK` runs
- *    sparsest → densest and an intensity of N raises its first N layers. It is a
- *    prefix on purpose: commercial adaptive packs ship layers as *cumulative*
- *    intensity tiers (layer 1, layer 1+2, layer 1+2+3), so a prefix is the only
- *    combination the composer actually mixed and checked.
- *  - COLOR — layers outside the stack that are safe to toggle freely, purely for
- *    variety. Packs with genuinely independent stems populate these; a
- *    cumulative-only pack leaves them empty and still gets variation from
- *    intensity wobble alone.
+ *  - the FOUNDATION layer, which holds the harmony and is up in every mood
+ *    except `silent`, and
+ *  - some number of EXTRAS, drawn from the pack's freely combinable layers.
+ *
+ * Mood sets the budget: how many extras, and how loud. Ranges are expressed as
+ * fractions of the pool rather than absolute counts, so the same mood table
+ * works for a three-layer pack and a five-layer one — buying a bigger pack later
+ * widens the variation space without touching this file.
  *
  * On top sits FATIGUE. A mood that overstays its welcome thins itself out:
- * intensity drifts toward the mood's floor, color layers drop away, and the
- * whole bed sits back. This is the actual fix for "I muted it because it was
- * repetitive" — the music sags through a long CPU grind, so your own turn
- * snapping back to the full arrangement reads as an event rather than as more
- * wallpaper. Nothing here fights the composer; it only ever plays subsets the
- * pack was built to support.
+ * extras drop away and the whole bed sits back. This is the actual fix for "I
+ * muted it because it was repetitive" — the music sags through a long CPU grind,
+ * so your own turn snapping back to the full arrangement reads as an event
+ * rather than as more wallpaper. Nothing here fights the composer; it only ever
+ * plays subsets the pack was built to support.
  *
- * Everything is a pure function of (mood, variation, dwell, seed), so an
- * arrangement is reproducible. That matters beyond testability: replays re-run a
- * match from a seed and should sound the same the second time through.
+ * Everything is a pure function of (mood, variation, dwell, seed, pool size), so
+ * an arrangement is reproducible. That matters beyond testability: replays
+ * re-run a match from a seed and should sound the same the second time through.
  */
 
-/** Cumulative intensity stack, sparsest first. Intensity N raises the first N. */
-export const MUSIC_STACK = ['bed', 'pulse', 'bass', 'melody'] as const
-
-/** Independent layers, safe to toggle in any combination. */
-export const MUSIC_COLOR = ['accent', 'texture'] as const
-
-export type MusicStackId = (typeof MUSIC_STACK)[number]
-export type MusicColorId = (typeof MUSIC_COLOR)[number]
-export type MusicLayerId = MusicStackId | MusicColorId
-
-/** Every layer the bed can load, stack first. */
-export const MUSIC_LAYERS: readonly MusicLayerId[] = [...MUSIC_STACK, ...MUSIC_COLOR]
-
-/** Manifest key for a layer (see `musicManifest` in assetManifest.ts). */
-export function layerTrackId(layer: MusicLayerId): string {
-	return `layers/${layer}`
-}
-
 /**
- * Intensity moods the director maps game phase onto. Ordered loosely by energy;
- * `silent` and `rest` are the two ways the bed gets out of the way.
+ * Intensity moods the director maps game phase onto. `silent` and `rest` are the
+ * two ways the bed gets out of the way.
  */
 export type MusicMood = 'silent' | 'rest' | 'thinking' | 'ally' | 'enemy' | 'player' | 'hurry'
 
-/** How a mood is allowed to arrange itself. */
+/** How a mood is allowed to arrange itself, independent of any pack's size. */
 export interface MoodSpec {
-	/** Inclusive stack-depth range variation may choose from. */
-	minIntensity: number
-	maxIntensity: number
-	/** Color layers eligible in this mood. */
-	color: readonly MusicColorId[]
-	/** How many of `color` to raise at once. */
-	colorPick: number
+	/** Raise the pack's foundation layer. */
+	foundation: boolean
+	/** Lower bound on extras, as a fraction of the pool (0..1). */
+	minExtra: number
+	/** Upper bound on extras, as a fraction of the pool (0..1). */
+	maxExtra: number
 	/** Gain ceiling applied to every raised layer. */
 	level: number
 }
@@ -72,37 +51,25 @@ export interface MoodSpec {
 /**
  * Per-mood arrangement budgets.
  *
- * The ranges overlap deliberately. Adjacent moods sharing an intensity means a
+ * The ranges overlap deliberately. Adjacent moods sharing a layer count means a
  * turn flip does not always produce an audible jump, which keeps the music from
- * feeling like a state readout. The *distribution* differs, so over a match the
- * moods still read as distinct.
+ * feeling like a state readout. The levels still separate them, so over a match
+ * the moods read as distinct.
  */
 export const MOOD_SPECS: Readonly<Record<MusicMood, MoodSpec>> = {
-	// Terminal / stings own the field. Nothing from the bed.
-	silent: { minIntensity: 0, maxIntensity: 0, color: [], colorPick: 0, level: 0 },
-	// Deliberate breathing room: one layer, well back. Silence resets the ear,
-	// which is what makes the next full arrangement land.
-	rest: { minIntensity: 1, maxIntensity: 1, color: [], colorPick: 0, level: 0.5 },
+	// Terminal. The win/lose sting owns the moment; the bed gets out of its way.
+	silent: { foundation: false, minExtra: 0, maxExtra: 0, level: 0 },
+	// Deliberate breathing room: foundation only, well back. Silence resets the
+	// ear, which is what makes the next full arrangement land.
+	rest: { foundation: true, minExtra: 0, maxExtra: 0, level: 0.5 },
 	// CPU is computing. Sparse and unresolved — this is dead air, not a set piece.
-	thinking: { minIntensity: 1, maxIntensity: 2, color: ['texture'], colorPick: 1, level: 0.7 },
-	ally: { minIntensity: 2, maxIntensity: 3, color: ['texture'], colorPick: 1, level: 0.85 },
-	enemy: {
-		minIntensity: 2,
-		maxIntensity: 3,
-		color: ['accent', 'texture'],
-		colorPick: 1,
-		level: 0.9,
-	},
+	thinking: { foundation: true, minExtra: 0, maxExtra: 0.5, level: 0.7 },
+	ally: { foundation: true, minExtra: 0.5, maxExtra: 0.5, level: 0.85 },
+	enemy: { foundation: true, minExtra: 0.5, maxExtra: 1, level: 0.9 },
 	// Your turn: the fullest the bed normally gets.
-	player: {
-		minIntensity: 3,
-		maxIntensity: 4,
-		color: ['accent', 'texture'],
-		colorPick: 1,
-		level: 1,
-	},
-	// Hurry-up warning. Pinned wide open, and immune to fatigue (see `fatigued`).
-	hurry: { minIntensity: 4, maxIntensity: 4, color: ['accent'], colorPick: 1, level: 1 },
+	player: { foundation: true, minExtra: 0.5, maxExtra: 1, level: 1 },
+	// Hurry-up warning. Everything on, and immune to fatigue (see `extrasBudget`).
+	hurry: { foundation: true, minExtra: 1, maxExtra: 1, level: 1 },
 }
 
 /** Phrases in one mood before fatigue takes another step. */
@@ -114,57 +81,75 @@ const FATIGUE_LEVEL_FLOOR = 0.55
 /** Moods that refuse to thin out — they exist precisely to grab attention. */
 const FATIGUE_IMMUNE: readonly MusicMood[] = ['silent', 'hurry']
 
+const clamp01 = (value: number): number =>
+	Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0
+
 /** How many fatigue steps `dwell` phrases in one mood have accumulated. */
 export function fatigueSteps(dwell: number): number {
 	if (!Number.isFinite(dwell) || dwell <= 0) return 0
 	return Math.floor(dwell / FATIGUE_PHRASES)
 }
 
-/**
- * Thin a mood down for having outstayed its welcome. Pulls the intensity ceiling
- * toward the floor, drops color layers first, and eases the whole bed back — but
- * never below `FATIGUE_LEVEL_FLOOR`, so it decays into background rather than
- * into an awkward silence.
- */
-export function fatigued(mood: MusicMood, dwell: number): MoodSpec {
-	const spec = MOOD_SPECS[mood]
-	const steps = FATIGUE_IMMUNE.includes(mood) ? 0 : fatigueSteps(dwell)
-	if (steps === 0) return spec
-	return {
-		...spec,
-		maxIntensity: Math.max(spec.minIntensity, spec.maxIntensity - steps),
-		colorPick: Math.max(0, spec.colorPick - steps),
-		level: Math.max(spec.level * FATIGUE_LEVEL_FLOOR, spec.level * FATIGUE_LEVEL_FALLOFF ** steps),
-	}
-}
-
-/** One concrete thing to play: a stack depth plus a set of color layers. */
-export interface MusicArrangement {
-	/** Raises the first `intensity` layers of `MUSIC_STACK`. */
-	intensity: number
-	color: readonly MusicColorId[]
-	/** Gain for every raised layer. */
+/** A mood's budget resolved against a concrete pack size and dwell time. */
+export interface ExtrasBudget {
+	foundation: boolean
+	/** Inclusive bounds on how many extras to raise. */
+	min: number
+	max: number
 	level: number
 }
 
 /**
- * Every subset of `items` up to `maxK` in size, including the empty one, in a
- * stable order.
+ * Resolve a mood into a concrete budget for a pool of `poolSize` extras, thinned
+ * by however long the mood has overstayed.
  *
- * Up-to rather than exactly-k matters: it makes "the stack on its own, no color"
- * a legal arrangement, which both widens the cycle and gives fatigue somewhere
- * to land. Every subset is safe to play because color layers are, by definition,
- * the ones the pack declares independent.
+ * Fatigue pulls `max` toward `min` and eases the level back, but never below
+ * `FATIGUE_LEVEL_FLOOR`, so a stale mood decays into background rather than into
+ * an awkward silence. `min` is never touched: every mood keeps its floor, so
+ * fatigue can thin the arrangement but cannot strip a mood of its identity.
  */
-function subsetsUpTo<T>(items: readonly T[], maxK: number): T[][] {
-	const limit = Math.max(0, Math.min(maxK, items.length))
-	const out: T[][] = [[]]
-	const acc: T[] = []
+export function extrasBudget(mood: MusicMood, dwell: number, poolSize: number): ExtrasBudget {
+	const spec = MOOD_SPECS[mood]
+	const pool = Math.max(0, Math.trunc(poolSize))
+	const scale = (fraction: number): number => Math.min(pool, Math.round(clamp01(fraction) * pool))
+
+	const min = scale(spec.minExtra)
+	const ceiling = Math.max(min, scale(spec.maxExtra))
+	const steps = FATIGUE_IMMUNE.includes(mood) ? 0 : fatigueSteps(dwell)
+
+	return {
+		foundation: spec.foundation,
+		min,
+		max: Math.max(min, ceiling - steps),
+		level:
+			steps === 0
+				? spec.level
+				: Math.max(spec.level * FATIGUE_LEVEL_FLOOR, spec.level * FATIGUE_LEVEL_FALLOFF ** steps),
+	}
+}
+
+/** One concrete thing to play. */
+export interface MusicArrangement {
+	foundation: boolean
+	/** Indices into the pack's `extras`, ascending. */
+	extras: readonly number[]
+	/** Gain for every raised layer. */
+	level: number
+}
+
+/** All ascending index tuples of length `k` drawn from `0..count-1`. */
+function subsetsOfSize(count: number, k: number): number[][] {
+	if (k <= 0) return [[]]
+	if (k > count) return []
+	const out: number[][] = []
+	const acc: number[] = []
 	const walk = (start: number): void => {
-		if (acc.length === limit) return
-		for (let i = start; i < items.length; i++) {
-			acc.push(items[i])
+		if (acc.length === k) {
 			out.push([...acc])
+			return
+		}
+		for (let i = start; i < count; i++) {
+			acc.push(i)
 			walk(i + 1)
 			acc.pop()
 		}
@@ -214,8 +199,8 @@ function shuffled<T>(items: readonly T[], rng: () => number): T[] {
 }
 
 /**
- * Every distinct arrangement a (possibly fatigued) mood permits, in a
- * seed-shuffled order.
+ * Every distinct arrangement a (possibly fatigued) mood permits over a pool of
+ * `poolSize` extras, in a seed-shuffled order.
  *
  * Because the cycle holds only distinct arrangements, indexing it with
  * consecutive variation numbers can never repeat an arrangement back to back —
@@ -223,15 +208,23 @@ function shuffled<T>(items: readonly T[], rng: () => number): T[] {
  * the ear latches onto, so the cycle structurally rules it out and every
  * arrangement gets aired before any of them comes round again.
  */
-export function variationCycle(mood: MusicMood, dwell: number, seed: number): MusicArrangement[] {
-	const spec = fatigued(mood, dwell)
-	const colorSets = subsetsUpTo(spec.color, spec.colorPick)
+export function variationCycle(
+	mood: MusicMood,
+	dwell: number,
+	seed: number,
+	poolSize: number
+): MusicArrangement[] {
+	const budget = extrasBudget(mood, dwell, poolSize)
 	const out: MusicArrangement[] = []
-	for (let intensity = spec.minIntensity; intensity <= spec.maxIntensity; intensity++) {
-		for (const color of colorSets) out.push({ intensity, color, level: spec.level })
+	for (let k = budget.min; k <= budget.max; k++) {
+		for (const extras of subsetsOfSize(Math.max(0, Math.trunc(poolSize)), k)) {
+			out.push({ foundation: budget.foundation, extras, level: budget.level })
+		}
 	}
-	if (out.length === 0) out.push({ intensity: spec.minIntensity, color: [], level: spec.level })
-	return shuffled(out, mulberry32(hash32(`${mood}:${seed}`)))
+	if (out.length === 0) {
+		out.push({ foundation: budget.foundation, extras: [], level: budget.level })
+	}
+	return shuffled(out, mulberry32(hash32(`${mood}:${seed}:${poolSize}`)))
 }
 
 /**
@@ -242,30 +235,34 @@ export function arrangementFor(
 	mood: MusicMood,
 	variation: number,
 	dwell: number,
-	seed: number
+	seed: number,
+	poolSize: number
 ): MusicArrangement {
-	const cycle = variationCycle(mood, dwell, seed)
+	const cycle = variationCycle(mood, dwell, seed, poolSize)
 	const index = ((Math.trunc(variation) % cycle.length) + cycle.length) % cycle.length
 	return cycle[index]
 }
 
-/** Expand an arrangement into per-layer gains for the engine. */
-export function mixForArrangement(arrangement: MusicArrangement): MusicMix {
-	const mix: Record<string, number> = {}
-	const depth = Math.max(0, Math.min(MUSIC_STACK.length, Math.trunc(arrangement.intensity)))
-	const level = Math.max(0, Math.min(1, arrangement.level))
+/** Expand an arrangement into per-layer gains for a concrete pack. */
+export function mixForArrangement(arrangement: MusicArrangement, pack: MusicPack): MusicMix {
+	const level = clamp01(arrangement.level)
 	if (level === 0) return {}
-	for (let i = 0; i < depth; i++) mix[layerTrackId(MUSIC_STACK[i])] = level
-	for (const layer of arrangement.color) mix[layerTrackId(layer)] = level
+	const mix: Record<string, number> = {}
+	if (arrangement.foundation) mix[pack.foundation] = level
+	for (const index of arrangement.extras) {
+		const layer = pack.extras[index]
+		if (layer !== undefined) mix[layer] = level
+	}
 	return mix
 }
 
-/** Convenience: mood + clock position → per-layer gains. */
+/** Convenience: mood + clock position + pack → per-layer gains. */
 export function mixForMood(
 	mood: MusicMood,
 	variation: number,
 	dwell: number,
-	seed: number
+	seed: number,
+	pack: MusicPack
 ): MusicMix {
-	return mixForArrangement(arrangementFor(mood, variation, dwell, seed))
+	return mixForArrangement(arrangementFor(mood, variation, dwell, seed, pack.extras.length), pack)
 }

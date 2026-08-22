@@ -2,7 +2,6 @@
 import { describe, it, expect } from 'vitest'
 import { writable } from 'svelte/store'
 import {
-	MUSIC_STEMS,
 	moodForState,
 	musicMixForState,
 	stingForState,
@@ -11,7 +10,13 @@ import {
 	type MusicTrackId,
 	type PhraseSource,
 } from '../../src/lib/Audio/musicDirector'
-import { FATIGUE_PHRASES, MUSIC_LAYERS, layerTrackId } from '../../src/lib/Audio/musicVariation'
+import { FATIGUE_PHRASES } from '../../src/lib/Audio/musicVariation'
+import {
+	PLAYABLE_PACKS,
+	packForMatch,
+	packLayers,
+	type MusicPack,
+} from '../../src/lib/Audio/musicPacks'
 import type { MusicMix, MusicMixOptions, PlaySingleOptions } from '../../src/lib/Audio/audioEngine'
 import type { GameState } from '../../src/lib/Engine/gameState'
 
@@ -23,9 +28,85 @@ const base = (overrides: Partial<MusicState> = {}): MusicState => ({
 	...overrides,
 })
 
-describe('MUSIC_STEMS', () => {
-	it('is exactly the bed layers, so the engine loads nothing else', () => {
-		expect(MUSIC_STEMS).toEqual(MUSIC_LAYERS.map(layerTrackId))
+/**
+ * Pinned so arrangements are deterministic, with three extras so the moods have
+ * room to vary. Real packs ship three layers (one foundation, two extras).
+ */
+const TEST_PACK: MusicPack = {
+	id: 'test',
+	loopSeconds: 60,
+	phrasesPerLoop: 4,
+	foundation: 'packs/test/layer1',
+	extras: ['packs/test/layer2', 'packs/test/layer3', 'packs/test/layer4'],
+}
+
+describe('pack selection', () => {
+	it('derives the pack from the match seed when none is pinned', () => {
+		const store = writable(makeGameState())
+		const rec = recorder()
+		const clock = fakePhrases()
+		for (const seed of [0, 1, 2, 3]) {
+			const director = new MusicDirector({
+				localTeam: 0,
+				store,
+				...rec,
+				phraseSource: clock.source,
+				seed,
+			})
+			expect(director.currentPack().id).toBe(packForMatch(seed).id)
+			director.stop()
+		}
+	})
+
+	it('holds one pack for the whole match', () => {
+		// Packs run at different tempos and keys, so switching mid-match would
+		// clash and crossfading between them would be worse.
+		const store = writable(makeGameState({ currentTeam: 0 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			seed: 1,
+		})
+
+		director.start()
+		const chosen = director.currentPack().id
+		store.set(makeGameState({ currentTeam: 1 }))
+		clock.advance(20)
+		store.set(makeGameState({ phase: 'gameOver', winner: 0 }))
+		expect(director.currentPack().id).toBe(chosen)
+		director.stop()
+	})
+
+	it('only ever raises layers belonging to its own pack', () => {
+		const store = writable(makeGameState({ currentTeam: 0 }))
+		const rec = recorder()
+		const clock = fakePhrases()
+		const director = new MusicDirector({
+			localTeam: 0,
+			store,
+			...rec,
+			phraseSource: clock.source,
+			pack: TEST_PACK,
+			phrasesPerVariation: 1,
+		})
+
+		director.start()
+		clock.advance(30)
+		const own = new Set(packLayers(TEST_PACK))
+		for (const call of rec.mixCalls) {
+			for (const layer of Object.keys(call.mix)) expect(own).toContain(layer)
+		}
+		director.stop()
+	})
+
+	it('ships a phrase length that divides each real pack cleanly', () => {
+		for (const pack of PLAYABLE_PACKS) {
+			expect(pack.loopSeconds / pack.phrasesPerLoop, pack.id).toBeGreaterThan(6)
+		}
 	})
 })
 
@@ -73,7 +154,7 @@ describe('moodForState (pure)', () => {
 
 	it('goes silent on game over so the sting owns the moment', () => {
 		expect(moodForState(base({ phase: 'gameOver', winner: 0 }), 0)).toBe('silent')
-		expect(musicMixForState(base({ phase: 'gameOver', winner: 1 }), 0)).toEqual({})
+		expect(musicMixForState(base({ phase: 'gameOver', winner: 1 }), 0, TEST_PACK)).toEqual({})
 	})
 })
 
@@ -198,11 +279,12 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()
 		expect(rec.stemStarts).toHaveLength(1)
-		expect(rec.stemStarts[0]).toEqual([...MUSIC_STEMS])
+		expect(rec.stemStarts[0]).toEqual(packLayers(TEST_PACK))
 		expect(clock.startedCount()).toBe(1)
 		director.stop()
 	})
@@ -218,6 +300,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 			setTimer: (fn) => {
 				introCb = fn
 				return 1 as unknown as ReturnType<typeof setTimeout>
@@ -243,6 +326,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()
@@ -268,6 +352,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()
@@ -288,6 +373,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 			phrasesPerVariation: 1,
 			seed: 5,
 		})
@@ -310,6 +396,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 			phrasesPerVariation: 1,
 			fadeMs: 800,
 			variationFadeMs: 2500,
@@ -340,6 +427,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 			phrasesPerVariation: 1,
 			seed: 2,
 		})
@@ -364,6 +452,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 			phrasesPerVariation: 1,
 			seed: 4,
 		})
@@ -389,6 +478,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()
@@ -411,6 +501,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 			phrasesPerVariation: 1,
 		})
 
@@ -434,6 +525,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()
@@ -452,6 +544,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()
@@ -476,6 +569,7 @@ describe('MusicDirector (subscription shell)', () => {
 			store,
 			...rec,
 			phraseSource: clock.source,
+			pack: TEST_PACK,
 		})
 
 		director.start()

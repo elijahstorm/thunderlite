@@ -278,7 +278,7 @@ describe('master-muted playback suppression', () => {
 
 	it('keeps music stems primed but silent and unplayed when muted', () => {
 		const { engine, created } = makeStemEngine(mutedSettings())
-		engine.startMusicStems(['layers/bed', 'layers/pulse'])
+		engine.startMusicStems(['packs/pack1/layer1', 'packs/pack1/layer2'])
 
 		expect(created).toHaveLength(2)
 		for (const el of created) {
@@ -289,7 +289,7 @@ describe('master-muted playback suppression', () => {
 
 	it('resumes the primed track and stems once sound is turned back on', () => {
 		const { engine, created } = makeEngine(mutedSettings())
-		engine.startMusicStems(['layers/bed'])
+		engine.startMusicStems(['packs/pack1/layer1'])
 		engine.playEnv('weather/rain')
 		expect(created.every((e) => e.paused)).toBe(true)
 
@@ -314,7 +314,7 @@ describe('master-muted playback suppression', () => {
 // ── Music stem layer (adaptive crossfade) ───────────────────────────────────────
 
 describe('music stem layer', () => {
-	const STEMS = ['layers/bed', 'layers/pulse', 'layers/bass'] as const
+	const STEMS = ['packs/pack1/layer1', 'packs/pack1/layer2', 'packs/pack1/layer3'] as const
 
 	it('starts every stem looping, in lockstep, at gain 0', () => {
 		const { engine, created } = makeStemEngine()
@@ -332,10 +332,10 @@ describe('music stem layer', () => {
 	it('snaps to the target mix when fadeMs is 0', () => {
 		const { engine, created } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'packs/pack1/layer1': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('bed'))!
-		const enemy = created.find((e) => e.src.includes('bass'))!
+		const player = created.find((e) => e.src.includes('pack1/layer1'))!
+		const enemy = created.find((e) => e.src.includes('pack1/layer3'))!
 		const channelVol = effectiveVolume(engine.getState(), 'music')
 		expect(player.volume).toBeCloseTo(channelVol)
 		expect(enemy.volume).toBe(0)
@@ -344,13 +344,13 @@ describe('music stem layer', () => {
 	it('crossfades stem gains over time without restarting any stem', () => {
 		const { engine, created, clock } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'packs/pack1/layer1': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('bed'))!
-		const enemy = created.find((e) => e.src.includes('bass'))!
+		const player = created.find((e) => e.src.includes('pack1/layer1'))!
+		const enemy = created.find((e) => e.src.includes('pack1/layer3'))!
 
 		// Now flip to the enemy theme with a real fade
-		engine.setMusicMix({ 'layers/bass': 1 }, { fadeMs: 1000 })
+		engine.setMusicMix({ 'packs/pack1/layer3': 1 }, { fadeMs: 1000 })
 
 		// Halfway through, both should be roughly equally loud (linear ramp)
 		clock.advance(500)
@@ -372,9 +372,9 @@ describe('music stem layer', () => {
 	it('re-targeting mid-fade continues smoothly from the current gain', () => {
 		const { engine, created, clock } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'packs/pack1/layer1': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('bed'))!
+		const player = created.find((e) => e.src.includes('pack1/layer1'))!
 
 		// Start fading player out toward 0
 		engine.setMusicMix({}, { fadeMs: 1000 })
@@ -385,7 +385,7 @@ describe('music stem layer', () => {
 		expect(midGain).toBeCloseTo(0.6, 2) // 40% faded
 
 		// Reverse direction — re-target player back to 1
-		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 1000 })
+		engine.setMusicMix({ 'packs/pack1/layer1': 1 }, { fadeMs: 1000 })
 		clock.advance(0)
 		clock.tick()
 		// Just after re-target, still near the current 0.6 (no jump)
@@ -404,9 +404,9 @@ describe('music stem layer', () => {
 	it('master mute silences every stem', () => {
 		const { engine, created } = makeStemEngine()
 		engine.startMusicStems(STEMS)
-		engine.setMusicMix({ 'layers/bed': 1 }, { fadeMs: 0 })
+		engine.setMusicMix({ 'packs/pack1/layer1': 1 }, { fadeMs: 0 })
 
-		const player = created.find((e) => e.src.includes('bed'))!
+		const player = created.find((e) => e.src.includes('pack1/layer1'))!
 		expect(player.volume).toBeGreaterThan(0)
 
 		engine.setMasterMute(true)

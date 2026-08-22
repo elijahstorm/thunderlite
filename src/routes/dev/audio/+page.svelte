@@ -3,12 +3,11 @@
 	import { ANIMATION_TIME } from '$lib/Engine/Animator/animator'
 	import { audioEngine } from '$lib/Audio/audioEngine'
 	import { sfxManifest, envManifest } from '$lib/Audio/assetManifest'
-	import { MUSIC_STEMS } from '$lib/Audio/musicDirector'
 	import { MusicClock } from '$lib/Audio/musicClock'
+	import { MUSIC_PACKS, packLayers, phraseSecondsFor, type MusicPack } from '$lib/Audio/musicPacks'
 	import {
 		FATIGUE_PHRASES,
 		MOOD_SPECS,
-		MUSIC_STACK,
 		arrangementFor,
 		mixForMood,
 		type MusicMood,
@@ -42,11 +41,11 @@
 	// swapped for buttons, so a mood or a fatigue level can be held still and
 	// listened to instead of arriving on its own schedule.
 	const moods = Object.keys(MOOD_SPECS) as MusicMood[]
-	const PHRASE_SECONDS = 8
 	const PHRASES_PER_VARIATION = 2
 	const MOOD_FADE_MS = 800
 	const VARIATION_FADE_MS = 2500
 
+	let pack = $state<MusicPack>(MUSIC_PACKS[0])
 	let bedRunning = $state(false)
 	let mood = $state<MusicMood>('player')
 	let variation = $state(0)
@@ -57,41 +56,53 @@
 	let auto = $state(true)
 	let stems: ReadonlyMap<string, { currentGain: number; targetGain: number }> = $state(new Map())
 
-	const arrangement = $derived(arrangementFor(mood, variation, dwell, seed))
+	const layers = $derived(packLayers(pack))
+	const arrangement = $derived(arrangementFor(mood, variation, dwell, seed, pack.extras.length))
 	const fatigueLevel = $derived(Math.floor(dwell / FATIGUE_PHRASES))
 
 	const applyMix = (fadeMs: number) =>
-		audioEngine.setMusicMix(mixForMood(mood, variation, dwell, seed), { fadeMs })
+		audioEngine.setMusicMix(mixForMood(mood, variation, dwell, seed, pack), { fadeMs })
 
-	// Constructed eagerly — it starts no timer until `start()`, so this is safe
-	// during SSR.
-	const clock = new MusicClock({
-		phraseSeconds: PHRASE_SECONDS,
-		position: () => audioEngine.getMusicPosition(),
-		onPhrase: (p) => {
-			phrase = p
-			if (!auto) return
-			dwell += 1
-			variation = Math.floor(p / PHRASES_PER_VARIATION)
-			applyMix(VARIATION_FADE_MS)
-		},
-	})
+	// Rebuilt per pack rather than reused: the phrase length is derived from the
+	// pack's own loop, so a clock outliving a pack switch would tick off-grid.
+	let clock: MusicClock | null = null
 
-	const startBed = () => {
-		audioEngine.startMusicStems(MUSIC_STEMS)
-		bedRunning = true
-		variation = 0
-		dwell = 0
-		phrase = 0
-		clock.reset()
-		clock.start()
-		applyMix(0)
-	}
 	const stopBed = () => {
-		clock.stop()
+		clock?.stop()
+		clock = null
 		audioEngine.stopMusicStems()
 		bedRunning = false
 		stems = new Map()
+	}
+
+	const startBed = () => {
+		stopBed()
+		audioEngine.startMusicStems(layers)
+		variation = 0
+		dwell = 0
+		phrase = 0
+		clock = new MusicClock({
+			phraseSeconds: phraseSecondsFor(pack),
+			position: () => audioEngine.getMusicPosition(),
+			onPhrase: (p) => {
+				phrase = p
+				if (!auto) return
+				dwell += 1
+				variation = Math.floor(p / PHRASES_PER_VARIATION)
+				applyMix(VARIATION_FADE_MS)
+			},
+		})
+		clock.start()
+		bedRunning = true
+		applyMix(0)
+	}
+
+	// Packs run at different tempos and keys, so this is a hard cut, exactly as a
+	// match boundary would be. There is no safe crossfade between two packs.
+	const selectPack = (next: MusicPack) => {
+		const wasRunning = bedRunning
+		pack = next
+		if (wasRunning) startBed()
 	}
 
 	// A mood change resets fatigue, exactly as the director does — which is what
@@ -186,11 +197,32 @@
 	<section class="space-y-3">
 		<h2 class="font-medium text-slate-300">Adaptive bed</h2>
 		<p class="text-xs text-slate-500">
-			Every layer loops in lockstep and is only ever mixed by gain. A mood picks how deep into the
-			stack to go; variation re-arranges within the mood on phrase edges; fatigue thins a mood out
-			the longer it overstays. Leave it on Auto and just listen for a couple of minutes, which is
-			the only way to judge whether it still wears out.
+			A pack is one composition delivered as independent stems, so any subset sums cleanly. A mood
+			picks how many to raise; variation re-picks on phrase edges; fatigue thins a mood out the
+			longer it overstays. A match holds one pack for its whole length, since packs differ in tempo
+			and key. Leave it on Auto and just listen for a couple of minutes, which is the only way to
+			judge whether it still wears out.
 		</p>
+
+		<div class="flex flex-wrap items-center gap-1.5">
+			{#each MUSIC_PACKS as p}
+				<button
+					class="rounded px-2.5 py-1 text-xs {pack.id === p.id
+						? 'bg-indigo-600'
+						: 'bg-slate-700 hover:bg-slate-600'}"
+					onclick={() => selectPack(p)}
+				>
+					{p.id}
+					<span class="text-slate-400">
+						{p.loopSeconds.toFixed(0)}s · {p.extras.length + 1}L
+					</span>
+					{#if p.devOnly}<span class="text-amber-400">dev</span>{/if}
+				</button>
+			{/each}
+			<span class="text-xs text-slate-600">
+				phrase {phraseSecondsFor(pack).toFixed(2)}s · {pack.credit ?? 'uncredited'}
+			</span>
+		</div>
 
 		<div class="flex flex-wrap items-center gap-2">
 			{#if !bedRunning}
@@ -260,12 +292,14 @@
 					</dd>
 				</div>
 				<div>
-					<dt class="inline text-slate-500">intensity</dt>
-					<dd class="inline tabular-nums">{arrangement.intensity}/{MUSIC_STACK.length}</dd>
+					<dt class="inline text-slate-500">extras</dt>
+					<dd class="inline tabular-nums">
+						{arrangement.extras.length}/{pack.extras.length}
+					</dd>
 				</div>
 				<div>
-					<dt class="inline text-slate-500">color</dt>
-					<dd class="inline">{arrangement.color.length ? arrangement.color.join(', ') : 'none'}</dd>
+					<dt class="inline text-slate-500">foundation</dt>
+					<dd class="inline">{arrangement.foundation ? 'up' : 'down'}</dd>
 				</div>
 				<div>
 					<dt class="inline text-slate-500">level</dt>
@@ -274,15 +308,15 @@
 			</dl>
 
 			<div class="grid max-w-2xl grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-1">
-				{#each MUSIC_STEMS as stem, i}
-					{@const gain = stems.get(stem)?.currentGain ?? 0}
-					{@const isStack = i < MUSIC_STACK.length}
-					<span class="text-xs {isStack ? 'text-slate-300' : 'text-slate-500 italic'}">
-						{stem.replace('layers/', '')}
+				{#each layers as layer, i}
+					{@const gain = stems.get(layer)?.currentGain ?? 0}
+					{@const isFoundation = i === 0}
+					<span class="text-xs {isFoundation ? 'text-slate-300' : 'text-slate-500'}">
+						{layer.split('/').pop()}{isFoundation ? ' (foundation)' : ''}
 					</span>
 					<div class="h-2 overflow-clip rounded bg-slate-700">
 						<div
-							class="h-full {isStack ? 'bg-emerald-400' : 'bg-sky-400'}"
+							class="h-full {isFoundation ? 'bg-emerald-400' : 'bg-sky-400'}"
 							style="width: {gain * 100}%"
 						></div>
 					</div>
@@ -292,8 +326,8 @@
 				{/each}
 			</div>
 			<p class="text-xs text-slate-600">
-				Green is the cumulative stack (an intensity of N raises the first N). Blue is color, toggled
-				for variety only. Run scripts/audio/gen-demo-layers.sh if these all read 0%.
+				Green is the foundation, up in every mood but silent. Blue are the freely combinable extras.
+				If the demo pack reads 0% across the board, run scripts/audio/gen-demo-layers.sh.
 			</p>
 		{/if}
 	</section>

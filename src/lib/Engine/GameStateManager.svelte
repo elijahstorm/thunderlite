@@ -414,13 +414,10 @@
 		musicDirector = new MusicDirector({
 			localTeam,
 			isCpuTeam: () => !isMultiplayer,
-			// Must match the phrase length the bed layers were rendered at, or
-			// re-arrangements drift off the bar line. See
-			// scripts/audio/gen-demo-layers.sh; update both together when real
-			// layers land.
-			phraseSeconds: 8,
-			// Stable per-match seed so a replay arranges itself the way the live
-			// match did, rather than rolling a fresh set of variations.
+			// Stable per-match seed. It picks both the pack and the arrangement
+			// order, so a replay hears the same music the live match did instead of
+			// rolling fresh. The phrase length comes from whichever pack this seed
+			// lands on, so there is nothing to keep in sync by hand.
 			seed: seedFromString(gameSession || campaignLevelId || 'local'),
 		})
 		musicDirector.start()

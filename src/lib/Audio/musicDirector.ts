@@ -7,7 +7,8 @@ import {
 	type PlaySingleOptions,
 } from '$lib/Audio/audioEngine'
 import { MusicClock } from '$lib/Audio/musicClock'
-import { MUSIC_LAYERS, layerTrackId, mixForMood, type MusicMood } from '$lib/Audio/musicVariation'
+import { packForMatch, packLayers, phraseSecondsFor, type MusicPack } from '$lib/Audio/musicPacks'
+import { mixForMood, type MusicMood } from '$lib/Audio/musicVariation'
 
 /**
  * Music director — drives the adaptive music bed in time with the game.
@@ -43,8 +44,12 @@ export type MusicStingId = 'game/intro' | 'game/win' | 'game/lose'
 /** Any logical music id the director can ask the engine for. */
 export type MusicTrackId = MusicStingId
 
-/** Manifest ids of the bed layers, stack first then color. */
-export const MUSIC_STEMS: readonly string[] = MUSIC_LAYERS.map(layerTrackId)
+/**
+ * A match plays exactly one pack. Layers within a pack are interchangeable;
+ * layers across packs are not (different tempos, different keys), so the pack is
+ * chosen once from the match seed and held for the whole match. Variety across
+ * packs is variety across matches, which is the axis players actually notice.
+ */
 
 /**
  * The minimal slice of state the mood mapping needs, decoupled from the concrete
@@ -98,11 +103,12 @@ export function moodForState(state: MusicState, localTeam: number): MusicMood {
 export function musicMixForState(
 	state: MusicState,
 	localTeam: number,
+	pack: MusicPack,
 	variation = 0,
 	dwell = 0,
 	seed = 0
 ): MusicMix {
-	return mixForMood(moodForState(state, localTeam), variation, dwell, seed)
+	return mixForMood(moodForState(state, localTeam), variation, dwell, seed, pack)
 }
 
 /**
@@ -161,8 +167,13 @@ export interface MusicDirectorOptions {
 	 */
 	variationFadeMs?: number
 	/**
-	 * Seconds of audio per phrase. Set this to the pack's actual phrase length
-	 * (loop seconds ÷ phrases per loop) so re-arrangements land on a bar line.
+	 * Pack to play. Defaults to one chosen from `seed`, so a replay hears the pack
+	 * its live match did. Pass one explicitly to pin it (dev pages, tests).
+	 */
+	pack?: MusicPack
+	/**
+	 * Seconds of audio per phrase. Defaults to the pack's own subdivision, which
+	 * divides its loop exactly — override only to deliberately go off-grid.
 	 */
 	phraseSeconds?: number
 	/** Phrases to hold an arrangement before rolling the next one. */
@@ -183,7 +194,6 @@ export interface MusicDirectorOptions {
 const DEFAULT_INTRO_MS = 3500
 const DEFAULT_FADE_MS = 800
 const DEFAULT_VARIATION_FADE_MS = 2500
-const DEFAULT_PHRASE_SECONDS = 8
 const DEFAULT_PHRASES_PER_VARIATION = 2
 
 /** True when two mixes would sound identical, so we can skip a pointless fade. */
@@ -215,6 +225,7 @@ export class MusicDirector {
 	private readonly variationFadeMs: number
 	private readonly phrasesPerVariation: number
 	private readonly seed: number
+	private readonly pack: MusicPack
 	private readonly clock: PhraseSource
 	private readonly setTimer: (fn: () => void, ms: number) => TimerHandle
 	private readonly clearTimer: (handle: TimerHandle) => void
@@ -252,6 +263,7 @@ export class MusicDirector {
 			opts.phrasesPerVariation ?? DEFAULT_PHRASES_PER_VARIATION
 		)
 		this.seed = opts.seed ?? 0
+		this.pack = opts.pack ?? packForMatch(this.seed)
 
 		const onPhrase = (phrase: number): void => {
 			this.phrase = phrase
@@ -260,7 +272,7 @@ export class MusicDirector {
 		this.clock =
 			opts.phraseSource?.(onPhrase) ??
 			new MusicClock({
-				phraseSeconds: opts.phraseSeconds ?? DEFAULT_PHRASE_SECONDS,
+				phraseSeconds: opts.phraseSeconds ?? phraseSecondsFor(this.pack),
 				position: () => audioEngine.getMusicPosition(),
 				onPhrase,
 			})
@@ -270,14 +282,14 @@ export class MusicDirector {
 	}
 
 	/**
-	 * Begin driving music. Starts every layer in lockstep (silent), starts the
-	 * phrase clock, then mixes up the first arrangement. On a fresh match (turn 1)
+	 * Begin driving music. Starts every layer of this match's pack in lockstep
+	 * (silent), starts the phrase clock, then mixes up the first arrangement. On a fresh match (turn 1)
 	 * the intro sting plays over a held-back bed for `introMs`.
 	 */
 	start(): void {
 		if (this.unsubscribe) return
 
-		this.startStems(MUSIC_STEMS)
+		this.startStems(packLayers(this.pack))
 		this.clock.reset()
 		this.phrase = 0
 		this.mood = null
@@ -345,6 +357,11 @@ export class MusicDirector {
 		return this.mood
 	}
 
+	/** The pack this match is playing. Fixed for the match's lifetime. */
+	currentPack(): MusicPack {
+		return this.pack
+	}
+
 	/** Build the music-relevant view of the current game state. */
 	private snapshot(state: GameState): MusicState {
 		const opponentActive = state.phase === 'playing' && state.currentTeam !== this.localTeam
@@ -377,7 +394,7 @@ export class MusicDirector {
 
 		const dwell = this.phrase - this.moodStartPhrase
 		const variation = Math.floor(this.phrase / this.phrasesPerVariation)
-		const mix = mixForMood(mood, variation, dwell, this.seed)
+		const mix = mixForMood(mood, variation, dwell, this.seed, this.pack)
 
 		// A mood change is news and fades fast; a re-arrangement inside one mood
 		// should slide under the player's attention, so it gets the long fade.

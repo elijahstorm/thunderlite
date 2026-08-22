@@ -6,19 +6,31 @@
  * under `static/game/sounds/`, served from the site root at `/game/sounds/...`.
  */
 
+import { MUSIC_PACKS, packLayers } from '$lib/Audio/musicPacks'
+
 export type AudioFormat = 'ogg' | 'mp3'
 export type AudioChannel = 'music' | 'sfx' | 'env'
 
 const ROOT = '/game/sounds'
 
 /**
+ * A pack layer's manifest id doubles as its path under `music/`, so both are
+ * derived from the pack registry rather than restated here. That keeps it
+ * impossible for a pack to declare a layer the manifest cannot resolve.
+ */
+const packLayerEntries: Record<string, string> = Object.fromEntries(
+	MUSIC_PACKS.flatMap(packLayers).map((id) => [id, `${ROOT}/music/${id}`])
+)
+
+/**
  * Music tracks on the single-active `music` channel.
  *
  * Two distinct kinds live here:
  *
- *  - `layers/*` are the adaptive bed — same length, tempo and key, started
- *    together and mixed by gain alone (see `musicVariation.ts`). These are the
- *    only entries the stem layer ever loads.
+ *  - `packs/*` are the adaptive beds — one composition per pack, delivered as
+ *    independent stems of identical length, started together and mixed by gain
+ *    alone (see `musicVariation.ts`). These are the only entries the stem layer
+ *    ever loads, and only one pack's worth at a time.
  *  - everything else is a one-shot sting or a standalone screen loop, played
  *    through the single-active path.
  *
@@ -28,14 +40,7 @@ const ROOT = '/game/sounds'
  * survives as a sting, which is what its 6-second one-shot always was.
  */
 export const musicManifest: Record<string, string> = {
-	// Adaptive bed — cumulative intensity stack, sparsest first.
-	'layers/bed': `${ROOT}/music/layers/bed`,
-	'layers/pulse': `${ROOT}/music/layers/pulse`,
-	'layers/bass': `${ROOT}/music/layers/bass`,
-	'layers/melody': `${ROOT}/music/layers/melody`,
-	// Adaptive bed — independent color layers.
-	'layers/accent': `${ROOT}/music/layers/accent`,
-	'layers/texture': `${ROOT}/music/layers/texture`,
+	...packLayerEntries,
 	// One-shot stings.
 	'game/intro': `${ROOT}/music/game/intro`,
 	'game/win': `${ROOT}/music/game/win`,
@@ -87,6 +92,12 @@ export function lookupAudio(channel: AudioChannel, name: string): string | undef
 export function resolveAudioPath(basePath: string, format: AudioFormat): string {
 	return encodeURI(`${basePath}.${format}`)
 }
+
+/**
+ * Every format the bank ships. Format is negotiated per browser at runtime, so
+ * each track must exist in all of them, carrying the same audio.
+ */
+export const AUDIO_FORMATS: readonly AudioFormat[] = ['ogg', 'mp3']
 
 /** MIME types used for `canPlayType` format negotiation. */
 export const AUDIO_MIME: Record<AudioFormat, string> = {

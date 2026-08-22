@@ -41,7 +41,7 @@ SRC="static/game/sounds/music/game/player.ogg"
 SECONDS_TARGET=96
 OFFSET=30
 PHRASE=8
-OUT_DIR="static/game/sounds/music/layers"
+OUT_DIR="static/game/sounds/music/packs/demo"
 
 while getopts "i:s:o:f:h" opt; do
 	case "$opt" in
@@ -87,8 +87,13 @@ render() {
 		# Opus only accepts 48k, so the sample rate is per-format.
 		if [ "$fmt" = "ogg" ]; then args=(-c:a libopus -b:a 112k -ar 48000)
 		else args=(-c:a libmp3lame -b:a 112k -ar 44100); fi
+		# The trailing atrim is load-bearing, not belt-and-braces: a tail-extending
+		# filter (aecho's delay line, any reverb) makes its layer longer than the
+		# rest, and the bed is started once and never resynced, so a layer that is
+		# 0.48s long drifts out of phase on the first wrap. Clamping every layer
+		# after its own chain makes it structurally impossible.
 		ffmpeg -hide_banner -loglevel error -y -i "$SRC" \
-			-af "${loop_window},${chain}" \
+			-af "${loop_window},${chain},atrim=duration=${LEN},asetpts=N/SR/TB" \
 			-ac 2 "${args[@]}" "$OUT_DIR/${name}.${fmt}"
 	done
 	# Both formats must carry the SAME audio — the engine picks one per browser via
@@ -113,8 +118,25 @@ render melody  "highpass=f=3500"
 render accent  "highpass=f=6000,volume=-9dB"
 render texture "lowpass=f=2000,aecho=0.8:0.9:120|250|480:0.5|0.35|0.2,volume=-12dB"
 
+
+# Every layer must be the same length as every other, for the same reason.
+echo
+echo "verifying layer parity:"
+ref=""
+for f in "$OUT_DIR"/*.ogg; do
+	d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")
+	if [ -z "$ref" ]; then ref="$d"; fi
+	# Tolerance, not equality: opus container durations jitter by a few ms from
+	# packet padding even when the decoded sample counts match exactly.
+	if ! awk -v a="$d" -v b="$ref" 'BEGIN { exit (a - b < 0.02 && b - a < 0.02) ? 0 : 1 }'; then
+		echo "  FAIL $(basename "$f") is ${d}s, expected ${ref}s" >&2; exit 1
+	fi
+done
+echo "  ok  all layers ${ref%.*}s"
+
 echo
 echo "total: $(du -sh "$OUT_DIR" | cut -f1)"
 echo
-echo "Set MusicDirector phraseSeconds=${PHRASE} to match this render."
+echo "Registered as the 'demo' pack in src/lib/Audio/musicPacks.ts."
+echo "If you change -s/-f, update that pack's loopSeconds/phrasesPerLoop to match."
 echo "Audition at /dev/audio."
