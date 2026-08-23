@@ -12,7 +12,7 @@ importers:
         specifier: 5.2.2
         version: 5.2.2(svelte@5.56.4(@typescript-eslint/types@8.62.0))
       '@portone/browser-sdk':
-        specifier: ^0.1.9
+        specifier: 0.1.9
         version: 0.1.9
       as-toast:
         specifier: 1.1.0
@@ -21,8 +21,8 @@ importers:
         specifier: 5.0.1
         version: 5.0.1
       dontcode:
-        specifier: ^0.2.5
-        version: 0.2.7
+        specifier: 0.2.8
+        version: 0.2.8
       flowbite-svelte:
         specifier: 1.33.1
         version: 1.33.1(rollup@4.53.3)(svelte@5.56.4(@typescript-eslint/types@8.62.0))(tailwindcss@4.3.1)
@@ -1473,8 +1473,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  dontcode@0.2.7:
-    resolution: {integrity: sha512-pGTWzRsedHJSS5sqWCintWJM+W/0dZj6XIBWHk44DUKektOL8szNRUhnfCqq42OiR+6zAyDsN651IL60WRmwKg==}
+  dontcode@0.2.8:
+    resolution: {integrity: sha512-Ohz5RSF0IDlENWZDhSSKRAasGoXHzHS8chundMdfbt/g2q0b/Re3JDwITYoAIPX9lOcfsinY/sK0eC2/ZAqpOQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -3883,7 +3883,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  dontcode@0.2.7:
+  dontcode@0.2.8:
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       zod: 3.25.76

@@ -30,6 +30,7 @@ import {
 	type DontCodeClient,
 	type BillingPlan,
 	type PaymentMethod,
+	type PaymentReceipt,
 	type ReserveSubscriptionResult,
 	type SendEmailInput,
 	type SendEmailResult,
@@ -41,6 +42,7 @@ export { DontCodeError, isDontCodeError } from 'dontcode'
 export type {
 	BillingPlan,
 	PaymentMethod,
+	PaymentReceipt,
 	ReserveSubscriptionResult,
 	Subscription,
 	SubscriptionStatus,
@@ -391,7 +393,64 @@ export const realtime = {
 // the DontCode user id (`locals.user`), passed explicitly. Never call from the
 // browser: these carry the project API key.
 
+/**
+ * Popup config for a one-shot charge. Mirrors the SDK's `RequestPaymentResult`;
+ * defined locally because the installed SDK (0.2.7) predates it — swap to the
+ * SDK export once `dontcode` >= 0.2.8 is installed.
+ */
+export interface RequestPaymentResult {
+	paymentId: string
+	storeId: string
+	channelKey: string
+	currency: string
+}
+
+type RequestPaymentFn = (params: {
+	amount: number
+	itemName: string
+	method: PaymentMethod
+	currency?: string
+}) => Promise<RequestPaymentResult>
+
+/** `payments.requestPayment` shipped in SDK 0.2.8; older installs lack it. */
+const requestPaymentFn = (): RequestPaymentFn | undefined => {
+	const api = client().payments as unknown as { requestPayment?: RequestPaymentFn }
+	return typeof api.requestPayment === 'function' ? api.requestPayment.bind(api) : undefined
+}
+
 export const payments = {
+	/** Whether the installed SDK supports one-shot charges (needs dontcode >= 0.2.8). */
+	supportsOneTimePayments(): boolean {
+		return requestPaymentFn() !== undefined
+	},
+
+	/**
+	 * One-shot charge, step 1: create a payment intent and get the popup config.
+	 * The gateway owns the provider relationship — the app never configures
+	 * PortOne itself, exactly like the subscription reserve step.
+	 */
+	requestPayment(params: {
+		amount: number
+		itemName: string
+		method: PaymentMethod
+		currency?: string
+	}): Promise<RequestPaymentResult> {
+		const fn = requestPaymentFn()
+		if (!fn) throw new Error('One-time payments need dontcode >= 0.2.8')
+		return fn(params)
+	},
+
+	/** Verify and record a one-shot charge the customer just completed in the popup. */
+	verify(params: {
+		paymentId: string
+		expectedAmount: number
+		currency: string
+		description?: string
+		userId?: string
+	}): Promise<PaymentReceipt> {
+		return client().payments.verify(params)
+	},
+
 	/** Split flow step 1: reserve a subscription and get the popup config. */
 	reserveSubscription(params: {
 		plan: BillingPlan

@@ -9,8 +9,8 @@
 			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">My Items</h1>
 		</div>
 		<span class="chip text-secondary border-secondary/30 bg-secondary/10">
-			<Icon icon="lucide:sparkles" width={12} />
-			Pro feature
+			<Icon icon="lucide:hammer" width={12} />
+			Coming soon
 		</span>
 	</header>
 
@@ -21,11 +21,11 @@
 			<Icon icon="lucide:package" width={22} />
 		</div>
 		<div class="space-y-1">
-			<p class="font-medium text-foreground">Unlock items with Pro</p>
+			<p class="font-medium text-foreground">Items are still being built</p>
 			<p class="text-sm text-muted-foreground">
-				Pro players keep their inventory across sessions and devices.
+				Collectibles and cosmetics will show up here in a future update. Like everything else in
+				ThunderLite, they will be free.
 			</p>
 		</div>
-		<a href="/my/pro" class="btn btn-primary">Upgrade to Pro</a>
 	</div>
 </section>

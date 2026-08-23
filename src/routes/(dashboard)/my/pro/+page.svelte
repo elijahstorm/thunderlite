@@ -4,8 +4,11 @@
 	import { invalidateAll } from '$app/navigation'
 	import {
 		PLANS,
-		PERKS,
+		SUPPORT_POINTS,
 		PAYMENT_METHODS,
+		DONATION_PRESETS_CENTS,
+		DONATION_MIN_CENTS,
+		DONATION_MAX_CENTS,
 		formatPrice,
 		type PlanId,
 		type ProPaymentMethod,
@@ -15,7 +18,12 @@
 	let { data } = $props()
 
 	let subscription = $derived(data.subscription as SubscriptionView | null)
-	let isPro = $derived(subscription?.isPro ?? false)
+	let isSupporter = $derived(subscription?.isPro ?? false)
+	let donationsEnabled = $derived(data.donationsEnabled as boolean)
+
+	// The checkout modal serves both flows: a one-time donation and recurring support.
+	type CheckoutMode = 'donate' | 'subscribe'
+	let checkoutMode = $state<CheckoutMode>('subscribe')
 
 	let selectedPlan: PlanId = $state('monthly')
 	let selectedMethod: ProPaymentMethod = $state('card')
@@ -26,6 +34,27 @@
 	let checkoutError = $state<string | null>(null)
 
 	let plan = $derived(PLANS[selectedPlan])
+
+	// One-time donation amount: preset chips or a custom dollar field.
+	let donationCents = $state(500)
+	let customAmount = $state('')
+	let customCents = $derived.by(() => {
+		const dollars = Number(customAmount)
+		if (!Number.isFinite(dollars) || dollars <= 0) return null
+		return Math.round(dollars * 100)
+	})
+	let activeDonationCents = $derived(customAmount !== '' ? customCents : donationCents)
+	let donationValid = $derived(
+		activeDonationCents !== null &&
+			activeDonationCents >= DONATION_MIN_CENTS &&
+			activeDonationCents <= DONATION_MAX_CENTS
+	)
+
+	let checkoutAmountLabel = $derived(
+		checkoutMode === 'donate'
+			? formatPrice(activeDonationCents ?? 0)
+			: `${formatPrice(plan.priceCents)}/${plan.interval}`
+	)
 
 	const post = (path: string, body?: unknown) =>
 		fetch(path, {
@@ -43,8 +72,8 @@
 				})
 			: '—'
 
-	const openCheckout = (planId: PlanId) => {
-		selectedPlan = planId
+	const openCheckout = (mode: CheckoutMode) => {
+		checkoutMode = mode
 		checkoutError = null
 		checkoutOpen = true
 	}
@@ -54,45 +83,86 @@
 		checkoutOpen = false
 	}
 
-	// Real billing via the DontCode payments gateway (PortOne): reserve a
+	// One-time donation: get popup config + paymentId, charge in the PortOne
+	// popup, then have the server verify the settled payment with the gateway.
+	const submitDonation = async () => {
+		const amountCents = activeDonationCents
+		if (!amountCents || !donationValid) {
+			checkoutError = 'Pick a donation amount first.'
+			return
+		}
+
+		const startRes = await post('/api/pro/donate/start', {
+			amountCents,
+			method: selectedMethod,
+		})
+		if (!startRes.ok) {
+			const body = await startRes.json().catch(() => null)
+			throw new Error(body?.message ?? `Could not start the donation (${startRes.status})`)
+		}
+		const { payment } = await startRes.json()
+
+		// Lazy import so the PortOne browser SDK never loads server-side.
+		const { requestDonation } = await import('$lib/Pro/portone')
+		const paid = await requestDonation(payment, selectedMethod)
+		if ('error' in paid) throw new Error(paid.error)
+
+		const verifyRes = await post('/api/pro/donate/verify', {
+			paymentId: paid.paymentId,
+			amountCents,
+			method: selectedMethod,
+		})
+		if (!verifyRes.ok) {
+			const body = await verifyRes.json().catch(() => null)
+			throw new Error(body?.message ?? `Could not confirm the donation (${verifyRes.status})`)
+		}
+
+		addToast(`Thank you for the ${formatPrice(amountCents)} donation!`)
+	}
+
+	// Recurring support via the DontCode payments gateway (PortOne): reserve a
 	// subscription, issue a billing key in the provider popup, then confirm it.
+	const submitSubscription = async () => {
+		const reserveRes = await post('/api/pro/subscribe/reserve', {
+			plan: selectedPlan,
+			method: selectedMethod,
+		})
+		if (!reserveRes.ok) {
+			const body = await reserveRes.json().catch(() => null)
+			throw new Error(body?.message ?? `Could not start checkout (${reserveRes.status})`)
+		}
+		const { reservation } = await reserveRes.json()
+
+		const { issueBillingKey } = await import('$lib/Pro/portone')
+		const issued = await issueBillingKey(reservation, selectedMethod)
+
+		if ('error' in issued) {
+			// Popup dismissed or failed — release the half-open reservation.
+			await post('/api/pro/subscribe/abort', {
+				subscriptionId: reservation.subscriptionId,
+			})
+			throw new Error(issued.error)
+		}
+
+		const confirmRes = await post('/api/pro/subscribe/confirm', {
+			subscriptionId: reservation.subscriptionId,
+			billingKey: issued.billingKey,
+		})
+		if (!confirmRes.ok) {
+			const body = await confirmRes.json().catch(() => null)
+			throw new Error(body?.message ?? `Could not confirm (${confirmRes.status})`)
+		}
+
+		addToast('You are officially a supporter. Thank you!')
+	}
+
 	const submitCheckout = async () => {
 		if (processing) return
 		processing = true
 		checkoutError = null
 		try {
-			const reserveRes = await post('/api/pro/subscribe/reserve', {
-				plan: selectedPlan,
-				method: selectedMethod,
-			})
-			if (!reserveRes.ok) {
-				const body = await reserveRes.json().catch(() => null)
-				throw new Error(body?.message ?? `Could not start checkout (${reserveRes.status})`)
-			}
-			const { reservation } = await reserveRes.json()
-
-			// Lazy import so the PortOne browser SDK never loads server-side.
-			const { issueBillingKey } = await import('$lib/Pro/portone')
-			const issued = await issueBillingKey(reservation, selectedMethod)
-
-			if ('error' in issued) {
-				// Popup dismissed or failed — release the half-open reservation.
-				await post('/api/pro/subscribe/abort', {
-					subscriptionId: reservation.subscriptionId,
-				})
-				throw new Error(issued.error)
-			}
-
-			const confirmRes = await post('/api/pro/subscribe/confirm', {
-				subscriptionId: reservation.subscriptionId,
-				billingKey: issued.billingKey,
-			})
-			if (!confirmRes.ok) {
-				const body = await confirmRes.json().catch(() => null)
-				throw new Error(body?.message ?? `Could not confirm (${confirmRes.status})`)
-			}
-
-			addToast('Welcome to ThunderLite Pro!')
+			if (checkoutMode === 'donate') await submitDonation()
+			else await submitSubscription()
 			checkoutOpen = false
 			await invalidateAll()
 		} catch (err) {
@@ -108,7 +178,7 @@
 		try {
 			const response = await fetch('/api/pro/cancel', { method: 'POST' })
 			if (!response.ok) throw new Error(`HTTP ${response.status}`)
-			addToast('Subscription will end at the period close.')
+			addToast('Your support will end at the period close. Thank you for backing the project.')
 			await invalidateAll()
 		} catch (err) {
 			addToast(`Could not cancel. ${err}`, 'warn')
@@ -123,7 +193,7 @@
 		try {
 			const response = await fetch('/api/pro/resume', { method: 'POST' })
 			if (!response.ok) throw new Error(`HTTP ${response.status}`)
-			addToast('Your subscription is active again.')
+			addToast('Your support is active again. Thank you!')
 			await invalidateAll()
 		} catch (err) {
 			addToast(`Could not resume. ${err}`, 'warn')
@@ -136,134 +206,219 @@
 <section>
 	<header class="mb-6 flex items-start justify-between gap-3">
 		<div>
-			<p class="section-eyebrow">Upgrade</p>
-			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">ThunderLite Pro</h1>
+			<p class="section-eyebrow">Support</p>
+			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+				Support ThunderLite
+			</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				Get more out of the game and help keep the project alive.
+				ThunderLite is free, with no paywalled content. If you want to help cover servers and
+				development, this is the place. Patreon style: give once, or back the project monthly.
 			</p>
 		</div>
-		{#if isPro}
+		{#if isSupporter}
 			<span
 				class="inline-flex items-center gap-1.5 rounded-full bg-secondary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-secondary"
 			>
-				<Icon icon="lucide:sparkles" width={13} />
-				Pro
+				<Icon icon="lucide:heart" width={13} />
+				Supporter
 			</span>
 		{/if}
 	</header>
 
-	{#if isPro && subscription}
-		<!-- Active subscriber: manage the existing plan. -->
-		<div class="card p-6 sm:p-8 space-y-6">
-			<div class="flex flex-wrap items-end justify-between gap-3">
-				<div>
-					<p class="text-xs uppercase tracking-wide text-muted-foreground">Current plan</p>
-					<p class="text-2xl font-semibold tracking-tight text-foreground mt-1">
-						{PLANS[subscription.plan].label} · {formatPrice(subscription.priceCents)}
-						<span class="text-sm font-normal text-muted-foreground">/{subscription.interval}</span>
-					</p>
-				</div>
-				<span
-					class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium"
-					class:bg-accent={!subscription.cancelAtPeriodEnd}
-					class:text-accent-foreground={!subscription.cancelAtPeriodEnd}
-					class:bg-muted={subscription.cancelAtPeriodEnd}
-					class:text-muted-foreground={subscription.cancelAtPeriodEnd}
-				>
-					{subscription.cancelAtPeriodEnd ? 'Canceling' : 'Active'}
-				</span>
-			</div>
-
-			<p class="text-sm text-muted-foreground">
-				{#if subscription.cancelAtPeriodEnd}
-					Pro access ends on <span class="text-foreground font-medium"
-						>{formatDate(subscription.currentPeriodEnd)}</span
-					>. You can resume any time before then.
-				{:else}
-					Renews on <span class="text-foreground font-medium"
-						>{formatDate(subscription.currentPeriodEnd)}</span
-					>.
-				{/if}
-			</p>
-
-			<div class="border-t border-border pt-6 flex flex-wrap gap-3">
-				{#if subscription.cancelAtPeriodEnd}
-					<button class="btn btn-primary" onclick={resume} disabled={processing}>
-						Resume subscription
-					</button>
-				{:else}
-					<button class="btn btn-secondary" onclick={cancel} disabled={processing}>
-						Cancel subscription
-					</button>
-				{/if}
-			</div>
-
-			<p class="text-xs text-muted-foreground flex items-center gap-1.5">
-				<Icon icon="lucide:shield-check" width={13} />
-				Billing is handled securely by our payment provider. Manage or cancel any time.
-			</p>
-		</div>
-	{:else}
-		<!-- Not subscribed: perks + plan picker. -->
-		<div class="card p-6 sm:p-8 space-y-6">
+	<div class="space-y-6">
+		<!-- What donations pay for. -->
+		<div class="card p-6 sm:p-8">
 			<ul class="grid sm:grid-cols-2 gap-3">
-				{#each PERKS as perk (perk.label)}
+				{#each SUPPORT_POINTS as point (point.label)}
 					<li class="flex items-start gap-3 text-sm text-foreground">
 						<span
 							class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground shrink-0"
 						>
-							<Icon icon={perk.icon} width={16} />
+							<Icon icon={point.icon} width={16} />
 						</span>
-						{perk.label}
+						{point.label}
 					</li>
 				{/each}
 			</ul>
-
-			<div class="border-t border-border pt-6 grid sm:grid-cols-2 gap-3">
-				{#each Object.values(PLANS) as p (p.id)}
-					<button
-						type="button"
-						class="text-left rounded-lg border p-4 transition-colors"
-						class:border-secondary={selectedPlan === p.id}
-						class:bg-accent={selectedPlan === p.id}
-						class:border-border={selectedPlan !== p.id}
-						class:hover:bg-muted={selectedPlan !== p.id}
-						onclick={() => (selectedPlan = p.id)}
-					>
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-semibold text-foreground">{p.label}</span>
-							{#if p.badge}
-								<span
-									class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-secondary/10 text-secondary"
-								>
-									{p.badge}
-								</span>
-							{/if}
-						</div>
-						<p class="mt-2 text-xl font-semibold tracking-tight text-foreground">
-							{formatPrice(p.priceCents)}
-							<span class="text-sm font-normal text-muted-foreground">/{p.interval}</span>
-						</p>
-						<p class="text-xs text-muted-foreground mt-0.5">{p.cadence}</p>
-					</button>
-				{/each}
-			</div>
-
-			<div class="flex flex-wrap items-center justify-between gap-3">
-				<p class="text-xs text-muted-foreground flex items-center gap-1.5">
-					<Icon icon="lucide:shield-check" width={13} />
-					Secure checkout. Cancel any time.
-				</p>
-				<button class="btn btn-primary" onclick={() => openCheckout(selectedPlan)}>
-					Subscribe · {formatPrice(plan.priceCents)}/{plan.interval}
-				</button>
-			</div>
 		</div>
-	{/if}
+
+		<div class="grid lg:grid-cols-2 gap-6 items-start">
+			{#if donationsEnabled}
+				<!-- One-time donation: preset chips or a custom amount. -->
+				<div class="card p-6 sm:p-8 space-y-5">
+					<div>
+						<h2 class="text-lg font-semibold tracking-tight text-foreground">One-time donation</h2>
+						<p class="text-sm text-muted-foreground mt-0.5">
+							Give whatever feels right. No account changes, no strings.
+						</p>
+					</div>
+
+					<div class="flex flex-wrap gap-2">
+						{#each DONATION_PRESETS_CENTS as cents (cents)}
+							<button
+								type="button"
+								class="rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
+								class:border-secondary={customAmount === '' && donationCents === cents}
+								class:bg-accent={customAmount === '' && donationCents === cents}
+								class:border-border={customAmount !== '' || donationCents !== cents}
+								class:hover:bg-muted={customAmount !== '' || donationCents !== cents}
+								onclick={() => {
+									donationCents = cents
+									customAmount = ''
+								}}
+							>
+								{formatPrice(cents)}
+							</button>
+						{/each}
+						<label
+							class="flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm"
+						>
+							<span class="text-muted-foreground">$</span>
+							<input
+								type="number"
+								min={DONATION_MIN_CENTS / 100}
+								max={DONATION_MAX_CENTS / 100}
+								step="1"
+								placeholder="Custom"
+								class="w-20 bg-transparent outline-none text-foreground"
+								bind:value={customAmount}
+							/>
+						</label>
+					</div>
+
+					{#if customAmount !== '' && !donationValid}
+						<p class="text-xs text-destructive">
+							Donations can be anywhere from {formatPrice(DONATION_MIN_CENTS)} to {formatPrice(
+								DONATION_MAX_CENTS
+							)}.
+						</p>
+					{/if}
+
+					<div class="flex flex-wrap items-center justify-between gap-3">
+						<p class="text-xs text-muted-foreground flex items-center gap-1.5">
+							<Icon icon="lucide:shield-check" width={13} />
+							Secure one-time checkout.
+						</p>
+						<button
+							class="btn btn-primary"
+							onclick={() => openCheckout('donate')}
+							disabled={!donationValid}
+						>
+							Donate {donationValid ? formatPrice(activeDonationCents ?? 0) : ''}
+						</button>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Recurring support: manage when active, otherwise the plan picker. -->
+			{#if isSupporter && subscription}
+				<div class="card p-6 sm:p-8 space-y-6">
+					<div class="flex flex-wrap items-end justify-between gap-3">
+						<div>
+							<p class="text-xs uppercase tracking-wide text-muted-foreground">Recurring support</p>
+							<p class="text-2xl font-semibold tracking-tight text-foreground mt-1">
+								{PLANS[subscription.plan].label} · {formatPrice(subscription.priceCents)}
+								<span class="text-sm font-normal text-muted-foreground"
+									>/{subscription.interval}</span
+								>
+							</p>
+						</div>
+						<span
+							class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium"
+							class:bg-accent={!subscription.cancelAtPeriodEnd}
+							class:text-accent-foreground={!subscription.cancelAtPeriodEnd}
+							class:bg-muted={subscription.cancelAtPeriodEnd}
+							class:text-muted-foreground={subscription.cancelAtPeriodEnd}
+						>
+							{subscription.cancelAtPeriodEnd ? 'Ending' : 'Active'}
+						</span>
+					</div>
+
+					<p class="text-sm text-muted-foreground">
+						{#if subscription.cancelAtPeriodEnd}
+							Your support ends on <span class="text-foreground font-medium"
+								>{formatDate(subscription.currentPeriodEnd)}</span
+							>. You can resume any time before then. Nothing about your account changes either way.
+						{:else}
+							Renews on <span class="text-foreground font-medium"
+								>{formatDate(subscription.currentPeriodEnd)}</span
+							>. Thank you for keeping the project going.
+						{/if}
+					</p>
+
+					<div class="border-t border-border pt-6 flex flex-wrap gap-3">
+						{#if subscription.cancelAtPeriodEnd}
+							<button class="btn btn-primary" onclick={resume} disabled={processing}>
+								Resume support
+							</button>
+						{:else}
+							<button class="btn btn-secondary" onclick={cancel} disabled={processing}>
+								Cancel support
+							</button>
+						{/if}
+					</div>
+
+					<p class="text-xs text-muted-foreground flex items-center gap-1.5">
+						<Icon icon="lucide:shield-check" width={13} />
+						Billing is handled securely by our payment provider. Manage or cancel any time.
+					</p>
+				</div>
+			{:else}
+				<div class="card p-6 sm:p-8 space-y-5">
+					<div>
+						<h2 class="text-lg font-semibold tracking-tight text-foreground">Monthly support</h2>
+						<p class="text-sm text-muted-foreground mt-0.5">
+							Steady support is what makes planning new content possible. Cancel any time.
+						</p>
+					</div>
+
+					<div class="grid sm:grid-cols-2 gap-3">
+						{#each Object.values(PLANS) as p (p.id)}
+							<button
+								type="button"
+								class="text-left rounded-lg border p-4 transition-colors"
+								class:border-secondary={selectedPlan === p.id}
+								class:bg-accent={selectedPlan === p.id}
+								class:border-border={selectedPlan !== p.id}
+								class:hover:bg-muted={selectedPlan !== p.id}
+								onclick={() => (selectedPlan = p.id)}
+							>
+								<div class="flex items-center justify-between">
+									<span class="text-sm font-semibold text-foreground">{p.label}</span>
+									{#if p.badge}
+										<span
+											class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-secondary/10 text-secondary"
+										>
+											{p.badge}
+										</span>
+									{/if}
+								</div>
+								<p class="mt-2 text-xl font-semibold tracking-tight text-foreground">
+									{formatPrice(p.priceCents)}
+									<span class="text-sm font-normal text-muted-foreground">/{p.interval}</span>
+								</p>
+								<p class="text-xs text-muted-foreground mt-0.5">{p.cadence}</p>
+							</button>
+						{/each}
+					</div>
+
+					<div class="flex flex-wrap items-center justify-between gap-3">
+						<p class="text-xs text-muted-foreground flex items-center gap-1.5">
+							<Icon icon="lucide:shield-check" width={13} />
+							Secure checkout. Cancel any time.
+						</p>
+						<button class="btn btn-primary" onclick={() => openCheckout('subscribe')}>
+							Become a supporter · {formatPrice(plan.priceCents)}/{plan.interval}
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</div>
 </section>
 
 {#if checkoutOpen}
-	<!-- Checkout: pick a method, then authorize a billing key in the provider popup. -->
+	<!-- Checkout: pick a method, then authorize payment in the provider popup. -->
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-sm"
 		onclick={closeCheckout}
@@ -282,9 +437,15 @@
 		>
 			<div class="flex items-start justify-between gap-3">
 				<div>
-					<h2 class="text-lg font-semibold tracking-tight text-foreground">Checkout</h2>
+					<h2 class="text-lg font-semibold tracking-tight text-foreground">
+						{checkoutMode === 'donate' ? 'One-time donation' : 'Checkout'}
+					</h2>
 					<p class="text-sm text-muted-foreground mt-0.5">
-						{PLANS[selectedPlan].label} · {formatPrice(plan.priceCents)}/{plan.interval}
+						{#if checkoutMode === 'donate'}
+							{checkoutAmountLabel} donation
+						{:else}
+							{PLANS[selectedPlan].label} support · {checkoutAmountLabel}
+						{/if}
 					</p>
 				</div>
 				<button
@@ -343,9 +504,9 @@
 					<Icon icon="lucide:loader-circle" class="animate-spin" width={16} />
 					Processing…
 				{:else if checkoutError}
-					Try again · {formatPrice(plan.priceCents)}/{plan.interval}
+					Try again · {checkoutAmountLabel}
 				{:else}
-					Continue · {formatPrice(plan.priceCents)}/{plan.interval}
+					Continue · {checkoutAmountLabel}
 				{/if}
 			</button>
 		</div>

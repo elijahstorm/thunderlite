@@ -1,10 +1,28 @@
 # ThunderLite — Marketing Plan & Copy Bank
 
+## ⚡ START HERE (today's one action, ~30 minutes)
+
+Everything below is already written. The only thing between you and being "launched" is:
+
+1. Open the game, play 2 minutes into a mid-size battle, take **one screenshot** (shot #1 from the shot list).
+2. Copy the r/AdvanceWars post from section 2 (claims re-verified against the codebase as of Aug 23).
+3. Post it. Set a phone reminder to check replies tonight and tomorrow morning.
+
+That's the whole task. Not the itch.io page, not the clip, not HN. One subreddit, one screenshot, one paste. r/AdvanceWars is the friendliest possible audience for this game — it is the lowest-stakes, highest-warmth first post available. If it flops, it cost 30 minutes and nobody on HN saw it. Fail fast starts here.
+
+**Pre-flight (2 min, before any post):**
+- [ ] Load one genuinely large map (100x100+) once so the scale claim is fresh in your hands. If 500x500 feels rough, say "tested up to 500x500, 100x100 is the sweet spot" (already the phrasing below) and don't demo 500 live.
+- [ ] Confirm the campaign really loads with no account in an incognito window (code says it does — campaign is not auth-gated; /play multiplayer is).
+
+---
+
 **Core pitch:** Battalion: Arena, rebuilt from scratch — bigger maps, smarter AI, real multiplayer, still free.
 
+> **Claim status (verified against code, 2026-08-23):** ELO + match history + replays are LIVE. Async multiplayer with email turn notifications is LIVE. Single player needs no signup (campaign is un-gated). Monetization is now DONATIONS (one-time + monthly, Patreon style, nothing paywalled) — copy below matches. 500x500 is the one claim only you can verify by playing.
+
 **One-liner variants** (use whichever fits the platform's tone):
-- "I rebuilt Battalion: Arena from the ground up — adaptive AI, 500x500 maps, live multiplayer, still free."
-- "A love letter to Battalion: Arena / Advance Wars — turn-based tactics, live in your browser, no install."
+- "I rebuilt Battalion: Arena from the ground up. Adaptive AI, 500x500 maps, live multiplayer, still free."
+- "A love letter to Battalion: Arena / Advance Wars. Turn-based tactics, live in your browser, no install."
 - "The Advance Wars-style multiplayer game I always wanted, finally not laggy and not exploitable."
 
 ---
@@ -13,12 +31,13 @@
 
 | Day | Action |
 |---|---|
-| Day 0 | Set up / polish itch.io page. This is your stable "home base" link you'll point everyone to. |
-| Day 1–2 | Post to r/AdvanceWars |
-| Day 3–4 | Post Show HN |
-| Day 5–6 | Post to r/webgames, r/IndieGaming |
-| Day 7–8 | Devlog post specifically about the adaptive AI rework (its own story, separate from launch) |
-| Day 9–10 | Drop into 2–3 Advance Wars Discord servers' self-promo channels |
+| Day 0 (TODAY) | Post to r/AdvanceWars — one screenshot + the copy in section 2. The site itself is the home-base link; no itch.io prerequisite. |
+| Day 1 | Just reply to comments. Nothing new to post. |
+| Day 2–3 | Capture the 10–15s gameplay clip (shot #2), post to r/webgames + r/IndieGaming |
+| Day 4–5 | Set up itch.io page (copy in section 6) — now with a screenshot + clip you already have |
+| Day 6–7 | Post Show HN (do the 500x500 pre-flight check first — HN will stress-test claims) |
+| Day 8–9 | Devlog post about the adaptive AI rework (its own story, separate from launch) |
+| Day 10+ | Drop into 2–3 Advance Wars Discord servers' self-promo channels |
 | Ongoing | X/Bluesky posts with clips, reply to every comment everywhere for the first 48hrs of each post |
 
 **Golden rule:** be present and responsive in comments for the first day of each post. Engagement in the first few hours is what algorithms/upvotes reward, and it's also just the friendliest way to build a small community.
@@ -28,7 +47,7 @@
 ## 2. Reddit — r/AdvanceWars
 
 **Title:**
-> I rebuilt Battalion: Arena from scratch — adaptive AI, huge maps, live multiplayer, free in your browser
+> I rebuilt Battalion: Arena from scratch - adaptive AI, huge maps, live multiplayer, free in your browser
 
 **Body:**
 > A while back I played Battalion: Arena a ton and always wished it had better multiplayer reliability, less exploitable AI, and bigger maps. So I ended up rebuilding the whole thing myself.
@@ -37,21 +56,21 @@
 > https://thunderlite.vercel.app/
 >
 > Some of what's new/different:
-> - **AI that adapts** to the situation and to your playstyle, instead of running the same predictable pattern you can learn and exploit in a few games
-> - **Map sizes up to 500x500** (100x100 is the realistic sweet spot) with lots of units/buildings and no lag — the old engine capped out around 20x20
-> - **Live async multiplayer** — share a code, take your turn whenever, opponent picks up when they're free
+> - **AI that reacts** to the battlefield and to what it sees you do, instead of running the same predictable pattern you can learn and exploit in a few games
+> - **Map sizes up to 500x500** (100x100 is the realistic sweet spot) with lots of units/buildings and no lag. The old engine capped out around 20x20
+> - **Live async multiplayer** - share a code, take your turn whenever, opponent picks up when they're free (you get an email when it's your move)
 > - **ELO ranking + reviewable match history**
 > - New units, a weather system, and a much more robust map editor with a proper scripting engine
 > - Backed by a more reliable DB/hosting setup so games don't randomly break mid-match
 >
-> Still very much a solo passion project, not trying to make money off it, just want more people to enjoy it since I've had a blast building it. Would love feedback, bug reports, or just hearing what you think if you give it a shot.
+> Still very much a solo passion project. The whole game is free with nothing paywalled; there's a donate page (one-time or monthly, Patreon style) if you want to help cover hosting, but that's it. Would love feedback, bug reports, or just hearing what you think if you give it a shot.
 
 ---
 
 ## 3. Show HN
 
 **Title:**
-> Show HN: I rebuilt a turn-based tactics game (Advance Wars–style) to handle 500x500 maps in-browser
+> Show HN: I rebuilt a turn-based tactics game (Advance Wars-style) to handle 500x500 maps in-browser
 
 **Body:**
 > ThunderLite is a browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars. https://thunderlite.vercel.app/
@@ -59,26 +78,26 @@
 > I'm a solo dev and this started as "I wish this game I liked worked better," which turned into a full rebuild. A few technical bits that might be interesting to this crowd:
 >
 > - Engine work took map size limits from ~20x20 (original) to a realistic 100x100 and a tested ceiling of 500x500, fully populated with units/buildings, without meaningful lag
-> - Rebuilt the CPU opponent to adapt to game state and to the human player's patterns over the course of a match, instead of running a fixed decision tree that becomes trivially exploitable after a few games
-> - Multiplayer is async (share a code, take turns whenever) and backed by a more reliable DB/storage layer than my original setup — ran load and soak testing before calling it stable
+> - Rebuilt the CPU opponent to react to game state and to what it observes the player doing (it holds beliefs about units it has seen through fog rather than cheating with full vision), instead of running a fixed decision tree that becomes trivially exploitable after a few games
+> - Multiplayer is async (share a code, take turns whenever) and backed by a more reliable DB/storage layer than my original setup. Ran load and soak testing before calling it stable
 > - Built-in map editor with a scripting engine for custom maps/scenarios
 > - ELO + full match history for competitive play
 >
-> No monetization, just a project I wanted to exist. Happy to talk through any of the engine/AI/infra decisions in comments.
+> The game is entirely free with nothing paywalled; there's an optional donate page that helps cover hosting. Mostly it's a project I wanted to exist. Happy to talk through any of the engine/AI/infra decisions in comments.
 
 ---
 
 ## 4. r/webgames
 
 **Title:**
-> [Free] ThunderLite — turn-based tactics in your browser, Advance Wars-inspired, live multiplayer
+> [Free] ThunderLite - turn-based tactics in your browser, Advance Wars-inspired, live multiplayer
 
 **Body:**
-> Free browser game, no install, no signup required to try single player. Turn-based tactics in the Battalion: Arena / Advance Wars mold — build units, capture territory, outmaneuver the enemy.
+> Free browser game, no install, no signup required to try single player. Turn-based tactics in the Battalion: Arena / Advance Wars mold: build units, capture territory, outmaneuver the enemy.
 >
 > https://thunderlite.vercel.app/
 >
-> - Live multiplayer via shareable room codes (async — take your turn whenever)
+> - Live multiplayer via shareable room codes (async, take your turn whenever)
 > - Built-in map editor, browse community maps
 > - ELO + match history
 > - CPU opponent that adapts instead of being easily exploitable
@@ -95,31 +114,31 @@
 **Body:**
 > One of the biggest complaints with the original game this is inspired by (and honestly most tactics-game AI in general) is that the CPU runs a fixed pattern. Play it a few times, learn the pattern, and every game after that is just execution, not a real fight.
 >
-> So for ThunderLite I rebuilt the AI to react to both the current battlefield state and to how the specific opponent has been playing — meaning it takes noticeably longer before you can "solve" it, and different playstyles get different responses back.
+> So for ThunderLite I rebuilt the AI to react to the current battlefield state and to what it has actually observed the opponent doing (including remembering units it saw slip into fog, instead of cheating with full vision). It takes noticeably longer before you can "solve" it, and different situations get genuinely different responses back.
 >
 > It's live now if anyone wants to poke at it and see if you can find the seams: https://thunderlite.vercel.app/
 >
-> Curious if anyone here has done similar adaptive-AI work for turn-based games — happy to compare notes.
+> Curious if anyone here has done similar adaptive-AI work for turn-based games. Happy to compare notes.
 
 ---
 
 ## 6. itch.io page copy
 
 **Short description (for the game card):**
-> Free browser-based turn-based tactics — Advance Wars-inspired, live multiplayer, huge maps, adaptive AI. No install.
+> Free browser-based turn-based tactics. Advance Wars-inspired, live multiplayer, huge maps, adaptive AI. No install.
 
 **Full description:**
-> ThunderLite is a love letter to Battalion: Arena and the Advance Wars family of turn-based tactics games — rebuilt from the ground up to fix everything that used to be frustrating.
+> ThunderLite is a love letter to Battalion: Arena and the Advance Wars family of turn-based tactics games, rebuilt from the ground up to fix everything that used to be frustrating.
 >
 > **What's in it:**
-> - Live, async multiplayer — share a room code, take your turn whenever
+> - Live, async multiplayer - share a room code, take your turn whenever, get an email when it's your move
 > - Map sizes up to 500x500 (100x100 recommended), fully populated with units and buildings, no lag
-> - CPU opponent that adapts to the situation and to your playstyle, so it stays a real challenge for longer
-> - Built-in map editor with a scripting engine — build and share your own maps
+> - CPU opponent that adapts to the situation and to what it sees you do, so it stays a real challenge for longer
+> - Built-in map editor with a scripting engine - build and share your own maps
 > - New units and a weather system that affects strategy
 > - ELO ranking and full match history
 >
-> Free to play, no download, playable straight in your browser. Built solo as a passion project — feedback and bug reports always welcome.
+> Free to play, no download, playable straight in your browser. Built solo as a passion project; feedback and bug reports always welcome.
 
 **Tags to use:** turn-based, tactics, strategy, multiplayer, browser, free, advance-wars-like, wargame
 
@@ -127,17 +146,17 @@
 
 ## 7. X / Bluesky short posts (pair each with a clip or gif)
 
-1. > Rebuilt an Advance Wars-style tactics game from scratch — adaptive AI, maps up to 500x500, live multiplayer, still free. thunderlite.vercel.app
+1. > Rebuilt an Advance Wars-style tactics game from scratch. Adaptive AI, maps up to 500x500, live multiplayer, still free. thunderlite.vercel.app
 
-2. > The old AI in games like this gets "solved" after 3-4 matches. Spent a while making mine actually adapt to your playstyle instead. Free to try: thunderlite.vercel.app
+2. > The old AI in games like this gets "solved" after 3-4 matches. Spent a while making mine actually react to the battlefield and what it observes you doing. Free to try: thunderlite.vercel.app
 
-3. > No install, no signup needed to try it — turn-based tactics, live in your browser. thunderlite.vercel.app
+3. > No install, no signup needed to try it. Turn-based tactics, live in your browser. thunderlite.vercel.app
 
 ---
 
 ## 8. Discord self-promo blurb (short, casual)
 
-> Made a free browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars — live multiplayer via room codes, adaptive AI, map editor, up to 500x500 maps. No install: https://thunderlite.vercel.app/ — solo project, would love feedback!
+> Made a free browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars. Live multiplayer via room codes, adaptive AI, map editor, up to 500x500 maps. No install: https://thunderlite.vercel.app/ (solo project, would love feedback!)
 
 ---
 

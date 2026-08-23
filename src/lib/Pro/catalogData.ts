@@ -29,7 +29,7 @@ const sdkInterval = (interval: 'month' | 'year'): 'monthly' | 'yearly' =>
 /** Plans registered with the gateway. `amount` is the canonical USD-cent price. */
 export const catalogPlans: CatalogPlan[] = Object.values(PLANS).map((plan, index) => ({
 	plan_id: plan.id,
-	name: `ThunderLite Pro ${plan.label}`,
+	name: `ThunderLite Supporter ${plan.label}`,
 	amount: plan.priceCents,
 	currency: 'USD',
 	interval: sdkInterval(plan.interval),
@@ -37,22 +37,12 @@ export const catalogPlans: CatalogPlan[] = Object.values(PLANS).map((plan, index
 	active: true,
 }))
 
+/**
+ * Support is donation-style: the only feature is the supporter flag itself.
+ * The old gated perks (inventory/maps/matchmaking) were removed from the
+ * catalog; they were never enforced in game code.
+ */
 export const catalogFeatures: CatalogFeature[] = [
-	{
-		feature_key: PRO_FEATURES.persistentInventory,
-		name: 'Persistent inventory',
-		description: 'Inventory that carries across sessions.',
-	},
-	{
-		feature_key: PRO_FEATURES.unlimitedMaps,
-		name: 'Unlimited custom maps',
-		description: 'No cap on saved custom maps.',
-	},
-	{
-		feature_key: PRO_FEATURES.priorityMatchmaking,
-		name: 'Priority matchmaking',
-		description: 'Front-of-queue placement in online matches.',
-	},
 	{
 		feature_key: PRO_FEATURES.supporter,
 		name: 'Supporter',

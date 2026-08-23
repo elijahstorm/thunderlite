@@ -47,7 +47,7 @@ export async function issueBillingKey(
 		channelKey: reservation.channelKey,
 		billingKeyMethod: reservation.billingKeyMethod,
 		issueId: `${reservation.subscriptionId}-${Date.now()}`,
-		issueName: 'ThunderLite Pro',
+		issueName: 'ThunderLite supporter',
 		...(customer?.email ? { customer: { email: customer.email } } : {}),
 		...(easyPayProvider ? { easyPay: { easyPayProvider } } : {}),
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -57,4 +57,40 @@ export async function issueBillingKey(
 	if (!response) return { error: 'Checkout was closed before finishing.' }
 	if (response.code) return { error: response.message ?? response.code }
 	return { billingKey: response.billingKey }
+}
+
+/** Popup config for a one-time donation, as returned by /api/pro/donate/start. */
+export interface DonationCheckout {
+	paymentId: string
+	storeId: string
+	channelKey: string
+	amount: number
+	currency: 'KRW' | 'USD'
+}
+
+export type DonationResult = { paymentId: string } | { error: string }
+
+/** Open the PortOne popup for a one-shot charge; the server verifies it after. */
+export async function requestDonation(
+	checkout: DonationCheckout,
+	method: ProPaymentMethod,
+	customer?: { email?: string }
+): Promise<DonationResult> {
+	const easyPayProvider = easyPayProviderFor(method)
+	const response = await PortOne.requestPayment({
+		storeId: checkout.storeId,
+		channelKey: checkout.channelKey,
+		paymentId: checkout.paymentId,
+		orderName: 'ThunderLite donation',
+		totalAmount: checkout.amount,
+		currency: checkout.currency,
+		payMethod: method === 'card' ? 'CARD' : 'EASY_PAY',
+		...(customer?.email ? { customer: { email: customer.email } } : {}),
+		...(easyPayProvider ? { easyPay: { easyPayProvider } } : {}),
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	} as any)
+
+	if (!response) return { error: 'Checkout was closed before finishing.' }
+	if (response.code) return { error: response.message ?? response.code }
+	return { paymentId: response.paymentId }
 }

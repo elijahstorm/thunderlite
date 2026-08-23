@@ -1,9 +1,13 @@
 /**
- * ThunderLite Pro plan catalog — shared by the checkout UI and the server so
+ * ThunderLite supporter catalog — shared by the checkout UI and the server so
  * the price a user sees is the price the server records. Prices are authored in
  * USD cents; the DontCode payments gateway is the source of truth for who is
  * subscribed, and `money.server.ts` converts these to the charge currency for
  * the chosen provider (KRW for the easy-pay rails, USD for card).
+ *
+ * Support is Patreon-style: nothing in the game is paywalled. Recurring
+ * "supporter" subscriptions reuse the billing-key flow; one-time donations go
+ * through the one-shot PortOne payment + gateway verify (donations.server.ts).
  */
 
 export type PlanId = 'monthly' | 'yearly'
@@ -26,11 +30,14 @@ export const PAYMENT_METHODS: { id: ProPaymentMethod; label: string; icon: strin
 export const isPaymentMethod = (value: unknown): value is ProPaymentMethod =>
 	value === 'card' || value === 'kakaopay' || value === 'tosspay' || value === 'naverpay'
 
-/** SDK feature keys a Pro subscription grants. Checked with `payments.hasFeature`. */
+/**
+ * SDK feature keys a supporter subscription grants. Support is donation-style:
+ * the only "feature" is the supporter flag itself (checked with
+ * `payments.hasFeature` if the UI ever wants to show a supporter heart).
+ * The old gated-perk keys (inventory/maps/matchmaking) were never enforced
+ * anywhere and are gone from the catalog.
+ */
 export const PRO_FEATURES = {
-	persistentInventory: 'persistent_inventory',
-	unlimitedMaps: 'unlimited_maps',
-	priorityMatchmaking: 'priority_matchmaking',
 	supporter: 'supporter',
 } as const
 
@@ -86,9 +93,25 @@ export const formatPrice = (cents: number): string => {
 	return `$${dollars % 1 === 0 ? dollars.toFixed(0) : dollars.toFixed(2)}`
 }
 
-export const PERKS = [
-	{ icon: 'lucide:package', label: 'Persistent inventory across sessions' },
-	{ icon: 'lucide:map', label: 'Unlimited custom maps' },
-	{ icon: 'lucide:zap', label: 'Priority match-making' },
-	{ icon: 'lucide:heart', label: 'Support indie development' },
+/** What donations actually pay for. Honest copy: nothing here is a paywall. */
+export const SUPPORT_POINTS = [
+	{ icon: 'lucide:server', label: 'Keeps the servers and multiplayer running' },
+	{ icon: 'lucide:map', label: 'Funds new units, maps, and campaign chapters' },
+	{ icon: 'lucide:lock-open', label: 'No paywalls. Every feature stays free for everyone' },
+	{ icon: 'lucide:heart', label: 'Made by one person; every donation genuinely helps' },
 ]
+
+// ── One-time donations ───────────────────────────────────────────────────────
+
+/** Preset one-time amounts, in USD cents. The custom field allows anything in range. */
+export const DONATION_PRESETS_CENTS = [300, 500, 1000, 2500]
+
+/** Bounds for a one-time donation (USD cents): floor for processor minimums, ceiling as a fat-finger guard. */
+export const DONATION_MIN_CENTS = 100
+export const DONATION_MAX_CENTS = 50000
+
+export const isValidDonationCents = (value: unknown): value is number =>
+	typeof value === 'number' &&
+	Number.isInteger(value) &&
+	value >= DONATION_MIN_CENTS &&
+	value <= DONATION_MAX_CENTS

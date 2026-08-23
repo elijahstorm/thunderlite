@@ -25,12 +25,7 @@
 			items: [
 				{ href: '/me', label: 'Profile', icon: 'lucide:user' },
 				{ href: '/my/games', label: 'My Games', icon: 'lucide:swords' },
-				{
-					href: '/my/items',
-					label: 'My Items',
-					icon: 'lucide:layout-grid',
-					badge: 'Pro',
-				},
+				{ href: '/my/items', label: 'My Items', icon: 'lucide:layout-grid' },
 				{ href: '/my/maps', label: 'My Maps', icon: 'lucide:map' },
 				{ href: '/my/inbox', label: 'Inbox', icon: 'lucide:inbox' },
 				{ href: '/my/friends', label: 'Friends', icon: 'lucide:users' },
@@ -38,7 +33,7 @@
 		},
 		{
 			title: 'More',
-			items: [{ href: '/my/pro', label: 'Upgrade to Pro', icon: 'lucide:sparkles' }],
+			items: [{ href: '/my/pro', label: 'Support the project', icon: 'lucide:heart' }],
 		},
 	]
 
@@ -89,13 +84,6 @@
 										>
 											<Icon icon={item.icon} width={16} />
 											<span class="flex-1">{item.label}</span>
-											{#if item.badge}
-												<span
-													class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-secondary/10 text-secondary"
-												>
-													{item.badge}
-												</span>
-											{/if}
 										</a>
 									</li>
 								{/each}

@@ -112,9 +112,11 @@
 			part of why all of this can stay free to play.
 		</p>
 		<p>
-			It is built and maintained by one person, in the open. It is free to play, with no ads and no
-			tracking beyond the basics required to keep the lights on. If something breaks or you have an
-			idea, tell me on GitHub. I read everything.
+			It is built and maintained by one person, in the open. It is free to play, with no ads, no
+			paywalled content, and no tracking beyond the basics required to keep the lights on. If you
+			want to chip in for hosting, there is an optional donation page, Patreon style, and nothing in
+			the game is ever locked behind it. If something breaks or you have an idea, tell me on GitHub.
+			I read everything.
 		</p>
 		<div class="pt-2 flex flex-wrap items-center gap-3">
 			<a href="/login" class="btn btn-primary">

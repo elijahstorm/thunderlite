@@ -24,32 +24,41 @@ const formatDate = (iso: string | null): string =>
 // ── Subscription lifecycle ──────────────────────────────────────────────────
 
 export const proActivated = (planLabel: string, periodEnd: string | null): EmailContent => ({
-	subject: 'Welcome to ThunderLite Pro',
-	markdownText: `# You are Pro now
+	subject: 'Thank you for supporting ThunderLite',
+	markdownText: `# You are a supporter now
 
-Thanks for upgrading to **ThunderLite Pro** (${planLabel}). Your perks are live right away.
+Thank you for backing **ThunderLite** (${planLabel} support). The game is built by one person, and recurring support is what keeps the servers running and new content coming. It means a lot.
 
-Your plan renews on **${formatDate(periodEnd)}**. You can manage or cancel any time from Settings.${signoff}${prefsFooter}`,
+Your support renews on **${formatDate(periodEnd)}**. You can manage or cancel any time from Settings.${signoff}${prefsFooter}`,
 })
 
 export const proCanceled = (periodEnd: string | null): EmailContent => ({
-	subject: 'Your ThunderLite Pro plan is set to end',
+	subject: 'Your ThunderLite support is set to end',
 	markdownText: `# Cancellation confirmed
 
-Your ThunderLite Pro subscription will not renew. You keep every Pro perk until **${formatDate(
+Your recurring support will not renew after **${formatDate(
 		periodEnd
-	)}**, then your account returns to the free tier.
+	)}**. Nothing about your account changes: ThunderLite has no paywalled content, so everything stays exactly as it is.
 
-Changed your mind? You can resume before then from Settings, and nothing is lost.${signoff}${prefsFooter}`,
+Thank you for having supported the project. If you change your mind, you can resume any time from Settings.${signoff}${prefsFooter}`,
 })
 
 export const proResumed = (periodEnd: string | null): EmailContent => ({
-	subject: 'Your ThunderLite Pro plan is active again',
-	markdownText: `# Welcome back to Pro
+	subject: 'Your ThunderLite support is active again',
+	markdownText: `# Welcome back
 
-Good to have you back. Your ThunderLite Pro subscription is active again and will renew on **${formatDate(
+Good to have you back. Your recurring support is active again and will renew on **${formatDate(
 		periodEnd
-	)}**.${signoff}${prefsFooter}`,
+	)}**. Thank you for keeping the project going.${signoff}${prefsFooter}`,
+})
+
+export const donationThanks = (amountLabel: string): EmailContent => ({
+	subject: 'Thank you for your donation',
+	markdownText: `# Thank you
+
+Your **${amountLabel}** donation to ThunderLite went through. The game is a one-person project with no paywalled content, so donations like yours are what keep the servers running and new maps, units, and campaign chapters coming.
+
+Genuinely: thank you.${signoff}${prefsFooter}`,
 })
 
 // ── Social / inbox ───────────────────────────────────────────────────────────

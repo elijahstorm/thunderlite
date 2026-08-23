@@ -21,8 +21,8 @@
 	const categories: { key: keyof Prefs; label: string; description: string }[] = [
 		{
 			key: 'subscription',
-			label: 'Subscription',
-			description: 'Pro activation, cancellation, and renewals.',
+			label: 'Support',
+			description: 'Donation receipts and recurring support updates.',
 		},
 		{
 			key: 'social',

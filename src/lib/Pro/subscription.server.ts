@@ -31,7 +31,7 @@ function billingPlanFor(planId: PlanId, method: PaymentMethod): BillingPlan {
 	const { amount, currency } = chargeFor(method, plan.priceCents)
 	return {
 		id: plan.id,
-		name: `ThunderLite Pro ${plan.label}`,
+		name: `ThunderLite Supporter ${plan.label}`,
 		amount,
 		interval: sdkInterval(plan.interval),
 		currency,
