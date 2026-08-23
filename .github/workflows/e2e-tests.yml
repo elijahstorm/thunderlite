@@ -1,7 +1,12 @@
 name: Integration Tests
 
+# Temporarily disabled: CI test runs are paused. To resume, restore the
+# push/pull_request triggers below and remove the workflow_dispatch stub.
+# on:
+#   deployment_status:
 on:
-  deployment_status:
+    workflow_dispatch:
+    
 jobs:
   run-e2es:
     if: github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success'
