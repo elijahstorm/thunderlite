@@ -41,14 +41,26 @@ export type QueuedEvent = {
 	 * with others queued behind it is fast-forwarded to keep up).
 	 */
 	animate: boolean
+	/**
+	 * Whether this event reached us as live play rather than as history.
+	 *
+	 * False for everything replayed out of the event log on the way in — the
+	 * catch-up poll after a load, and any gap backfill. That distinction is not
+	 * cosmetic: an action that fails to apply while we are REPLAYING the log is a
+	 * hole in the log itself, which every client replays identically and which no
+	 * amount of resyncing can close. One that fails during live play means this
+	 * client alone has drifted. Only the second is a desync worth freezing the
+	 * board over. See `GameSocket`'s desync listener.
+	 */
+	live: boolean
 	via: EventTransport
 }
 
 export type EventQueueHandlers = {
 	/** Play an action's choreography and commit it. Awaited — the queue blocks. */
-	animate: (action: SerializedAction) => Promise<void>
+	animate: (action: SerializedAction, entry: QueuedEvent) => Promise<void>
 	/** Commit an action instantly, no choreography. */
-	apply: (action: SerializedAction) => void
+	apply: (action: SerializedAction, entry: QueuedEvent) => void
 	/** True while the board is available; a queue with no board idles in place. */
 	ready: () => boolean
 	/** Called after each event lands, with whether it was animated. */
@@ -81,8 +93,8 @@ export const createEventQueue = (handlers: EventQueueHandlers) => {
 				// or catching up) fast-forward instead: falling behind the room is worse
 				// than missing the slide, and the state applied is identical either way.
 				const animated = entry.animate && pending.length === 0 && isAnimatable(entry.action)
-				if (animated) await handlers.animate(entry.action)
-				else handlers.apply(entry.action)
+				if (animated) await handlers.animate(entry.action, entry)
+				else handlers.apply(entry.action, entry)
 				handlers.onApplied?.(entry, animated)
 			}
 		} finally {

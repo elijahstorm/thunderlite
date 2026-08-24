@@ -14,6 +14,7 @@
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
 	import { teamHasPendingActions } from './pendingActions'
+	import { controlsTeam } from './turnOwnership'
 	import { routeAnimation, animations, animationBusy, boardBusy } from './Animator/animator'
 	import { actionMenuState } from './HUD/actionMenuStore'
 	import { buildMenuState } from './HUD/buildMenuStore'
@@ -30,6 +31,7 @@
 	import TurnTransition from './HUD/TurnTransition.svelte'
 	import { turnTransitionActive } from './HUD/turnTransitionStore'
 	import { campaignScriptActive } from '$lib/Campaign/scriptGate'
+	import { syncLocked } from './desync'
 
 	interface Props {
 		interactor: undefined | ReturnType<typeof socketSelect>
@@ -196,6 +198,10 @@
 		// refused server-side ('Not your turn'), so the local board silently desyncs
 		// from the match. Gate every turn the same way, online or not.
 		if ($gameState.currentTeam !== localTeam) return
+		// Board input is dead once this client is known to have diverged from the
+		// room — see `desync.ts`. `interactor` guards itself too; this stops the
+		// selection/hover bookkeeping above it from running at all.
+		if ($syncLocked) return
 		if ($turnTransitionActive) return
 		// A campaign block is mutating the board — swallow input until it finishes so
 		// a move can't resolve against a board the script is mid-rewrite of.
@@ -252,7 +258,38 @@
 		}
 	})
 
+	// The turn the End Turn button offers to end: only ever this client's own side.
+	// Online this used to be ungated (the button's old `cpuOpponent` flag was false
+	// for every socket match), so pressing it on the OPPONENT's turn ran the local
+	// end-turn, flipped this board to the next side, and got the relay refused
+	// server-side — leaving the two clients on different turns and every later
+	// action answered with 'Not your turn'.
+	const canEndTurn = $derived($gameState.currentTeam === localTeam)
+
+	// Which side this client is allowed to commit actions for at all — its own
+	// seat, plus (online) a CPU seat it drives. See `turnOwnership.ts`: the rule
+	// is the server's, kept in one place so the two can't drift.
+	const controlsCurrentTeam = $derived(
+		controlsTeam({
+			team: $gameState.currentTeam,
+			localTeam,
+			isMultiplayer,
+			isAiDriver,
+			aiTeams,
+		})
+	)
+
 	const handleEndTurn = () => {
+		// Never end a turn this client doesn't own. Every end-turn applies to the
+		// local board immediately and is only then relayed, so a stray call (a
+		// mis-enabled control, a watchdog firing after the turn already moved on)
+		// desyncs the match rather than doing nothing. The gate belongs here, on the
+		// one funnel every caller goes through, not on each button.
+		if (!controlsCurrentTeam) return
+		// Frozen after a detected desync: this client's board no longer matches the
+		// room, so ending "its" turn would hand the opponent a turn the server never
+		// agreed had ended. See `desync.ts`.
+		if ($syncLocked) return
 		if (endTurnAction) {
 			endTurnAction()
 			return
@@ -514,14 +551,7 @@
 	</div>
 {/if}
 
-<HUDRoot
-	{map}
-	{minimap}
-	{fogOfWar}
-	onEndTurn={handleEndTurn}
-	{localTeam}
-	cpuOpponent={!isMultiplayer}
-/>
+<HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} {canEndTurn} />
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />

@@ -21,6 +21,7 @@ import { canSelectUnit, gameState } from '../gameState'
 import { openBuildMenu, closeBuildMenu } from '../HUD/buildMenuStore'
 import { applyAction, type CommitOptions } from '../applyAction'
 import { emitOutgoingAction } from '../outgoingActions'
+import { isSyncLocked } from '../desync'
 import { airLift, findFriendlyTransporters, shipOut } from '../modifiers/transport'
 import { buildableAdjacentTiles, resolveAdjacentBuild } from '../modifiers/builder'
 import { canDeployFromFactory } from '../build'
@@ -56,12 +57,19 @@ type Interaction = {
 type Interactor = (interaction: Interaction) => void
 
 export const interactor: Interactor = (interaction) =>
+	!isSyncLocked() &&
 	verifyInteraction(interaction) &&
 	actionsDecision[interaction.action ?? get(interactionState)](interaction)
 
 const verifyInteraction = (obj: object) => Object.hasOwn(obj, 'tile') && Object.hasOwn(obj, 'map')
 
 const commit = (map: MapObject, action: SerializedAction, opts?: CommitOptions): void => {
+	// Last line of defence for the sync lock. Every local action lands here, and a
+	// locked client must not mutate its board OR relay: it is already holding state
+	// the room never accepted, and one more action only widens the gap. Surrender
+	// is exempt — quitting must always be possible, and the server attributes it to
+	// the sender's own team rather than trusting the board it came from.
+	if (action.kind !== 'surrender' && isSyncLocked()) return
 	// `live: true` — locally-initiated action, so fire its SFX. Replayed and
 	// relayed actions go through `applyAction` directly and stay silent. Animated
 	// actions (move / attack) voice their sound at the animation beat and pass
@@ -415,6 +423,7 @@ export const beginBuildPlacement = (
 	team: number,
 	unitType: number
 ): boolean => {
+	if (isSyncLocked()) return false
 	const valid = buildableAdjacentTiles(map, builderTile, unitType)
 	if (valid.length === 0) return false
 
@@ -481,6 +490,7 @@ export const commitFactoryBuild = (
 	buildingTile: number,
 	unitType: number
 ): boolean => {
+	if (isSyncLocked()) return false
 	if (!canDeployFromFactory(map, buildingTile, unitType)) return false
 	commit(map, { kind: 'build', building: buildingTile, unitType })
 	return true
@@ -509,6 +519,7 @@ const actionsDecision = {
 const actionType = [move, attack] as const
 
 export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): void => {
+	if (isSyncLocked()) return
 	const menu = get(actionMenuState)
 	if (!menu.open || menu.unitTile === null) return
 	const tile = menu.unitTile
@@ -614,6 +625,7 @@ export const peekMenu = (): void => {
 // caller (the board's click handler) uses that to decide between re-summoning the
 // menu and running a normal tile selection.
 export const reopenMenuFromPeek = (map: MapObject): boolean => {
+	if (isSyncLocked()) return false
 	const menu = get(actionMenuState)
 	if (!menu.peeking || menu.unitTile === null) return false
 	const tile = menu.unitTile
@@ -640,6 +652,7 @@ export const reopenMenuFromPeek = (map: MapObject): boolean => {
 // tile. This bites hardest on a unit standing on its own Warfactory, the very
 // case the player most wants to move off of.
 export const openInPlaceMenu = (map: MapObject, tile: number): boolean => {
+	if (isSyncLocked()) return false
 	const unit = map.layers.units[tile]
 	if (!unit) return false
 	if (!canSelectUnit(unit, tile)) return false

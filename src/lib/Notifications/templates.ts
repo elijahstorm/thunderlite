@@ -69,7 +69,14 @@ export const friendRequest = (fromName: string): EmailContent => ({
 
 **${fromName}** wants to be friends on ThunderLite.
 
-Open your friends list to accept or ignore the request.${prefsFooter}`,
+Open your friends list in ThunderLite to accept or ignore the request.${prefsFooter}`,
+})
+
+export const friendAccepted = (fromName: string): EmailContent => ({
+	subject: `${fromName} accepted your friend request`,
+	markdownText: `# You are friends now
+
+**${fromName}** accepted your friend request on ThunderLite. You will find each other in your friends list, and you can start a game or send a message any time.${prefsFooter}`,
 })
 
 export const newFollower = (fromName: string): EmailContent => ({

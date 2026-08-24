@@ -43,14 +43,19 @@
 
 	resetForm()
 
-	const checkUsernameTaken = (e: Event) => {
-		const value = (e.target as HTMLInputElement)?.value
-		return (
-			value &&
-			fetch(`/api/user/exists/${value}`)
-				.then((response) => response.json())
-				.then((data) => (usernameTaken = data.exists?.length))
-		)
+	// Normalise the same way the submit handler does: the field renders an `@`
+	// prefix that is not part of the stored username, so checking the raw input
+	// would query a name nobody owns. An empty field clears the flag rather than
+	// leaving a stale conflict behind.
+	const checkUsernameTaken = async (e: Event) => {
+		const value = (e.target as HTMLInputElement)?.value?.replace(/.*@/, '') ?? ''
+		if (!value) {
+			usernameTaken = false
+			return
+		}
+		const response = await fetch(`/api/user/exists/${encodeURIComponent(value)}`)
+		const data = await response.json()
+		usernameTaken = Boolean(data.exists?.length)
 	}
 
 	const errors: { [key: string]: string } = $derived(

@@ -31,7 +31,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	if (!user) {
 		try {
-			await makeUserDBDataFromAuth(locals.user)
+			await makeUserDBDataFromAuth(locals.user, locals.userEmail)
 			user = {
 				id: -1,
 				auth: locals.user,
@@ -64,8 +64,10 @@ export const actions = {
 		if (Object.keys(errors).length > 0) return fail(400, { errors })
 
 		if (validated.username && typeof validated.username === 'string') {
+			// Exclude the caller's own row: keeping your existing username while
+			// editing the rest of the profile must not read as a conflict.
 			const user = await db.find('profiles', {
-				where: { username: validated.username },
+				where: { username: validated.username, auth: { not: locals.user } },
 				select: ['id'],
 			})
 			if (user.length) {

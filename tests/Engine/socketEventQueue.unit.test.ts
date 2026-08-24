@@ -55,12 +55,12 @@ describe('socket event queue', () => {
 	it('never applies a polled event while an earlier one is still animating', async () => {
 		const { log, gates, queue } = harness()
 
-		queue.push({ id: 1, action: move(10, 12), animate: true, via: 'push' })
+		queue.push({ id: 1, action: move(10, 12), animate: true, live: true, via: 'push' })
 		await flush()
 		expect(log).toEqual([`animate:start:${label(move(10, 12))}`])
 
 		// Mid-slide: the poll delivers the attack that follows the move.
-		queue.push({ id: 2, action: attack(12, 13), animate: false, via: 'poll' })
+		queue.push({ id: 2, action: attack(12, 13), animate: false, live: true, via: 'poll' })
 		await flush()
 
 		// It must NOT have touched the board yet.
@@ -84,9 +84,9 @@ describe('socket event queue', () => {
 	it('applies events in accepted order regardless of which transport delivered them', async () => {
 		const { log, queue } = harness()
 
-		queue.push({ id: 1, action: move(1, 2), animate: false, via: 'poll' })
-		queue.push({ id: 2, action: attack(2, 3), animate: false, via: 'push' })
-		queue.push({ id: 3, action: move(4, 5), animate: false, via: 'poll' })
+		queue.push({ id: 1, action: move(1, 2), animate: false, live: false, via: 'poll' })
+		queue.push({ id: 2, action: attack(2, 3), animate: false, live: false, via: 'push' })
+		queue.push({ id: 3, action: move(4, 5), animate: false, live: false, via: 'poll' })
 		await flush()
 
 		expect(log.filter((l) => l.startsWith('applied'))).toEqual([
@@ -103,10 +103,10 @@ describe('socket event queue', () => {
 		// the middle one has another behind it, so it fast-forwards rather than
 		// making this client fall a further slide-length behind the room; only the
 		// last one — alone in the queue — gets its choreography.
-		queue.push({ id: 1, action: move(1, 2), animate: true, via: 'push' })
+		queue.push({ id: 1, action: move(1, 2), animate: true, live: true, via: 'push' })
 		await flush()
-		queue.push({ id: 2, action: move(2, 3), animate: true, via: 'push' })
-		queue.push({ id: 3, action: move(3, 4), animate: true, via: 'push' })
+		queue.push({ id: 2, action: move(2, 3), animate: true, live: true, via: 'push' })
+		queue.push({ id: 3, action: move(3, 4), animate: true, live: true, via: 'push' })
 
 		gates[0].resolve()
 		await flush()
@@ -119,7 +119,7 @@ describe('socket event queue', () => {
 	it('never animates a catch-up backlog', async () => {
 		const { log, queue } = harness()
 
-		queue.push({ id: 1, action: move(1, 2), animate: false, via: 'poll' })
+		queue.push({ id: 1, action: move(1, 2), animate: false, live: false, via: 'poll' })
 		await flush()
 
 		expect(log).toEqual([`apply:${label(move(1, 2))}`, 'applied:1'])
@@ -128,7 +128,7 @@ describe('socket event queue', () => {
 	it('only animates move and attack; every other kind applies instantly', async () => {
 		const { log, queue } = harness()
 
-		queue.push({ id: 1, action: { kind: 'end-turn' }, animate: true, via: 'push' })
+		queue.push({ id: 1, action: { kind: 'end-turn' }, animate: true, live: true, via: 'push' })
 		await flush()
 
 		expect(log).toEqual([`apply:${label({ kind: 'end-turn' })}`, 'applied:1'])
@@ -137,7 +137,7 @@ describe('socket event queue', () => {
 	it('drops events (loudly) when the board has gone away', async () => {
 		const { log, queue } = harness(() => false)
 
-		queue.push({ id: 7, action: move(1, 2), animate: true, via: 'push' })
+		queue.push({ id: 7, action: move(1, 2), animate: true, live: true, via: 'push' })
 		await flush()
 
 		expect(log).toEqual(['dropped:7'])
@@ -146,16 +146,52 @@ describe('socket event queue', () => {
 	it('picks up events pushed while a drain is already in flight', async () => {
 		const { log, gates, queue } = harness()
 
-		queue.push({ id: 1, action: attack(1, 2), animate: true, via: 'push' })
+		queue.push({ id: 1, action: attack(1, 2), animate: true, live: true, via: 'push' })
 		await flush()
 		expect(queue.busy).toBe(true)
 
-		queue.push({ id: 2, action: { kind: 'wait', tile: 3 }, animate: true, via: 'push' })
+		queue.push({ id: 2, action: { kind: 'wait', tile: 3 }, animate: true, live: true, via: 'push' })
 		gates[0].resolve()
 		await flush()
 
 		expect(log.filter((l) => l.startsWith('applied'))).toEqual(['applied:1', 'applied:2'])
 		expect(queue.busy).toBe(false)
 		expect(queue.size).toBe(0)
+	})
+
+	/**
+	 * The commit handlers get the whole entry, not just the action, so the caller
+	 * can tell an event that arrived as LIVE play from one it pulled out of the log
+	 * on the way in.
+	 *
+	 * That distinction is load-bearing, and match 13 is why. A player's opening
+	 * moves never reached the log, so the moves that followed them were unapplyable
+	 * for everybody — and the desync banner fired on the catch-up replay just as
+	 * loudly as on live divergence. It therefore came straight back on every
+	 * reload and never left, telling two players who had by then replayed the same
+	 * log and were byte-for-byte in sync that they were out of sync. A hole in the
+	 * shared log is not a divergence between clients; only the live case is.
+	 */
+	it('hands the commit handlers the entry, so replay is distinguishable from live', async () => {
+		const seen: { id: number; live: boolean }[] = []
+		const queue = createEventQueue({
+			ready: () => true,
+			animate: async (_action, entry) => {
+				seen.push({ id: entry.id, live: entry.live })
+			},
+			apply: (_action, entry) => {
+				seen.push({ id: entry.id, live: entry.live })
+			},
+		})
+
+		// A catch-up replay out of the log, then a live push behind it.
+		queue.push({ id: 1, action: move(1, 2), animate: false, live: false, via: 'poll' })
+		queue.push({ id: 2, action: move(2, 3), animate: true, live: true, via: 'push' })
+		await flush()
+
+		expect(seen).toEqual([
+			{ id: 1, live: false },
+			{ id: 2, live: true },
+		])
 	})
 })

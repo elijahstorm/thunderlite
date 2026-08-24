@@ -136,9 +136,17 @@ export const queryUsersByAuth = async (auths: string[], me: string = ''): Promis
 	}
 }
 
-export const makeUserDBDataFromAuth = async (auth: string) => {
+/**
+ * Create the profile row for a signed-in account.
+ *
+ * `email` is stored on the row from the start when the caller has it. Without
+ * it the profile is unreachable by email: `notify()` resolves recipients from
+ * `profiles.email`, so a user who has never acted (and therefore never hit
+ * `rememberEmail`) silently receives nothing.
+ */
+export const makeUserDBDataFromAuth = async (auth: string, email?: string) => {
 	try {
-		await db.insert('profiles', { auth })
+		await db.insert('profiles', email ? { auth, email } : { auth })
 	} catch (msg) {
 		await logToErrorDb(msg)
 		throw error(500, 'Could not make user')

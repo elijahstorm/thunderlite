@@ -38,7 +38,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// so first-time profile creation should just work; a failure here is a real
 		// error rather than a cue to self-migrate from the request path.
 		try {
-			await makeUserDBDataFromAuth(auth)
+			await makeUserDBDataFromAuth(auth, locals.userEmail)
 		} catch {
 			throw error(500, 'There was an issue making your new account')
 		}
@@ -62,8 +62,10 @@ export const actions = {
 		if (Object.keys(errors).length > 0) return fail(400, { errors })
 
 		if (validated.username && typeof validated.username === 'string') {
+			// Exclude the caller's own row: keeping your existing username while
+			// editing the rest of the profile must not read as a conflict.
 			const user = await db.find('profiles', {
-				where: { username: validated.username },
+				where: { username: validated.username, auth: { not: locals.user } },
 				select: ['id'],
 			})
 			if (user.length) {

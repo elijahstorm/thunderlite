@@ -141,24 +141,34 @@ export async function notify(input: NotifyInput): Promise<void> {
 		})
 		if (!claimed) return
 
-		const res = await notifications.sendEmail({
-			to,
-			subject: input.content.subject,
-			markdownText: input.content.markdownText,
-		})
-
-		if (res.success) {
-			await db.update(
-				'email_log',
-				{ dedup_key: input.dedupKey },
-				{ success: true, message_id: res.messageId ?? null }
-			)
-		} else {
-			// Release the claim so the next attempt can retry this event.
-			await db.delete('email_log', { dedup_key: input.dedupKey })
-			await logToErrorDb(`email send failed (${input.category}): ${res.error ?? 'unknown'}`)
+		// The gateway reports some failures in-band and raises others (an
+		// unavailable or not-yet-enabled service throws a DontCodeError). Both
+		// have to release the claim: a claim leaked on a throw is permanent, and
+		// it silences that exact event forever even after the gateway recovers.
+		let error: string | null = null
+		try {
+			const res = await notifications.sendEmail({
+				to,
+				subject: input.content.subject,
+				markdownText: input.content.markdownText,
+			})
+			if (res.success) {
+				await db.update(
+					'email_log',
+					{ dedup_key: input.dedupKey },
+					{ success: true, message_id: res.messageId ?? null }
+				)
+				return
+			}
+			error = res.error ?? 'unknown'
+		} catch (err) {
+			error = err instanceof Error ? err.message : `${err}`
 		}
+
+		// Release the claim so the next attempt can retry this event.
+		await db.delete('email_log', { dedup_key: input.dedupKey })
+		await logToErrorDb(`email send failed (${input.category}, ${input.dedupKey}): ${error}`)
 	} catch (err) {
-		await logToErrorDb(err)
+		await logToErrorDb(err, `notify ${input.category} ${input.dedupKey}`)
 	}
 }

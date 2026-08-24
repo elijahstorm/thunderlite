@@ -5,35 +5,25 @@
 
 	interface Props {
 		onEndTurn?: () => void
-		localTeam?: number
-		/** True when other teams are CPU. Hotseat passes false so both human players
-		 * can end their own turn from the same client. */
-		cpuOpponent?: boolean
+		/** Whether the side currently holding the turn is one this client commands.
+		 * The parent owns this (it knows localTeam, the CPU seats and whether the
+		 * match is online); the button only renders the answer. It used to be
+		 * derived here from a `cpuOpponent` flag, which was false for every ONLINE
+		 * match — so the button stayed live on the opponent's turn, ended their turn
+		 * on this board only, and desynced the match. */
+		canEndTurn?: boolean
 		/** Collapsed rail: icon-only. */
 		compact?: boolean
 	}
 
-	let {
-		onEndTurn = () => {},
-		localTeam = 0,
-		cpuOpponent = false,
-		compact = false,
-	}: Props = $props()
+	let { onEndTurn = () => {}, canEndTurn = true, compact = false }: Props = $props()
 
 	let state = $derived($gameState)
-	let disabled = $derived(
-		state.phase !== 'playing' ||
-			(cpuOpponent && state.currentTeam !== localTeam) ||
-			$turnTransitionActive
-	)
+	let disabled = $derived(state.phase !== 'playing' || !canEndTurn || $turnTransitionActive)
 	// Say *why* the button is dead rather than just greying out — waiting on the
 	// other side is the common case and used to look like a broken button.
 	let label = $derived(
-		state.phase !== 'playing'
-			? 'Match over'
-			: cpuOpponent && state.currentTeam !== localTeam
-				? "Opponent's turn"
-				: 'End Turn'
+		state.phase !== 'playing' ? 'Match over' : !canEndTurn ? "Opponent's turn" : 'End Turn'
 	)
 </script>
 

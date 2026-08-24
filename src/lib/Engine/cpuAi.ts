@@ -2,6 +2,7 @@ import { get } from 'svelte/store'
 import { gameState } from './gameState'
 import { applyAction, type CommitOptions } from './applyAction'
 import { emitOutgoingAction } from './outgoingActions'
+import { isSyncLocked } from './desync'
 import { animateRoute } from './Animator/animator'
 import { animateAttackSequence } from './attackSequence'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
@@ -76,6 +77,11 @@ export const isCpuTurn = (humanTeam: number): boolean => {
 }
 
 const commit = (map: MapObject, action: SerializedAction, opts?: CommitOptions): void => {
+	// A driven CPU seat rides this client's relay stream, so a client frozen by a
+	// detected desync must stop relaying for the AI too — otherwise the one board
+	// we know is wrong keeps writing the room's history. Never set outside online
+	// play, so local/campaign CPU turns are untouched. See `desync.ts`.
+	if (isSyncLocked()) return
 	// The CPU turn is live, animated gameplay (one action at a time), so its
 	// moves/attacks/deaths should sound just like a human's. Only the reconnect
 	// replay path stays silent. Animated actions (move / attack) voice their

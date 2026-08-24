@@ -18,11 +18,20 @@
  * replay play simply have no listener attached, so it stays a no-op there.
  */
 
-import { writable } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 import type { SerializedAction } from './Interactor/serializedAction'
 
 export type DesyncReason =
-	'missing-attacker' | 'missing-target' | 'missing-unit' | 'missing-building' | 'missing-mover'
+	| 'missing-attacker'
+	| 'missing-target'
+	| 'missing-unit'
+	| 'missing-building'
+	| 'missing-mover'
+	// Not an engine bail-out: the online layer could not get an action this client
+	// has ALREADY applied into the room's log. Same divergence, opposite direction —
+	// here we are the one holding state nobody else will ever see.
+	| 'action-refused'
+	| 'action-lost'
 
 export type DesyncReport = {
 	action: SerializedAction
@@ -46,8 +55,35 @@ export const reportDesync = (action: SerializedAction, reason: DesyncReason): vo
 	desyncCount.update((n) => n + 1)
 }
 
+/**
+ * Whether gameplay input is frozen because this client's board is known to
+ * disagree with the room.
+ *
+ * A report on its own is a diagnosis; this is the treatment. Once the boards
+ * differ, every further action is taken against a board nobody else has: it
+ * either gets refused by the server (and vanishes) or gets recorded against
+ * state the room never reached (and corrupts the log for everyone). Match 13 is
+ * the worked example — one player kept commanding units the room had never
+ * moved, so the opponent walked onto "occupied" tiles and the phantom units
+ * blinked out. Freezing is the only honest response: the player stops writing
+ * history that cannot be reconciled, and is told to resync.
+ *
+ * ONLY the online layer (`GameSocket`) sets this. Local, hotseat, campaign and
+ * replay attach no listener and never lock, so nothing off the network path
+ * changes behaviour. Surrender is deliberately never gated on it: giving up is
+ * always available, and the server attributes it to the sender's own team.
+ */
+export const syncLocked = writable(false)
+
+/** Freeze gameplay input. Cleared only by a resync (a reload) or a new match. */
+export const lockGameplayForDesync = (): void => syncLocked.set(true)
+
+/** Guard for the input funnels — cheap enough to call on every click. */
+export const isSyncLocked = (): boolean => get(syncLocked)
+
 /** Fresh match: forget anything the previous board reported. */
 export const resetDesync = (): void => {
 	desyncReports.set(null)
 	desyncCount.set(0)
+	syncLocked.set(false)
 }

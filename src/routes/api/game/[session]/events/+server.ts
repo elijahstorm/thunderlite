@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit'
+import { error, isHttpError, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { gameStore } from '$lib/Game/store.server'
 import { notifyAsyncTimeout } from '$lib/Game/asyncNotify.server'
@@ -64,7 +64,10 @@ export const GET = async ({ url, params, locals }) => {
 
 		return json({ events, lastEventId, turnDeadline, aiTeams, isAiDriver, clientSeq })
 	} catch (msg) {
-		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
+		// See the note on the same line in `move/+server.ts`: the SDK's
+		// `DontCodeError` also carries `status`, so a duck-typed check re-threw
+		// gateway failures on the sync path without ever logging them.
+		if (isHttpError(msg)) throw msg
 		await logToErrorDb(msg)
 		throw error(500, 'Could not load game events')
 	}

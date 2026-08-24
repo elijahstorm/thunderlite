@@ -13,7 +13,9 @@
 		map?: MapObject | undefined
 		onEndTurn?: () => void
 		localTeam?: number
-		cpuOpponent?: boolean
+		/** Whether the side holding the turn is one this client commands — passed
+		 * straight through to the End Turn button. */
+		canEndTurn?: boolean
 		/** Show the overview map at the top of the HUD rail. */
 		minimap?: boolean
 		fogOfWar?: boolean
@@ -23,7 +25,7 @@
 		map = undefined,
 		onEndTurn = () => {},
 		localTeam = 0,
-		cpuOpponent = false,
+		canEndTurn = true,
 		minimap = false,
 		fogOfWar = false,
 	}: Props = $props()
@@ -164,11 +166,11 @@
 		</div>
 
 		<div class="shrink-0 border-t border-white/10 p-2">
-			<EndTurnButton {onEndTurn} {localTeam} {cpuOpponent} />
+			<EndTurnButton {onEndTurn} {canEndTurn} />
 		</div>
 	{:else}
 		<div class="mt-auto p-1.5">
-			<EndTurnButton {onEndTurn} {localTeam} {cpuOpponent} compact />
+			<EndTurnButton {onEndTurn} {canEndTurn} compact />
 		</div>
 	{/if}
 </aside>

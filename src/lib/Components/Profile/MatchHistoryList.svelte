@@ -92,15 +92,6 @@
 						{:else}
 							<span class="font-medium text-foreground">{title(entry)}</span>
 						{/if}
-
-						<!-- Your own side of the ladder: where the match left you, and what
-						     it moved. `eloAfter` is null for unrated games, which is most
-						     of them (hot-seat, campaign, anything with a CPU seat). -->
-						{#if entry.eloAfter != null}
-							<span data-testid="match-elo-delta" title="Your rating after this match">
-								<RatingBadge elo={entry.eloAfter} delta={entry.eloDelta} size="xs" />
-							</span>
-						{/if}
 					</div>
 
 					<p class="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -119,6 +110,28 @@
 						{/if}
 					</p>
 				</div>
+
+				<!-- Your own side of the ladder: where the match left you, and what it
+				     moved. Deliberately kept off the "vs <name>" line and labelled, so
+				     it can never be misread as the opponent's rating. `eloAfter` is null
+				     for unrated games, which is most of them (hot-seat, campaign,
+				     anything with a CPU seat). -->
+				{#if entry.eloAfter != null}
+					<div
+						class="shrink-0 text-right leading-tight"
+						data-testid="match-elo-delta"
+						title="Your ladder rating after this match"
+					>
+						<span
+							class="block text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+						>
+							Your rating
+						</span>
+						<span class="mt-0.5 inline-flex">
+							<RatingBadge elo={entry.eloAfter} delta={entry.eloDelta} size="xs" />
+						</span>
+					</div>
+				{/if}
 
 				{#if entry.reviewable}
 					<a

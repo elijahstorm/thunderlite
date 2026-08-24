@@ -6,9 +6,12 @@
 	import Icon from '@iconify/svelte'
 	interface Props {
 		children?: import('svelte').Snippet
+		data: { friendRequests?: number }
 	}
 
-	let { children }: Props = $props()
+	let { children, data }: Props = $props()
+
+	let friendRequests = $derived(data?.friendRequests ?? 0)
 
 	let openAside = $state(false)
 
@@ -19,7 +22,12 @@
 	// @ts-ignore
 	onNavigate(closeAside)
 
-	const navSections = [
+	type NavItem = { href: string; label: string; icon: string; badge?: number }
+	type NavSection = { title: string; items: NavItem[] }
+
+	// Derived, not const: the Friends badge tracks the pending-request count
+	// that the layout load refreshes on every navigation.
+	let navSections = $derived<NavSection[]>([
 		{
 			title: 'Account',
 			items: [
@@ -28,14 +36,14 @@
 				{ href: '/my/items', label: 'My Items', icon: 'lucide:layout-grid' },
 				{ href: '/my/maps', label: 'My Maps', icon: 'lucide:map' },
 				{ href: '/my/inbox', label: 'Inbox', icon: 'lucide:inbox' },
-				{ href: '/my/friends', label: 'Friends', icon: 'lucide:users' },
+				{ href: '/my/friends', label: 'Friends', icon: 'lucide:users', badge: friendRequests },
 			],
 		},
 		{
 			title: 'More',
 			items: [{ href: '/my/pro', label: 'Support the project', icon: 'lucide:heart' }],
 		},
-	]
+	])
 
 	let pathname = $derived($page.url.pathname)
 </script>
@@ -84,6 +92,14 @@
 										>
 											<Icon icon={item.icon} width={16} />
 											<span class="flex-1">{item.label}</span>
+											{#if item.badge}
+												<span
+													class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground"
+													aria-label="{item.badge} waiting"
+												>
+													{item.badge}
+												</span>
+											{/if}
 										</a>
 									</li>
 								{/each}

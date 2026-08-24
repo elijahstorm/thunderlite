@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit'
+import { error, isHttpError, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { isValidSerializedAction } from '$lib/Engine/Interactor/serializedAction.js'
 import { gameStore, OutOfOrderEventError } from '$lib/Game/store.server'
@@ -29,13 +29,23 @@ export const POST = async ({ request, params, locals }) => {
 	// The sender's own 0-based counter for this room. It is what carries the order
 	// the PLAYER acted in — the log's `seq` only records which request won its
 	// insert race, which for two overlapping requests is a coin flip (see
-	// `appendEvent`). Optional: a client that doesn't send one keeps the old
-	// unordered, non-idempotent behaviour.
+	// `appendEvent`).
+	//
+	// REQUIRED, and the requirement is the point. It used to be optional, so a
+	// client that didn't send one silently fell back to the old unordered,
+	// non-idempotent append — the exact behaviour the ordering work removed. That
+	// fallback is reachable by any browser tab loaded before the deploy that added
+	// it, and match 13 is what that looks like from the inside: one player on a
+	// stale bundle relayed unordered, the room recorded a `wait` ahead of the move
+	// that created it, and both boards were unrecoverable from turn two on. One
+	// party to a match must not be able to opt the whole room out of its ordering
+	// guarantee, so an unordered relay is refused instead of served. 426 rather
+	// than 400: the request is well-formed, the CLIENT is what's out of date.
 	const rawClientSeq = (body as { clientSeq?: unknown })?.clientSeq
-	const clientSeq =
-		typeof rawClientSeq === 'number' && Number.isInteger(rawClientSeq) && rawClientSeq >= 0
-			? rawClientSeq
-			: undefined
+	if (typeof rawClientSeq !== 'number' || !Number.isInteger(rawClientSeq) || rawClientSeq < 0) {
+		throw error(426, 'This version of the game is out of date. Reload to keep playing.')
+	}
+	const clientSeq = rawClientSeq
 
 	try {
 		// Membership, whose-turn-it-is, and the room row are independent reads on
@@ -168,7 +178,14 @@ export const POST = async ({ request, params, locals }) => {
 
 		return json({ event, turnDeadline })
 	} catch (msg) {
-		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
+		// `isHttpError`, not a duck-typed `'status' in msg`. The loose check was
+		// meant to re-throw our own `error(...)` results untouched, but the SDK's
+		// `DontCodeError` carries `status` and `body` too — so a gateway failure on
+		// this path (a rate limit, a "temporarily unavailable") was re-thrown with
+		// the GATEWAY's status and never reached `logToErrorDb`. That is why a move
+		// could vanish leaving no server-side trace at all: the one path that
+		// records why a relay failed was the one path a failed relay skipped.
+		if (isHttpError(msg)) throw msg
 		if (msg instanceof OutOfOrderEventError) {
 			// This request is out of step with the sender's own stream — it overtook an
 			// earlier one of theirs, or their counter is stale after a reload. Recording

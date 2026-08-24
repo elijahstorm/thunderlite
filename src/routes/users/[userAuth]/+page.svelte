@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { untrack } from 'svelte'
 	import { goto } from '$app/navigation'
 	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
@@ -15,32 +14,66 @@
 	let isMe = $derived(!!data.me && data.me === user.auth)
 	let canAct = $derived(!!data.me && !isMe)
 
-	// Optimistic local state seeded from the server's relationship snapshot.
-	let relationship = $state(untrack(() => data.user.relationship ?? null))
-	let following = $state(untrack(() => data.user.following ?? false))
+	// Optimistic local state layered over the server's snapshot. It is stamped
+	// with the profile it belongs to: SvelteKit reuses this component when you
+	// navigate from one player to the next, so an override that wasn't keyed
+	// would follow you onto the next profile.
+	type Local = { auth: string; relationship: RelationshipStatus | null; following: boolean }
+	let local = $state<Local | null>(null)
+	let pending = $state('')
+
+	let relationship = $derived(
+		local?.auth === user.auth ? local.relationship : (user.relationship ?? null)
+	)
+	let following = $derived(local?.auth === user.auth ? local.following : (user.following ?? false))
+
+	const override = (patch: Partial<Omit<Local, 'auth'>>) => {
+		local = { auth: user.auth, relationship, following, ...patch }
+	}
 
 	const message = () => goto(`/chat/${user.auth}`)
 
-	const friend = async () => {
-		await fetch(`/api/user/${user.auth}/friend-request`, { method: 'POST' })
-			.then((r) => r.json())
-			.then((res) => (relationship = res?.status ?? 'friend-request'))
-			.catch(() => {})
+	/**
+	 * Both relationship endpoints answer with the resulting `RelationshipStatus`,
+	 * so the button repaints from the server's word. The optimistic write first
+	 * is what makes the click feel instant; a failure rolls it back rather than
+	 * leaving a lie on screen.
+	 */
+	const act = async (action: 'friend-request' | 'block', optimistic: RelationshipStatus) => {
+		if (pending) return
+		const previous = relationship
+		pending = action
+		override({ relationship: optimistic })
+		try {
+			const response = await fetch(`/api/user/${user.auth}/${action}`, { method: 'POST' })
+			if (!response.ok) throw new Error(`${response.status}`)
+			const result = await response.json()
+			override({ relationship: (result?.status as RelationshipStatus) ?? optimistic })
+		} catch {
+			override({ relationship: previous })
+		} finally {
+			pending = ''
+		}
 	}
+
+	const friend = () => act('friend-request', 'friend-request')
+	const block = () => act('block', 'blocked')
 
 	const toggleFollow = async () => {
+		if (pending) return
 		const next = !following
-		following = next
-		await fetch(`/api/user/${user.auth}/${next ? 'follow' : 'unfollow'}`, {
-			method: 'POST',
-		}).catch(() => (following = !next))
-	}
-
-	const block = async () => {
-		await fetch(`/api/user/${user.auth}/block`, { method: 'POST' })
-			.then((r) => r.json())
-			.then((res) => (relationship = res?.status ?? 'blocked'))
-			.catch(() => {})
+		pending = 'follow'
+		override({ following: next })
+		try {
+			const response = await fetch(`/api/user/${user.auth}/${next ? 'follow' : 'unfollow'}`, {
+				method: 'POST',
+			})
+			if (!response.ok) throw new Error(`${response.status}`)
+		} catch {
+			override({ following: !next })
+		} finally {
+			pending = ''
+		}
 	}
 
 	let friendLabel = $derived(
@@ -79,15 +112,25 @@
 				type="button"
 				class="btn btn-sm"
 				class:btn-ghost={relationship !== 'friends'}
-				disabled={relationship === 'friends' || relationship === 'friend-request'}
+				disabled={!!pending || relationship === 'friends' || relationship === 'friend-request'}
 				onclick={friend}
 			>
 				{friendLabel}
 			</button>
-			<button type="button" class="btn btn-ghost btn-sm" onclick={toggleFollow}>
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm"
+				disabled={!!pending}
+				onclick={toggleFollow}
+			>
 				{following ? 'Following' : 'Follow'}
 			</button>
-			<button type="button" class="btn btn-ghost btn-sm text-destructive" onclick={block}>
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm text-destructive"
+				disabled={!!pending || relationship === 'blocked'}
+				onclick={block}
+			>
 				{relationship === 'blocked' ? 'Blocked' : 'Block'}
 			</button>
 		</div>

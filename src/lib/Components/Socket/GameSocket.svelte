@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte'
 	import { browser } from '$app/environment'
+	import { updated } from '$app/state'
 	import LocalInteracter from '$lib/Engine/Interactor/LocalInteracter.svelte'
 	import {
 		dispatchSerializedAction,
@@ -11,7 +12,13 @@
 	import { animateRemoteAction } from '$lib/Engine/remoteAnimate'
 	import { createEventQueue } from './eventQueue'
 	import { outgoingActions } from '$lib/Engine/outgoingActions'
-	import { desyncReports, resetDesync } from '$lib/Engine/desync'
+	import {
+		desyncReports,
+		lockGameplayForDesync,
+		reportDesync,
+		resetDesync,
+		syncLocked,
+	} from '$lib/Engine/desync'
 	import { boardDigestDetail, boardSnapshot } from '$lib/Engine/boardDigest'
 	import {
 		logDesync,
@@ -103,6 +110,22 @@
 	// board: nothing this client does from here on will match the opponent.
 	let desynced: { reason: string; action: string } | null = $state(null)
 	let desyncUnsubscribe: (() => void) | null = null
+	/**
+	 * True while the queue is committing an event we pulled out of the LOG rather
+	 * than one that arrived as live play (the catch-up replay after a load, or a
+	 * gap backfill).
+	 *
+	 * An action that fails to apply in that window is not a divergence between the
+	 * two players: the log is the room's shared truth, so every client replays the
+	 * same hole and lands on the same board. Match 13 is why this distinction is
+	 * here. One player's opening moves never reached the log, so the moves that
+	 * followed them were unapplyable for everyone — and because the banner fired on
+	 * replay too, it came straight back on every reload and never left, telling two
+	 * players who were by then perfectly in sync that they were not. Those reports
+	 * are still logged (they name exactly where the log broke); they just don't
+	 * accuse the player of a desync they cannot do anything about.
+	 */
+	let applyingHistory = false
 	// Once a board has diverged, EVERY later action can fail to apply. The first
 	// few carry all the diagnostic value (they bracket the divergence); the rest
 	// are consequences. Cap what we snapshot and ship so a broken match can't turn
@@ -137,8 +160,22 @@
 
 	const queue = createEventQueue({
 		ready: () => map() !== undefined,
-		animate: (action) => animateRemoteAction(map()!, action),
-		apply: (action) => dispatchSerializedAction(map()!, action),
+		animate: async (action, entry) => {
+			applyingHistory = !entry.live
+			try {
+				await animateRemoteAction(map()!, action)
+			} finally {
+				applyingHistory = false
+			}
+		},
+		apply: (action, entry) => {
+			applyingHistory = !entry.live
+			try {
+				dispatchSerializedAction(map()!, action)
+			} finally {
+				applyingHistory = false
+			}
+		},
 		onApplied: (entry, animated) => {
 			logIncoming(entry.id, entry.action, entry.via, animated ? 'animated' : 'applied')
 			appliedEventId = entry.id
@@ -182,7 +219,7 @@
 		}
 		// Queue it — never apply here. Applying an event while an earlier one is
 		// still animating is exactly what desynced matches; see `eventQueue.ts`.
-		queue.push({ id: event.id, action, animate: via === 'push' && caughtUp, via })
+		queue.push({ id: event.id, action, animate: via === 'push' && caughtUp, live: caughtUp, via })
 		logIncoming(event.id, action, via, 'queued')
 		requestRedraw = performance.now()
 		return true
@@ -294,6 +331,25 @@
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+	/**
+	 * An action we applied locally that the room will never see.
+	 *
+	 * This is the other half of a desync, and until match 13 it was the silent
+	 * half. The engine's reports catch the case where the LOG holds something this
+	 * board cannot apply; this catches the reverse — this board holds something the
+	 * log refused. It is strictly worse for the player who suffers it, because
+	 * nothing on their screen looks wrong: their units are where they moved them,
+	 * and the opponent simply walks through the ones the room never saw move.
+	 *
+	 * Routed through `reportDesync` so it lands on exactly the same path as an
+	 * engine bail-out — logged, surfaced, and the board frozen — rather than being
+	 * a second, parallel notion of "out of sync".
+	 */
+	const reportUnrelayed = (action: SerializedAction, reason: 'action-refused' | 'action-lost') => {
+		if (!multiplayer) return
+		reportDesync(action, reason)
+	}
+
 	const relay = async (action: SerializedAction) => {
 		for (let attempt = 0; attempt < RELAY_ATTEMPTS; attempt++) {
 			const outcome = await relayOnce(action, attempt)
@@ -303,8 +359,10 @@
 		// Out of attempts. The action is already on our board but not in the log, so
 		// this client is ahead of the room. We deliberately do NOT consume an ordinal
 		// — blocking the stream forever over one lost action would be worse than the
-		// gap, and the digest checkpoints will surface the divergence.
+		// gap. The board is frozen from here: playing on against state the room never
+		// accepted is what turns one lost action into an unplayable match.
 		logOutgoing(action, 'failed', { error: 'exhausted-retries' })
+		reportUnrelayed(action, 'action-lost')
 	}
 
 	const relayOnce = async (
@@ -327,7 +385,11 @@
 					clientSeq = data.expected
 					return 'retry'
 				}
+				// The counter already matches what the server expects and it still
+				// refused, so retrying can only produce the same answer. The action is
+				// on our board and nowhere else.
 				logOutgoing(action, 'failed', { status: 409, attempt })
+				reportUnrelayed(action, 'action-lost')
 				return 'done'
 			}
 			if (res.status === 403) {
@@ -337,6 +399,11 @@
 				// Nothing was recorded, so the ordinal stays unconsumed.
 				logOutgoing(action, 'rejected', { status: 403 })
 				flashWrongTurn()
+				// The flash alone was not enough. It reads as "that click didn't take",
+				// but the click DID take locally — this board and the room have disagreed
+				// about the turn since whenever the first one was refused, and every
+				// action after it compounds the split. Freeze and offer the resync.
+				reportUnrelayed(action, 'action-refused')
 				return 'done'
 			}
 			if (!res.ok) {
@@ -346,6 +413,7 @@
 					return 'retry'
 				}
 				logOutgoing(action, 'failed', { status: res.status })
+				reportUnrelayed(action, 'action-lost')
 				return 'done'
 			}
 			// Durably recorded — only now does this action own its ordinal.
@@ -437,14 +505,24 @@
 		// the player, rather than letting the divergence compound in silence.
 		desyncUnsubscribe = desyncReports.subscribe((report) => {
 			if (!report) return
-			desynced = { reason: report.reason, action: report.action.kind }
+			// Replaying the log: a hole here is shared by every client, so it is
+			// diagnostics, not a divergence. Recorded, never surfaced — see
+			// `applyingHistory`.
+			const history = applyingHistory
+			if (!history) {
+				desynced = { reason: report.reason, action: report.action.kind }
+				// Freeze input. The board is provably not the room's board, and every
+				// further action either gets refused or is recorded against state the
+				// room never reached.
+				lockGameplayForDesync()
+			}
 			if (desyncsLogged >= MAX_DESYNC_REPORTS) return
 			desyncsLogged += 1
 			const m = map()
 			logDesync(
 				appliedEventId,
 				report.action,
-				report.reason,
+				history ? `${report.reason}/replay` : report.reason,
 				m ? boardSnapshot(m).slice(0, 4000) : undefined
 			)
 		})
@@ -492,12 +570,34 @@
 	 * The only honest recovery from a detected desync. There is no server-side
 	 * simulation to ask for the truth, but the event log IS the truth: a reload
 	 * re-runs `poll(since=-1)` from a fresh board and replays every action in
-	 * order, which rebuilds exactly the state the room agrees on. Offered rather
-	 * than forced — yanking the page out from under someone mid-turn is worse than
-	 * letting them finish the beat and press the button.
+	 * order, which rebuilds exactly the state the room agrees on.
+	 *
+	 * Now that a desync freezes input there is nothing left to finish first, so
+	 * this is the one way out of the frozen state — which is also why it has to
+	 * actually clear it. It does: the reload starts from the log, and a hole in the
+	 * log no longer re-raises the banner (see `applyingHistory`), so a client that
+	 * has resynced comes back unlocked and matching the room.
 	 */
 	const resync = () => {
 		logNote('resync-requested', { lastEventId, appliedEventId })
+		stopLiveLog()
+		location.reload()
+	}
+
+	/**
+	 * A deploy has landed since this tab loaded its bundle.
+	 *
+	 * Harmless on most pages; not in a live match. This client speaks whatever sync
+	 * protocol it shipped with, and the room's other seat may now be speaking a
+	 * newer one. That is not hypothetical — it is exactly how match 13 broke, with
+	 * one player on a pre-deploy bundle relaying unordered actions into a log the
+	 * other player then could not replay. Reloading rebuilds the board from the log
+	 * and costs nothing, so say so plainly rather than waiting for the desync.
+	 */
+	const staleBuild = $derived(multiplayer && updated.current && !desynced)
+
+	const reloadForUpdate = () => {
+		logNote('stale-build-reload', { lastEventId, appliedEventId })
 		stopLiveLog()
 		location.reload()
 	}
@@ -535,9 +635,26 @@
 			in:fly={{ y: 10 }}
 			data-testid="desync-toast"
 		>
-			<span>Out of sync with your opponent.</span>
+			<span>
+				Out of sync with your opponent.
+				{#if $syncLocked}Your moves are paused until you resync.{/if}
+			</span>
 			<button class="underline font-semibold" onclick={resync} data-testid="desync-resync"
 				>Resync now</button
+			>
+		</div>
+	{/if}
+	{#if staleBuild}
+		<div
+			class="fixed bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-sky-700 text-white text-sm px-4 py-2 rounded shadow-lg z-50"
+			in:fly={{ y: 10 }}
+			data-testid="stale-build-toast"
+		>
+			<span>A new version of the game is out.</span>
+			<button
+				class="underline font-semibold"
+				onclick={reloadForUpdate}
+				data-testid="stale-build-reload">Reload</button
 			>
 		</div>
 	{/if}

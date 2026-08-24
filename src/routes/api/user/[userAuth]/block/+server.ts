@@ -5,16 +5,11 @@ import { setRelationship } from '$lib/Database/Relationships/relationships.js'
 export const POST = async ({ params, locals }) => {
 	try {
 		return json(
-			await new Promise<{ status: string }>((resolve) =>
-				setRelationship(
-					{
-						source: locals.user,
-						target: params.userAuth,
-						status: 'blocked',
-					},
-					resolve
-				)
-			)
+			await setRelationship({
+				source: locals.user,
+				target: params.userAuth,
+				status: 'blocked',
+			})
 		)
 	} catch (msg) {
 		await logToErrorDb(msg)
