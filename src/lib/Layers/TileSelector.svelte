@@ -14,6 +14,9 @@
 		validTile: (x: number, y: number) => boolean
 		canSelectAt?: (x: number, y: number) => boolean
 		mini?: boolean
+		/** Cell size in px for a `mini` board. The HUD's overview map shrinks this so
+		 * a whole board fits its rail instead of overflowing and being cropped. */
+		miniCell?: number
 		editor?: boolean
 		animator?: typeof Animator
 		children?: import('svelte').Snippet<[any]>
@@ -26,12 +29,13 @@
 		validTile,
 		canSelectAt = () => true,
 		mini = false,
+		miniCell = 20,
 		editor = false,
 		animator = Animator,
 		children,
 	}: Props = $props()
 
-	const cellWidth = $derived(mini ? 20 : 60)
+	const cellWidth = $derived(mini ? miniCell : 60)
 	const cellHeight = $derived(cellWidth)
 
 	const handleClick = (_x: number, _y: number) => {
@@ -103,8 +107,20 @@
 
 <svelte:window onresize={publishGeometry} />
 
-<section bind:this={section} class="grid relative w-full h-full overflow-hidden">
-	<div class="col-start-1 row-start-1 cursor-pointer">
+<!--
+	The single grid cell is pinned to `minmax(0, 1fr)` — the size of this section,
+	no more. Left as an `auto` track it took its size from the *canvas* inside it,
+	which the Scroller sizes in px: shrinking the window (or opening the HUD rail)
+	left the track at the old, larger width, so the section never reported a
+	smaller clientWidth and the Scroller's reflow concluded nothing had changed.
+	The board could grow but never shrink back. Same reasoning for `min-w-0` /
+	`overflow-hidden` on the cell: they stop the canvas voting on its own size.
+-->
+<section
+	bind:this={section}
+	class="grid grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] relative w-full h-full overflow-hidden"
+>
+	<div class="col-start-1 row-start-1 min-w-0 min-h-0 overflow-hidden cursor-pointer">
 		{@render children?.({
 			handleClick,
 			handleHover,

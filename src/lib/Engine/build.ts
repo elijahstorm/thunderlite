@@ -148,6 +148,13 @@ export const spawnBuiltUnit = (
 	const state = get(gameState)
 	const player = state.players.find((p) => p.team === team)
 	if (!player) return { ok: false, reason: 'invalid' }
+	// Production is a turn action: a factory only rolls a unit out on its owner's
+	// own turn. Every legitimate caller already satisfies this (the build menu, a
+	// CPU plan, a relayed opponent build replayed in log order), so the check costs
+	// nothing — it exists so no UI path can ever spend an off-turn team's money.
+	if (state.phase !== 'playing' || state.currentTeam !== team) {
+		return { ok: false, reason: 'not-buildable' }
+	}
 	if (data.cost <= 0) return { ok: false, reason: 'not-buildable' }
 	if (!isProducibleUnit(data)) return { ok: false, reason: 'not-buildable' }
 	if (!playerCanBuildType(player, data.type)) return { ok: false, reason: 'not-buildable' }

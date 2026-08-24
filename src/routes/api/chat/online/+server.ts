@@ -28,7 +28,7 @@ export const GET = async ({ locals }) => {
 		return json({ users })
 	} catch (msg) {
 		// No realtime service here — treat as "nobody resolvable is online".
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		return json({ users: [] })
 	}
 }

@@ -83,7 +83,7 @@ export const getMapById: (
 
 		return { map, owner }
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not get map from database')
 	}
 }
@@ -214,7 +214,7 @@ export const queryMaps: (
 
 		return { maps, users }
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not get map from database')
 	}
 }
@@ -256,7 +256,7 @@ export const queryUserPublicMaps: (owner: string) => Promise<{ maps: MapDBData[]
 		)
 		return { maps }
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		return { maps: [] }
 	}
 }
@@ -289,7 +289,7 @@ export const queryMyMaps: (
 			remaining: Math.max(0, MAX_MAPS_PER_USER - maps.length),
 		}
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not load your maps')
 	}
 }

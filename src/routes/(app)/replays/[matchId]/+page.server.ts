@@ -110,7 +110,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not load the replay')
 	}
 }

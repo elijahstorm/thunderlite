@@ -2,7 +2,7 @@
 	import type { LayoutData } from './$types'
 	import { Toasts } from 'as-toast'
 	import { browser } from '$app/environment'
-	import { initSession } from '$lib/dontcode/client'
+	import { initSession, refreshSession } from '$lib/dontcode/client'
 	import NavigationProgress from '$lib/Components/Feedback/NavigationProgress.svelte'
 	import '../app.css'
 
@@ -21,8 +21,16 @@
 	// Seed the client session stores from the server-resolved user. Kept to the
 	// browser so the module-level stores are never mutated during SSR (which
 	// would leak one request's user into another's render).
+	//
+	// On a prerendered route (`/`) this payload was baked at build time, so its
+	// `user` is always null regardless of who's actually signed in — seeding
+	// from it would log the visitor out of the UI for the rest of the session.
+	// Ask the server instead. `refreshSession` only clears the stores once it
+	// has an answer, so an already-signed-in user never flashes as logged out.
 	$effect(() => {
-		if (browser) initSession(data.user)
+		if (!browser) return
+		if (data.prerendered) refreshSession()
+		else initSession(data.user)
 	})
 </script>
 

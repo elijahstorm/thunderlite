@@ -41,11 +41,11 @@ export const POST = async ({ locals, request }) => {
 		// must be handled ahead of the generic HttpError re-throw below.
 		const forwarded = dontCodeCheckoutPayload(err)
 		if (forwarded) {
-			logToErrorDb(err)
+			await logToErrorDb(err)
 			return json(forwarded.body, { status: forwarded.status })
 		}
 		if (isHttpError(err)) throw err
-		logToErrorDb(err)
+		await logToErrorDb(err)
 		throw error(500, 'Could not confirm subscription')
 	}
 }

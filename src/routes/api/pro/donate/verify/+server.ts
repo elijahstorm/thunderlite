@@ -42,10 +42,10 @@ export const POST = async ({ locals, request }) => {
 	} catch (err) {
 		const forwarded = dontCodeCheckoutPayload(err)
 		if (forwarded) {
-			logToErrorDb(err)
+			await logToErrorDb(err)
 			return json(forwarded.body, { status: forwarded.status })
 		}
-		logToErrorDb(err)
+		await logToErrorDb(err)
 		throw error(500, 'Could not verify the donation')
 	}
 }

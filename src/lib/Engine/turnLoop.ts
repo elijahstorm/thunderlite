@@ -180,5 +180,21 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 		runPhaseForTeam(map, advance.team, 'Each_Turn', ['unit', 'building'], after)
 		runPhaseForTeam(map, advance.team, 'Move', ['unit'], after)
 		applyWinConditions(map)
+
+		// The side we just handed the turn to can be declared lost by that very
+		// evaluation — its last unit drowned on a scripted spawn, a Start_Turn
+		// modifier finished it off. With two sides that IS the end of the match, so
+		// it never mattered; from three sides up the game continues, and it would
+		// continue sitting on a dead side's turn that no client will ever play. Hand
+		// it on. `nextActiveTeam` skips anyone already out, so each hop lands on a
+		// live side (or the match is over and the phase check stops us) — the
+		// recursion can't revisit a team and is bounded by the player count.
+		const settled = get(gameState)
+		if (
+			settled.phase === 'playing' &&
+			settled.players.find((p) => p.team === settled.currentTeam)?.hasLost
+		) {
+			endTurn({ map })
+		}
 	}
 }

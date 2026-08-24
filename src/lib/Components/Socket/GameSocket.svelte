@@ -22,10 +22,22 @@
 		asyncGame?: boolean
 		/** Initial turn deadline from the loader; the event poll keeps it fresh. */
 		turnDeadline?: number | null
+		/** Initial CPU-seat wiring from the loader; the event poll keeps it fresh
+		 * (the driver can change mid-match when a human is swept for absence). */
+		aiTeams?: number[]
+		isAiDriver?: boolean
 		children?: import('svelte').Snippet<[any]>
 	}
 
-	let { map, gameSession = '', asyncGame = false, turnDeadline = null, children }: Props = $props()
+	let {
+		map,
+		gameSession = '',
+		asyncGame = false,
+		turnDeadline = null,
+		aiTeams = [],
+		isAiDriver = false,
+		children,
+	}: Props = $props()
 
 	const POLL_INTERVAL = 1500
 	// With a live websocket, polling drops to a slow reconciliation pass that
@@ -60,6 +72,13 @@
 	// Seeded from the loader (initial value only — polls own it after that),
 	// refreshed by every poll/move response; a ticker re-renders the countdown.
 	let deadline: number | null = $state(untrack(() => turnDeadline))
+	// CPU seats and whether WE run them. Seeded from the loader, then owned by the
+	// poll: the lowest-seat human drives the AI, and that seat can change during
+	// the match (the absence sweep removes a player who left). Without the refresh
+	// a board with CPU sides can end up with no driver at all and stall on the
+	// AI's turn — the same deadlock as a side with no member.
+	let liveAiTeams = $state(untrack(() => aiTeams))
+	let liveIsAiDriver = $state(untrack(() => isAiDriver))
 	let clockNow = $state(Date.now())
 	let clockTimer: ReturnType<typeof setInterval> | null = null
 	const deadlineLeftMs = $derived(deadline != null ? deadline - clockNow : null)
@@ -132,9 +151,22 @@
 			const data = (await res.json()) as {
 				events?: GameEvent[]
 				turnDeadline?: number | null
+				aiTeams?: number[]
+				isAiDriver?: boolean
 			}
 			if (!data?.events) return
 			if (asyncGame && data.turnDeadline !== undefined) deadline = data.turnDeadline
+			if (Array.isArray(data.aiTeams)) {
+				// Replace only on a real change so the state manager's CPU effect isn't
+				// re-keyed (and its in-flight turn cancelled) by every poll.
+				const next = data.aiTeams
+				if (next.length !== liveAiTeams.length || next.some((t, i) => t !== liveAiTeams[i])) {
+					liveAiTeams = next
+				}
+			}
+			if (typeof data.isAiDriver === 'boolean' && data.isAiDriver !== liveIsAiDriver) {
+				liveIsAiDriver = data.isAiDriver
+			}
 			for (const evt of data.events) {
 				if (!applyEvent(evt, false)) break
 			}
@@ -274,7 +306,12 @@
 </script>
 
 {#if multiplayer}
-	{@render children?.({ socket, requestRedraw })}
+	{@render children?.({
+		socket,
+		requestRedraw,
+		aiTeams: liveAiTeams,
+		isAiDriver: liveIsAiDriver,
+	})}
 	{#if asyncGame && deadlineLeftMs != null}
 		<div
 			class="fixed top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-full shadow z-40 pointer-events-none {deadlineLeftMs <

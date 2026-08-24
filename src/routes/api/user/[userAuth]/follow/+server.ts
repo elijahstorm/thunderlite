@@ -16,7 +16,7 @@ export const POST = async ({ params, locals }) => {
 		await db.insert('follows', { source, target })
 		status = 'ok'
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Invalid target auth string')
 	}
 

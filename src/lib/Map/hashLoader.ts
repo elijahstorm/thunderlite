@@ -17,7 +17,7 @@ export const getMapData = async (mapId: string) => {
 			select: ['map_data', 'name', 'status'],
 		})
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not get map from database')
 	}
 
@@ -34,7 +34,7 @@ export const isValidMapId = async (mapId: string) => {
 	try {
 		return (await db.count('maps', { public_id: mapId })) > 0
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not perform count check on database')
 	}
 }

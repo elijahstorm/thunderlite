@@ -89,7 +89,7 @@ export const POST = async ({ request, locals }) => {
 				}
 			)
 		} catch (msg) {
-			logToErrorDb(msg)
+			await logToErrorDb(msg)
 			throw error(500, { message: 'Could not save map to database' })
 		}
 		return json({ id })
@@ -126,7 +126,7 @@ export const POST = async ({ request, locals }) => {
 			return json({ id: publicId })
 		} catch (msg) {
 			if (isConflict(msg)) continue // public_id clash — remint and retry.
-			logToErrorDb(msg)
+			await logToErrorDb(msg)
 			throw error(500, { message: 'Could not save map to database' })
 		}
 	}

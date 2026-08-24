@@ -23,7 +23,7 @@ export const POST = async ({ locals }) => {
 
 		return json({ status: 'ok', subscription })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not resume subscription')
 	}
 }

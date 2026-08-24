@@ -30,7 +30,7 @@ export const POST = async ({ locals, request }) => {
 		await setPrefs(userAuth, prefs)
 		return json({ status: 'ok', prefs })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not save preferences')
 	}
 }

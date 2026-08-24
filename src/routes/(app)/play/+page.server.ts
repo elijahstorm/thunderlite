@@ -46,7 +46,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// (idempotent — a member who chose a team in the lobby keeps it), then read
 	// this client's team back. This replaces the old client-side re-derivation
 	// that let two players both resolve to team 0.
-	const teams = teamsFromHash(mapHash)
+	const teams = await teamsFromHash(mapHash)
 	if (teams.length) {
 		await gameStore.assignTeamsIfNeeded(gameSession, teams)
 		// Align the server's turn pointer with the engine's first team before the
@@ -119,7 +119,7 @@ const buildTeamRoster = async (gameSession: string, me: string): Promise<TeamRos
 		return out
 	} catch (msg) {
 		// A roster failure must never take down the match — degrade to "Player N".
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		return {}
 	}
 }
@@ -153,7 +153,7 @@ const getGameSession = async (userSession: string) => {
 		return { gameSession: current.session, mapId: current.mapId, seat, room }
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not load game session')
 	}
 }

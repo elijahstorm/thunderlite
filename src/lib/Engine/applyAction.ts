@@ -400,6 +400,15 @@ export const applyAction = (
 				players: s.players.map((p) => (p.team === action.team ? { ...p, hasLost: true } : p)),
 			}))
 			applyWinConditions(map as MapObject)
+			// A forfeit by the side whose turn it IS has to hand the turn on, or the
+			// board sits on a team that no longer plays and nothing can move. With two
+			// sides the match is simply over (win conditions, above), which is why
+			// this never mattered before; from three sides up the game continues
+			// without the quitter and somebody has to be given the turn.
+			const after = get(gameState)
+			if (after.phase === 'playing' && after.currentTeam === action.team) {
+				endTurn({ map })
+			}
 			return
 		}
 	}

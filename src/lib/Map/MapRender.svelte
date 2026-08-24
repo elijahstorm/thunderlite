@@ -45,6 +45,7 @@
 		computeShownThreatUnitTiles,
 	} from '$lib/Engine/threatOverlay'
 	import { setHoverTile } from '$lib/Engine/uiState'
+	import { hudGutter } from '$lib/Engine/HUD/hudInsets'
 	import { dev } from '$app/environment'
 	import { analyzePathDebug, pathDebugEnabled } from '$lib/Engine/Interactor/Pathing/pathDebug'
 	import {
@@ -67,6 +68,9 @@
 		 * which drives the K1 script (dialogue, camera, spawns) against the engine. */
 		campaign?: CutsceneScript | undefined
 		mini?: boolean
+		/** Cell size in px for a `mini` board, so the HUD rail can fit a whole map
+		 * into its width instead of cropping it. */
+		miniCell?: number
 		pause?: boolean
 		/** Map-editor mode: suppresses gameplay-only overlays (the tile-selector
 		 * animation and the hover "selectable unit" icon) that have no meaning while
@@ -92,6 +96,7 @@
 		map = $bindable(),
 		campaign = undefined,
 		mini = false,
+		miniCell = 20,
 		pause = false,
 		editor = false,
 		fogOfWar = false,
@@ -111,6 +116,14 @@
 	}: Props = $props()
 
 	const render = () => (requestRedraw = performance.now())
+
+	// Room the runtime HUD rail occupies on the right edge. The live gameplay board
+	// pads itself by that much so the rail sits *beside* the map rather than on top
+	// of it — tiles under a floating panel can't be clicked, because the panel gets
+	// the pointer event. The backdrop still paints across the padding, so the rail
+	// keeps the same framed background behind it. Minimaps and the editor have no
+	// HUD, so they never inset.
+	let gutter = $derived(!mini && !editor ? $hudGutter : 0)
 
 	// The fog veil eases in/out per tile (see fogRender), but the board's normal
 	// repaint cadence is the 200ms sprite tick — far too coarse for a smooth fade.
@@ -464,7 +477,10 @@
 	})
 </script>
 
-<div class="w-full h-full flex justify-center items-center {backdrop}">
+<div
+	class="w-full h-full flex justify-center items-center {backdrop}"
+	style="padding-right: {gutter}px"
+>
 	{#if colorizer}
 		<Game {map} {makeImage} {colorizer} {select} {campaign} {editor}>
 			{#snippet children({ interfacer, renderData, select, validTile })}
@@ -472,6 +488,7 @@
 					<TileSelector
 						{animator}
 						{mini}
+						{miniCell}
 						{editor}
 						{interfacer}
 						{select}
@@ -488,8 +505,18 @@
 							handleOffset,
 						})}
 							{@const SvelteComponent = scroller}
+							<!--
+								`min-w-0 min-h-0 overflow-hidden` is load-bearing. The canvas inside
+								is sized in px by the Scroller's reflow, and as a flex item this box
+								defaults to a min-content floor — so an oversized canvas propped the
+								box open, the section's clientWidth stayed at the old value, and
+								reflow's "nothing changed" early-out then refused to shrink it. The
+								board could grow with the window but never shrink back (and likewise
+								never give room back to the HUD rail). Clipping the overflow keeps
+								the canvas from voting on its own container's size.
+							-->
 							<div
-								class="w-full h-full"
+								class="w-full h-full min-w-0 min-h-0 overflow-hidden"
 								style={mini
 									? `max-width: ${map.cols * cellWidth}px; max-height: ${map.rows * cellHeight}px`
 									: ''}
@@ -510,6 +537,7 @@
 									)(() => map)}
 									afterPaint={flushDeferredOverlays}
 									{requestRedraw}
+									reflowSignal={gutter}
 									{handleClick}
 									{handleHover}
 									{handleKeypress}

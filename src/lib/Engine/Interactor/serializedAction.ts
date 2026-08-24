@@ -14,7 +14,11 @@ export type SerializedAction =
 	| { kind: 'transport-load'; transport: number; passenger: number }
 	| { kind: 'transport-unload'; transport: number; tile: number }
 	| { kind: 'wait'; tile: number }
-	| { kind: 'end-turn' }
+	// `next` is the team this client's engine advanced to (see socketEndTurn). It
+	// is advisory metadata for the SERVER's turn pointer, not something the engine
+	// reads back — `applyAction` ignores it and re-derives the rotation itself, so
+	// a logged end-turn replays identically with or without it.
+	| { kind: 'end-turn'; next?: number }
 	| { kind: 'surrender'; team: number }
 
 export type GameEvent = {
@@ -61,7 +65,10 @@ export const isValidSerializedAction = (value: unknown): value is SerializedActi
 		case 'transport-unload':
 			return isTile(v.transport) && isTile(v.tile)
 		case 'end-turn':
-			return true
+			return (
+				v.next === undefined ||
+				(typeof v.next === 'number' && Number.isInteger(v.next) && v.next >= 0)
+			)
 		case 'surrender':
 			return isTile(v.team)
 	}

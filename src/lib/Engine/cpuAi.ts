@@ -221,7 +221,24 @@ export const runCpuTurn = ({
 		return true
 	}
 
+	// Nobody is watching this client's board. Animations are then pure cost — and
+	// worse, a hidden tab suspends requestAnimationFrame and clamps setTimeout to
+	// once a second (once a *minute* after a few minutes hidden), so a CPU turn
+	// paced by those timers crawls. That is only a cosmetic loss here, but in an
+	// online room this client is relaying the AI's moves for everyone else: the
+	// other players sit and wait on a tab they can't see. So when hidden the turn
+	// skips the choreography and commits straight through.
+	const hidden = (): boolean => typeof document !== 'undefined' && document.hidden
+
 	const schedule = (fn: () => void) => {
+		if (hidden()) {
+			// Microtasks are untouched by background throttling, so the turn resolves at
+			// full speed. `cancel` still stops it — `tick` re-checks `stillOurTurn`,
+			// which reads the same `cancelled` flag the cleared timer would have.
+			timer = null
+			queueMicrotask(fn)
+			return
+		}
 		timer = setTimeout(fn, delayMs)
 	}
 
@@ -274,6 +291,12 @@ export const runCpuTurn = ({
 				commit(map, { kind: 'wait', tile: action.from })
 				return { proceed: false, changed: [action.from] }
 			}
+			if (hidden()) {
+				// No slide to roll the footsteps under, so let the commit voice the move.
+				recordStealthPassthrough(map, walked, unit)
+				commit(map, { kind: 'move', from: action.from, to: finalTile })
+				return { proceed: !collided, changed: [action.from, finalTile] }
+			}
 			map.layers.units[action.from] = null
 			// Footsteps roll *with* the walk, not after it. The commit below
 			// suppresses 'move' so the sound isn't heard twice.
@@ -303,6 +326,13 @@ export const runCpuTurn = ({
 			// `safeAnimate` still guards the visuals, but the commit lives inside the
 			// sequencer; pass it through so a cancelled turn skips the commit too.
 			if (cancelled) return { proceed: false, changed: [] }
+			if (hidden()) {
+				// The commit normally rides inside the sequencer; with no sequence to play,
+				// `applyAction` resolves the whole exchange on its own (the same path a
+				// reconnecting client replays combat through).
+				commit(map, action)
+				return { proceed: true, changed: [action.from, action.to] }
+			}
 			await safeAnimate(() =>
 				animateAttackSequence(map, action.from, action.to, (a, opts) => {
 					if (!cancelled) commit(map, a, opts)

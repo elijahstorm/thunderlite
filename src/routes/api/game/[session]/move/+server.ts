@@ -84,6 +84,14 @@ export const POST = async ({ request, params, locals }) => {
 		const event = await gameStore.appendEvent(session, actor, toRecord)
 
 		let turnDeadline: number | null = isAsync ? (room?.turn_deadline ?? null) : null
+		if (!isAsync && toRecord.kind === 'surrender' && current === actor) {
+			// The side that just quit was holding the turn. Every client's engine has
+			// already handed the turn to the next side (see applyAction's surrender
+			// case), so the pointer has to follow or that side's every action comes
+			// back "Not your turn". Two-side rooms never noticed: the match ends with
+			// the forfeit. Async rooms take the richer path below (clock + emails).
+			await gameStore.advanceTurn(session, actor)
+		}
 		if (isAsync && toRecord.kind === 'surrender') {
 			// Settle the room server-side (turn pointer, clock, TTL) and tell the
 			// opponent: in async play they are usually offline, and without this a
@@ -106,22 +114,30 @@ export const POST = async ({ request, params, locals }) => {
 			}
 		}
 		if (action.kind === 'end-turn' && members.length > 1) {
-			const idx = members.indexOf(actor)
-			const nextIdx = (idx + 1) % members.length
-			const next = members[nextIdx]
-			await gameStore.setCurrentTurn(session, next)
+			// Hand the pointer on in the ENGINE's order (ascending team), carrying
+			// the ending client's own verdict for the one thing the server can't
+			// see: a side eliminated in combat, which the engine skips and no event
+			// records. Seat-index rotation was indistinguishable from this while
+			// rooms held two seats; on a three-side map it hands the turn to the
+			// wrong side and the match deadlocks. See gameStore.advanceTurn.
+			const next = await gameStore.advanceTurn(session, actor, action.next ?? null)
+			if (!next) {
+				// Nothing eligible to rotate to (no seat carries a team yet) — keep
+				// the old seat walk so such a room still moves rather than freezing.
+				const idx = members.indexOf(actor)
+				await gameStore.setCurrentTurn(session, members[(idx + 1) % members.length])
+			}
 			if (isAsync) {
 				// The next player gets the room's full per-turn allowance, and an
 				// email — in async play they are usually offline right now, and the
 				// notification is how they learn the game moved.
 				turnDeadline = await gameStore.resetTurnDeadline(session, room)
 				const roster = await gameStore.roster(session)
-				const nextMember = roster.find((m) => m.userSession === next)
 				const actorMember = roster.find((m) => m.userSession === actor)
 				await notifyAsyncYourTurn({
 					session,
 					eventId: event.id,
-					nextUserAuth: nextMember?.userAuth ?? null,
+					nextUserAuth: next?.userAuth ?? null,
 					opponentAuth: actorMember?.userAuth ?? null,
 					turnTimeoutMs: clampAsyncTimeout(room?.turn_timeout_ms),
 				})
@@ -137,7 +153,7 @@ export const POST = async ({ request, params, locals }) => {
 		return json({ event, turnDeadline })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not record move')
 	}
 }

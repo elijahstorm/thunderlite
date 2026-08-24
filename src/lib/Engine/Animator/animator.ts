@@ -14,6 +14,11 @@ export const ANIMATION_TIME = 200
 // to register the slide without holding up the next combat beat.
 export const HEALTH_BAR_ANIMATION_TIME = 400
 
+// Grace on top of the ease before the wall-clock backstop finishes it by hand
+// (see `animateHealthBar`). Generous enough that a visible tab always lands the
+// real animation first, short enough that a hidden one isn't held up long.
+export const HEALTH_BAR_BACKSTOP_SLACK = 600
+
 // Per-frame playback for combat overlays (attack swings, explosions). These
 // sprite sheets run 8-14 frames; at the 200ms movement beat they dragged on for
 // 1.6-2.8s and read as unnaturally slow. ~55ms (~18fps) keeps them punchy while
@@ -146,6 +151,24 @@ export const setRouteCamera = (camera: RouteCamera) => {
 // can't wipe a fresh board's registration during a hand-off.
 export const clearRouteCamera = (camera: RouteCamera) => {
 	if (routeCamera === camera) routeCamera = null
+}
+
+/**
+ * Centre the main board on a tile. Same camera the route follow drives, exposed
+ * so UI outside the board tree can steer it — the HUD's overview map uses this
+ * for click-to-jump. Returns false when no board is mounted (tests, menus).
+ */
+export const panBoardToTile = (x: number, y: number, animate = true): boolean => {
+	const camera = routeCamera
+	if (!camera) return false
+	const view = camera.view()
+	if (!view) return false
+	camera.panTo(
+		(x + 0.5) * view.tileWidth - view.width / 2,
+		(y + 0.5) * view.tileHeight - view.height / 2,
+		animate
+	)
+	return true
 }
 
 // How close (in tiles) the moving unit may get to a viewport edge before the
@@ -420,12 +443,38 @@ export const animateHealthBar = (unit: UnitObject, from: number, to: number, hol
 		beginAnimationBeat()
 		const start = performance.now()
 		let frameId = 0
+		let settled = false
+		// requestAnimationFrame is not merely throttled in a hidden tab, it is
+		// suspended outright — so an ease that starts (or gets interrupted) while the
+		// tab is in the background never advances and never resolves, stranding
+		// whoever awaited it. For the attack sequence that means the commit inside it
+		// never runs; when the attack belongs to a CPU side this client is driving for
+		// an online room, the whole match hangs on that turn for every other player.
+		// setTimeout is only throttled, never suspended, so it can always finish the
+		// ease. It is deliberately NOT registered with `schedule`: this timer's job is
+		// to settle a promise, and `clearAnimations` cancelling it would reintroduce
+		// exactly the hang it exists to prevent.
+		const settle = () => {
+			if (settled) return
+			settled = true
+			clearTimeout(backstop)
+			// A teardown mid-ease (`clearAnimations`) already reset this unit; don't
+			// paint a stale value back onto a board that has moved on.
+			if (easingUnits.has(unit)) {
+				unit.displayHealth = hold ? to : undefined
+				easingUnits.delete(unit)
+				repaintSignal.update((n) => n + 1)
+			}
+			endAnimationBeat()
+			resolve()
+		}
 		const requestStep = () => {
 			frameId = requestAnimationFrame(step)
 			pendingFrames.add(frameId)
 		}
 		const step = (now: number) => {
 			pendingFrames.delete(frameId)
+			if (settled) return
 			const t = Math.min(1, (now - start) / HEALTH_BAR_ANIMATION_TIME)
 			// easeOutCubic — fast departure, gentle landing.
 			const eased = 1 - Math.pow(1 - t, 3)
@@ -434,13 +483,10 @@ export const animateHealthBar = (unit: UnitObject, from: number, to: number, hol
 			if (t < 1) {
 				requestStep()
 			} else {
-				unit.displayHealth = hold ? to : undefined
-				easingUnits.delete(unit)
-				repaintSignal.update((n) => n + 1)
-				endAnimationBeat()
-				resolve()
+				settle()
 			}
 		}
+		const backstop = setTimeout(settle, HEALTH_BAR_ANIMATION_TIME + HEALTH_BAR_BACKSTOP_SLACK)
 		requestStep()
 	})
 

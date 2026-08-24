@@ -20,7 +20,7 @@ export const GET = async ({ params, locals }) => {
 			status = relationship.status
 		}
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not access database')
 	}
 

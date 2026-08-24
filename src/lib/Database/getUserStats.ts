@@ -88,7 +88,7 @@ export const getUserStats = async (auth: string): Promise<UserStats> => {
 		])
 		return { ...computeStats(rows), elo: ladder?.elo == null ? null : Number(ladder.elo) }
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		return emptyStats()
 	}
 }

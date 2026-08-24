@@ -20,7 +20,7 @@ export const POST = async ({ params, locals }) => {
 		return json({ session: next })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not set up a rematch')
 	}
 }

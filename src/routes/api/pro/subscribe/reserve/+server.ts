@@ -28,7 +28,7 @@ export const POST = async ({ locals, request }) => {
 		const reservation = await reserveSubscription(userAuth, plan, method)
 		return json({ status: 'ok', reservation })
 	} catch (err) {
-		logToErrorDb(err)
+		await logToErrorDb(err)
 		// The gateway surfaces actionable reasons (e.g. 402 BANK_ACCOUNT_REQUIRED
 		// when the project has no verified payout account). Forward its status +
 		// message so the buyer sees why, instead of a blanket 500.

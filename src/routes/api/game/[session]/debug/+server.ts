@@ -30,7 +30,7 @@ export const GET = async ({ params, locals }) => {
 
 	let mapTeams: number[] = []
 	try {
-		mapTeams = teamsFromHash((await getMapData(room.map_id)).mapHash)
+		mapTeams = await teamsFromHash((await getMapData(room.map_id)).mapHash)
 	} catch {
 		mapTeams = []
 	}

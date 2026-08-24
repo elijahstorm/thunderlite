@@ -19,7 +19,7 @@ export const POST = async ({ locals, request }) => {
 	try {
 		await abortSubscription(subscriptionId)
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 	}
 	return json({ status: 'ok' })
 }

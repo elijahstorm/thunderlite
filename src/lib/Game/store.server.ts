@@ -24,7 +24,27 @@ import { generateKey } from '$lib/Security/keys'
 import { clampAsyncTimeout, type GameMode } from '$lib/Game/asyncConfig'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
-export const MAX_PLAYERS = 2
+/**
+ * Seat count bounds. A room's real capacity is `game_room.max_players`, derived
+ * from the MAP's side count when the room is created (see `seatsForMap`) — one
+ * seat per side the board fields, because a side no member owns deadlocks the
+ * match the moment the engine's turn rotation reaches it. These only fence that
+ * derived number: two is the smallest playable match, and the ceiling keeps a
+ * pathological map from opening an unfillable room.
+ */
+export const MIN_ROOM_PLAYERS = 2
+export const MAX_ROOM_PLAYERS = 8
+/** Capacity for a room whose map we couldn't read, and for rows written before
+ * `max_players` existed — exactly the old hard-coded behaviour. */
+export const DEFAULT_MAX_PLAYERS = 2
+
+/** Clamp any candidate seat count into the playable range. */
+export const clampCapacity = (seats: unknown): number => {
+	const n = Math.trunc(Number(seats))
+	if (!Number.isFinite(n)) return DEFAULT_MAX_PLAYERS
+	return Math.min(MAX_ROOM_PLAYERS, Math.max(MIN_ROOM_PLAYERS, n))
+}
+
 /** How long the lobby counts down once the room is full before it opens `/play`. */
 export const LOBBY_COUNTDOWN_MS = 10_000
 /** A player gone from `/play` for this long (no heartbeat) is auto-resigned.
@@ -53,7 +73,16 @@ type RoomRow = {
 	mode?: GameMode | null
 	turn_timeout_ms?: number | null
 	turn_deadline?: number | null
+	max_players?: number | null
 }
+
+/**
+ * How many seats this room holds. Derived from the map at creation and stored on
+ * the row, so every capacity question (join, AI fill, full, ready gate, the
+ * public browser) answers from the same number instead of a global constant.
+ */
+export const roomCapacity = (room: RoomRow | null): number =>
+	room?.max_players == null ? DEFAULT_MAX_PLAYERS : clampCapacity(room.max_players)
 
 /** A room created with mode 'async' — turns carry multi-day deadlines. */
 const isAsyncRoom = (room: RoomRow | null): room is RoomRow => !!room && room.mode === 'async'
@@ -76,6 +105,7 @@ type MemberRow = {
 	team?: number | null
 	is_ai?: boolean | null
 	last_seen?: number | null
+	ready?: boolean | null
 }
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = { seq: number; user_session: string; action: unknown; ts: number }
@@ -99,21 +129,20 @@ async function members(session: string): Promise<string[]> {
  * before the column existed) so the in-game player list falls back to a generic
  * label for that seat. Powers the seat → username/avatar mapping in `/play`.
  */
-async function roster(
-	session: string
-): Promise<
+async function roster(session: string): Promise<
 	{
 		userSession: string
 		seat: number
 		userAuth: string | null
 		team: number | null
 		isAi: boolean
+		ready: boolean
 	}[]
 > {
 	const rows = await db.find<MemberRow>('game_member', {
 		where: { session },
 		orderBy: { seat: 'asc' },
-		select: ['user_session', 'seat', 'user_auth', 'team', 'is_ai'],
+		select: ['user_session', 'seat', 'user_auth', 'team', 'is_ai', 'ready'],
 	})
 	return rows.map((r) => ({
 		userSession: r.user_session,
@@ -121,6 +150,7 @@ async function roster(
 		userAuth: r.user_auth ?? null,
 		team: r.team == null ? null : Number(r.team),
 		isAi: !!r.is_ai,
+		ready: !!r.ready,
 	}))
 }
 
@@ -131,6 +161,79 @@ async function teamOf(session: string, userSession: string): Promise<number | nu
 		select: ['team'],
 	})
 	return row && row.team != null ? Number(row.team) : null
+}
+
+/**
+ * Pre-game readiness, live rooms only (see the `ready` migration). A live lobby
+ * holds until every human seat has readied up, so a full room never drops
+ * someone into a match they were not looking at.
+ */
+async function setMemberReady(session: string, userSession: string, ready: boolean): Promise<void> {
+	await db.update('game_member', { session, user_session: userSession }, { ready })
+}
+
+/**
+ * Un-ready every seat in the room. Called whenever the lineup changes (a join, a
+ * side change, an AI added, a player removed) so a ready given for one setup
+ * can't start a different one — the whole point of the gate.
+ */
+async function clearReady(session: string): Promise<void> {
+	await db.update('game_member', { session }, { ready: false })
+}
+
+/**
+ * Who the live lobby is still waiting on. `humans` excludes CPU seats (they have
+ * no client to press anything, so they never count as pending).
+ *
+ * Two different gates come out of this. `humansReady` — every human present has
+ * confirmed — is what lets the HOST start a room that never filled, whose free
+ * seats are then taken by CPUs (`fillWithAi`). `allReady` additionally requires
+ * a full house, and is the gate on the AUTOMATIC countdown: a room that fills on
+ * its own may only launch itself once every seat is accounted for.
+ */
+async function readyState(
+	session: string,
+	roomIn?: RoomRow | null
+): Promise<{
+	count: number
+	capacity: number
+	humans: number
+	readyHumans: number
+	full: boolean
+	humansReady: boolean
+	allReady: boolean
+}> {
+	const room = roomIn === undefined ? await getRoom(session) : roomIn
+	const capacity = roomCapacity(room)
+	const rows = await roster(session)
+	const humans = rows.filter((r) => !r.isAi)
+	const readyHumans = humans.filter((r) => r.ready).length
+	const full = rows.length >= capacity
+	const humansReady = humans.length > 0 && readyHumans === humans.length
+	return {
+		count: rows.length,
+		capacity,
+		humans: humans.length,
+		readyHumans,
+		full,
+		humansReady,
+		allReady: full && humansReady,
+	}
+}
+
+/**
+ * May this room's countdown run BY ITSELF? Live rooms need a full house AND
+ * every human readied. Async rooms release on their own: a correspondence
+ * opponent is EXPECTED to be away, so waiting on them to press a button would
+ * stall the game indefinitely.
+ *
+ * The host's explicit start is deliberately NOT this gate — see the start
+ * endpoint, which accepts `humansReady` and fills the empty seats with CPUs.
+ */
+async function canStart(session: string, room: RoomRow | null): Promise<boolean> {
+	if (!room) return false
+	if (isAsyncRoom(room)) return (await memberCount(session)) >= roomCapacity(room)
+	return (await readyState(session, room)).allReady
 }
 
 /** Explicitly set (or clear) a member's team — used by lobby seat selection. */
@@ -236,17 +339,24 @@ async function leaveGame(session: string, userSession: string): Promise<void> {
  * `opts.mode` picks live (default) or async play at creation; it is immutable
  * afterwards. Async rooms store the host's per-turn clock (clamped to the
  * allowed range) and get a week to find an opponent instead of the live 24h.
+ *
+ * `opts.maxPlayers` is the room's seat count, which the caller derives from the
+ * MAP (`seatsForMap`) — one seat per side the board fields. It is stored on the
+ * row so nothing downstream has to decode the map again, and defaults to
+ * DEFAULT_MAX_PLAYERS when the map couldn't be read.
  */
 async function createRoom(
 	userSession: string,
 	mapId: string,
 	userAuth: string,
-	opts?: { mode?: GameMode; turnTimeoutMs?: number | null }
+	opts?: { mode?: GameMode; turnTimeoutMs?: number | null; maxPlayers?: number | null }
 ): Promise<string> {
 	const session = generateKey()
 	const mode: GameMode = opts?.mode === 'async' ? 'async' : 'live'
 	const turn_timeout_ms = mode === 'async' ? clampAsyncTimeout(opts?.turnTimeoutMs) : null
 	const expires_at = now() + (mode === 'async' ? ASYNC_LOBBY_TTL_MS : ROOM_TTL_MS)
+	const max_players =
+		opts?.maxPlayers == null ? DEFAULT_MAX_PLAYERS : clampCapacity(opts.maxPlayers)
 	await db.insert('game_room', {
 		session,
 		map_id: mapId,
@@ -254,6 +364,7 @@ async function createRoom(
 		expires_at,
 		mode,
 		turn_timeout_ms,
+		max_players,
 	})
 	await db.insert('game_member', {
 		session,
@@ -299,11 +410,17 @@ async function removeMember(session: string, userSession: string): Promise<void>
  * Reserve a seat for a CPU player. Occupies capacity like a human seat (so a
  * room with a host + AI reads as full and starts). AI members never heartbeat,
  * so they're exempt from the absence sweep. Returns the AI's synthetic session.
+ *
+ * `team` pins the CPU to the side the host clicked. It used to be dropped on the
+ * floor, which meant "Add AI" on side 3 produced a CPU that `assignTeamsIfNeeded`
+ * then parked on the first FREE side instead — leaving the side the host was
+ * actually trying to fill unowned, and the match deadlocked on its turn.
  */
-async function addAiMember(session: string): Promise<string | null> {
+async function addAiMember(session: string, team?: number | null): Promise<string | null> {
+	const capacity = roomCapacity(await getRoom(session))
 	for (let attempt = 0; attempt < APPEND_RETRIES; attempt++) {
 		const seat = await db.count('game_member', { session })
-		if (seat >= MAX_PLAYERS) return null
+		if (seat >= capacity) return null
 		const aiSession = `ai-${generateKey()}`
 		const inserted = await db.insertIgnoreConflict('game_member', {
 			session,
@@ -311,10 +428,32 @@ async function addAiMember(session: string): Promise<string | null> {
 			seat,
 			user_auth: null,
 			is_ai: true,
+			...(team == null ? {} : { team }),
 		})
 		if (inserted) return aiSession
 	}
 	return null
+}
+
+/**
+ * Fill every remaining seat with a CPU. This is what makes a map with more sides
+ * than players playable: the host starts whenever the humans present are ready,
+ * and the sides nobody took are commanded by the AI (driven by the lowest-seat
+ * human — see `aiDriver`) rather than left unowned, which would deadlock the
+ * match the moment the turn rotation reached them.
+ *
+ * Seats are left team-less on purpose; `assignTeamsIfNeeded` hands them whichever
+ * sides the humans didn't claim, in the map's stable order. Returns how many
+ * CPUs were added.
+ */
+async function fillWithAi(session: string): Promise<number> {
+	const capacity = roomCapacity(await getRoom(session))
+	let added = 0
+	while ((await memberCount(session)) < capacity) {
+		if (!(await addAiMember(session))) break
+		added++
+	}
+	return added
 }
 
 /** Is this member a CPU seat? */
@@ -368,7 +507,7 @@ async function ensureMember(
 		await setPlayerGame(userSession, session)
 		return true
 	}
-	if ((await memberCount(session)) >= MAX_PLAYERS) return false
+	if ((await memberCount(session)) >= roomCapacity(await getRoom(session))) return false
 	await addMember(session, userSession, userAuth)
 	await setPlayerGame(userSession, session)
 	return true
@@ -401,6 +540,9 @@ async function rematchRoom(
 	const next = await createRoom(userSession, room.map_id, userAuth, {
 		mode: isAsyncRoom(room) ? 'async' : 'live',
 		turnTimeoutMs: room.turn_timeout_ms ?? null,
+		// Same map, same number of sides — carry the seat count over rather than
+		// re-deriving it (and silently dropping to 2 if the map read failed).
+		maxPlayers: roomCapacity(room),
 	})
 	await db.update('game_room', { session }, { rematch_session: next })
 	// Lost a race with another rematcher? Prefer the room that landed first.
@@ -453,13 +595,14 @@ async function listPublicRooms(
 			session: r.session,
 			mapId: r.map_id,
 			count: counts[i],
-			maxPlayers: MAX_PLAYERS,
+			// Per room, not global: a four-side map lists as 1/4, not 1/2.
+			maxPlayers: roomCapacity(r),
 			// Surfaced in the browser so a joiner knows the pace they sign up for.
 			mode: (r.mode === 'async' ? 'async' : 'live') as GameMode,
 			turnTimeoutMs: r.turn_timeout_ms == null ? null : Number(r.turn_timeout_ms),
 		}))
 		// Only rooms that have a host and a free seat are joinable from the browser.
-		.filter((r) => r.count > 0 && r.count < MAX_PLAYERS)
+		.filter((r) => r.count > 0 && r.count < r.maxPlayers)
 	return { rooms, hasMore }
 }
 
@@ -539,11 +682,17 @@ async function seatOf(session: string, userSession: string): Promise<number> {
  * re-join or a duplicate call never resets the clock out from under a countdown
  * already ticking on every client. Best-effort: a room whose schema predates
  * the `start_at` column just never counts down rather than failing the join.
+ *
+ * The `canStart` gate lives HERE rather than at the call sites so every path
+ * that could arm a countdown (join, the lobby poll's self-heal, an AI filling
+ * the last seat) obeys the same rule: a live room waits for every human to
+ * ready up, an async room does not.
  */
 async function armStartCountdown(session: string): Promise<number | null> {
 	const room = await getRoom(session)
 	if (!room) return null
 	if (room.start_at != null) return Number(room.start_at)
+	if (!(await canStart(session, room))) return null
 	const start_at = now() + LOBBY_COUNTDOWN_MS
 	try {
 		await db.update('game_room', { session }, { start_at, ...startPatch(room, start_at) })
@@ -684,10 +833,15 @@ async function matchRecorded(session: string): Promise<boolean> {
 	return row !== null
 }
 
-/** Seats plus the teams already out of the game (surrender events in the log).
+/**
+ * Seats plus the teams already out of the game (surrender events in the log).
  * The log is the source of truth for "who is still in" server-side — the
- * engine's hasLost lives only in clients. */
-async function asyncStanding(
+ * engine's `hasLost` lives only in clients, which is why an elimination BY
+ * COMBAT can't be seen from here (see `advanceTurn`, which takes the ending
+ * client's word for that one case). Used by the live turn rotation as well as
+ * the async deadline paths.
+ */
+async function standing(
 	session: string
 ): Promise<{ seats: Awaited<ReturnType<typeof roster>>; surrendered: Set<number> }> {
 	const [seats, log] = await Promise.all([roster(session), events(session, -1)])
@@ -700,20 +854,97 @@ async function asyncStanding(
 	return { seats, surrendered }
 }
 
-/** The next still-in member after `fromUserSession` in seat rotation order,
- * excluding `fromUserSession` itself. Mirrors the move endpoint's rotation. */
+/**
+ * Members still in the game, in the ENGINE's turn order: ascending team number,
+ * which is exactly how `nextActiveTeam` walks `state.players` (derived from the
+ * map with `[...teams].sort()`). Seat order is NOT the same thing once players
+ * pick their own sides, and with three or more sides the two orders diverge
+ * outright — a server pointer walking seats would hand the turn to a side whose
+ * client isn't expecting it and the match would sit there.
+ *
+ * Team-less seats are dropped: nothing can be commanded without a side.
+ */
+const turnOrder = (seats: Awaited<ReturnType<typeof roster>>, surrendered: Set<number>) =>
+	seats
+		.filter((m): m is (typeof seats)[number] & { team: number } => m.team != null)
+		.filter((m) => !surrendered.has(m.team))
+		.sort((a, b) => a.team - b.team)
+
+/**
+ * The next still-in member after side `fromTeam`: the lowest team above it, or
+ * back round to the lowest of all. This is `nextActiveTeam`'s rule verbatim.
+ *
+ * Keyed on the TEAM, never on the member's position in the eligible list —
+ * because the side we're rotating away from is often no longer in it (it just
+ * surrendered, or timed out). Walking the filtered list instead would restart
+ * from its head, i.e. hand the turn to the lowest surviving side rather than the
+ * one that genuinely comes next, and every client would refuse to agree.
+ */
+const nextInTurnOrder = (
+	seats: Awaited<ReturnType<typeof roster>>,
+	fromTeam: number | null,
+	surrendered: Set<number>
+) => {
+	const ordered = turnOrder(seats, surrendered)
+	if (ordered.length === 0) return null
+	if (fromTeam == null) return ordered[0]
+	return ordered.find((m) => m.team > fromTeam) ?? ordered[0]
+}
+
+/** The next still-in member after `fromUserSession` in TEAM rotation order,
+ * excluding `fromUserSession` itself unless they are all that's left. */
 const nextActiveAfter = (
 	seats: Awaited<ReturnType<typeof roster>>,
 	fromUserSession: string,
 	surrendered: Set<number>
 ) => {
-	const idx = seats.findIndex((m) => m.userSession === fromUserSession)
-	const ordered = idx >= 0 ? [...seats.slice(idx + 1), ...seats.slice(0, idx)] : seats
-	return (
-		ordered.find(
-			(m) => m.userSession !== fromUserSession && m.team != null && !surrendered.has(m.team)
-		) ?? null
-	)
+	const from = seats.find((m) => m.userSession === fromUserSession)
+	const next = nextInTurnOrder(seats, from?.team ?? null, surrendered)
+	if (next && next.userSession === fromUserSession) {
+		// Only themselves left in the rotation — nobody to hand to.
+		return turnOrder(seats, surrendered).length > 1 ? null : next
+	}
+	return next
+}
+
+/**
+ * Hand the turn on after an end-turn, and return whoever now holds it.
+ *
+ * The server's pointer is a permission check, not a simulation: it has to land
+ * on the same side the ENGINE just advanced to, or that side's client sees a
+ * turn it is allowed to play while the server refuses every action from it (or,
+ * worse, nobody's client is on that side at all and the match stalls forever).
+ * Two things keep the two in step:
+ *
+ *  - `claimedNextTeam` is the team the ending client's own engine advanced to,
+ *    carried on the `end-turn` action. It is the only way the server can know
+ *    about a side ELIMINATED IN COMBAT — the engine skips a team with `hasLost`,
+ *    but nothing about that reaches the event log, so a team-order rotation
+ *    here would hand the turn to a dead player and deadlock a 3+ side match.
+ *    Honoured only when it names a member who is still in, and never when it
+ *    names the actor's own side while somebody else is still playing (which is
+ *    what a client claiming an extra turn for itself would look like).
+ *  - Failing that, plain team-ascending rotation, skipping surrendered sides.
+ */
+async function advanceTurn(
+	session: string,
+	actorUserSession: string,
+	claimedNextTeam?: number | null
+): Promise<{ userSession: string; userAuth: string | null; team: number } | null> {
+	const { seats, surrendered } = await standing(session)
+	const ordered = turnOrder(seats, surrendered)
+	if (ordered.length === 0) return null
+
+	const claimed =
+		claimedNextTeam == null ? null : (ordered.find((m) => m.team === claimedNextTeam) ?? null)
+	const next =
+		claimed && (claimed.userSession !== actorUserSession || ordered.length === 1)
+			? claimed
+			: nextActiveAfter(seats, actorUserSession, surrendered)
+	if (!next) return null
+
+	await setCurrentTurn(session, next.userSession)
+	return { userSession: next.userSession, userAuth: next.userAuth, team: next.team }
 }
 
 /** Re-arm the turn clock after an end-turn: the next player gets the room's
@@ -770,7 +1001,7 @@ async function enforceTurnDeadline(
 		return null
 	}
 
-	const { seats, surrendered } = await asyncStanding(session)
+	const { seats, surrendered } = await standing(session)
 	const member = seats.find((m) => m.userSession === room.current_turn)
 	if (!member || member.team == null || surrendered.has(member.team)) {
 		// Nothing enforceable: the member left (their resign was recorded on the
@@ -834,7 +1065,7 @@ async function settleAsyncAfterSurrender(
 	if (!isAsyncRoom(room) || !hasStarted(room)) return null
 
 	// The fresh surrender is already in the log, so it is in `surrendered` here.
-	const { seats, surrendered } = await asyncStanding(session)
+	const { seats, surrendered } = await standing(session)
 	const next = nextActiveAfter(seats, resignedUserSession, surrendered)
 	const survivors = seats.filter((m) => m.team != null && !surrendered.has(m.team))
 	const gameOver = survivors.length <= 1
@@ -881,7 +1112,7 @@ async function resignAsyncMember(
 	if (!isAsyncRoom(room) || !hasStarted(room)) return null
 	if (await matchRecorded(session)) return null
 
-	const { seats, surrendered } = await asyncStanding(session)
+	const { seats, surrendered } = await standing(session)
 	const member = seats.find((m) => m.userSession === userSession)
 	if (!member || member.team == null || surrendered.has(member.team)) return null
 
@@ -1005,6 +1236,8 @@ export const gameStore = {
 	aiDriver,
 	setLockRandom,
 	memberCount,
+	fillWithAi,
+	advanceTurn,
 	listPublicRooms,
 	setPublic,
 	touchMember,
@@ -1014,6 +1247,10 @@ export const gameStore = {
 	armStartCountdown,
 	startNow,
 	disarmCountdown,
+	setMemberReady,
+	clearReady,
+	readyState,
+	canStart,
 	seedFirstTurn,
 	currentTurn,
 	setCurrentTurn,

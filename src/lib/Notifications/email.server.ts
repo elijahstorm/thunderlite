@@ -58,7 +58,7 @@ export async function rememberEmail(userAuth: string, email: string | undefined)
 			await db.update('profiles', { auth: userAuth }, { email })
 		}
 	} catch (err) {
-		logToErrorDb(err)
+		await logToErrorDb(err)
 	}
 }
 
@@ -156,9 +156,9 @@ export async function notify(input: NotifyInput): Promise<void> {
 		} else {
 			// Release the claim so the next attempt can retry this event.
 			await db.delete('email_log', { dedup_key: input.dedupKey })
-			logToErrorDb(`email send failed (${input.category}): ${res.error ?? 'unknown'}`)
+			await logToErrorDb(`email send failed (${input.category}): ${res.error ?? 'unknown'}`)
 		}
 	} catch (err) {
-		logToErrorDb(err)
+		await logToErrorDb(err)
 	}
 }

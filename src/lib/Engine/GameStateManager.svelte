@@ -86,6 +86,16 @@
 	const TURN_TIMEOUT_MS = 30_000
 	const TURN_WARN_SECONDS = 10
 
+	// Online anti-stall for a CPU side THIS client drives. The AI's turn is real
+	// gameplay running on exactly one machine, and no other player is allowed to
+	// act for a seat that isn't theirs — so if this client wedges mid-turn (a
+	// planner throw the tick's own net misses, an animation promise that never
+	// settles) the match sits on the CPU's turn forever with nobody able to break
+	// it. The driver therefore watches its own AI turn and force-ends it after this
+	// long with no committed action. Longer than the human clock because the first
+	// plan of a large army is a genuine pause, and every CPU action refreshes it.
+	const AI_STALL_TIMEOUT_MS = 45_000
+
 	const isMultiplayer = $derived(
 		gameSession !== '' && gameSession !== 'ephemeral' && gameSession !== 'testSession'
 	)
@@ -176,7 +186,16 @@
 		if (!interactor) return
 		if (viewState !== 'waiting') return
 		if (active) return
-		if (!isMultiplayer && $gameState.currentTeam !== localTeam) return
+		// Board input is only ever the LOCAL player's, so it's dead on anyone else's
+		// turn. This used to be gated on `!isMultiplayer`, which left online matches
+		// wide open: on the opponent's (or an online CPU seat's) turn every click was
+		// still live, so tapping their Warfactory popped the build menu in their
+		// colours, and tapping their un-acted units selected them — `canSelectUnit`
+		// only asks whether the unit belongs to the team whose turn it is. Actions
+		// taken that way mutate this client's board immediately; the relay is then
+		// refused server-side ('Not your turn'), so the local board silently desyncs
+		// from the match. Gate every turn the same way, online or not.
+		if ($gameState.currentTeam !== localTeam) return
 		if ($turnTransitionActive) return
 		// A campaign block is mutating the board — swallow input until it finishes so
 		// a move can't resolve against a board the script is mid-rewrite of.
@@ -384,16 +403,30 @@
 	const myOnlineTurn = $derived(
 		isMultiplayer && $gameState.phase === 'playing' && $gameState.currentTeam === localTeam
 	)
+	// A CPU side this client is the designated driver for — the turn the watchdog
+	// above covers. Mirrors the gate the CPU effect itself runs on.
+	const drivenAiTurn = $derived(
+		isMultiplayer &&
+			isAiDriver &&
+			$gameState.phase === 'playing' &&
+			aiTeams.includes($gameState.currentTeam)
+	)
 	const turnSecondsLeft = $derived(
 		turnExpiresAt ? Math.max(0, Math.ceil((turnExpiresAt - turnNow) / 1000)) : 0
 	)
 
-	// (Re)arm the deadline the moment my online turn begins.
+	// (Re)arm the deadline the moment a turn this client is responsible for begins —
+	// my own, or a CPU side I drive. The two are mutually exclusive (a CPU seat is
+	// never `localTeam`), so one clock serves both with its own allowance.
 	$effect(() => {
-		const key = myOnlineTurn ? `${$gameState.currentTeam}:${$gameState.turnNumber}` : ''
+		const watched = myOnlineTurn || drivenAiTurn
+		const key = watched ? `${$gameState.currentTeam}:${$gameState.turnNumber}` : ''
 		if (key !== armedTurnKey) {
 			armedTurnKey = key
-			turnExpiresAt = key && typeof window !== 'undefined' ? Date.now() + TURN_TIMEOUT_MS : 0
+			turnExpiresAt =
+				key && typeof window !== 'undefined'
+					? Date.now() + (myOnlineTurn ? TURN_TIMEOUT_MS : AI_STALL_TIMEOUT_MS)
+					: 0
 		}
 	})
 
@@ -422,22 +455,30 @@
 		})
 		musicDirector.start()
 
-		// Any committed local action (not the end-turn itself) refreshes the timeout.
+		// Any committed action from this client (not the end-turn itself) refreshes the
+		// timeout — the CPU's relayed moves count, so a long but healthy AI turn keeps
+		// resetting its own watchdog and only a genuinely stuck one runs the clock out.
 		outgoingResetUnsub = outgoingActions.subscribe((action) => {
-			if (action && action.kind !== 'end-turn' && myOnlineTurn) {
-				turnExpiresAt = Date.now() + TURN_TIMEOUT_MS
-			}
+			if (!action || action.kind === 'end-turn') return
+			if (myOnlineTurn) turnExpiresAt = Date.now() + TURN_TIMEOUT_MS
+			else if (drivenAiTurn) turnExpiresAt = Date.now() + AI_STALL_TIMEOUT_MS
 		})
 		// Tick the countdown and fire the auto-end once past the deadline.
 		turnTimer = setInterval(() => {
 			turnNow = Date.now()
 			if (
-				myOnlineTurn &&
+				(myOnlineTurn || drivenAiTurn) &&
 				turnExpiresAt &&
 				turnNow >= turnExpiresAt &&
 				timedOutTurnKey !== armedTurnKey
 			) {
 				timedOutTurnKey = armedTurnKey
+				// Stop the wedged planner before handing the turn on, so a tick that
+				// later comes back to life can't commit into someone else's turn.
+				if (cpuHandle) {
+					cpuHandle.cancel()
+					cpuHandle = null
+				}
 				handleEndTurn()
 			}
 		}, 500)

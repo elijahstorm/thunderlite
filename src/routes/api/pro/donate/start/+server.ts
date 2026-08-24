@@ -28,7 +28,7 @@ export const POST = async ({ locals, request }) => {
 		const payment = await startDonation(amountCents, method)
 		return json({ status: 'ok', payment })
 	} catch (err) {
-		logToErrorDb(err)
+		await logToErrorDb(err)
 		// Forward actionable gateway reasons (e.g. 402 BANK_ACCOUNT_REQUIRED)
 		// so the donor sees why, instead of a blanket 500.
 		const forwarded = dontCodeCheckoutPayload(err)

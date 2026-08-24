@@ -108,7 +108,7 @@ export const POST = async ({ request, params, locals }) => {
 					try {
 						await settleOnlineMatch({ matchId, session, winnerTeam })
 					} catch (msg) {
-						logToErrorDb(msg)
+						await logToErrorDb(msg)
 					}
 				}
 			} else {
@@ -172,7 +172,7 @@ export const POST = async ({ request, params, locals }) => {
 		return json({ matchId, outcome })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not persist match result')
 	}
 }

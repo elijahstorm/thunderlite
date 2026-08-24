@@ -190,7 +190,7 @@ export const getMatchHistory = async (
 
 		return { entries: composeHistory(mine, matches, others, profiles, maps), total }
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		return { entries: [], total: 0 }
 	}
 }

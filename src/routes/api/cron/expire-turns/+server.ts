@@ -33,12 +33,12 @@ export const GET = async ({ request }) => {
 				await notifyAsyncTimeout(room.session, enforced, clampAsyncTimeout(room.turn_timeout_ms))
 			} catch (msg) {
 				// One broken room must not stall the rest of the sweep.
-				logToErrorDb(msg)
+				await logToErrorDb(msg)
 			}
 		}
 		return json({ checked: rooms.length, resigned })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not sweep expired turns')
 	}
 }

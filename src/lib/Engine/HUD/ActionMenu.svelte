@@ -4,6 +4,7 @@
 	import { cubicOut } from 'svelte/easing'
 	import { actionMenuState } from './actionMenuStore'
 	import { boardGeometry } from './boardGeometry'
+	import { hudGutter } from './hudInsets'
 	import { performMenuAction, peekMenu, cancelMenu } from '../Interactor/interactor'
 	import type { ActionMenuItemId } from '../actions'
 
@@ -15,6 +16,10 @@
 
 	let menu = $derived($actionMenuState)
 	let geo = $derived($boardGeometry)
+	// The HUD rail owns the right edge of the screen, so treat it as off-limits:
+	// clamping to the raw viewport width used to tuck the panel under the rail,
+	// where its buttons were unreachable.
+	let rail = $derived($hudGutter)
 
 	const labels: Record<ActionMenuItemId, string> = {
 		attack: 'Attack',
@@ -72,13 +77,14 @@
 				return { left: null as number | null, top: null as number | null, side: 'right' as const }
 			}
 			const tileCenterY = tileBox.top + tileBox.h / 2
+			const rightEdge = vw - rail
 			let side: 'right' | 'left' = 'right'
 			let left = tileBox.left + tileBox.w + GAP
-			if (left + panelW > vw - MARGIN) {
+			if (left + panelW > rightEdge - MARGIN) {
 				side = 'left'
 				left = tileBox.left - GAP - panelW
 			}
-			left = Math.max(MARGIN, Math.min(left, vw - panelW - MARGIN))
+			left = Math.max(MARGIN, Math.min(left, rightEdge - panelW - MARGIN))
 			let top = tileCenterY - panelH / 2
 			top = Math.max(MARGIN, Math.min(top, vh - panelH - MARGIN))
 			return { left, top, side }
@@ -159,7 +165,9 @@
 
 	<div
 		class="fixed z-56 {anchored ? '' : 'inset-0 flex items-center justify-center'}"
-		style={anchored ? `left: ${placement.left}px; top: ${placement.top}px;` : ''}
+		style={anchored
+			? `left: ${placement.left}px; top: ${placement.top}px;`
+			: `padding-right: ${rail}px;`}
 		data-testid="action-menu"
 		role="dialog"
 		aria-modal="true"

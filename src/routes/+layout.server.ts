@@ -1,4 +1,5 @@
 import type { LayoutServerLoad } from './$types'
+import { building } from '$app/environment'
 import { kv } from '$lib/dontcode/server'
 
 interface SiteConfig {
@@ -39,5 +40,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	// signed-in state on first paint instead of round-tripping /api/auth/me.
 	const user = locals.user ? { id: locals.user, email: locals.userEmail ?? null } : null
 
-	return { config, user }
+	// `/` is prerendered, so this payload is baked at build time with `user:
+	// null` and `uses: {}` (never re-run on the client). Flag it so the layout
+	// knows the `user` below is "unknown", not "signed out" — otherwise a hard
+	// reload of the home page seeds the client stores as logged out and, since
+	// the node never re-runs, keeps them that way across every later navigation.
+	return { config, user, prerendered: building }
 }

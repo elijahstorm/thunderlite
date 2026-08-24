@@ -20,14 +20,23 @@ export const GET = async ({ url, params, locals }) => {
 		// tables and don't depend on each other, so fetch them in one barrier —
 		// this is the hot poll path. The events are discarded (never returned)
 		// if the 403 fires.
-		const [members, page, room] = await Promise.all([
-			gameStore.members(session),
+		const [seats, page, room] = await Promise.all([
+			gameStore.roster(session),
 			gameStore.events(session, since),
 			gameStore.getRoom(session),
 		])
-		if (members.length === 0 || !members.includes(userSession)) {
+		if (seats.length === 0 || !seats.some((m) => m.userSession === userSession)) {
 			throw error(403, 'Not a member of this game session')
 		}
+
+		// Who is playing the CPU sides, re-answered on every poll rather than only
+		// at page load. The driver is the lowest-seat human (see gameStore.aiDriver)
+		// and the absence sweep can REMOVE that human mid-match — on a board with
+		// CPU sides that would leave the AI with nobody to run it, and the match
+		// would sit on the CPU's turn forever. Derived from the roster we already
+		// read here, so the poll costs no extra queries.
+		const aiTeams = seats.filter((m) => m.isAi && m.team != null).map((m) => m.team as number)
+		const isAiDriver = seats.find((m) => !m.isAi)?.userSession === userSession
 
 		// Async rooms enforce the turn clock lazily on the poll too, so a viewer
 		// with the game open sees the timeout resolve without waiting for the
@@ -49,10 +58,10 @@ export const GET = async ({ url, params, locals }) => {
 			}
 		}
 
-		return json({ events, lastEventId, turnDeadline })
+		return json({ events, lastEventId, turnDeadline, aiTeams, isAiDriver })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not load game events')
 	}
 }

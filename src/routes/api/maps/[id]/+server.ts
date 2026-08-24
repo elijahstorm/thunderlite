@@ -43,14 +43,14 @@ export const DELETE = async ({ params, locals }) => {
 		])
 		await db.delete('maps', { public_id: params.id })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, { message: 'Could not delete map.' })
 	}
 
 	try {
 		await storage.removePublic([`maps/${params.id}.png`])
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 	}
 
 	return json({ deleted: true })

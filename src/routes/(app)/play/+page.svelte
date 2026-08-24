@@ -24,7 +24,10 @@
 	let localTeam = $derived(data.localTeam ?? 0)
 	// Server sends profiles already keyed by team.
 	let teamRoster = $derived(data.roster ?? {})
-	// Online CPU seats + whether this client drives them.
+	// Online CPU seats + whether this client drives them. These are the loader's
+	// initial values; GameSocket re-reads them from the event poll and hands the
+	// current pair back through its snippet, because the driver (the lowest-seat
+	// human) can change mid-match when a player is swept for absence.
 	let aiTeams = $derived(data.aiTeams ?? [])
 	let isAiDriver = $derived(data.isAiDriver ?? false)
 </script>
@@ -39,16 +42,18 @@
 				{userSession}
 				asyncGame={data.asyncGame ?? false}
 				turnDeadline={data.turnDeadline ?? null}
+				{aiTeams}
+				{isAiDriver}
 			>
-				{#snippet children({ socket, requestRedraw })}
+				{#snippet children({ socket, requestRedraw, aiTeams: liveAiTeams, isAiDriver: liveDriver })}
 					<GameStateManager
 						{userSession}
 						{gameSession}
 						{map}
 						minimap
 						{localTeam}
-						{aiTeams}
-						{isAiDriver}
+						aiTeams={liveAiTeams ?? aiTeams}
+						isAiDriver={liveDriver ?? isAiDriver}
 						fogOfWar={map.fog ?? true}
 						interactor={socket ? socketSelect(socket, () => map) : undefined}
 						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}

@@ -139,7 +139,7 @@ const query: (type: QueryType) => (
 
 			users = users.slice((page ?? 0) * limit, (page ?? 0) * limit + limit)
 		} catch (msg) {
-			logToErrorDb(msg)
+			await logToErrorDb(msg)
 			throw error(500, 'Could not get users from database')
 		}
 

@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
-import { gameStore, MAX_PLAYERS } from '$lib/Game/store.server'
+import { gameStore, roomCapacity } from '$lib/Game/store.server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
 import { getMapData } from '$lib/Map/hashLoader'
 import { teamsFromHash } from '$lib/Game/mapTeams'
@@ -13,14 +13,20 @@ export type LobbyMember = {
 	team: number | null
 	isAi: boolean
 	isMe: boolean
+	/** Live rooms: has this seat confirmed it's at the keyboard? CPU seats never
+	 * need to (they have no client), so they read as ready. */
+	ready: boolean
 	user: UserDBData | null
 }
 
 /**
  * Pre-game lobby for a single room. Members wait here while the room fills, pick
- * their side (or the host arranges seats / reserves AI), and once it's full a
- * 10s countdown opens `/play`. A member who lands here after the match already
- * started is forwarded straight into `/play`.
+ * their side (or the host arranges seats / reserves AI), and once it's full AND
+ * every human has readied up a 10s countdown opens `/play`. A member who lands
+ * here after the match already started is forwarded straight into `/play`.
+ *
+ * Async rooms skip the ready gate: their players are expected to be away, so
+ * those lobbies release as soon as the room fills.
  */
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const userSession = locals.session
@@ -51,11 +57,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 				select: ['name', 'thumbnail'],
 			}),
 		])
-		teams = teamsFromHash(mapHash)
+		teams = await teamsFromHash(mapHash)
 		mapName = meta?.name ?? mapName
 		thumbnail = meta?.thumbnail ?? null
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 	}
 
 	// Hydrate members with profiles.
@@ -69,8 +75,17 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		team: s.team,
 		isAi: s.isAi,
 		isMe: s.userSession === userSession,
+		ready: s.isAi || s.ready,
 		user: s.userAuth ? (byAuth.get(s.userAuth) ?? null) : null,
 	}))
+
+	// Readiness summary for the lobby's gate copy. Humans only: a CPU seat has no
+	// client to confirm with, so it is never something the room waits on.
+	const humans = seats.filter((s) => !s.isAi)
+	const readyCount = humans.filter((s) => s.ready).length
+	// One seat per side the map fields — a three-side board is a three-seat room.
+	const maxPlayers = roomCapacity(room)
+	const isAsync = room.mode === 'async'
 
 	return {
 		session,
@@ -80,12 +95,23 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		seat,
 		isHost: seat === 0,
 		count,
-		maxPlayers: MAX_PLAYERS,
+		maxPlayers,
 		startAt: room.start_at ?? null,
 		// Host-chosen at creation, immutable after: 'live' or 'async', plus the
 		// async per-turn clock for the lobby copy.
-		mode: room.mode === 'async' ? ('async' as const) : ('live' as const),
+		mode: isAsync ? ('async' as const) : ('live' as const),
+		// The host can launch a room that never filled — every side nobody took is
+		// handed to the CPU. Correspondence rooms have no CPU seats (an offline
+		// driver would just let the AI's clock run out), so they still need a full
+		// house before anything can start.
+		canFillWithAi: !isAsync,
+		canHostStart: isAsync ? count >= maxPlayers : humans.length > 0 && readyCount === humans.length,
 		turnTimeoutMs: room.turn_timeout_ms == null ? null : Number(room.turn_timeout_ms),
+		// Live rooms gate the countdown on ready-up; async rooms don't.
+		requiresReady: room.mode !== 'async',
+		myReady: seats.find((s) => s.userSession === userSession)?.ready ?? false,
+		readyCount,
+		humanCount: humans.length,
 		teams,
 		lockRandom: !!room.lock_random,
 		members,

@@ -22,11 +22,9 @@ import { openBuildMenu, closeBuildMenu } from '../HUD/buildMenuStore'
 import { applyAction, type CommitOptions } from '../applyAction'
 import { emitOutgoingAction } from '../outgoingActions'
 import { airLift, findFriendlyTransporters, shipOut } from '../modifiers/transport'
-import { buildAdjacent, buildableAdjacentTiles } from '../modifiers/builder'
-import { audioEngine } from '$lib/Audio/audioEngine'
-import { sfxForAction } from '$lib/Audio/sfxMap'
+import { buildableAdjacentTiles, resolveAdjacentBuild } from '../modifiers/builder'
+import { canDeployFromFactory } from '../build'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
-import { recordMatchStat } from '../matchStats'
 import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
@@ -81,6 +79,13 @@ const select: Interactor = ({ map, tile }) => {
 			if (
 				state.phase === 'playing' &&
 				building.team === state.currentTeam &&
+				// ...and the side on turn is the one this client commands. Ownership by
+				// itself isn't enough: on an opponent's (or an online CPU seat's) turn
+				// their factory IS the current team's, so without this the menu opened
+				// in their colours and spent their money on a unit only this client
+				// could see. The board-input gate in GameStateManager stops those clicks
+				// upstream; this keeps the engine honest on its own.
+				state.currentTeam === get(viewerTeam) &&
 				!state.actedTiles.has(tile)
 			) {
 				openBuildMenu(tile, building.team)
@@ -442,20 +447,43 @@ const selectBuildTile: Interactor = ({ map, tile }) => {
 	// frees the builder to act again (mirrors the attack-target / land flows).
 	if (!valid.includes(tile)) return
 
-	const result = buildAdjacent(map, pending.builderTile, pending.unitType, pending.team, tile)
-	if (result.ok) {
-		// Live human build mutates the board directly (not via applyAction), so fire
-		// the build chime here — same as the factory build menu path.
-		const sfx = sfxForAction('build')
-		if (sfx) audioEngine.playSfx(sfx)
-		// Credit the build stat inline too, mirroring applyAction's live-gated sink —
-		// otherwise builder-deployed units never reach the "Built" tally.
-		recordMatchStat({ kind: 'build', team: pending.team })
+	// Pre-flight against the board, THEN commit: `commit` relays, so a build that
+	// would fail must never be sent (it would no-op on the opponent's client while
+	// this one showed nothing either).
+	const resolved = resolveAdjacentBuild(map, pending.builderTile, pending.unitType, tile)
+	if (!resolved.ok) {
+		if (resolved.reason === 'no-space') addToast('No space to deploy unit', 'warn')
 		return
 	}
-	if (result.reason === 'no-space') {
-		addToast('No space to deploy unit', 'warn')
-	}
+	// Routed through `commit` like every other action rather than calling
+	// `buildAdjacent` directly: that direct call applied the build locally and
+	// nothing else, so online the deployed unit never reached the opponent's board
+	// (and stealth memory / win conditions were skipped). `applyAction` fires the
+	// build chime and the "Built" stat on the live path, so neither is done here.
+	commit(map, {
+		kind: 'build-adjacent',
+		builder: pending.builderTile,
+		unitType: pending.unitType,
+		destination: tile,
+	})
+}
+
+/**
+ * Roll a unit out of a factory (the build menu's commit). Goes through `commit`
+ * so the build applies, sounds, counts toward stats, feeds the CPU's stealth
+ * memory, re-checks win conditions AND relays to an online opponent — a bare
+ * `spawnBuiltUnit` did only the first of those, so online factory builds never
+ * reached the other client and quietly desynced the match. Returns false (having
+ * done nothing) when the factory has no legal tile to deploy onto.
+ */
+export const commitFactoryBuild = (
+	map: MapObject,
+	buildingTile: number,
+	unitType: number
+): boolean => {
+	if (!canDeployFromFactory(map, buildingTile, unitType)) return false
+	commit(map, { kind: 'build', building: buildingTile, unitType })
+	return true
 }
 
 // Forfeit the match for `team`. Routed through `commit` like any other action so

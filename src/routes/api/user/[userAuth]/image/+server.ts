@@ -20,7 +20,7 @@ export const POST = async ({ params, request }) => {
 	try {
 		await db.update('profiles', { auth: userAuth }, { profile_image_url: url })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not save image url to database')
 	}
 

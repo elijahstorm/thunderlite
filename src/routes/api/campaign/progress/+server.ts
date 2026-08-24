@@ -41,7 +41,7 @@ export const POST = async ({ request, locals }) => {
 
 		return json({ status: 'ok', highestUnlockedOrder: next })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not persist campaign progress')
 	}
 }

@@ -28,7 +28,7 @@ export const GET = async ({ request }) => {
 		const { count } = await db.delete('messages', { created_at: { lt: cutoff } })
 		return json({ deleted: count, cutoff })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not prune messages')
 	}
 }

@@ -71,7 +71,7 @@
 		onclick={toggle}
 		aria-label="Game settings"
 		aria-expanded={open}
-		class="pointer-events-auto rounded-lg bg-black/70 p-2 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-black/85"
+		class="pointer-events-auto rounded-lg border border-white/10 bg-neutral-900/85 p-2 text-white shadow-lg backdrop-blur-md transition-colors hover:bg-neutral-800/90"
 	>
 		<Icon icon="mdi:cog" width="20" height="20" />
 	</button>

@@ -11,6 +11,7 @@
 <script lang="ts">
 	import { dialogueState, advanceDialogue, skipDialogue } from './dialogueStore'
 	import { speakerColorOverrides, resolveSpeakerColor } from './speakerColors'
+	import { hudGutter } from '$lib/Engine/HUD/hudInsets'
 
 	let state = $derived($dialogueState)
 	let line = $derived(state.lines[state.index] ?? '')
@@ -23,8 +24,11 @@
 
 {#if state.active}
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+	<!-- Padded past the HUD rail so the box centres on the *board*, not the window,
+	     and never sits over the turn controls. -->
 	<div
 		class="fixed inset-x-0 bottom-0 z-[70] flex justify-center p-4"
+		style="padding-right: calc(1rem + {$hudGutter}px)"
 		data-testid="dialogue-overlay"
 		onclick={advanceDialogue}
 	>

@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
-import { gameStore, MAX_PLAYERS } from '$lib/Game/store.server'
+import { gameStore, roomCapacity } from '$lib/Game/store.server'
 import { realtime } from '$lib/dontcode/server'
 
 export const POST = async ({ request, locals }) => {
@@ -22,13 +22,16 @@ export const POST = async ({ request, locals }) => {
 		}
 		if (!room.map_id) throw error(500, 'Game session is missing map data')
 
+		// Seats are per-room (one per side the map fields), not a global constant.
+		const capacity = roomCapacity(room)
+
 		// Already in this room — just refresh the pointer and return the map.
 		if (members.includes(userSession)) {
 			await gameStore.setPlayerGame(userSession, session)
 			return json({ session, mapId: room.map_id })
 		}
 
-		if (members.length >= MAX_PLAYERS) {
+		if (members.length >= capacity) {
 			throw error(409, 'Game session is full')
 		}
 
@@ -37,16 +40,22 @@ export const POST = async ({ request, locals }) => {
 		await gameStore.addMember(session, userSession, locals.user ?? '')
 		// Guard the seat race: if we tipped the room over capacity, roll back.
 		const count = await gameStore.memberCount(session)
-		if (count > MAX_PLAYERS) {
+		if (count > capacity) {
 			await gameStore.removeMember(session, userSession)
 			throw error(409, 'Game session is full')
 		}
 		await gameStore.setPlayerGame(userSession, session)
+		// A new arrival changes the lineup, so nobody's earlier ready carries over
+		// — including a host who readied up and then wandered off while waiting.
+		// Everyone confirms against the room they can actually see.
+		await gameStore.clearReady(session)
 
-		// A join that fills the room arms the pre-game countdown and nudges every
-		// lobby (the host's especially) to show it without waiting for a poll. Both
-		// are best-effort — the lobby's own poll + self-heal cover a lost push.
-		if (count >= MAX_PLAYERS) {
+		// A join that fills the room may arm the pre-game countdown (a live room
+		// still waits for both players to ready up; an async room releases on its
+		// own) and nudges every lobby (the host's especially) to show the change
+		// without waiting for a poll. Both are best-effort — the lobby's own poll
+		// + self-heal cover a lost push.
+		if (count >= capacity) {
 			const startAt = await gameStore.armStartCountdown(session)
 			await realtime.tryPublish(`game:${session}`, { lobby: { count, startAt } })
 		} else {
@@ -56,7 +65,7 @@ export const POST = async ({ request, locals }) => {
 		return json({ session, mapId: room.map_id })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not join game session')
 	}
 }

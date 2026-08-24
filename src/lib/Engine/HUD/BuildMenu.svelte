@@ -3,19 +3,11 @@
 	import { addToast } from 'as-toast'
 	import { gameState } from '../gameState'
 	import { spriteStore } from '$lib/Sprites/spriteStore'
-	import {
-		buildableUnits,
-		canDeployFromFactory,
-		spawnBuiltUnit,
-		type BuildableUnit,
-	} from '../build'
+	import { buildableUnits, canDeployFromFactory, type BuildableUnit } from '../build'
 	import { buildableAdjacentTiles } from '../modifiers/builder'
-	import { beginBuildPlacement } from '../Interactor/interactor'
+	import { beginBuildPlacement, commitFactoryBuild } from '../Interactor/interactor'
 	import { walletOf } from '../wallet'
 	import { buildMenuState, closeBuildMenu } from './buildMenuStore'
-	import { audioEngine } from '$lib/Audio/audioEngine'
-	import { sfxForAction } from '$lib/Audio/sfxMap'
-	import { recordMatchStat } from '../matchStats'
 	import UnitSpritePreview from './UnitSpritePreview.svelte'
 
 	interface Props {
@@ -96,22 +88,15 @@
 			return
 		}
 
-		const result = spawnBuiltUnit(map, menu.buildingTile, entry.type, menu.team)
-		if (result.ok) {
-			// Live human spawn — the build menu mutates directly (not via applyAction),
-			// so fire the build chime here. Replay never touches this path.
-			const sfx = sfxForAction('build')
-			if (sfx) audioEngine.playSfx(sfx)
-			// ...and credit the build stat inline for the same reason: CPU/online builds
-			// are counted by applyAction's live-gated sink, but this direct human path
-			// never reaches it, which left the local player's "Built" column at 0.
-			recordMatchStat({ kind: 'build', team: menu.team })
-			closeBuildMenu()
+		// Committed as an action (not a bare `spawnBuiltUnit`) so the build relays to
+		// an online opponent and picks up applyAction's chime, "Built" stat, stealth
+		// bookkeeping and win-condition pass — the direct spawn this used to do
+		// applied only to this client's board.
+		if (!commitFactoryBuild(map, menu.buildingTile, entry.type)) {
+			addToast('No space to deploy unit', 'warn')
 			return
 		}
-		if (result.reason === 'no-space') {
-			addToast('No space to deploy unit', 'warn')
-		}
+		closeBuildMenu()
 	}
 
 	const handleCancel = () => closeBuildMenu()

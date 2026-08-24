@@ -31,7 +31,7 @@ export const POST = async ({ params, locals }) => {
 		await gameStore.leaveGame(session, userSession)
 		return json({ ok: true })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not leave the game')
 	}
 }

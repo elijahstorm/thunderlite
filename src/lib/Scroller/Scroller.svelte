@@ -108,6 +108,14 @@
 		contentWidth: number
 		contentHeight: number
 		requestRedraw?: number
+		/**
+		 * Bump this whenever something *outside* the board changes how much room the
+		 * container has (the HUD rail collapsing, for instance). A resize event never
+		 * fires for that — the window hasn't changed — so without it the canvas keeps
+		 * its old size and the board is left mis-centred inside a container that has
+		 * quietly grown or shrunk. `reflow` no-ops when nothing actually moved.
+		 */
+		reflowSignal?: number
 		handleClick: (x: number, y: number) => void
 		handleHover: (x: number, y: number) => void
 		handleOffset: (x: number, y: number, zoom: number) => void
@@ -123,6 +131,7 @@
 		contentWidth,
 		contentHeight,
 		requestRedraw = 0,
+		reflowSignal = 0,
 		handleClick,
 		handleHover,
 		handleOffset,
@@ -282,11 +291,13 @@
 	})
 
 	// The board's content dimensions changed (editor resized the map, or first
-	// mount). This genuinely needs a reflow to resize the canvas and recompute
-	// scroll bounds; `reflow` itself no-ops if nothing actually changed.
+	// mount), or the container's own room changed (`reflowSignal`). Either
+	// genuinely needs a reflow to resize the canvas and recompute scroll bounds;
+	// `reflow` itself no-ops if nothing actually changed.
 	$effect(() => {
 		contentWidth
 		contentHeight
+		reflowSignal
 		reflow?.()
 	})
 </script>

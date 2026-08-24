@@ -39,7 +39,7 @@ export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
 			user = null
 		}
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not get user from database')
 	}
 
@@ -121,7 +121,7 @@ export const queryUsersByAuth = async (
 				}) as UserDBData
 		)
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not get users from database')
 	}
 }
@@ -130,7 +130,7 @@ export const makeUserDBDataFromAuth = async (auth: string) => {
 	try {
 		await db.insert('profiles', { auth })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not make user')
 	}
 }
@@ -144,7 +144,7 @@ export const updateUserDBData = async (
 		const data = Object.fromEntries(entries.map((entry) => [entry, user[entry]]))
 		await db.update('profiles', { auth }, data)
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		throw error(500, 'Could not make user')
 	}
 }

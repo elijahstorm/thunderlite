@@ -37,7 +37,7 @@ export const POST = async ({ params, locals }) => {
 		const resigned = await gameStore.sweepAbsent(session, userSession)
 		return json({ ok: true, resigned })
 	} catch (msg) {
-		logToErrorDb(msg)
+		await logToErrorDb(msg)
 		// Never surface heartbeat failures to the client — it's best-effort.
 		return json({ ok: false })
 	}

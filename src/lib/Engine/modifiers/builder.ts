@@ -55,11 +55,16 @@ export type BuildAdjacentResult =
 	| { ok: true; tile: number }
 	| { ok: false; reason: 'no-space' | 'not-affordable' | 'not-buildable' | 'invalid' }
 
-export const buildAdjacent = (
+/**
+ * Where a Warmachine build would land, and why it couldn't — resolved WITHOUT
+ * touching the board. `buildAdjacent` is this check plus the mutation, and the
+ * interactor pre-flights with it so a doomed build is never committed (online,
+ * committing one would relay an event that no-ops on the opponent's board).
+ */
+export const resolveAdjacentBuild = (
 	map: MapObject | MapProcesser,
 	builderTile: number,
 	unitType: number,
-	team: number,
 	destination?: number
 ): BuildAdjacentResult => {
 	const data = unitData[unitType]
@@ -72,8 +77,7 @@ export const buildAdjacent = (
 	// (refilled by mining) rather than the shared player money pool.
 	const builder = map.layers.units[builderTile]
 	if (!builder) return { ok: false, reason: 'invalid' }
-	const funds = walletOf(builder)
-	if (funds < data.cost) return { ok: false, reason: 'not-affordable' }
+	if (walletOf(builder) < data.cost) return { ok: false, reason: 'not-affordable' }
 
 	const adjacencies = buildableAdjacentTiles(map, builderTile, unitType)
 	const spawnTile =
@@ -81,6 +85,23 @@ export const buildAdjacent = (
 			? destination
 			: adjacencies[0]
 	if (typeof spawnTile !== 'number') return { ok: false, reason: 'no-space' }
+	return { ok: true, tile: spawnTile }
+}
+
+export const buildAdjacent = (
+	map: MapObject | MapProcesser,
+	builderTile: number,
+	unitType: number,
+	team: number,
+	destination?: number
+): BuildAdjacentResult => {
+	const resolved = resolveAdjacentBuild(map, builderTile, unitType, destination)
+	if (!resolved.ok) return resolved
+
+	const data = unitData[unitType]
+	const builder = map.layers.units[builderTile]
+	if (!data || !builder) return { ok: false, reason: 'invalid' }
+	const spawnTile = resolved.tile
 
 	map.layers.units[spawnTile] = {
 		type: unitType,
@@ -91,7 +112,7 @@ export const buildAdjacent = (
 	// Quick fade-in so the fresh unit eases onto the board instead of popping.
 	beginBuildFade(spawnTile)
 
-	builder.wallet = funds - data.cost
+	builder.wallet = walletOf(builder) - data.cost
 
 	markTileActed(spawnTile)
 	markTileActed(builderTile)

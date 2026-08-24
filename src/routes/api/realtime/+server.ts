@@ -77,7 +77,7 @@ export const POST = async ({ request, locals }) => {
 		// A 404 from the gateway means it simply has no realtime service (the
 		// local mock) — expected, not worth logging. Callers treat any failed
 		// mint as "no realtime" and fall back to polling.
-		if (!(isDontCodeError(msg) && msg.status === 404)) logToErrorDb(msg)
+		if (!(isDontCodeError(msg) && msg.status === 404)) await logToErrorDb(msg)
 		throw error(503, 'Realtime is not available')
 	}
 }
