@@ -1,4 +1,5 @@
 import { onMatchEnd, type MatchResult } from '$lib/Engine/matchEnd'
+import { clearMatchRating, matchRating } from '$lib/Game/matchRating'
 
 /**
  * recordMatch — a J1 `onMatchEnd` subscriber that persists match results. It is
@@ -13,32 +14,55 @@ import { onMatchEnd, type MatchResult } from '$lib/Engine/matchEnd'
  *   unauthenticated writes, so this is enforced on both ends).
  *
  * Writes are best-effort and fire-and-forget — a failed POST must never block
- * the UI or the other match-end subscribers.
+ * the UI or the other match-end subscribers. The online POST's response is the
+ * one thing read back: it carries the local player's ladder movement, which the
+ * game-over screen shows. A failure there just leaves the rating line off.
  */
 
-const post = (path: string, payload: unknown): void => {
+type ResultResponse = { elo?: { before?: unknown; delta?: unknown } | null }
+
+const post = (path: string, payload: unknown, onResult?: (data: ResultResponse) => void): void => {
 	if (typeof fetch !== 'function') return
 	void fetch(path, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json' },
 		body: JSON.stringify(payload),
-	}).catch(() => {
-		// Persistence is best-effort; swallow network/server errors.
 	})
+		.then((response) => (onResult && response.ok ? response.json() : null))
+		.then((data) => data && onResult?.(data as ResultResponse))
+		.catch(() => {
+			// Persistence is best-effort; swallow network/server errors.
+		})
+}
+
+/** Publish the ladder movement the server settled, if this match was rated. */
+const publishRating = (data: ResultResponse): void => {
+	const before = Number(data?.elo?.before)
+	const delta = Number(data?.elo?.delta)
+	if (!Number.isFinite(before) || !Number.isFinite(delta)) return
+	matchRating.set({ before, delta })
 }
 
 export const recordMatch = (result: MatchResult): void => {
+	// Whatever this match turns out to be, it is not the previous one — drop any
+	// rating still on screen from an earlier game before the new one resolves.
+	clearMatchRating()
+
 	if (result.mode === 'online') {
 		if (!result.sessionId) return
 		const local = result.players.find((p) => p.isLocal)
 		if (!local) return
-		post(`/api/game/${result.sessionId}/result`, {
-			mode: 'online',
-			team: local.team,
-			winner: result.winner,
-			turns: result.turns,
-			mapSha: result.mapSha ?? null,
-		})
+		post(
+			`/api/game/${result.sessionId}/result`,
+			{
+				mode: 'online',
+				team: local.team,
+				winner: result.winner,
+				turns: result.turns,
+				mapSha: result.mapSha ?? null,
+			},
+			publishRating
+		)
 		return
 	}
 

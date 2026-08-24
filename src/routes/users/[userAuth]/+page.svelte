@@ -3,12 +3,14 @@
 	import { goto } from '$app/navigation'
 	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 	import StatsPanel from '$lib/Components/Profile/StatsPanel.svelte'
+	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 	import MapCard from '$lib/Components/Widgets/Social/MapCard.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 
 	let { data } = $props()
 	let user = $derived(data.user)
 	let stats = $derived(data.stats)
+	let eloHistory = $derived(data.eloHistory)
 	let maps = $derived(data.maps ?? [])
 	let isMe = $derived(!!data.me && data.me === user.auth)
 	let canAct = $derived(!!data.me && !isMe)
@@ -55,9 +57,12 @@
 		<UserIcon {user} noClick size={4} />
 		<div class="min-w-0 flex-1">
 			<p class="section-eyebrow">Player</p>
-			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-				{user.display_name || user.username || 'Player'}
-			</h1>
+			<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+				<h1 class="text-2xl font-semibold tracking-tight text-foreground">
+					{user.display_name || user.username || 'Player'}
+				</h1>
+				<RatingBadge elo={stats?.elo} size="md" />
+			</div>
 			{#if user.username}
 				<p class="text-sm text-muted-foreground mt-1">@{user.username}</p>
 			{/if}
@@ -88,7 +93,7 @@
 		</div>
 	{/if}
 
-	<StatsPanel {stats} heading="Match record" />
+	<StatsPanel {stats} history={eloHistory} heading="Match record" />
 
 	<section class="space-y-3">
 		<h2 class="text-lg font-semibold tracking-tight text-foreground">Saved maps</h2>

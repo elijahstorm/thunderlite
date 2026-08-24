@@ -3,6 +3,7 @@
 	import { teamColor } from '../teamColors'
 	import { playerRoster } from './playerRoster'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 
 	// Every player's funds, always on screen so they can be compared at a glance.
 	// The active team gets a team-coloured edge and a lifted row; defeated players
@@ -53,6 +54,12 @@
 			>
 				{labelFor(player, roster[player.team])}
 			</span>
+
+			<!-- Online sides carry their ladder rating, so you know mid-match who
+			     you're actually fighting. CPU / hot-seat sides have none. -->
+			{#if roster[player.team]}
+				<RatingBadge elo={roster[player.team].elo} size="xs" bare onDark hideUnrated />
+			{/if}
 
 			<span
 				class="shrink-0 font-mono text-[11px] tabular-nums {active

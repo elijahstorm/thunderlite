@@ -8,6 +8,7 @@ import type { PageServerLoad } from './$types'
 import { validate } from '$lib/Database/validators'
 import { getUserStats } from '$lib/Database/getUserStats'
 import { getMatchHistory } from '$lib/Database/getMatchHistory'
+import { getEloHistory } from '$lib/Database/getEloHistory'
 import { db } from '$lib/dontcode/server'
 
 export const prerender = false
@@ -21,9 +22,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// are defensive (a brand-new account returns zeros / an empty page), and a
 	// profile lookup failure means "no account yet" — caught below to bootstrap
 	// one — so swallow it here rather than rejecting the whole barrier.
-	let [user, stats, recent] = await Promise.all([
+	let [user, stats, eloHistory, recent] = await Promise.all([
 		getUserDBDataFromAuth(locals.user).catch(() => null),
 		getUserStats(locals.user),
+		getEloHistory(locals.user),
 		getMatchHistory(locals.user, { limit: 5 }),
 	])
 
@@ -44,7 +46,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	}
 
-	return { user, stats, recentGames: recent.entries, totalGames: recent.total }
+	return { user, stats, eloHistory, recentGames: recent.entries, totalGames: recent.total }
 }
 
 export const actions = {

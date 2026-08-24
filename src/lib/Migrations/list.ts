@@ -18,6 +18,8 @@ import { CreateGameRoom } from './create_game_room.sql'
 import { CreateGameRoomSettings } from './create_game_room_settings.sql'
 import { CreateGameMember } from './create_game_member.sql'
 import { CreateGameEvent } from './create_game_event.sql'
+import { CreateGameEventOrdering } from './create_game_event_ordering.sql'
+import { CreateGameLog } from './create_game_log.sql'
 import { CreateGameAsync } from './create_game_async.sql'
 import { CreateGameReady } from './create_game_ready.sql'
 import { CreateGameCapacity } from './create_game_capacity.sql'
@@ -55,6 +57,9 @@ export const consolidatedSchema = [
 	CreateGameRoomSettings,
 	CreateGameMember,
 	CreateGameEvent,
+	// After CreateGameEvent: its alters target game_event.
+	CreateGameEventOrdering,
+	CreateGameLog,
 	// After CreateGameMember: its index targets game_member.
 	CreateGameAsync,
 	CreateGameReady,
@@ -86,6 +91,7 @@ export const appTables = [
 	'game_room',
 	'game_member',
 	'game_event',
+	'game_log',
 	'player_game',
 	'email_log',
 	'notification_prefs',

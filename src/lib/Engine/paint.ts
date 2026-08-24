@@ -5,7 +5,7 @@ import { ANIMATION_POINTER, ANIMATION_SELECT } from '$lib/GameData/animation'
 import { animationFrame } from '$lib/Sprites/animationFrameCount'
 import { gameState } from './gameState'
 import { interactionSource } from './Interactor/interactionState'
-import { computeFogMask, drawFog, observeFog, observeUnitFade } from './fogRender'
+import { computeFogMask, drawFog, observeFog, observeUnitFade, type FadeScope } from './fogRender'
 import { isUnitStealthed, unitSeenByViewer, type ViewerFog } from './visibility'
 import { isWalletUnit, walletOf } from './wallet'
 import { observeMaterialize, drawMaterialize } from './materialize'
@@ -57,7 +57,12 @@ export const paint =
 		localTeam: number = 0,
 		// Map-editor mode: there is no "selectable unit" gameplay, so the per-unit
 		// idle select marker is suppressed entirely.
-		editor: boolean = false
+		editor: boolean = false,
+		// This board's own fog/unit fade state. Per-board, because the fade is keyed
+		// by tile and two boards on screen at once (gameplay + the HUD overview map)
+		// would otherwise fight over the same easing values. Omitted by one-off
+		// painters (thumbnails), which fall back to a shared scope.
+		fadeScope: FadeScope | undefined = undefined
 	) =>
 	(getMap: () => MapObject) =>
 	(context: CanvasRenderingContext2D) =>
@@ -119,7 +124,9 @@ export const paint =
 		// Cloak fade × build fade-in: a freshly-built unit eases up from transparent,
 		// then settles at whatever the cloak state calls for.
 		const unitAlpha =
-			unitAtTile !== null ? observeUnitFade(tile, unitAlphaTarget) * observeBuildFade(tile) : 1
+			unitAtTile !== null
+				? observeUnitFade(tile, unitAlphaTarget, fadeScope) * observeBuildFade(tile)
+				: 1
 
 		context.save()
 		context.translate(left, top)
@@ -284,7 +291,7 @@ export const paint =
 		// over a few frames. The overlay crumbles organically wherever a covered
 		// tile abuts a seen one, and stays solid in the fogged interior.
 		if (fog) {
-			const fogValue = observeFog(tile, tileVisible || airborneReveal ? 0 : 1)
+			const fogValue = observeFog(tile, tileVisible || airborneReveal ? 0 : 1, fadeScope)
 			if (fogValue > 0.002) {
 				const fogMask = computeFogMask(fog.visible, row, col, map.rows, map.cols)
 				drawFog(context, width, height, fogMask, fogValue)

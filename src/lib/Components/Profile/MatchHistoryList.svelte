@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte'
 	import FallbackImage from '$lib/Components/Images/FallbackImage.svelte'
+	import RatingBadge from './RatingBadge.svelte'
 	import type { MatchHistoryEntry, MatchHistoryOpponent } from '$lib/Database/getMatchHistory'
 
 	interface Props {
@@ -49,13 +50,6 @@
 		if (entry.mode === 'hotseat') return 'Hot-seat match'
 		return 'Online match'
 	}
-
-	const eloChip = (delta: number): string =>
-		delta > 0
-			? 'text-emerald-600 dark:text-emerald-400'
-			: delta < 0
-				? 'text-red-600 dark:text-red-400'
-				: 'text-muted-foreground'
 </script>
 
 <ul class="space-y-3" data-testid="match-history">
@@ -88,6 +82,8 @@
 								</span>
 								{title(entry)}
 							</a>
+							<!-- Their rating today, so a win reads as "who did I beat". -->
+							<RatingBadge elo={opponent.elo} size="xs" hideUnrated />
 							{#if entry.opponents.length > 1}
 								<span class="text-xs text-muted-foreground">
 									and {entry.opponents.length - 1} more
@@ -97,13 +93,12 @@
 							<span class="font-medium text-foreground">{title(entry)}</span>
 						{/if}
 
-						{#if entry.eloDelta != null}
-							<span
-								class="text-xs font-semibold tabular-nums {eloChip(entry.eloDelta)}"
-								title="Rating change"
-								data-testid="match-elo-delta"
-							>
-								{entry.eloDelta > 0 ? `+${entry.eloDelta}` : entry.eloDelta}
+						<!-- Your own side of the ladder: where the match left you, and what
+						     it moved. `eloAfter` is null for unrated games, which is most
+						     of them (hot-seat, campaign, anything with a CPU seat). -->
+						{#if entry.eloAfter != null}
+							<span data-testid="match-elo-delta" title="Your rating after this match">
+								<RatingBadge elo={entry.eloAfter} delta={entry.eloDelta} size="xs" />
 							</span>
 						{/if}
 					</div>

@@ -6,6 +6,7 @@
 	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import { logChat } from '$lib/Engine/liveLog'
 
 	interface Props {
 		/** Game room code. Group chat is scoped to `chat:{session}` — room members only. */
@@ -53,6 +54,10 @@
 		if (!data?.message) return
 		// We render our own sends optimistically; drop the echo if it comes back.
 		if (data.source === currentAuth) return
+		// Group chat is realtime-only (no DB), so this is the ONLY record of what
+		// was said in the room — worth having when reconstructing a reported match.
+		// The recorder is a no-op outside a real online session.
+		logChat(data.source, data.message, false)
 		push(data)
 	}
 
@@ -74,6 +79,7 @@
 		if (!message || !currentAuth || !conn) return
 		const msg: GroupMessage = { source: currentAuth, message, at: seq }
 		conn.publish(channel(session), msg)
+		logChat(currentAuth, message, true)
 		push(msg)
 		draft = ''
 	}

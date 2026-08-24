@@ -1,5 +1,6 @@
 <script lang="ts">
 	import UserImageAndName from '../UserImageAndName.svelte'
+	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 
 	interface Props {
 		user: UserDBData
@@ -18,10 +19,14 @@
 	<!-- Name + avatar open the full profile (saved maps, add friend, etc.). -->
 	<a
 		href={user ? `/users/${user.auth}` : '#'}
-		class="flex items-center min-w-0 rounded-lg hover:bg-muted transition-colors -mx-1 px-1 py-1"
+		class="flex flex-1 items-center min-w-0 rounded-lg hover:bg-muted transition-colors -mx-1 px-1 py-1"
 	>
 		<UserImageAndName {user} text noClick />
 	</a>
+	<!-- The person you're talking to is usually someone you're arranging a game
+	     with, so their rating belongs in the conversation header. -->
+	<RatingBadge elo={user?.elo} size="xs" hideUnrated />
+
 	<button
 		type="button"
 		aria-label="Close conversation"

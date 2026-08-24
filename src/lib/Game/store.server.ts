@@ -108,7 +108,17 @@ type MemberRow = {
 	ready?: boolean | null
 }
 type PlayerGameRow = { session: string; expires_at: number }
-type EventRow = { seq: number; user_session: string; action: unknown; ts: number }
+type EventRow = {
+	seq: number
+	user_session: string
+	action: unknown
+	ts: number
+	// Ordering columns (see create_game_event_ordering). NULL on rows written
+	// before they existed, which is why nothing reads them back except the
+	// duplicate lookup in `appendEvent`.
+	sender_session?: string | null
+	client_seq?: number | null
+}
 
 const now = () => Date.now()
 const expired = (expires_at: unknown) => Number(expires_at) <= now()
@@ -773,26 +783,133 @@ const toEvent = (row: EventRow): GameEvent => ({
 })
 
 /**
- * Append an action to the room's log and return the stored event. `seq` is the
- * current row count; the `(session, seq)` primary key makes the append atomic —
- * on a lost race we recompute `seq` and retry.
+ * Do two events carry the same action? Compared on canonically ordered keys, so
+ * a round trip through jsonb (which does not preserve key order) still matches.
+ */
+const sameAction = (row: EventRow, action: SerializedAction): boolean => {
+	const stored = (typeof row.action === 'string' ? JSON.parse(row.action) : row.action) as Record<
+		string,
+		unknown
+	>
+	const canon = (value: Record<string, unknown>): string =>
+		JSON.stringify(
+			Object.keys(value)
+				.sort()
+				.map((key) => [key, value[key]])
+		)
+	return canon(stored) === canon(action as unknown as Record<string, unknown>)
+}
+
+/** An append refused because it would record history out of order. */
+export class OutOfOrderEventError extends Error {
+	constructor(
+		readonly expected: number,
+		readonly received: number
+	) {
+		super(`Event arrived out of order (expected client_seq ${expected}, got ${received})`)
+		this.name = 'OutOfOrderEventError'
+	}
+}
+
+/**
+ * Where a sender's next event belongs in its own stream: the count of events it
+ * has already relayed. Contiguous by construction — `appendEvent` refuses any
+ * gap — so the count IS the next expected `client_seq`.
+ */
+async function nextClientSeq(session: string, senderSession: string): Promise<number> {
+	return db.count('game_event', { session, sender_session: senderSession })
+}
+
+/**
+ * Append an action to the room's log and return the stored event.
+ *
+ * Two different orderings are at play, and conflating them is what broke match
+ * 11 (`yvwVsg1V2HRpKHrk`, seq 69/70 — an attack recorded before the move that
+ * put the attacker on the tile, which every client except the sender then
+ * replayed as "the unit moved and never fired").
+ *
+ *   `seq` is the room's log position, taken from the row count. The
+ *   `(session, seq)` primary key makes claiming one atomic; a lost race
+ *   recomputes and retries. But it records the order requests WIN THE INSERT
+ *   RACE, which for two overlapping requests is a coin flip — not the order a
+ *   player acted in.
+ *
+ *   `clientSeq` is the sender's own 0-based counter, so it DOES carry the order
+ *   the player acted in. When it's supplied, this refuses to append an event
+ *   whose predecessor from the same sender isn't in the log yet: a request that
+ *   overtook its own predecessor is rejected (`OutOfOrderEventError`) rather
+ *   than recorded in the wrong place, and the caller retries once the earlier
+ *   one lands. A `clientSeq` we've already stored is a duplicate — a browser
+ *   retry, a double-fired handler — and returns the existing row instead of
+ *   appending the same action twice.
+ *
+ * `senderSession` is the authenticated caller, which is not always the acting
+ * seat: a human driving a CPU seat relays actions attributed to the AI. Ordering
+ * follows the SENDER (one stream of requests, one counter), attribution follows
+ * `userSession`.
+ *
+ * Callers that pass no `clientSeq` (a legacy client) keep the old behaviour
+ * exactly, unordered and non-idempotent.
+ *
+ * `ts` is stamped ONCE, before the loop. It used to be re-stamped inside it, so
+ * the row that lost a race carried the time of its retry rather than the time it
+ * arrived — which makes a misordered log look perfectly consistent. That cost
+ * real time diagnosing this bug and is not worth repeating.
  */
 async function appendEvent(
 	session: string,
 	userSession: string,
-	action: SerializedAction
+	action: SerializedAction,
+	options: { senderSession?: string; clientSeq?: number } = {}
 ): Promise<GameEvent> {
+	const ts = now()
+	const { senderSession, clientSeq } = options
+	const ordered = senderSession !== undefined && clientSeq !== undefined
+
+	if (ordered) {
+		const expected = await nextClientSeq(session, senderSession)
+		if (clientSeq < expected) {
+			const existing = await db.findOne<EventRow>('game_event', {
+				where: { session, sender_session: senderSession, client_seq: clientSeq },
+			})
+			// Behind the counter means one of two very different things, and telling
+			// them apart matters: if the stored action is the SAME one, this is a
+			// genuine duplicate (a browser retry) and the stored row is the answer. If
+			// it's a DIFFERENT action, the sender's counter is stale — it reloaded and
+			// restarted at 0 — and honouring it would silently swallow a real action
+			// by handing back an unrelated old event. Refuse, and the error carries the
+			// value the sender should resume from.
+			if (existing && sameAction(existing, action)) return toEvent(existing)
+			if (existing) throw new OutOfOrderEventError(expected, clientSeq)
+			// Counted but not found (a concurrent insert mid-read): fall through and
+			// let the unique index adjudicate.
+		} else if (clientSeq > expected) {
+			// This request overtook one of its own predecessors. Recording it here is
+			// precisely the corruption we are preventing.
+			throw new OutOfOrderEventError(expected, clientSeq)
+		}
+	}
+
 	for (let attempt = 0; attempt < APPEND_RETRIES; attempt++) {
 		const seq = await db.count('game_event', { session })
-		const ts = now()
 		const inserted = await db.insertIgnoreConflict('game_event', {
 			session,
 			seq,
 			user_session: userSession,
 			action,
 			ts,
+			...(ordered ? { sender_session: senderSession, client_seq: clientSeq } : {}),
 		})
 		if (inserted) return { id: seq, userSession, action, ts }
+		// A conflict is ambiguous: we may have lost the race for `seq` (retry with a
+		// fresh one), or hit the sender's unique index because this exact event is
+		// already stored (return it — retrying would spin until it threw).
+		if (ordered) {
+			const existing = await db.findOne<EventRow>('game_event', {
+				where: { session, sender_session: senderSession, client_seq: clientSeq },
+			})
+			if (existing) return toEvent(existing)
+		}
 	}
 	throw new Error('Could not append game event after retries')
 }
@@ -817,6 +934,110 @@ async function events(
 		events: rows.map(toEvent),
 		lastEventId: total > 0 ? total - 1 : -1,
 	}
+}
+
+// ── Diagnostic client trace (`game_log`) ─────────────────────────────────────
+// Observational, not authoritative. `game_event` records what the server was
+// told; this records what each individual CLIENT sent, received, and computed —
+// the half of the picture that's missing whenever two boards diverge, since the
+// shared event log looks identical to both of them. Nothing in gameplay reads
+// these rows, so every write here is best-effort and must never be able to fail
+// a move (see the log route, which swallows its own errors).
+
+/** One recorded client observation. `eventId` is the `game_event.seq` it hangs off. */
+export type GameLogEntry = {
+	kind: string
+	eventId: number
+	detail: Record<string, unknown>
+	ts: number
+}
+
+/** Cap per request so one client can't flood the table with a single POST. */
+export const MAX_LOG_ENTRIES_PER_BATCH = 60
+/** Cap on one entry's serialized `detail`, to fence a runaway board snapshot. */
+export const MAX_LOG_DETAIL_BYTES = 8_000
+
+const LOG_KINDS = new Set(['out', 'in', 'state', 'chat', 'desync', 'note'])
+
+/** Coerce one client-supplied entry into a storable row, or null if unusable. */
+const sanitizeLogEntry = (raw: unknown): GameLogEntry | null => {
+	if (!raw || typeof raw !== 'object') return null
+	const v = raw as Record<string, unknown>
+	const kind = typeof v.kind === 'string' && LOG_KINDS.has(v.kind) ? v.kind : null
+	if (!kind) return null
+	const detail = v.detail && typeof v.detail === 'object' ? (v.detail as Record<string, unknown>) : {}
+	// Oversized details are truncated to a marker rather than rejected — losing the
+	// payload of one entry is much better than losing the entry (and its position
+	// in the trace) entirely.
+	const serialized = JSON.stringify(detail)
+	const safeDetail =
+		serialized.length > MAX_LOG_DETAIL_BYTES
+			? { truncated: true, bytes: serialized.length, head: serialized.slice(0, 512) }
+			: detail
+	const eventId =
+		typeof v.eventId === 'number' && Number.isInteger(v.eventId) ? v.eventId : -1
+	const ts = typeof v.ts === 'number' && Number.isFinite(v.ts) ? v.ts : now()
+	return { kind, eventId, detail: safeDetail, ts }
+}
+
+/**
+ * Append a batch of client observations. Rows are written independently so one
+ * bad entry can't lose the rest of the batch, and every failure is swallowed:
+ * diagnostics must never be able to break the game they are diagnosing.
+ * Returns how many rows landed.
+ */
+async function appendLog(
+	session: string,
+	userSession: string,
+	rawEntries: unknown[]
+): Promise<number> {
+	const entries = rawEntries
+		.slice(0, MAX_LOG_ENTRIES_PER_BATCH)
+		.map(sanitizeLogEntry)
+		.filter((e): e is GameLogEntry => e !== null)
+	if (entries.length === 0) return 0
+	const results = await Promise.allSettled(
+		entries.map((entry) =>
+			db.insert('game_log', {
+				session,
+				user_session: userSession,
+				kind: entry.kind,
+				event_id: entry.eventId,
+				detail: entry.detail,
+				ts: entry.ts,
+			})
+		)
+	)
+	return results.filter((r) => r.status === 'fulfilled').length
+}
+
+/** The whole trace for a room, oldest first — what the debug reader renders. */
+async function readLog(
+	session: string,
+	limit = 1000
+): Promise<
+	{ id: number; userSession: string; kind: string; eventId: number; detail: unknown; ts: number }[]
+> {
+	const rows = await db.find<{
+		id: number
+		user_session: string
+		kind: string
+		event_id: number
+		detail: unknown
+		ts: string | number
+	}>('game_log', {
+		where: { session },
+		orderBy: { id: 'asc' },
+		limit,
+	})
+	return rows.map((row) => ({
+		id: Number(row.id),
+		userSession: row.user_session,
+		kind: row.kind,
+		eventId: Number(row.event_id),
+		detail: typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail,
+		ts: Number(row.ts),
+	}))
 }
 
 // ── Async (correspondence) play ───────────────────────────────────────────────
@@ -1255,7 +1476,10 @@ export const gameStore = {
 	currentTurn,
 	setCurrentTurn,
 	appendEvent,
+	nextClientSeq,
 	events,
+	appendLog,
+	readLog,
 	matchRecorded,
 	resetTurnDeadline,
 	finishAsyncRoom,

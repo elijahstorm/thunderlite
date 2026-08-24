@@ -6,6 +6,7 @@
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import { formatTimeLeft, formatTurnTimeout } from '$lib/Game/asyncConfig'
+	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 
 	interface Props {
 		data: PageData
@@ -180,6 +181,7 @@
 										<span class="text-muted-foreground font-normal">
 											vs {opponentName(game)}
 										</span>
+										<RatingBadge elo={game.opponent?.elo} size="xs" hideUnrated />
 									{/if}
 								</p>
 								<p

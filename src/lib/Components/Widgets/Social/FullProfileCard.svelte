@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { writable } from 'svelte/store'
 	import FallbackImage from '../Images/FallbackImage.svelte'
+	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 	import { browser } from '$app/environment'
 
 	interface Props {
@@ -49,9 +50,15 @@
 		<h2 class="text-2xl font-bold hover:text-gray-700 transition-all duration-200">
 			{user.display_name ?? 'No Name'}
 		</h2>
-		<h3 class="text-gray-500 hover:text-gray-600 transition-all duration-200">
-			@{user.username ?? 'anonymous'}
-		</h3>
+		<div class="flex items-center justify-between gap-2">
+			<h3 class="text-gray-500 hover:text-gray-600 transition-all duration-200 truncate">
+				@{user.username ?? 'anonymous'}
+			</h3>
+			<!-- The popup opens from every avatar in the app (chat rows, lobbies,
+			     rosters), so this is the widest-reach place another player's rating
+			     can appear. -->
+			<RatingBadge elo={user.elo} size="xs" hideUnrated />
+		</div>
 		<p class="mt-2 text-gray-600 hover:text-gray-700 transition-all duration-200">
 			{user.bio ?? 'No bio'}
 		</p>

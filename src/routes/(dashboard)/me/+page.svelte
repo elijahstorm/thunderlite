@@ -32,6 +32,7 @@
 
 	let user = $derived(data.user)
 	let stats = $derived(data.stats)
+	let eloHistory = $derived(data.eloHistory)
 	// Re-merge server fields into the working copy when the server user changes,
 	// preserving in-progress local edits. Depends only on `user`; `updated` is read
 	// untracked so a local edit doesn't re-trigger the merge (which would loop).
@@ -120,7 +121,7 @@
 		<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">Match record</h2>
 	</header>
 
-	<StatsPanel {stats} heading="Your record" />
+	<StatsPanel {stats} history={eloHistory} heading="Your record" />
 </section>
 
 {#if data.recentGames?.length}

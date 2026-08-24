@@ -175,18 +175,36 @@ const getFogOverlay = (mask: number, level: number): HTMLCanvasElement | null =>
 const TAU = 230 // easing time constant (ms); ~3× this ≈ a ~700ms settle
 
 type TileFog = { current: number; target: number; lastMs: number }
-const tileState = new Map<number, TileFog>()
+type UnitFade = { current: number; target: number; lastMs: number }
+
+// The fade state is keyed by tile, so it MUST be scoped per board. Two boards can
+// be on screen at once (the gameplay board and the HUD rail's overview map) and
+// they don't necessarily paint the same targets for the same tile — different
+// zoom, different pause state, and historically different viewers. Sharing one
+// module-level map made the two boards tug the same easing value in opposite
+// directions every frame: neither ever settled, `fogBusy` never went quiet, and
+// every tile one board could see and the other couldn't parked half-veiled with
+// hidden units half-faded into view. Each board owns its own scope instead.
+export type FadeScope = { tiles: Map<number, TileFog>; units: Map<number, UnitFade> }
+export const createFadeScope = (): FadeScope => ({ tiles: new Map(), units: new Map() })
+
+// Fallback scope for one-off painters with no board of their own (map thumbnails).
+const defaultScope = createFadeScope()
 
 const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : 0)
 
-// Eases the tile toward `target` and returns its current fog level (0..1).
-// Called once per tile per paint; `target` is 1 for covered tiles, 0 for visible.
-export const observeFog = (tile: number, target: number): number => {
+// Shared easing step for both fade kinds: snap on first sight, otherwise ease by
+// real elapsed time so the cadence is independent of repaint frequency.
+const ease = (
+	store: Map<number, { current: number; target: number; lastMs: number }>,
+	tile: number,
+	target: number
+): number => {
 	const t = nowMs()
-	let s = tileState.get(tile)
+	let s = store.get(tile)
 	if (!s) {
 		s = { current: target, target, lastMs: t }
-		tileState.set(tile, s)
+		store.set(tile, s)
 		return target
 	}
 	s.target = target
@@ -199,14 +217,21 @@ export const observeFog = (tile: number, target: number): number => {
 	return s.current
 }
 
-// True while any tracked tile is still mid-fade — drives the render pump so it
-// keeps repainting until everything has settled, then stops.
-export const fogBusy = (): boolean => {
-	for (const s of tileState.values()) {
+const busy = (store: Map<number, { current: number; target: number }>): boolean => {
+	for (const s of store.values()) {
 		if (Math.abs(s.target - s.current) > 0.01) return true
 	}
 	return false
 }
+
+// Eases the tile toward `target` and returns its current fog level (0..1).
+// Called once per tile per paint; `target` is 1 for covered tiles, 0 for visible.
+export const observeFog = (tile: number, target: number, scope: FadeScope = defaultScope): number =>
+	ease(scope.tiles, tile, target)
+
+// True while any tracked tile is still mid-fade — drives the render pump so it
+// keeps repainting until everything has settled, then stops.
+export const fogBusy = (scope: FadeScope = defaultScope): boolean => busy(scope.tiles)
 
 // ── Per-tile unit-opacity fade ────────────────────────────────────────────────
 // Mirrors the tile fog easing, but for the *unit* sprite's alpha rather than the
@@ -214,34 +239,14 @@ export const fogBusy = (): boolean => {
 // settles at 0.5 so the player can read its state, instead of popping. Keyed by
 // tile like the fog state; a freshly-occupied tile snaps to its target so units
 // don't fade up on spawn/load. Reuses the same TAU so the cadence matches the veil.
-type UnitFade = { current: number; target: number; lastMs: number }
-const unitFadeState = new Map<number, UnitFade>()
-
-export const observeUnitFade = (tile: number, target: number): number => {
-	const t = nowMs()
-	let s = unitFadeState.get(tile)
-	if (!s) {
-		s = { current: target, target, lastMs: t }
-		unitFadeState.set(tile, s)
-		return target
-	}
-	s.target = target
-	const dt = t - s.lastMs
-	s.lastMs = t
-	if (dt > 0) {
-		s.current += (target - s.current) * (1 - Math.exp(-dt / TAU))
-		if (Math.abs(target - s.current) < 0.004) s.current = target
-	}
-	return s.current
-}
+export const observeUnitFade = (
+	tile: number,
+	target: number,
+	scope: FadeScope = defaultScope
+): number => ease(scope.units, tile, target)
 
 // True while any unit opacity is still easing toward its target.
-export const unitFadeBusy = (): boolean => {
-	for (const s of unitFadeState.values()) {
-		if (Math.abs(s.target - s.current) > 0.01) return true
-	}
-	return false
-}
+export const unitFadeBusy = (scope: FadeScope = defaultScope): boolean => busy(scope.units)
 
 // Draws the fog veil for one tile at fade level `value` (0..1). `mask` selects the
 // crumble pattern from computeFogMask(); `value` selects the dissolve frame.

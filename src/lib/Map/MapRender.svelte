@@ -36,7 +36,7 @@
 	import { splashPreviewForHover } from '$lib/Engine/aoePreview'
 	import { interactionSource, interactionState } from '$lib/Engine/Interactor/interactionState'
 	import { fogOfWarEnabled, viewerVisibility } from '$lib/Engine/fogState'
-	import { fogBusy, unitFadeBusy } from '$lib/Engine/fogRender'
+	import { fogBusy, unitFadeBusy, createFadeScope } from '$lib/Engine/fogRender'
 	import { materializeBusy, materializeSignal } from '$lib/Engine/materialize'
 	import { buildFadeBusy } from '$lib/Engine/buildFade'
 	import {
@@ -131,6 +131,12 @@
 	// runs for one frame to let the new visibility targets register through paint,
 	// then keeps going only while a fade is still in flight, and stops itself —
 	// so there's no permanent rAF loop burning cycles on a settled board.
+	// This board's own fog/unit fade state (see fogRender). Never shared with the
+	// other board on screen: the HUD rail's overview map and the gameplay board
+	// paint the same tile indices, so one shared easing store had them overwriting
+	// each other's targets every frame.
+	const fadeScope = createFadeScope()
+
 	let fogRaf = 0
 	const pumpFog = () => {
 		if (typeof requestAnimationFrame === 'undefined') return
@@ -140,8 +146,8 @@
 			render()
 			if (
 				performance.now() - start < 120 ||
-				fogBusy() ||
-				unitFadeBusy() ||
+				fogBusy(fadeScope) ||
+				unitFadeBusy(fadeScope) ||
 				materializeBusy() ||
 				buildFadeBusy()
 			) {
@@ -226,16 +232,24 @@
 	// over a stale "on" value from a prior online match. A scripted `fog:`
 	// command writes the same store afterwards, and this never re-fires to clobber
 	// it because the `fogOfWar` prop itself doesn't change mid-match.
+	//
+	// Primary boards only. A mini board is a companion to a real one, and these
+	// globals describe *the* match — a secondary board writing them just races the
+	// board that owns them.
 	$effect.pre(() => {
+		if (mini) return
 		fogOfWarEnabled.set(fogOfWar)
 	})
 
 	// Mirror the viewer's visibility snapshot into a global store so the DOM
 	// Animator (walking/attack/explosion overlays) can hide animations whose
 	// source tile is in fog. Depends on $gameState (units act) and
-	// $fogOfWarEnabled (live fog toggles) so both refresh the mask.
+	// $fogOfWarEnabled (live fog toggles) so both refresh the mask. Primary board
+	// only — the overlay belongs to the gameplay board, so letting the minimap
+	// write here published *its* viewer's reach and leaked enemy animations.
 	$effect.pre(() => {
 		$gameState
+		if (mini) return
 		viewerVisibility.set($fogOfWarEnabled ? visibilityProvider() : null)
 	})
 
@@ -533,7 +547,8 @@
 										pause,
 										visibilityProvider,
 										localTeam,
-										editor
+										editor,
+										fadeScope
 									)(() => map)}
 									afterPaint={flushDeferredOverlays}
 									{requestRedraw}

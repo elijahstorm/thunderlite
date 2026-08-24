@@ -1,7 +1,7 @@
 import { error, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { isValidSerializedAction } from '$lib/Engine/Interactor/serializedAction.js'
-import { gameStore } from '$lib/Game/store.server'
+import { gameStore, OutOfOrderEventError } from '$lib/Game/store.server'
 import { realtime } from '$lib/dontcode/server'
 import {
 	notifyAsyncResignation,
@@ -25,6 +25,17 @@ export const POST = async ({ request, params, locals }) => {
 	}
 	const action = (body as { event?: unknown })?.event
 	if (!isValidSerializedAction(action)) throw error(400, 'Invalid action payload')
+
+	// The sender's own 0-based counter for this room. It is what carries the order
+	// the PLAYER acted in — the log's `seq` only records which request won its
+	// insert race, which for two overlapping requests is a coin flip (see
+	// `appendEvent`). Optional: a client that doesn't send one keeps the old
+	// unordered, non-idempotent behaviour.
+	const rawClientSeq = (body as { clientSeq?: unknown })?.clientSeq
+	const clientSeq =
+		typeof rawClientSeq === 'number' && Number.isInteger(rawClientSeq) && rawClientSeq >= 0
+			? rawClientSeq
+			: undefined
 
 	try {
 		// Membership, whose-turn-it-is, and the room row are independent reads on
@@ -81,7 +92,12 @@ export const POST = async ({ request, params, locals }) => {
 			}
 		}
 
-		const event = await gameStore.appendEvent(session, actor, toRecord)
+		// Ordered against the SENDER, attributed to the ACTOR — they differ when a
+		// human drives a CPU seat, whose actions ride the driver's request stream.
+		const event = await gameStore.appendEvent(session, actor, toRecord, {
+			senderSession: userSession,
+			clientSeq,
+		})
 
 		let turnDeadline: number | null = isAsync ? (room?.turn_deadline ?? null) : null
 		if (!isAsync && toRecord.kind === 'surrender' && current === actor) {
@@ -153,6 +169,17 @@ export const POST = async ({ request, params, locals }) => {
 		return json({ event, turnDeadline })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
+		if (msg instanceof OutOfOrderEventError) {
+			// This request is out of step with the sender's own stream — it overtook an
+			// earlier one of theirs, or their counter is stale after a reload. Recording
+			// it would put the log in an order the player never played, which is the
+			// exact corruption that made a relayed attack unapplyable for everyone else.
+			//
+			// A plain `json` rather than `error()` so the response can carry `expected`:
+			// the client resets its counter to that and retries, which self-heals a
+			// reload without a round of guessing.
+			return json({ expected: msg.expected, received: msg.received }, { status: 409 })
+		}
 		await logToErrorDb(msg)
 		throw error(500, 'Could not record move')
 	}

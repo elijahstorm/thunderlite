@@ -1,4 +1,5 @@
 import { logToErrorDb } from '$lib/Security/serverLogs'
+import { getPlayerRatings } from '$lib/Database/getPlayerRatings'
 import type { MatchOutcome } from '$lib/progression'
 import { db } from '$lib/dontcode/server'
 
@@ -7,7 +8,7 @@ import { db } from '$lib/dontcode/server'
  * `/my/games` (and the recent-games strip on `/me`). Same shape as
  * getUserStats: the fold from raw rows into display entries is the pure
  * `composeHistory(...)` so it is unit-testable headless, and `getMatchHistory`
- * is the thin DB wrapper that fetches the four row sets in batched waves (the
+ * is the thin DB wrapper that fetches the row sets in batched waves (the
  * platform API has no joins — see queryUsersByAuth for the idiom).
  */
 
@@ -17,6 +18,7 @@ export type HistoryPlayerRow = {
 	match_id: number
 	team: number | null
 	outcome: MatchOutcome
+	elo_before: number | null
 	elo_delta: number | null
 }
 
@@ -54,6 +56,9 @@ export type MatchHistoryOpponent = {
 	username: string | null
 	displayName: string | null
 	avatarUrl: string | null
+	/** The opponent's rating TODAY, not at the time of the match — the history
+	 *  row only stores the viewer's own snapshot. Null when they're unrated. */
+	elo: number | null
 }
 
 export type MatchHistoryEntry = {
@@ -68,6 +73,10 @@ export type MatchHistoryEntry = {
 	rated: boolean
 	/** Signed ladder movement this match produced, or null when unrated. */
 	eloDelta: number | null
+	/** The viewer's rating going INTO the match, or null when unrated. */
+	eloBefore: number | null
+	/** The viewer's rating coming OUT of the match, or null when unrated. */
+	eloAfter: number | null
 	opponents: MatchHistoryOpponent[]
 	/** True when the match has a persisted action log to watch (online play). */
 	reviewable: boolean
@@ -88,7 +97,9 @@ export const composeHistory = (
 	matches: HistoryMatchRow[],
 	opponents: HistoryOpponentRow[],
 	profiles: HistoryProfileRow[],
-	maps: HistoryMapRow[]
+	maps: HistoryMapRow[],
+	/** Opponent auth → current ladder rating. Absent entries read as unrated. */
+	ratings: Map<string, number> = new Map()
 ): MatchHistoryEntry[] => {
 	const matchById = new Map(matches.map((m) => [Number(m.id), m]))
 	const profileByAuth = new Map(profiles.map((p) => [p.auth, p]))
@@ -106,6 +117,7 @@ export const composeHistory = (
 			username: profile?.username ?? null,
 			displayName: profile?.display_name ?? null,
 			avatarUrl: profile?.profile_image_url ?? null,
+			elo: ratings.get(row.user_auth) ?? null,
 		})
 		opponentsByMatch.set(Number(row.match_id), list)
 	}
@@ -125,6 +137,8 @@ export const composeHistory = (
 			mapName: match.map_id ? (mapNameById.get(match.map_id) ?? null) : null,
 			rated: !!match.rated,
 			eloDelta: row.elo_delta == null ? null : Number(row.elo_delta),
+			eloBefore: row.elo_before == null ? null : Number(row.elo_before),
+			eloAfter: row.elo_before == null ? null : Number(row.elo_before) + Number(row.elo_delta ?? 0),
 			opponents: opponentsByMatch.get(Number(row.match_id)) ?? [],
 			reviewable: match.mode === 'online' && match.session_id != null,
 		})
@@ -148,7 +162,7 @@ export const getMatchHistory = async (
 		const [mine, total] = await Promise.all([
 			db.find<HistoryPlayerRow>('match_players', {
 				where: { user_auth: auth },
-				select: ['id', 'match_id', 'team', 'outcome', 'elo_delta'],
+				select: ['id', 'match_id', 'team', 'outcome', 'elo_before', 'elo_delta'],
 				orderBy: { id: 'desc' },
 				limit,
 				offset,
@@ -173,7 +187,7 @@ export const getMatchHistory = async (
 		// Wave 3: display labels — opponent profiles and map names.
 		const opponentAuths = [...new Set(others.map((o) => o.user_auth).filter(Boolean))] as string[]
 		const mapIds = [...new Set(matches.map((m) => m.map_id).filter(Boolean))] as string[]
-		const [profiles, maps] = await Promise.all([
+		const [profiles, maps, ratings] = await Promise.all([
 			opponentAuths.length
 				? db.find<HistoryProfileRow>('profiles', {
 						where: { auth: { in: opponentAuths } },
@@ -186,9 +200,10 @@ export const getMatchHistory = async (
 						select: ['public_id', 'name'],
 					})
 				: Promise.resolve<HistoryMapRow[]>([]),
+			getPlayerRatings(opponentAuths),
 		])
 
-		return { entries: composeHistory(mine, matches, others, profiles, maps), total }
+		return { entries: composeHistory(mine, matches, others, profiles, maps, ratings), total }
 	} catch (msg) {
 		await logToErrorDb(msg)
 		return { entries: [], total: 0 }

@@ -143,6 +143,25 @@ export const POST = async ({ request, params, locals }) => {
 			outcome,
 		})
 
+		// Read the caller's own ladder movement back off the row settlement just
+		// stamped, so the game-over screen can show "1212 → 1224" instead of
+		// making them go find it on their profile. Null for anything unrated, and
+		// null too in the rare race where a non-locking writer arrives before the
+		// locking writer's settlement lands — the profile still shows it either
+		// way, so this is a bonus, not a source of truth.
+		let elo: { before: number; delta: number } | null = null
+		if (mode === 'online') {
+			const settled = await db
+				.findOne<{ elo_before: number | null; elo_delta: number | null }>('match_players', {
+					where: { match_id: matchId, user_auth: userAuth },
+					select: ['elo_before', 'elo_delta'],
+				})
+				.catch(() => null)
+			if (settled?.elo_before != null) {
+				elo = { before: Number(settled.elo_before), delta: Number(settled.elo_delta ?? 0) }
+			}
+		}
+
 		// The match is over — release this player's "current room" pointer so the
 		// finished game stops showing as their active session and they can start a
 		// new one. Only clears if it still points here (a rematch already moved it).
@@ -169,7 +188,7 @@ export const POST = async ({ request, params, locals }) => {
 			content: matchResult(outcome, opponentName),
 		})
 
-		return json({ matchId, outcome })
+		return json({ matchId, outcome, elo })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		await logToErrorDb(msg)

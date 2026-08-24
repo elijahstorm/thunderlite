@@ -8,6 +8,7 @@
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import GameChat from '$lib/Components/Socket/GameChat.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 	import { cachedImage } from '$lib/Storage/cachedImage'
 	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
@@ -369,6 +370,12 @@
 								<span class="text-foreground">{nameOf(holder)}</span>
 							{/if}
 
+							<!-- Who you're actually up against: the rating sits with the name so
+							     both sides can size the match up before it starts. -->
+							{#if holder.user}
+								<RatingBadge elo={holder.user.elo} size="xs" hideUnrated />
+							{/if}
+
 							{#if data.requiresReady && !holder.isAi}
 								<span
 									class="text-xs font-medium px-2 py-0.5 rounded-full {readyOf(holder)
@@ -439,6 +446,9 @@
 								<UserIcon user={m.user} noClick size={1.5} />
 							{/if}
 							<span class="text-foreground">{nameOf(m)}</span>
+							{#if m.user}
+								<RatingBadge elo={m.user.elo} size="xs" hideUnrated />
+							{/if}
 							{#if data.requiresReady && !m.isAi}
 								<span
 									class="text-xs font-medium px-2 py-0.5 rounded-full {readyOf(m)

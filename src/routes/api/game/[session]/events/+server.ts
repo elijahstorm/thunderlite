@@ -20,10 +20,14 @@ export const GET = async ({ url, params, locals }) => {
 		// tables and don't depend on each other, so fetch them in one barrier —
 		// this is the hot poll path. The events are discarded (never returned)
 		// if the 403 fires.
-		const [seats, page, room] = await Promise.all([
+		const [seats, page, room, clientSeq] = await Promise.all([
 			gameStore.roster(session),
 			gameStore.events(session, since),
 			gameStore.getRoom(session),
+			// Where this caller's own request stream resumes. Sent on every poll so a
+			// client that reloads mid-match seeds its relay counter from the server
+			// instead of restarting at 0 and having its first action refused.
+			gameStore.nextClientSeq(session, userSession),
 		])
 		if (seats.length === 0 || !seats.some((m) => m.userSession === userSession)) {
 			throw error(403, 'Not a member of this game session')
@@ -58,7 +62,7 @@ export const GET = async ({ url, params, locals }) => {
 			}
 		}
 
-		return json({ events, lastEventId, turnDeadline, aiTeams, isAiDriver })
+		return json({ events, lastEventId, turnDeadline, aiTeams, isAiDriver, clientSeq })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		await logToErrorDb(msg)

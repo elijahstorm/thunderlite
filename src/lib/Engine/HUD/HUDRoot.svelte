@@ -138,11 +138,15 @@
 					class="mx-auto overflow-hidden rounded-md border border-white/10 shadow-inner"
 					style="width: {map.cols * miniCell}px; height: {map.rows * miniCell}px"
 				>
+					<!-- `localTeam` is not optional here: MapRender defaults it to 0, so
+					     the overview map used to draw player 1's fog no matter who was
+					     looking at it. -->
 					<MapRender
 						mini
 						pause
 						{miniCell}
 						{fogOfWar}
+						{localTeam}
 						{map}
 						select={jumpTo}
 						backdrop="bg-black/40"

@@ -282,6 +282,13 @@ type UserDBData = {
 	following?: boolean
 	follower?: boolean
 	relationship?: RelationshipStatus
+	/**
+	 * Ladder rating from `user_stats.elo`, or null/undefined for a player with no
+	 * rated game yet. Hydrated by the profile reads (getUserDBDataFromAuth,
+	 * queryUsersByAuth, queryUsers) so any surface that already renders a user
+	 * can show their rating without its own query.
+	 */
+	elo?: number | null
 	last_message?: {
 		message: string
 		unread: boolean

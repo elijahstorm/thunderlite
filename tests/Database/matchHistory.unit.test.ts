@@ -10,9 +10,9 @@ import {
 } from '../../src/lib/Database/getMatchHistory'
 
 const mine: HistoryPlayerRow[] = [
-	{ id: 30, match_id: 3, team: 0, outcome: 'win', elo_delta: 12 },
-	{ id: 20, match_id: 2, team: 1, outcome: 'loss', elo_delta: null },
-	{ id: 10, match_id: 1, team: 0, outcome: 'draw', elo_delta: null },
+	{ id: 30, match_id: 3, team: 0, outcome: 'win', elo_before: 1212, elo_delta: 12 },
+	{ id: 20, match_id: 2, team: 1, outcome: 'loss', elo_before: null, elo_delta: null },
+	{ id: 10, match_id: 1, team: 0, outcome: 'draw', elo_before: null, elo_delta: null },
 ]
 
 const matches: HistoryMatchRow[] = [
@@ -60,6 +60,8 @@ const profiles: HistoryProfileRow[] = [
 
 const maps: HistoryMapRow[] = [{ public_id: 'delta-bay', name: 'Delta Bay' }]
 
+const ratings = new Map([['foe-1', 1301]])
+
 describe('composeHistory', () => {
 	it('returns entries in the order of the player rows (newest-first page)', () => {
 		const entries = composeHistory(mine, matches, opponents, profiles, maps)
@@ -93,6 +95,21 @@ describe('composeHistory', () => {
 		expect(entries[1].eloDelta).toBeNull()
 	})
 
+	it('resolves the rating the match left the player on, and null when unrated', () => {
+		const entries = composeHistory(mine, matches, opponents, profiles, maps)
+		expect(entries[0].eloBefore).toBe(1212)
+		expect(entries[0].eloAfter).toBe(1224)
+		expect(entries[1].eloBefore).toBeNull()
+		expect(entries[1].eloAfter).toBeNull()
+	})
+
+	it("attaches each opponent's current rating, defaulting to unrated", () => {
+		expect(
+			composeHistory(mine, matches, opponents, profiles, maps, ratings)[0].opponents[0].elo
+		).toBe(1301)
+		expect(composeHistory(mine, matches, opponents, profiles, maps)[0].opponents[0].elo).toBeNull()
+	})
+
 	it('resolves map names and leaves unknown maps null', () => {
 		const entries = composeHistory(mine, matches, opponents, profiles, maps)
 		expect(entries[0].mapName).toBe('Delta Bay')
@@ -101,7 +118,7 @@ describe('composeHistory', () => {
 
 	it('skips a player row whose match row is missing instead of rendering it broken', () => {
 		const orphan: HistoryPlayerRow[] = [
-			{ id: 99, match_id: 999, team: 0, outcome: 'win', elo_delta: null },
+			{ id: 99, match_id: 999, team: 0, outcome: 'win', elo_before: null, elo_delta: null },
 		]
 		expect(composeHistory(orphan, matches, [], [], [])).toEqual([])
 	})

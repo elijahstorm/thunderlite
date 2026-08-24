@@ -30,6 +30,7 @@ import {
 import { recordFogKill } from './cpuAi/fogMemory'
 import type { SerializedAction } from './Interactor/serializedAction'
 import { recordAction } from './devLog'
+import { reportDesync } from './desync'
 
 /**
  * Options threaded through the apply path. `applyAction` stays deterministic and
@@ -163,7 +164,13 @@ const reduceHealth = (
 // Movement is not a tracked stat; it only emits SFX.
 const applyMove = (map: MapObject | MapProcesser, from: number, to: number, fx: SfxEmit): void => {
 	const unit = map.layers.units[from]
-	if (!unit) return
+	// Nothing on the source tile. Locally that means a stale action; online it means
+	// this client's board has drifted from the sender's, so raise the alarm (see
+	// `desync.ts`) rather than dropping the move without a trace.
+	if (!unit) {
+		reportDesync({ kind: 'move', from, to }, 'missing-mover')
+		return
+	}
 	if (from === to) return
 	// Abandoning a capture: stepping off the tile heals the building back to full.
 	resetCaptureProgress(map.layers.buildings[from], unit.team)
@@ -208,7 +215,14 @@ const applyAttack = (
 ): void => {
 	const attacker = map.layers.units[from]
 	const target = map.layers.units[to]
-	if (!attacker || !target) return
+	// THE desync that ruins online matches: a relayed attack whose attacker (or
+	// target) tile is empty on this client used to vanish here in silence, leaving
+	// the two boards permanently out of step. Still unapplyable — there is no
+	// coherent state to attack from — but no longer silent.
+	if (!attacker || !target) {
+		reportDesync({ kind: 'attack', from, to }, attacker ? 'missing-target' : 'missing-attacker')
+		return
+	}
 
 	fx('attack', attacker)
 	// Firing breaks cover: a cloaked attacker is seen by everyone, who now know it
@@ -286,7 +300,10 @@ export const applyAction = (
 		}
 		case 'capture': {
 			const unit = map.layers.units[action.tile]
-			if (!unit) return
+			if (!unit) {
+				reportDesync(action, 'missing-unit')
+				return
+			}
 			stat({ kind: 'capture', team: unit.team })
 			runModifiers(unit, 'Start_Turn', {
 				kind: 'unit',
@@ -300,21 +317,30 @@ export const applyAction = (
 		}
 		case 'mine': {
 			const unit = map.layers.units[action.tile]
-			if (!unit) return
+			if (!unit) {
+				reportDesync(action, 'missing-unit')
+				return
+			}
 			mine(map, action.tile, unit.team)
 			applyWinConditions(map as MapObject)
 			return
 		}
 		case 'repair': {
 			const unit = map.layers.units[action.tile]
-			if (!unit) return
+			if (!unit) {
+				reportDesync(action, 'missing-unit')
+				return
+			}
 			repair(map, action.tile, unit.team)
 			applyWinConditions(map as MapObject)
 			return
 		}
 		case 'build': {
 			const building = map.layers.buildings[action.building]
-			if (!building) return
+			if (!building) {
+				reportDesync(action, 'missing-building')
+				return
+			}
 			const built = spawnBuiltUnit(map, action.building, action.unitType, building.team)
 			// A stealth unit rolling off the line is logged by every team that can see
 			// the factory, feeding their fuzzy memory of enemy cloak strength.
@@ -329,7 +355,10 @@ export const applyAction = (
 		}
 		case 'build-adjacent': {
 			const builder = map.layers.units[action.builder]
-			if (!builder) return
+			if (!builder) {
+				reportDesync(action, 'missing-unit')
+				return
+			}
 			const built = buildAdjacent(
 				map,
 				action.builder,

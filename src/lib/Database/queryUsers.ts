@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
+import { getPlayerRatings } from '$lib/Database/getPlayerRatings'
 import { db } from '$lib/dontcode/server'
 
 type QueryType = 'public' | 'friends' | 'following' | 'followers'
@@ -138,6 +139,12 @@ const query: (type: QueryType) => (
 			})
 
 			users = users.slice((page ?? 0) * limit, (page ?? 0) * limit + limit)
+
+			// Ladder ratings last, on the sliced page only: the candidate set can be
+			// every public profile, and only the ten rows actually rendered need a
+			// rating chip.
+			const ratings = await getPlayerRatings(users.map((user) => user.auth))
+			users = users.map((user) => ({ ...user, elo: ratings.get(user.auth) ?? null }))
 		} catch (msg) {
 			await logToErrorDb(msg)
 			throw error(500, 'Could not get users from database')

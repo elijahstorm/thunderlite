@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
+import { getPlayerRatings } from '$lib/Database/getPlayerRatings'
 import { db } from '$lib/dontcode/server'
 
 export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
@@ -16,17 +17,24 @@ export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
 			// e.g. a logged-out profile view) they're all false/0/null, so skip the
 			// four round-trips entirely rather than querying `source: ''` — same
 			// logged-out short-circuit as the batched `queryUsersByAuth`.
-			const [following, follower, messageCount, relationship] = me
-				? await Promise.all([
-						db.count('follows', { source: me, target: auth }),
-						db.count('follows', { source: auth, target: me }),
-						db.count('messages', { source: me, target: auth }),
-						db.findOne<{ status: RelationshipStatus }>('relationships', {
-							where: { source: me, target: auth },
-							select: ['status'],
-						}),
-					])
-				: [0, 0, 0, null as { status: RelationshipStatus } | null]
+			// The ladder rating is NOT viewer-relative (a rating is public and the
+			// same for everyone), so it is fetched either way.
+			type Social = [number, number, number, { status: RelationshipStatus } | null]
+			const [ratings, social] = await Promise.all([
+				getPlayerRatings([auth]),
+				me
+					? Promise.all([
+							db.count('follows', { source: me, target: auth }),
+							db.count('follows', { source: auth, target: me }),
+							db.count('messages', { source: me, target: auth }),
+							db.findOne<{ status: RelationshipStatus }>('relationships', {
+								where: { source: me, target: auth },
+								select: ['status'],
+							}),
+						])
+					: Promise.resolve<Social>([0, 0, 0, null]),
+			])
+			const [following, follower, messageCount, relationship] = social
 
 			user = {
 				...profile,
@@ -34,6 +42,7 @@ export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
 				follower: follower > 0,
 				message_count: messageCount,
 				relationship: relationship?.status ?? null,
+				elo: ratings.get(auth) ?? null,
 			} as UserDBData
 		} else {
 			user = null
@@ -65,15 +74,12 @@ export const getUserDBDataFromAuth = async (auth: string, me: string = '') => {
  * owner without a profile row is simply omitted rather than 500-ing the whole
  * listing.
  */
-export const queryUsersByAuth = async (
-	auths: string[],
-	me: string = ''
-): Promise<UserDBData[]> => {
+export const queryUsersByAuth = async (auths: string[], me: string = ''): Promise<UserDBData[]> => {
 	const uniqueAuths = [...new Set(auths)].filter(Boolean)
 	if (uniqueAuths.length === 0) return []
 
 	try {
-		const [profiles, followingRows, followerRows, messageRows, relationshipRows] =
+		const [profiles, followingRows, followerRows, messageRows, relationshipRows, ratings] =
 			await Promise.all([
 				db.find<UserDBData>('profiles', { where: { auth: { in: uniqueAuths } } }),
 				me
@@ -100,6 +106,9 @@ export const queryUsersByAuth = async (
 							select: ['target', 'status'],
 						})
 					: Promise.resolve<{ target: string; status: RelationshipStatus }[]>([]),
+				// Ratings are public, so unlike the social flags above they are
+				// fetched with or without a viewer. One `in` query for the page.
+				getPlayerRatings(uniqueAuths),
 			])
 
 		const following = new Set(followingRows.map((row) => row.target))
@@ -118,6 +127,7 @@ export const queryUsersByAuth = async (
 					follower: followers.has(profile.auth),
 					message_count: messageCounts.get(profile.auth) ?? 0,
 					relationship: relationships.get(profile.auth) ?? null,
+					elo: ratings.get(profile.auth) ?? null,
 				}) as UserDBData
 		)
 	} catch (msg) {
