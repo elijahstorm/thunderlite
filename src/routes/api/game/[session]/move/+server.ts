@@ -204,9 +204,9 @@ export const POST = async ({ request, params, locals }) => {
 		// the client backs off and re-sends the same ordinal (which the server
 		// dedupes), instead of concluding the action was lost and freezing the
 		// board over a delay that resolves itself.
-		const limit = noteRateLimit(msg)
+		const limit = noteRateLimit(msg, 'db')
 		if (limit.limited) {
-			const retryAfter = gatewayCooldownSeconds()
+			const retryAfter = Math.max(1, gatewayCooldownSeconds(limit.scope ?? 'db'))
 			await logToErrorDb(msg, 'Move relay rate limited')
 			return json(
 				{ error: 'Server is busy', rateLimited: true, retryAfter },

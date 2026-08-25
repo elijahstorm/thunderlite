@@ -21,7 +21,7 @@
  */
 import { db, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
-import { gatewayThrottled, noteRateLimit } from '$lib/Security/rateLimit'
+import { budgetPressure, noteRateLimit } from '$lib/Security/rateLimit'
 import { clampAsyncTimeout, type GameMode } from '$lib/Game/asyncConfig'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
@@ -992,6 +992,10 @@ const sanitizeLogEntry = (raw: unknown): GameLogEntry | null => {
  * intact) while collapsing a flush into a single insert. `readLog` unrolls it,
  * and the cost lands entirely on the read path, which one person walks
  * afterwards while debugging.
+ *
+ * For scale: the gateway grants the `db` namespace 600 requests a minute for the
+ * whole project. A two-player match flushing every 2.5s used to be able to spend
+ * several times that on diagnostics alone; packed, it costs under a hundred.
  */
 const LOG_ENTRIES_PER_ROW = 30
 /** Ceiling on one row's serialized payload, so a row stays a sane size. */
@@ -1042,10 +1046,15 @@ async function appendLog(
 		.map(sanitizeLogEntry)
 		.filter((e): e is GameLogEntry => e !== null)
 	if (entries.length === 0) return 0
-	// Nothing here is worth waiting out a cooldown for. The client never retries
-	// a flush, so a skipped batch is simply a gap in the trace — much cheaper
-	// than lengthening a limit that a player's next move has to get through.
-	if (gatewayThrottled()) return 0
+	// Nothing here is worth a share of a tight budget. The client never retries a
+	// flush, so a skipped batch is a gap in the trace — much cheaper than
+	// spending `db` headroom a player's next move has to get through.
+	//
+	// `budgetPressure`, not "are we already refused": the gateway reports what is
+	// left on every successful response, so diagnostics can stand down while
+	// moves are still going through, instead of both of them hitting the wall
+	// together and the move being the one that visibly breaks.
+	if (budgetPressure('db')) return 0
 
 	const rows = packEntries(entries)
 	const results = await Promise.allSettled(
@@ -1065,7 +1074,7 @@ async function appendLog(
 	// Feed any 429 into the breaker so the next flush skips the gateway entirely
 	// rather than rediscovering the limit one insert at a time.
 	for (const result of results) {
-		if (result.status === 'rejected') noteRateLimit(result.reason)
+		if (result.status === 'rejected') noteRateLimit(result.reason, 'db')
 	}
 	return results.reduce((n, r, i) => (r.status === 'fulfilled' ? n + rows[i].length : n), 0)
 }

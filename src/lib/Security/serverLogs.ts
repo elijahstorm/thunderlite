@@ -9,8 +9,8 @@
  *    drop database writes — dropping one costs a nicer query, never the trace.
  *
  * 2. Logging must never be able to amplify the failure it's reporting. The
- *    `logs` insert is a gateway call on the same account-wide rate limit as
- *    everything else, so under load the old logger did the worst possible
+ *    `logs` insert spends the `db` budget — the same one every gameplay read
+ *    and write depends on — so under load the old logger did the worst possible
  *    thing: every 429 provoked another write, which 429'd, and each error
  *    handler added a round trip to a request that had already failed. Hence a
  *    circuit breaker, per-message deduplication, a timeout, and an absolute
@@ -18,7 +18,7 @@
  */
 import { dev } from '$app/environment'
 import { db } from '$lib/dontcode/server'
-import { gatewayCooldownMs, gatewayThrottled, noteRateLimit } from './rateLimit'
+import { budgetPressure, gatewayCooldownSeconds, noteRateLimit } from './rateLimit'
 
 /** Identical messages inside this window collapse into one row with a count. */
 const DEDUPE_WINDOW_MS = 60_000
@@ -74,15 +74,20 @@ export const logToErrorDb = async (e: unknown, info?: string) => {
 	console.error(message, e)
 	if (dev) return
 
-	// A rate limit is the one error never worth a row: writing it is another
-	// call against the very limit being reported. The console line above is the
-	// whole record, and the breaker below is the useful reaction.
+	// A rate limit is the one error never worth a row: writing it spends the `db`
+	// budget to report a shortage. The console line above is the whole record.
+	//
+	// No scope hint is passed, deliberately: this error came from some other call
+	// site and we don't know what it was spending. The gateway names its own
+	// bucket in `scope`, and an unnamed one is held as unattributed rather than
+	// blamed on a budget it may have nothing to do with.
 	const limit = noteRateLimit(e)
 	if (limit.limited) return
 
-	// Already known to be throttled — the write would fail, and failing costs a
-	// round trip on a request a player may be waiting on.
-	if (gatewayThrottled()) return
+	// The `db` budget is spent, or close enough that what's left belongs to
+	// gameplay. A log row is never worth the last of a window: the console line
+	// above is already the durable record.
+	if (budgetPressure('db')) return
 
 	const at = Date.now()
 	const { write, suppressed } = shouldWrite(message, at)
@@ -100,10 +105,10 @@ export const logToErrorDb = async (e: unknown, info?: string) => {
 		// The breaker: a 429 here parks every subsequent write until the gateway
 		// says we're welcome again, which is the difference between one failed
 		// write and one per error for the next minute.
-		const failure = noteRateLimit(msg)
+		const failure = noteRateLimit(msg, 'db')
 		if (failure.limited) {
 			console.error(
-				`Error log suppressed: gateway rate limited for ${Math.ceil(gatewayCooldownMs() / 1000)}s`
+				`Error log suppressed: db budget rate limited for ${gatewayCooldownSeconds('db')}s`
 			)
 			return
 		}

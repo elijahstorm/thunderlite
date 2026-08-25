@@ -21,8 +21,8 @@ importers:
         specifier: 5.0.1
         version: 5.0.1
       dontcode:
-        specifier: 0.2.8
-        version: 0.2.8
+        specifier: 0.2.9
+        version: 0.2.9
       flowbite-svelte:
         specifier: 1.33.1
         version: 1.33.1(rollup@4.53.3)(svelte@5.56.4(@typescript-eslint/types@8.62.0))(tailwindcss@4.3.1)
@@ -1473,8 +1473,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  dontcode@0.2.8:
-    resolution: {integrity: sha512-Ohz5RSF0IDlENWZDhSSKRAasGoXHzHS8chundMdfbt/g2q0b/Re3JDwITYoAIPX9lOcfsinY/sK0eC2/ZAqpOQ==}
+  dontcode@0.2.9:
+    resolution: {integrity: sha512-e50uY44EWG92TsKvFMDC/1eRBdlr7Qxi0XVJo/rsomx2XLzjyWnK6yg11E4QYTOR2nyQQBpTJrniLod7CW8pyw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1575,6 +1575,7 @@ packages:
   eslint@9.39.1:
     resolution: {integrity: sha512-BhHmn2yNOFA9H9JmmIVKJmd288g9hrVRDkdoIgRCRuSySRUHH7r/DI6aAXW9T1WwUuY3DFgrcaqB+deURBLR5g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -3883,7 +3884,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  dontcode@0.2.8:
+  dontcode@0.2.9:
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
       zod: 3.25.76

@@ -5,18 +5,19 @@ import { SERVICE_BUSY_HEADER } from '$lib/Security/serviceBusy'
 /**
  * What the client knows about the backend being rate limited.
  *
- * The DontCode gateway enforces one account-wide rate limit, so when it trips,
- * it trips for everything at once — presence, chat, diagnostics, moves. From
- * the player's side that looks like the whole app going vague, and the worst
- * possible response is an indefinite spinner: it reads as broken with no end in
- * sight. The gateway actually tells us how long the wait is, so we can say so.
+ * The backend meters each of its service namespaces on its own budget, so being
+ * throttled is rarely an all-or-nothing thing. The server decides which of those
+ * a player could actually notice and stamps the worst one onto every response as
+ * `x-service-busy: <seconds>` (see hooks.server.ts). This side only has to
+ * render it — the scope stays a server concern, because "which internal budget"
+ * is not a thing to put in front of someone trying to finish a turn.
  *
- * The server stamps every response with `x-service-busy: <seconds>` while it
- * knows it's in a cooldown (see hooks.server.ts), which means ANY request the
- * page was already making carries the news. There's nothing to poll and nothing
- * to wire per feature — a single wrapper around `fetch` keeps this current for
- * the whole app, and the state clears itself when responses stop carrying the
- * header.
+ * What matters here is the number. An indefinite spinner reads as broken with no
+ * end in sight; a countdown reads as scheduled, and people wait for it instead
+ * of reloading and adding to the load that caused it.
+ *
+ * Because ANY request carries the header, there's nothing to poll and nothing to
+ * wire per feature: one wrapper around `fetch` keeps this current app-wide.
  */
 
 /** Epoch ms the backend should be usable again; 0 when we believe it's fine. */

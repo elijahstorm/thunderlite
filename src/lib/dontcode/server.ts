@@ -24,6 +24,7 @@
  *   DONTCODE_API_KEY  — this project's API key (dc_…)
  */
 import { env } from '$env/dynamic/private'
+import { noteRateLimitStatus } from '$lib/Security/rateLimit'
 import {
 	dontcode,
 	isDontCodeError,
@@ -56,7 +57,15 @@ function client(): DontCodeClient {
 	if (!baseUrl) throw new Error('DONTCODE_API_URL is not set')
 	const apiKey = env.DONTCODE_API_KEY
 	if (!apiKey) throw new Error('DONTCODE_API_KEY is not set')
-	_client = dontcode({ baseUrl: baseUrl.replace(/\/$/, ''), apiKey })
+	_client = dontcode({
+		baseUrl: baseUrl.replace(/\/$/, ''),
+		apiKey,
+		// Every counted response — successes included — reports what is left of
+		// that namespace's budget. Feeding it straight into the app's budget
+		// tracker is what lets optional work ease off before it gets refused,
+		// rather than discovering the ceiling by hitting it. See rateLimit.ts.
+		onRateLimit: (status) => noteRateLimitStatus(status),
+	})
 	return _client
 }
 

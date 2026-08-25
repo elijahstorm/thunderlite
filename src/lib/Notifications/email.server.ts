@@ -12,6 +12,7 @@
  * every trigger is safe to exercise locally.
  */
 import { db, notifications } from '$lib/dontcode/server'
+import { budgetPressure, noteRateLimit } from '$lib/Security/rateLimit'
 import { logToErrorDb } from '$lib/Security/serverLogs'
 import type { EmailContent } from './templates'
 
@@ -126,6 +127,15 @@ export interface NotifyInput {
  */
 export async function notify(input: NotifyInput): Promise<void> {
 	try {
+		// `notifications` is the tightest budget the gateway grants — 60/min for
+		// the whole project, against the database's 600 — and the hourly async
+		// sweep can want two emails per expired room. Once it's spent, every
+		// further send fails anyway; the only question is whether we pay a round
+		// trip (plus the preference and recipient reads in front of it) to find
+		// that out again. Skipping costs the same lost email for a fraction of the
+		// traffic, and leaves the dedup key unclaimed so a later sweep can retry.
+		if (budgetPressure('notifications')) return
+
 		if (!(await allows(input.userAuth, input.category))) return
 
 		const to = input.email ?? (await recipientEmail(input.userAuth))
@@ -162,6 +172,9 @@ export async function notify(input: NotifyInput): Promise<void> {
 			}
 			error = res.error ?? 'unknown'
 		} catch (err) {
+			// Teach the breaker which budget this was, so the rest of a sweep skips
+			// the gateway instead of rediscovering the limit one email at a time.
+			noteRateLimit(err, 'notifications')
 			error = err instanceof Error ? err.message : `${err}`
 		}
 

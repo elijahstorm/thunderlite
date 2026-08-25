@@ -3,7 +3,7 @@ import { building } from '$app/environment'
 import { env } from '$env/dynamic/private'
 import { auth } from '$lib/dontcode/server'
 import { resolveCachedUser } from '$lib/dontcode/sessionCache'
-import { gatewayCooldownSeconds } from '$lib/Security/rateLimit'
+import { playerFacingCooldownSeconds } from '$lib/Security/rateLimit'
 import { SERVICE_BUSY_HEADER } from '$lib/Security/serviceBusy'
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -54,11 +54,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const response = await resolve(event)
 
-	// Tell the client what we know about the gateway's rate limit. Any request
+	// Tell the client what we know about the gateway's rate limits. Any request
 	// carries the news, so the countdown in the UI starts from whatever the page
 	// happened to be doing rather than needing a poll of its own — and it stops
 	// on its own when responses come back without the header.
-	const busyFor = gatewayCooldownSeconds()
+	//
+	// Only budgets a player could notice are announced (see PLAYER_FACING): the
+	// gateway meters each namespace separately, and a full email queue is not a
+	// reason to tell someone mid-match that the servers are busy.
+	const busyFor = playerFacingCooldownSeconds()
 	if (busyFor > 0) response.headers.set(SERVICE_BUSY_HEADER, `${busyFor}`)
 
 	return response

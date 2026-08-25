@@ -42,10 +42,11 @@
 	 */
 	let degraded = $state(false)
 
-	// Presence is the app's most disposable feature and its most frequent caller:
-	// every open client polls it, and it shares one rate limit with the moves
-	// people are actually waiting on. So when the backend reports a cooldown, the
-	// poll steps aside entirely — a stale friends list costs nobody a match.
+	// Presence is the app's most disposable feature and one of its most frequent
+	// callers: every open client polls it, and hydrating the result into profiles
+	// spends the same database budget as the moves people are waiting on. So when
+	// the backend reports a cooldown the poll steps aside entirely — a stale
+	// friends list costs nobody a match.
 	const refreshOnline = () => {
 		if (isServiceBusy()) {
 			degraded = true

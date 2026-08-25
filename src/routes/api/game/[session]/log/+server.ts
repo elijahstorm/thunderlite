@@ -55,7 +55,7 @@ export const POST = async ({ request, params, locals }) => {
 		// path was re-thrown and rendered as a 500. A logging endpoint answering
 		// 500 is precisely the outcome the rest of this file exists to prevent.
 		if (isHttpError(msg)) throw msg
-		noteRateLimit(msg)
+		noteRateLimit(msg, 'db')
 		// Swallowed on purpose: see the note above. Logging is never load-bearing.
 		return json({ stored: 0 })
 	}

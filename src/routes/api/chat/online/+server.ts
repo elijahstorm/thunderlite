@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit'
 import { realtime } from '$lib/dontcode/server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
-import { gatewayCooldownSeconds, noteRateLimit } from '$lib/Security/rateLimit'
+import { budgetPressure, gatewayCooldownSeconds, noteRateLimit } from '$lib/Security/rateLimit'
 
 /**
  * Who is signed in right now. Every client subscribes to `chat:global` purely
@@ -16,6 +16,12 @@ import { gatewayCooldownSeconds, noteRateLimit } from '$lib/Security/rateLimit'
 export const GET = async ({ locals }) => {
 	const me = locals.user
 	if (!me) return json({ users: [] })
+
+	// Presence costs the `realtime` budget; turning those ids into profiles costs
+	// the `db` budget that live matches run on. Every open client polls this every
+	// 12 seconds, so under database pressure the hydration is the first thing that
+	// should go — a stale friends list costs nobody a match.
+	if (budgetPressure('db')) return json({ users: [], degraded: true, retryAfter: 0 })
 
 	try {
 		const present = await realtime.presence('chat:global')
@@ -35,10 +41,16 @@ export const GET = async ({ locals }) => {
 		// so logging it wrote a row per client per 12s for a condition the comment
 		// above calls normal. The response tells the client how long to back off
 		// instead, which is the part anybody can act on.
-		const limit = noteRateLimit(msg)
+		// `realtime` is the budget this endpoint spends first (presence), and it is
+		// the roomiest one the gateway grants — 1200/min against the db's 600. A
+		// limit here is far more likely to have come from the `queryUsersByAuth`
+		// hydration behind it, so let the error name its own scope and fall back to
+		// realtime only when it doesn't.
+		const limit = noteRateLimit(msg, 'realtime')
+		const retryAfter = limit.scope ? gatewayCooldownSeconds(limit.scope) : 0
 		return json(
-			{ users: [], degraded: true, retryAfter: gatewayCooldownSeconds() },
-			limit.limited ? { headers: { 'retry-after': `${gatewayCooldownSeconds()}` } } : {}
+			{ users: [], degraded: true, retryAfter },
+			limit.limited && retryAfter > 0 ? { headers: { 'retry-after': `${retryAfter}` } } : {}
 		)
 	}
 }
