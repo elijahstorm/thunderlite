@@ -6,7 +6,7 @@
 	import PlayerList from './PlayerList.svelte'
 	import EndTurnButton from './EndTurnButton.svelte'
 	import TileInfoPanel from './TileInfoPanel.svelte'
-	import { setHudGutter, clearHudGutter } from './hudInsets'
+	import { setHudGutter, setHudRailWidth, clearHudGutter } from './hudInsets'
 	import { panBoardToTile } from '../Animator/animator'
 
 	interface Props {
@@ -59,6 +59,9 @@
 	// the rail from swallowing clicks meant for the tiles beneath it.
 	$effect(() => {
 		setHudGutter(overlaying ? COLLAPSED_PX : railWidth)
+		// Overlays reserve less than they paint, so publish the drawn width too:
+		// the chat docks anchor off this to stay beside the rail, never under it.
+		setHudRailWidth(railWidth)
 	})
 	onDestroy(clearHudGutter)
 

@@ -16,13 +16,47 @@ const MAX_MAPS_PER_USER = 30
 const ID_RETRIES = 5
 
 /** Decode a `data:<type>;base64,<data>` URL into bytes for storage upload. */
-const parseDataUrl = (dataUrl: string): { contentType: string; bytes: Uint8Array } | null => {
+const parseDataUrl = (
+	dataUrl: string
+	// Uint8Array<ArrayBuffer> (not the wider ArrayBufferLike default) so the bytes
+	// satisfy BufferSource for crypto.subtle.digest without a copy or a cast.
+): { contentType: string; bytes: Uint8Array<ArrayBuffer> } | null => {
 	const match = /^data:([^;,]+);base64,(.*)$/s.exec(dataUrl)
 	if (!match) return null
 	return { contentType: match[1], bytes: new Uint8Array(Buffer.from(match[2], 'base64')) }
 }
 
 const isConflict = (err: unknown) => isDontCodeError(err) && err.status === 409
+
+/**
+ * Short content fingerprint for a thumbnail's bytes.
+ *
+ * A map's preview is re-uploaded to one stable storage key (`maps/<public_id>.png`)
+ * so each map keeps a single object, but /api/img serves those bytes as
+ * `immutable` — a re-save would otherwise leave every viewer (and the CDN)
+ * pinned to the previous snapshot forever. Stamping the stored URL with a hash
+ * of the bytes gives each distinct preview its own URL, while a save that didn't
+ * change how the board looks reuses the URL it already had.
+ */
+const thumbnailVersion = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
+	const digest = await crypto.subtle.digest('SHA-256', bytes)
+	return Array.from(new Uint8Array(digest, 0, 8))
+		.map((byte) => byte.toString(16).padStart(2, '0'))
+		.join('')
+}
+
+/** Stamp `?v=` onto the public storage URL, leaving any existing query intact. */
+const versioned = (url: string, version: string): string => {
+	try {
+		const parsed = new URL(url)
+		parsed.searchParams.set('v', version)
+		return parsed.href
+	} catch {
+		// Not an absolute URL (mock gateway shapes) — better an unversioned URL
+		// than a broken one.
+		return url
+	}
+}
 
 /**
  * Publish or update a user's map.
@@ -59,6 +93,7 @@ export const POST = async ({ request, locals }) => {
 	}
 
 	const mapName = typeof name === 'string' && name.trim() ? name.trim() : 'Untitled map'
+	const version = await thumbnailVersion(parsedThumbnail.bytes)
 
 	// ── Update in place ──────────────────────────────────────────────────────
 	// Re-saving an existing map the caller owns updates the row and keeps its link.
@@ -100,7 +135,7 @@ export const POST = async ({ request, locals }) => {
 				{
 					name: mapName,
 					map_data: encoded,
-					thumbnail: thumbnailUrl,
+					thumbnail: versioned(thumbnailUrl, version),
 					updated_at: new Date().toISOString(),
 				}
 			)
@@ -135,7 +170,7 @@ export const POST = async ({ request, locals }) => {
 				owner_auth: owner,
 				name: mapName,
 				description: '',
-				thumbnail: thumbnailUrl,
+				thumbnail: versioned(thumbnailUrl, version),
 				map_data: encoded,
 				status: 'public',
 			})

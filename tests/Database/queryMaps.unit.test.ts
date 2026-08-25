@@ -75,16 +75,18 @@ function seedTwoOwnerFeed() {
 		{ id: 1, auth: 'ownerA', username: 'a', display_name: 'A', profile_image_url: '', bio: '' },
 		{ id: 2, auth: 'ownerB', username: 'b', display_name: 'B', profile_image_url: '', bio: '' },
 	]
-	// Viewer 'me-auth' follows ownerA, is followed by ownerB, messaged ownerA twice.
-	h.tableData.follows = [
-		{ source: 'me-auth', target: 'ownerA' },
-		{ source: 'ownerB', target: 'me-auth' },
-	]
+	// Viewer 'me-auth' is friends with ownerA and messaged them twice; ownerB has
+	// blocked the viewer. The block deliberately sits on ownerB's own row, since
+	// that is the only place a block ever lives and the reverse-direction read is
+	// the whole reason `blocked` needs a second query.
 	h.tableData.messages = [
 		{ source: 'me-auth', target: 'ownerA' },
 		{ source: 'me-auth', target: 'ownerA' },
 	]
-	h.tableData.relationships = [{ source: 'me-auth', target: 'ownerA', status: 'friends' }]
+	h.tableData.relationships = [
+		{ source: 'me-auth', target: 'ownerA', status: 'friends' },
+		{ source: 'ownerB', target: 'me-auth', status: 'blocked' },
+	]
 }
 
 beforeEach(() => {
@@ -136,32 +138,36 @@ describe('queryMaps owner batching (N+1 removal)', () => {
 	it('skips ALL social lookups when logged out (me === "")', async () => {
 		const { users } = await queryMaps({}, '')
 
-		expect(callsTo('follows')).toHaveLength(0)
 		expect(callsTo('messages')).toHaveLength(0)
 		expect(callsTo('relationships')).toHaveLength(0)
 
 		// Derived flags default to false/0/null with no viewer.
 		const a = users.find((u) => u.auth === 'ownerA')!
-		expect(a.following).toBe(false)
-		expect(a.follower).toBe(false)
 		expect(a.relationship).toBeNull()
+		expect(a.blocked).toBe(false)
 	})
 
 	it('batches social lookups (one call each) when logged in', async () => {
 		const { users } = await queryMaps({}, 'me-auth')
 
-		// One batched call per relation, not one-per-owner.
-		expect(callsTo('follows')).toHaveLength(2) // following + follower directions
+		// One batched call per relation, not one-per-owner. Two on relationships:
+		// the viewer's own rows, plus the reverse direction filtered to blocks.
 		expect(callsTo('messages')).toHaveLength(1)
-		expect(callsTo('relationships')).toHaveLength(1)
+		expect(callsTo('relationships')).toHaveLength(2)
 
 		const a = users.find((u) => u.auth === 'ownerA')!
-		expect(a.following).toBe(true) // me follows ownerA
 		expect(a.relationship).toBe('friends')
+		expect(a.blocked).toBe(false)
+	})
 
+	it('marks a viewer blocked by an owner, where the block is on the OTHER row', async () => {
+		const { users } = await queryMaps({}, 'me-auth')
+
+		// Nothing on the viewer's own row says anything about ownerB, so a reader
+		// that only looked at `relationship` would call this pair unblocked.
 		const b = users.find((u) => u.auth === 'ownerB')!
-		expect(b.follower).toBe(true) // ownerB follows me
-		expect(b.following).toBe(false)
+		expect(b.relationship).toBeNull()
+		expect(b.blocked).toBe(true)
 	})
 })
 

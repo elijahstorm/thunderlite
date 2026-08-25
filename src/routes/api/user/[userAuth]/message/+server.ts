@@ -3,6 +3,7 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db, realtime } from '$lib/dontcode/server'
 import { notify, profileName, rememberEmail } from '$lib/Notifications/email.server'
 import { newMessage } from '$lib/Notifications/templates'
+import { getBlockState } from '$lib/Database/Relationships/blocking'
 
 export const POST = async ({ params, request, locals }) => {
 	const message = (await request.formData()).get('chat-input')?.toString()
@@ -12,6 +13,14 @@ export const POST = async ({ params, request, locals }) => {
 	const target = userAuth
 	if (!source) return json({ status: 'not logged in' })
 	if (source === target) return json({ status: 'same' })
+
+	// A block kills the conversation in both directions, and this is the gate
+	// that makes it real: the insert, the realtime push and the email all hang
+	// off it. The reply is the same either way — naming which side blocked whom
+	// would hand the blocked player the one fact a block exists to withhold.
+	const { blocked } = await getBlockState(source, target)
+	if (blocked) return json({ status: 'blocked' })
+
 	let status = 'unknown'
 
 	try {
@@ -43,7 +52,7 @@ export const POST = async ({ params, request, locals }) => {
 		userAuth: target,
 		category: 'social',
 		dedupKey: `dm:${source}:${target}:${hourBucket}`,
-		content: newMessage(await profileName(source), preview),
+		content: newMessage(await profileName(source), preview, source),
 	})
 
 	return json({ status })

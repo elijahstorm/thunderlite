@@ -7,8 +7,10 @@
 	import { openDmWith } from '$lib/Stores/openDm'
 	// Width the in-game HUD rail is currently occupying (0 outside a match). The
 	// chat dock lives in the same bottom-right corner the rail owns, so it slides
-	// clear of it rather than parking a white slab over the turn controls.
-	import { hudGutter } from '$lib/Engine/HUD/hudInsets'
+	// clear of it rather than parking a white slab over the turn controls. We take
+	// the painted width when it is wider than the reserved gutter — a rail that
+	// overlays the board on a narrow viewport reserves only its collapsed width.
+	import { hudGutter, hudRailWidth } from '$lib/Engine/HUD/hudInsets'
 	import { onDestroy } from 'svelte'
 	import { writable } from 'svelte/store'
 	interface Props {
@@ -16,6 +18,8 @@
 	}
 
 	let { children }: Props = $props()
+
+	let railInset = $derived(Math.max($hudGutter, $hudRailWidth))
 
 	let auth = $state(writable<string | null>(null))
 
@@ -53,7 +57,7 @@
 	{#snippet children({ socketMessages })}
 		<section
 			class="fixed sm:block right-4 mr-[var(--hud-gutter)] z-50 rounded-t-xl overflow-clip transition-all border border-border border-b-0 bg-surface shadow-lg"
-			style="--hud-gutter: {$hudGutter}px"
+			style="--hud-gutter: {railInset}px"
 			class:-bottom-96={!showChatList}
 			class:bottom-0={showChatList}
 			class:hidden={showChat}
@@ -69,7 +73,7 @@
 		{#if chattingWith && $auth}
 			<section
 				class="fixed sm:right-96 sm:mr-[var(--hud-gutter)] z-50 translate-y-1 w-full max-w-full sm:max-w-[440px] sm:w-[440px] rounded-t-xl overflow-clip transition-all border border-border border-b-0 bg-surface shadow-lg"
-				style="--hud-gutter: {$hudGutter}px"
+				style="--hud-gutter: {railInset}px"
 				class:hidden={!showChat}
 				class:sm:block={!showChat}
 				class:sm:-bottom-96={!showChat}

@@ -279,9 +279,13 @@ type UserDBData = {
 	display_name: string
 	profile_image_url: string
 	bio: string
-	following?: boolean
-	follower?: boolean
 	relationship?: RelationshipStatus
+	/**
+	 * True when this pair is blocked in EITHER direction, from the viewer's side.
+	 * Collapsed on purpose: surfaces gate on "this conversation is closed", and
+	 * telling the client who blocked whom would leak the one fact a block hides.
+	 */
+	blocked?: boolean
 	/**
 	 * Ladder rating from `user_stats.elo`, or null/undefined for a player with no
 	 * rated game yet. Hydrated by the profile reads (getUserDBDataFromAuth,

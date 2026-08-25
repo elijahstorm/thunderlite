@@ -17,6 +17,8 @@ export type RelationshipOutcome =
 	| 'auto-accepted'
 	/** The target has blocked the source; the write was refused. */
 	| 'blocked-by-target'
+	/** The source has blocked the target; the write was refused. */
+	| 'blocked-target'
 	| 'not-logged-in'
 	| 'self'
 
@@ -60,6 +62,12 @@ export const setRelationship = async (params: {
 		// one either (it would leave a permanently pending row and email them).
 		if (theirs === 'blocked') {
 			return { status: mine ?? 'unknown', outcome: 'blocked-by-target' }
+		}
+
+		// You blocked them. Befriending would silently lift the block, so make it
+		// an explicit two-step: unblock first, then ask.
+		if (mine === 'blocked') {
+			return { status: 'blocked', outcome: 'blocked-target' }
 		}
 
 		// Asking to be friends with someone who already asked you IS the accept:

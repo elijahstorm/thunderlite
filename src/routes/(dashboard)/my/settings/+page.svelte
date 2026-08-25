@@ -27,7 +27,7 @@
 		{
 			key: 'social',
 			label: 'Social',
-			description: 'Friend requests, new followers, and direct messages.',
+			description: 'Friend requests and direct messages.',
 		},
 		{ key: 'game', label: 'Game', description: 'Match results and game updates.' },
 	]

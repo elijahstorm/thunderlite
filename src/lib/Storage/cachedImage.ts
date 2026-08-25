@@ -7,9 +7,10 @@
  *
  * {@link cachedImage} rewrites those URLs to point at our own /api/img proxy,
  * which fetches the bytes once (following the redirect) and re-serves them with
- * long-lived cache headers against a STABLE path. The upload key is unique per
- * file, so a given proxied URL is effectively immutable and safe to cache hard;
- * changing an avatar produces a new key and therefore a new URL.
+ * long-lived cache headers against a STABLE path. That is only safe because a
+ * given proxied URL is effectively immutable: avatars mint a new upload key per
+ * file, and map thumbnails (which reuse one key per map) carry a `?v=<hash of
+ * the bytes>` stamped on by /api/upload. Either way, new bytes mean a new URL.
  *
  * Anything not on the public storage origin (data URIs, other hosts, relative
  * paths, local mock-gateway URLs) is returned untouched, so this is a no-op
@@ -24,7 +25,9 @@ export function cachedImage<T extends string | null | undefined>(src: T): T | st
 		if (`${url.protocol}//${url.host}` !== PUBLIC_STORAGE_ORIGIN) return src
 		// Reconstructed 1:1 by the proxy against PUBLIC_STORAGE_ORIGIN, so only the
 		// object path (never a caller-controlled host) is ever fetched server-side.
-		return `/api/img/${url.pathname.replace(/^\/+/, '')}`
+		// The query string rides along so a re-uploaded map thumbnail's `?v=` lands
+		// on a fresh cache entry; the proxy drops it before fetching upstream.
+		return `/api/img/${url.pathname.replace(/^\/+/, '')}${url.search}`
 	} catch {
 		// Relative path or otherwise not an absolute URL — leave it alone.
 		return src

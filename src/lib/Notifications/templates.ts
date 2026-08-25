@@ -5,7 +5,15 @@
  * notifications gateway accepts. Each builder returns `{ subject, markdownText }`
  * ready to hand to the notifier. Keep the copy plain and warm; no em dashes in
  * anything a user reads (house style), and no HTML.
+ *
+ * Every email carries a link straight to the thing it is about (the friends
+ * list holding the request, the room whose turn is yours, the replay of the
+ * match that just ended), because the alternative is making the reader go find
+ * it. That is why builders take ids and not just display names.
+ *
+ * Server-only: the links need the deployment's public origin.
  */
+import { env } from '$env/dynamic/private'
 
 export interface EmailContent {
 	subject: string
@@ -14,7 +22,40 @@ export interface EmailContent {
 
 const signoff = '\n\nSee you on the battlefield,\nThe ThunderLite team'
 
-const prefsFooter = '\n\n---\n\nYou can change which emails you get from Settings in ThunderLite.'
+/**
+ * Absolute base for links in an email body. Mail clients render outside the app,
+ * so a root-relative href would resolve against the client's own domain and
+ * dead-end; `SITE_URL` lets a preview deploy point its emails at itself instead
+ * of production.
+ */
+const siteUrl = (env.SITE_URL || 'https://thunderlite.vercel.app').replace(/\/$/, '')
+
+/** Absolute in-app URL for a root-relative path. */
+const link = (path: string): string => `${siteUrl}${path}`
+
+/** Public profile of another player. Auth ids are opaque, so escape them. */
+const profileUrl = (userAuth: string): string => link(`/users/${encodeURIComponent(userAuth)}`)
+
+/** The one-to-one conversation with another player. */
+const chatUrl = (userAuth: string): string => link(`/chat/${encodeURIComponent(userAuth)}`)
+
+/**
+ * A room, live or async. The lobby forwards into `/play` once the match has
+ * started, so this one link works for "come ready up" and "it is your move"
+ * alike, and keeps working after the game ends (the final board).
+ */
+const roomUrl = (session: string): string => link(`/rooms/${encodeURIComponent(session)}`)
+
+/** The replay/result page for a recorded match. */
+const replayUrl = (matchId: number | string): string =>
+	link(`/replays/${encodeURIComponent(String(matchId))}`)
+
+const friendsUrl = link('/my/friends')
+const gamesUrl = link('/my/games')
+const roomsUrl = link('/rooms')
+const proUrl = link('/my/pro')
+
+const prefsFooter = `\n\n---\n\nYou can change which emails you get from [Settings](${siteUrl}/my/settings) in ThunderLite.`
 
 const formatDate = (iso: string | null): string =>
 	iso
@@ -29,7 +70,7 @@ export const proActivated = (planLabel: string, periodEnd: string | null): Email
 
 Thank you for backing **ThunderLite** (${planLabel} support). The game is built by one person, and recurring support is what keeps the servers running and new content coming. It means a lot.
 
-Your support renews on **${formatDate(periodEnd)}**. You can manage or cancel any time from Settings.${signoff}${prefsFooter}`,
+Your support renews on **${formatDate(periodEnd)}**. You can [manage or cancel it any time](${proUrl}).${signoff}${prefsFooter}`,
 })
 
 export const proCanceled = (periodEnd: string | null): EmailContent => ({
@@ -40,7 +81,7 @@ Your recurring support will not renew after **${formatDate(
 		periodEnd
 	)}**. Nothing about your account changes: ThunderLite has no paywalled content, so everything stays exactly as it is.
 
-Thank you for having supported the project. If you change your mind, you can resume any time from Settings.${signoff}${prefsFooter}`,
+Thank you for having supported the project. If you change your mind, you can [resume any time](${proUrl}).${signoff}${prefsFooter}`,
 })
 
 export const proResumed = (periodEnd: string | null): EmailContent => ({
@@ -49,7 +90,9 @@ export const proResumed = (periodEnd: string | null): EmailContent => ({
 
 Good to have you back. Your recurring support is active again and will renew on **${formatDate(
 		periodEnd
-	)}**. Thank you for keeping the project going.${signoff}${prefsFooter}`,
+	)}**. Thank you for keeping the project going.
+
+[View your supporter status](${proUrl})${signoff}${prefsFooter}`,
 })
 
 export const donationThanks = (amountLabel: string): EmailContent => ({
@@ -58,48 +101,46 @@ export const donationThanks = (amountLabel: string): EmailContent => ({
 
 Your **${amountLabel}** donation to ThunderLite went through. The game is a one-person project with no paywalled content, so donations like yours are what keep the servers running and new maps, units, and campaign chapters coming.
 
-Genuinely: thank you.${signoff}${prefsFooter}`,
+Genuinely: thank you.
+
+[View your supporter page](${proUrl})${signoff}${prefsFooter}`,
 })
 
 // ── Social / inbox ───────────────────────────────────────────────────────────
 
-export const friendRequest = (fromName: string): EmailContent => ({
+export const friendRequest = (fromName: string, fromAuth: string): EmailContent => ({
 	subject: `${fromName} sent you a friend request`,
 	markdownText: `# New friend request
 
-**${fromName}** wants to be friends on ThunderLite.
+**[${fromName}](${profileUrl(fromAuth)})** wants to be friends on ThunderLite.
 
-Open your friends list in ThunderLite to accept or ignore the request.${prefsFooter}`,
+[Accept or ignore the request](${friendsUrl})${prefsFooter}`,
 })
 
-export const friendAccepted = (fromName: string): EmailContent => ({
+export const friendAccepted = (fromName: string, fromAuth: string): EmailContent => ({
 	subject: `${fromName} accepted your friend request`,
 	markdownText: `# You are friends now
 
-**${fromName}** accepted your friend request on ThunderLite. You will find each other in your friends list, and you can start a game or send a message any time.${prefsFooter}`,
+**[${fromName}](${profileUrl(fromAuth)})** accepted your friend request on ThunderLite. You will find each other in your friends list, and you can start a game or send a message any time.
+
+[Send them a message](${chatUrl(fromAuth)}) or [open your friends list](${friendsUrl})${prefsFooter}`,
 })
 
-export const newFollower = (fromName: string): EmailContent => ({
-	subject: `${fromName} started following you`,
-	markdownText: `# You have a new follower
-
-**${fromName}** is now following you on ThunderLite.${prefsFooter}`,
-})
-
-export const newMessage = (fromName: string, preview: string): EmailContent => ({
+export const newMessage = (fromName: string, preview: string, fromAuth: string): EmailContent => ({
 	subject: `New message from ${fromName}`,
 	markdownText: `# ${fromName} sent you a message
 
 > ${preview}
 
-Open ThunderLite to read it and reply.${prefsFooter}`,
+[Open the conversation](${chatUrl(fromAuth)}) to read it and reply.${prefsFooter}`,
 })
 
 // ── Game events ───────────────────────────────────────────────────────────────
 
 export const matchResult = (
 	outcome: 'win' | 'loss' | 'draw',
-	opponentName: string | null
+	opponentName: string | null,
+	matchId: number | string
 ): EmailContent => {
 	const vs = opponentName ? ` against ${opponentName}` : ''
 	const headline =
@@ -114,20 +155,28 @@ export const matchResult = (
 		subject: `Match result: ${headline}`,
 		markdownText: `# ${headline}
 
-${line}${prefsFooter}`,
+${line}
+
+[See the full result](${replayUrl(matchId)}) or [browse your match history](${gamesUrl})${prefsFooter}`,
 	}
 }
 
 // ── Async (correspondence) games ─────────────────────────────────────────────
 
 /** It is your turn in an async match; `timeLabel` is the per-turn clock, e.g. '3 days'. */
-export const asyncYourTurn = (opponentName: string | null, timeLabel: string): EmailContent => ({
+export const asyncYourTurn = (
+	opponentName: string | null,
+	timeLabel: string,
+	session: string
+): EmailContent => ({
 	subject: 'Your move in your async ThunderLite match',
 	markdownText: `# Your move
 
 ${opponentName ? `**${opponentName}** finished their turn. ` : ''}It is your turn in your async ThunderLite match.
 
-You have **${timeLabel}** to finish your turn. If the clock runs out, the match is resigned automatically.${signoff}${prefsFooter}`,
+You have **${timeLabel}** to finish your turn. If the clock runs out, the match is resigned automatically.
+
+[Take your turn](${roomUrl(session)})${signoff}${prefsFooter}`,
 })
 
 /** Sent to the player whose turn clock ran out. */
@@ -140,25 +189,31 @@ export const asyncAutoResigned = (
 
 Your turn clock of **${timeLabel}** ran out, so your async ThunderLite match${opponentName ? ` against **${opponentName}**` : ''} was resigned automatically.
 
-Up for another? Start a fresh game any time.${signoff}${prefsFooter}`,
+Up for another? [Start a fresh game](${roomsUrl}) any time, or [look back at your match history](${gamesUrl}).${signoff}${prefsFooter}`,
 })
 
 /** Sent to the opponent when a player resigned an async match by hand. */
-export const asyncOpponentResigned = (opponentName: string | null): EmailContent => ({
+export const asyncOpponentResigned = (
+	opponentName: string | null,
+	session: string
+): EmailContent => ({
 	subject: 'Your opponent resigned your async match',
 	markdownText: `# Victory by resignation
 
 ${opponentName ? `**${opponentName}**` : 'Your opponent'} resigned your async ThunderLite match, so the win is yours.
 
-Jump back in to see the final board or start a rematch.${signoff}${prefsFooter}`,
+[See the final board](${roomUrl(session)}) or [start a rematch](${roomsUrl}).${signoff}${prefsFooter}`,
 })
 
 /** Sent to the opponent when the current player's clock ran out. */
-export const asyncOpponentTimedOut = (opponentName: string | null): EmailContent => ({
+export const asyncOpponentTimedOut = (
+	opponentName: string | null,
+	session: string
+): EmailContent => ({
 	subject: 'You won your async match on time',
 	markdownText: `# Victory on time
 
 ${opponentName ? `**${opponentName}**` : 'Your opponent'} ran out of time in your async ThunderLite match, so the win is yours.
 
-Jump back in to see the final board or start a rematch.${signoff}${prefsFooter}`,
+[See the final board](${roomUrl(session)}) or [start a rematch](${roomsUrl}).${signoff}${prefsFooter}`,
 })

@@ -209,7 +209,7 @@ export const POST = async ({ request, params, locals }) => {
 				category: 'game',
 				dedupKey: `match-result:${matchId}:${userAuth}`,
 				email: locals.userEmail,
-				content: matchResult(outcome, opponentName),
+				content: matchResult(outcome, opponentName, matchId),
 			})
 		}
 

@@ -26,8 +26,6 @@
 
 	const block = () => fetch(`/api/user/${user.auth}/block`, { method: 'POST' })
 
-	const follow = () => fetch(`/api/user/${user.auth}/follow`, { method: 'POST' })
-
 	const message = () => fetch(`/api/user/${user.auth}/message`, { method: 'POST' })
 
 	$effect(() => {
@@ -83,26 +81,21 @@
 					Block
 				</button>
 			</div>
-			<div class="flex mt-4 space-x-2">
-				<button
-					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground h-9 rounded-md px-3 w-full hover:bg-gray-700 hover:text-white transition-all duration-200"
-					onclick={(e) => {
-						e.stopPropagation()
-						follow()
-					}}
-				>
-					Follow
-				</button>
-				<button
-					class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent h-9 rounded-md px-3 w-full hover:border-gray-700 hover:text-gray-700 transition-all duration-200"
-					onclick={(e) => {
-						e.stopPropagation()
-						message()
-					}}
-				>
-					Message
-				</button>
-			</div>
+			<!-- `user.blocked` covers both directions, so the popup offers no way
+			     into a conversation the send endpoint would refuse anyway. -->
+			{#if !user.blocked}
+				<div class="flex mt-4 space-x-2">
+					<button
+						class="inline-flex items-center justify-center text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent h-9 rounded-md px-3 w-full hover:border-gray-700 hover:text-gray-700 transition-all duration-200"
+						onclick={(e) => {
+							e.stopPropagation()
+							message()
+						}}
+					>
+						Message
+					</button>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>

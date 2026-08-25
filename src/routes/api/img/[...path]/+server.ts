@@ -2,8 +2,9 @@ import type { RequestHandler } from './$types'
 import { PUBLIC_STORAGE_ORIGIN } from '$lib/Storage/cachedImage'
 
 // Cache a proxied public-storage image on the CDN for a year and in the browser
-// for a week. The upstream key is unique per upload, so the bytes at a given
-// path never change — treat them as immutable rather than revalidating.
+// for a week. The bytes behind a given URL never change — upload keys are unique
+// per file, and the one key that is reused (a map's thumbnail) is versioned by
+// content hash — so treat them as immutable rather than revalidating.
 const CACHE_HIT = 'public, max-age=604800, s-maxage=31536000, immutable'
 // Don't let a transient upstream failure get cached and pinned for a year.
 const CACHE_MISS = 'no-store'
@@ -18,6 +19,9 @@ const CACHE_MISS = 'no-store'
  * from the request, so there is no arbitrary-URL (SSRF) surface.
  */
 export const GET: RequestHandler = async ({ params, fetch }) => {
+	// Only the object path is forwarded. Any query string (map thumbnails carry a
+	// `?v=<content hash>` so a re-uploaded preview lands on a fresh cache entry)
+	// stays out of the upstream request — it exists purely as a cache key here.
 	const source = `${PUBLIC_STORAGE_ORIGIN}/${params.path}`
 
 	let upstream: Response

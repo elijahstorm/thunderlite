@@ -21,5 +21,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 		queryUsersByAuth(outgoing, me),
 	])
 
-	return { friends, incoming: incomingUsers, outgoing: outgoingUsers }
+	// Blocking clears the other side's row, so a blocked pair should not have a
+	// pending request left between them. Rows written before blocks were enforced
+	// can still be stranded, and a request you can neither accept nor answer is
+	// worse than no request — so the hub drops them. `queryFriends` already
+	// filters its own list.
+	const visible = (users: UserDBData[]) => users.filter((user) => !user.blocked)
+
+	return {
+		friends,
+		incoming: visible(incomingUsers),
+		outgoing: visible(outgoingUsers),
+	}
 }

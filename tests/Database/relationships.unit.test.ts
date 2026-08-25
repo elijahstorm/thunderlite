@@ -112,6 +112,29 @@ describe('setRelationship', () => {
 		expect(row('me', 'you')).toBeUndefined()
 	})
 
+	it('refuses to record a request aimed at someone YOU blocked', async () => {
+		// Befriending someone you blocked would quietly lift the block on the way
+		// past, which is not a thing a button labelled "Add friend" should do.
+		seed('me', 'you', 'blocked')
+
+		const result = await setRelationship({ source: 'me', target: 'you', status: 'friend-request' })
+
+		expect(result).toEqual({ status: 'blocked', outcome: 'blocked-target' })
+		expect(row('me', 'you')).toMatchObject({ status: 'blocked' })
+	})
+
+	it('unblocks through clearRelationship without touching the other direction', async () => {
+		seed('me', 'you', 'blocked')
+		seed('you', 'me', 'blocked')
+
+		expect(await clearRelationship('me', 'you', ['blocked'])).toBe(true)
+
+		expect(row('me', 'you')).toMatchObject({ status: 'unknown' })
+		// Their block is theirs to lift. Clearing it here would let anyone unblock
+		// themselves from someone else's list.
+		expect(row('you', 'me')).toMatchObject({ status: 'blocked' })
+	})
+
 	it('severs the other side when blocking', async () => {
 		seed('me', 'you', 'friends')
 		seed('you', 'me', 'friends')

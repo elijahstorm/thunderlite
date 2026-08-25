@@ -8,7 +8,6 @@ import { CreateInfoMorphMap } from './create_info_morph_map.sql'
 import { CreateShareMorphMap } from './create_share_morph_map.sql'
 import { CreateLikes } from './create_likes.sql'
 import { CreateRelationships } from './create_relationships.sql'
-import { CreateFollows } from './create_follows.sql'
 import { CreateMessages } from './create_messages.sql'
 import { CreateMatches } from './create_matches.sql'
 import { CreateMatchPlayers } from './create_match_players.sql'
@@ -26,6 +25,7 @@ import { CreateGameCapacity } from './create_game_capacity.sql'
 import { CreatePlayerGame } from './create_player_game.sql'
 import { CreateEmailLog } from './create_email_log.sql'
 import { CreateNotificationPrefs } from './create_notification_prefs.sql'
+import { DropFollows } from './drop_follows.sql'
 
 /**
  * The full app schema as ONE consolidated SQL script for the DontCode
@@ -46,7 +46,6 @@ export const consolidatedSchema = [
 	CreateShareMorphMap,
 	CreateLikes,
 	CreateRelationships,
-	CreateFollows,
 	CreateMessages,
 	CreateMatches,
 	CreateMatchPlayers,
@@ -67,6 +66,8 @@ export const consolidatedSchema = [
 	CreatePlayerGame,
 	CreateEmailLog,
 	CreateNotificationPrefs,
+	// Drops come last, after every create: `follows` was retired (see the file).
+	DropFollows,
 ]
 	.map((statement) => statement.trim())
 	.join('\n\n')
@@ -83,7 +84,6 @@ export const appTables = [
 	'share_morph_map',
 	'likes',
 	'relationships',
-	'follows',
 	'messages',
 	'matches',
 	'match_players',

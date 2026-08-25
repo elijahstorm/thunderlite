@@ -28,7 +28,7 @@ export const POST = async ({ params, locals }) => {
 				userAuth: target,
 				category: 'social',
 				dedupKey: `friend-request:${source}:${target}:${day}`,
-				content: friendRequest(await profileName(source)),
+				content: friendRequest(await profileName(source), source),
 			})
 		} else if (source && result.outcome === 'auto-accepted') {
 			// They asked first, so this call accepted. The person who waited is the
@@ -38,7 +38,7 @@ export const POST = async ({ params, locals }) => {
 				userAuth: target,
 				category: 'social',
 				dedupKey: `friend-accepted:${target}:${source}:${day}`,
-				content: friendAccepted(await profileName(source)),
+				content: friendAccepted(await profileName(source), source),
 			})
 		}
 

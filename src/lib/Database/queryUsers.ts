@@ -3,7 +3,7 @@ import { logToErrorDb } from '$lib/Security/serverLogs'
 import { getPlayerRatings } from '$lib/Database/getPlayerRatings'
 import { db } from '$lib/dontcode/server'
 
-type QueryType = 'public' | 'friends' | 'following' | 'followers'
+type QueryType = 'public' | 'friends'
 
 type MessageRow = {
 	source: string
@@ -25,10 +25,10 @@ const query: (type: QueryType) => (
 		const limit = 10
 
 		try {
-			// The old single query joined follows / relationships / a lateral
-			// last-message onto users; the platform API has no joins, so we fetch
-			// the candidate profiles first, batch-fetch the related rows with `in`
-			// filters and compose (plus sort and paginate) in JS.
+			// The old single query joined relationships / a lateral last-message onto
+			// users; the platform API has no joins, so we fetch the candidate
+			// profiles first, batch-fetch the related rows with `in` filters and
+			// compose (plus sort and paginate) in JS.
 			let candidates: UserDBData[]
 
 			if (type === 'public') {
@@ -37,27 +37,13 @@ const query: (type: QueryType) => (
 					orderBy: { created_at: 'desc' },
 				})
 			} else {
-				let auths: string[]
-				if (type === 'friends') {
-					const relationships = await db.find<{ target: string }>('relationships', {
-						where: { source: me, status: 'friends' },
-						select: ['target'],
-					})
-					auths = relationships.map((relationship) => relationship.target)
-				} else if (type === 'following') {
-					const follows = await db.find<{ target: string }>('follows', {
-						where: { source: me },
-						select: ['target'],
-					})
-					auths = follows.map((follow) => follow.target)
-				} else {
-					const follows = await db.find<{ source: string }>('follows', {
-						where: { target: me },
-						select: ['source'],
-					})
-					auths = follows.map((follow) => follow.source)
-				}
-				auths = [...new Set(auths)].filter((auth) => auth !== me)
+				const relationships = await db.find<{ target: string }>('relationships', {
+					where: { source: me, status: 'friends' },
+					select: ['target'],
+				})
+				const auths = [...new Set(relationships.map((relationship) => relationship.target))].filter(
+					(auth) => auth !== me
+				)
 				candidates = auths.length
 					? await db.find<UserDBData>('profiles', { where: { auth: { in: auths } } })
 					: []
@@ -65,29 +51,26 @@ const query: (type: QueryType) => (
 
 			const auths = candidates.map((user) => user.auth)
 
-			const [followingRows, followerRows, relationshipRows, sentMessages, receivedMessages] =
-				auths.length
-					? await Promise.all([
-							db.find<{ target: string }>('follows', {
-								where: { source: me, target: { in: auths } },
-								select: ['target'],
-							}),
-							db.find<{ source: string }>('follows', {
-								where: { source: { in: auths }, target: me },
-								select: ['source'],
-							}),
-							db.find<{ target: string; status: RelationshipStatus }>('relationships', {
-								where: { source: me, target: { in: auths } },
-								select: ['target', 'status'],
-							}),
-							db.find<MessageRow>('messages', { where: { source: me, target: { in: auths } } }),
-							db.find<MessageRow>('messages', { where: { source: { in: auths }, target: me } }),
-						])
-					: [[], [], [], [], []]
+			const [relationshipRows, blockedMeRows, sentMessages, receivedMessages] = auths.length
+				? await Promise.all([
+						db.find<{ target: string; status: RelationshipStatus }>('relationships', {
+							where: { source: me, target: { in: auths } },
+							select: ['target', 'status'],
+						}),
+						// The other direction, blocks only — a block lives on the blocker's
+						// row alone, so this is what stops someone who blocked the viewer
+						// from still surfacing in their people lists.
+						db.find<{ source: string }>('relationships', {
+							where: { source: { in: auths }, target: me, status: 'blocked' },
+							select: ['source'],
+						}),
+						db.find<MessageRow>('messages', { where: { source: me, target: { in: auths } } }),
+						db.find<MessageRow>('messages', { where: { source: { in: auths }, target: me } }),
+					])
+				: [[], [], [], []]
 
-			const following = new Set(followingRows.map((row) => row.target))
-			const followers = new Set(followerRows.map((row) => row.source))
 			const relationships = new Map(relationshipRows.map((row) => [row.target, row.status]))
+			const blockedMe = new Set(blockedMeRows.map((row) => row.source))
 
 			// Replaces the lateral join: the newest message per counterpart.
 			const lastMessages = new Map<string, MessageRow>()
@@ -99,20 +82,26 @@ const query: (type: QueryType) => (
 				}
 			}
 
-			users = candidates.map((profile) => {
-				const last = lastMessages.get(profile.auth)
-				return {
-					...profile,
-					following: following.has(profile.auth),
-					follower: followers.has(profile.auth),
-					relationship: relationships.get(profile.auth) ?? null,
-					last_message: {
-						message: last?.message ?? null,
-						unread: last && last.source !== me && last.read_at === null ? 1 : 0,
-						when: last?.created_at ?? null,
-					},
-				} as unknown as UserDBData
-			})
+			// A block hides the pair from each other's people lists, in both
+			// directions. Done before the sort and the page slice so a blocked player
+			// can't eat a slot in the window and leave a short page behind.
+			users = candidates
+				.filter(
+					(profile) => relationships.get(profile.auth) !== 'blocked' && !blockedMe.has(profile.auth)
+				)
+				.map((profile) => {
+					const last = lastMessages.get(profile.auth)
+					return {
+						...profile,
+						relationship: relationships.get(profile.auth) ?? null,
+						blocked: false,
+						last_message: {
+							message: last?.message ?? null,
+							unread: last && last.source !== me && last.read_at === null ? 1 : 0,
+							when: last?.created_at ?? null,
+						},
+					} as unknown as UserDBData
+				})
 
 			// order by last_message.created_at desc nulls last, then friends first
 			const when = (user: UserDBData) =>
@@ -157,5 +146,3 @@ const query: (type: QueryType) => (
 
 export const queryUsers = query('public')
 export const queryFriends = query('friends')
-export const queryFollowing = query('following')
-export const queryFollowers = query('followers')

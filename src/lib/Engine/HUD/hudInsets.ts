@@ -23,6 +23,22 @@ export const setHudGutter = (px: number): void => {
 	hudGutter.set(Math.max(0, Math.round(px)))
 }
 
+/**
+ * Visual width of the HUD rail, which is NOT always the same as `hudGutter`.
+ * On narrow viewports an expanded rail floats over the board and only reserves
+ * the collapsed width as gutter (the board would be unplayably small otherwise),
+ * so the gutter under-reports how much of the right edge is actually painted.
+ *
+ * Anything that must stay *visually* clear of the rail — the chat docks, which
+ * would otherwise end up underneath a floating rail — reads this instead.
+ */
+export const hudRailWidth = writable(0)
+
+export const setHudRailWidth = (px: number): void => {
+	hudRailWidth.set(Math.max(0, Math.round(px)))
+}
+
 export const clearHudGutter = (): void => {
 	hudGutter.set(0)
+	hudRailWidth.set(0)
 }

@@ -119,7 +119,7 @@
 				</li>
 				<li>
 					<span class="text-foreground font-medium">Gameplay data</span> — the maps you create, match
-					history and stats, game sessions and lobbies you join, and your friends and follows.
+					history and stats, game sessions and lobbies you join, and your friends list.
 				</li>
 				<li>
 					<span class="text-foreground font-medium">Chat messages</span> — direct messages and in-game

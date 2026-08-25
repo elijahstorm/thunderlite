@@ -30,7 +30,13 @@ export const GET = async ({ locals }) => {
 				present.map((entry) => entry.identity).filter((id): id is string => !!id && id !== me)
 			),
 		]
-		const users = auths.length ? await queryUsersByAuth(auths, me) : []
+		// `queryUsersByAuth` hydrates the block flag for the viewer, so honouring a
+		// block here is a filter rather than another round-trip. Presence is the one
+		// list a blocked player would otherwise keep appearing in, since it is built
+		// from whoever happens to be connected rather than from any relationship.
+		const users = auths.length
+			? (await queryUsersByAuth(auths, me)).filter((user) => !user.blocked)
+			: []
 		return json({ users })
 	} catch (msg) {
 		// No realtime service here — treat as "nobody resolvable is online".

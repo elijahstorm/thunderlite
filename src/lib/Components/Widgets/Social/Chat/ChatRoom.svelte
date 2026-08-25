@@ -19,9 +19,21 @@
 		source: string
 		target: string
 		ontoggle?: () => void
+		// The docked chat panel is a fixed-height widget, so its transcript is
+		// pinned to a set height. On the standalone /chat page the room instead
+		// owns whatever room is left under the site header, so the transcript
+		// flexes. `min-h-0` is what lets a flex child actually shrink and scroll.
+		fill?: boolean
 	}
 
-	let { socketMessages, highlight = false, source, target, ontoggle }: Props = $props()
+	let {
+		socketMessages,
+		highlight = false,
+		source,
+		target,
+		ontoggle,
+		fill = false,
+	}: Props = $props()
 	const targetUser = writable<UserDBData>()
 	const sourceUser = writable<UserDBData>()
 
@@ -114,10 +126,12 @@
 	})
 </script>
 
-<div class="justify-between flex flex-col h-full max-h-screen">
+<div class="justify-between flex flex-col h-full" class:max-h-screen={!fill} class:min-h-0={fill}>
 	<ChatHeader user={$targetUser} {ontoggle} {highlight} />
 	<InfiniteScroll
-		tailwind="flex flex-col-reverse max-h-[calc(21.25rem-1px)] h-[calc(21.25rem-1px)] justify-start gap-y-4 p-3 overflow-y-auto scrolling-touch"
+		tailwind="flex flex-col-reverse justify-start gap-y-4 p-3 overflow-y-auto scrolling-touch {fill
+			? 'flex-1 min-h-0'
+			: 'max-h-[calc(21.25rem-1px)] h-[calc(21.25rem-1px)]'}"
 		threshold={40}
 		reverse
 		onload={loadMoreMessage}
@@ -126,5 +140,15 @@
 			<ChatMessageGroups {messageGroup} sourceUser={$sourceUser} targetUser={$targetUser} />
 		{/each}
 	</InfiniteScroll>
-	<ChatInput {target} onsend={populateMessage} />
+	<!-- A block closes the conversation both ways. The transcript stays readable
+	     (it is history either side may want) but there is nothing left to send:
+	     /api/user/[userAuth]/message refuses the POST, so leaving a live composer
+	     here would only produce a toast for every attempt. -->
+	{#if $targetUser?.blocked}
+		<p class="border-t border-border p-3 text-center text-sm text-muted-foreground">
+			You and this player can't message each other.
+		</p>
+	{:else}
+		<ChatInput {target} onsend={populateMessage} />
+	{/if}
 </div>

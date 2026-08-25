@@ -35,7 +35,7 @@ export async function notifyAsyncYourTurn(input: {
 		userAuth: input.nextUserAuth,
 		category: 'game',
 		dedupKey: `async-turn:${input.session}:${input.eventId}`,
-		content: asyncYourTurn(opponentName, formatTurnTimeout(input.turnTimeoutMs)),
+		content: asyncYourTurn(opponentName, formatTurnTimeout(input.turnTimeoutMs), input.session),
 	})
 }
 
@@ -56,7 +56,7 @@ export async function notifyAsyncResignation(input: {
 		userAuth: input.opponentUserAuth,
 		category: 'game',
 		dedupKey: `async-resign:${input.session}:${input.eventId}`,
-		content: asyncOpponentResigned(resignedName),
+		content: asyncOpponentResigned(resignedName, input.session),
 	})
 }
 
@@ -90,8 +90,8 @@ export async function notifyAsyncTimeout(
 			category: 'game',
 			dedupKey: `async-timeout:${session}:${result.eventId}:opponent`,
 			content: result.gameOver
-				? asyncOpponentTimedOut(resignedName)
-				: asyncYourTurn(resignedName, timeLabel),
+				? asyncOpponentTimedOut(resignedName, session)
+				: asyncYourTurn(resignedName, timeLabel, session),
 		})
 	}
 }

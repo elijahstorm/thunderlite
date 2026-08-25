@@ -17,6 +17,7 @@
 	let updated: UserDBData = $state(untrack(() => data.user))
 
 	let usernameTaken = $state(false)
+	let saving = $state(false)
 
 	const resetForm = (data = {}) => (updated = { ...(user ?? {}), ...data })
 
@@ -65,13 +66,27 @@
 		method="POST"
 		class="card p-6 sm:p-8 space-y-1"
 		use:enhance={({ formData, cancel }) => {
-			if (usernameTaken) cancel()
+			// A known-taken username never reaches the server, so the toast is the only
+			// signal the user gets that the click did nothing.
+			if (usernameTaken) {
+				addToast('That username is already taken. Pick another one.', 'warn')
+				cancel()
+				return
+			}
 			formData.set('username', formData.get('username')?.toString().replace(/.*@/, '') ?? '')
+			saving = true
 			return async ({ result, update }) => {
-				if (result.status !== 200 && result.status !== 400) {
+				// `update` repopulates `form`, which is what the inline field messages read
+				// from, so run it before deciding which toast to show.
+				await update({ reset: false })
+				saving = false
+				if (result.status === 400) {
+					addToast('Some fields need fixing before we can save.', 'warn')
+				} else if (result.status !== 200) {
 					addToast('Error saving your data', 'warn')
+				} else {
+					addToast('Profile saved')
 				}
-				update({ reset: false })
 				// @ts-ignore
 				if (result.data?.validated) resetForm(result.data?.validated)
 			}
@@ -114,8 +129,12 @@
 		/>
 
 		<div class="flex justify-end gap-2 pt-6">
-			<button class="btn btn-ghost" type="button" onclick={() => resetForm()}>Cancel</button>
-			<button class="btn btn-primary" type="submit">Save changes</button>
+			<button class="btn btn-ghost" type="button" disabled={saving} onclick={() => resetForm()}>
+				Cancel
+			</button>
+			<button class="btn btn-primary" type="submit" disabled={saving}>
+				{saving ? 'Saving…' : 'Save changes'}
+			</button>
 		</div>
 	</form>
 </section>

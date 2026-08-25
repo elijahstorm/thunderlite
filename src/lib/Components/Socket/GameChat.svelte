@@ -7,6 +7,9 @@
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 	import { logChat } from '$lib/Engine/liveLog'
+	// The in-game HUD rail on the right edge (0 outside a match). The dock rides
+	// its width so it slides left when the rail expands, exactly like the board.
+	import { hudGutter, hudRailWidth } from '$lib/Engine/HUD/hudInsets'
 
 	interface Props {
 		/** Game room code. Group chat is scoped to `chat:{session}` — room members only. */
@@ -16,6 +19,12 @@
 	}
 
 	let { session = '', roster = [] }: Props = $props()
+
+	// Clear the rail's *painted* width, not just the gutter it reserves for the
+	// board: on narrow viewports an expanded rail floats over the map and only
+	// reserves its collapsed width, so the gutter alone would leave this dock
+	// sitting underneath it.
+	let railInset = $derived(Math.max($hudGutter, $hudRailWidth))
 
 	type GroupMessage = { source: string; message: string; at: number }
 
@@ -40,6 +49,13 @@
 	const nameFor = (auth: string) =>
 		byAuth.get(auth)?.display_name || byAuth.get(auth)?.username || 'Player'
 
+	// Blocking someone shouldn't be undone by ending up in a room with them. The
+	// room itself still works — a live match can't drop a seat over a social
+	// setting — but their lines are dropped on arrival, so the block holds for the
+	// one thing it can hold for here. The flag rides on the roster the page
+	// already loaded (viewer-relative, both directions), so this costs nothing.
+	const isBlocked = (auth: string) => byAuth.get(auth)?.blocked === true
+
 	let seq = 0
 	const push = (msg: GroupMessage) => {
 		messages = [...messages, msg]
@@ -54,6 +70,9 @@
 		if (!data?.message) return
 		// We render our own sends optimistically; drop the echo if it comes back.
 		if (data.source === currentAuth) return
+		// Dropped before the recorder: a blocked player's line is not shown, not
+		// counted as unread, and not written into this client's match log.
+		if (isBlocked(data.source)) return
 		// Group chat is realtime-only (no DB), so this is the ONLY record of what
 		// was said in the room — worth having when reconstructing a reported match.
 		// The recorder is a no-op outside a real online session.
@@ -104,10 +123,20 @@
 </script>
 
 {#if isRealSession(session)}
-	<div class="fixed bottom-4 left-4 z-40 w-[320px] max-w-[92vw]">
+	<!-- Bottom-right, not bottom-left: the "Made with DontCode" badge owns the
+	     bottom-left corner and was painting over this bubble mid-match. Everything
+	     here is measured in from the right edge so the dock is pushed left as the
+	     HUD rail expands. From lg up there is room to park beside the DM dock
+	     (340px + a 12px gap); narrower than that the two docks would not fit on one
+	     row (rail 264 + dock 352 + this 320 needs ~950px), so we stack above the DM
+	     dock's collapsed header instead. -->
+	<div
+		class="fixed z-40 flex justify-end w-[320px] max-w-[92vw] transition-[right,bottom] duration-200 ease-out bottom-24 lg:bottom-4 right-[calc(1rem_+_var(--rail))] lg:right-[calc(1rem_+_var(--rail)_+_352px)]"
+		style="--rail: {railInset}px"
+	>
 		{#if open}
 			<div
-				class="rounded-xl border border-border bg-surface shadow-lg overflow-hidden flex flex-col"
+				class="w-full rounded-xl border border-border bg-surface shadow-lg overflow-hidden flex flex-col"
 				in:fly={{ y: 12, duration: 150 }}
 			>
 				<header class="flex items-center justify-between px-3 py-2 border-b border-border">
