@@ -2,11 +2,19 @@
  * Gateway budget awareness (server-only).
  *
  * The DontCode v1 gateway budgets each namespace separately, per project
- * (`dontcode-backend` commit `6952df6c`). Per-minute allowances as of that
- * change: realtime 1200 · cache 1000 · db 600 · auth 300 · payments 120 ·
- * storage 120 · info 120 · notifications 60 · db/migrate 10.
+ * (`dontcode-backend` commit `6952df6c`). Per-minute allowances: realtime 1200 ·
+ * cache 1000 · db/read 900 · auth 300 · db/write 300 · payments 120 · storage
+ * 120 · info 120 · notifications 60 · db/migrate 10.
  *
- * Two consequences shape this module.
+ * The database is two budgets, not one. Reads and writes fail differently — a
+ * dropped `count` is a retry, a dropped `insert` is lost data — so the gateway
+ * meters them apart, and the numerous cheap reads can no longer decide when the
+ * writes start failing. The app gets the same split for free only if it tracks
+ * them apart too: one `db` key here would put a poll loop exhausting its own
+ * 900 back in charge of whether a move can be recorded, which is the arrangement
+ * the split exists to end.
+ *
+ * Two further consequences shape this module.
  *
  * 1. Budgets are per namespace, so cooldowns are tracked per namespace. One
  *    global flag would read a `notifications` limit — 60/min, the tightest
@@ -14,10 +22,10 @@
  *    and switch off diagnostics and presence over a budget they never spend.
  *    Suppressing the wrong feature is its own outage.
  *
- * 2. The gateway reports `RateLimit-Limit/-Remaining/-Reset` on every counted
- *    response, successes included, and `dontcode@0.2.9` surfaces that through
- *    an `onRateLimit` callback (wired in dontcode/server.ts). So the app does
- *    not have to wait to be refused before reacting. `budgetPressure` turns the
+ * 2. The gateway reports `RateLimit-Limit/-Remaining/-Reset/-Scope` on every
+ *    counted response, successes included, and `dontcode@0.2.11` surfaces that
+ *    through an `onRateLimit` callback (wired in dontcode/server.ts). So the app
+ *    does not have to wait to be refused before reacting. `budgetPressure` turns the
  *    remaining count into a decision that optional work can act on while calls
  *    are still succeeding — which is the difference between shedding diagnostic
  *    traffic and shedding a player's move.
@@ -32,16 +40,16 @@ import type { RateLimitStatus } from 'dontcode'
 import { isDontCodeError } from 'dontcode'
 
 /**
- * The gateway's metered namespaces. Spelled as the SDK derives them from the
- * request path (`db/migrate`, with a slash) — the 429 body's `scope` field uses
- * the gateway's internal spelling (`db_migrate`) for that one, so both are
- * normalised on the way in.
+ * The gateway's metered namespaces, spelled the way the wire spells them: the
+ * public, path-shaped name the gateway reports as `RateLimit-Scope` on every
+ * counted response and repeats as `scope` on a refusal.
  */
 export type GatewayScope =
 	| 'auth'
 	| 'cache'
-	| 'db'
 	| 'db/migrate'
+	| 'db/read'
+	| 'db/write'
 	| 'info'
 	| 'notifications'
 	| 'payments'
@@ -51,8 +59,9 @@ export type GatewayScope =
 const SCOPES = new Set<string>([
 	'auth',
 	'cache',
-	'db',
 	'db/migrate',
+	'db/read',
+	'db/write',
 	'info',
 	'notifications',
 	'payments',
@@ -60,10 +69,35 @@ const SCOPES = new Set<string>([
 	'storage',
 ])
 
-/** Accept either spelling of a namespace, and reject anything unrecognised. */
+/**
+ * The gateway's internal vertical ids use `_` — they also spell env var names
+ * and bucket keys, neither of which can hold a `/` — and it maps them to the
+ * public names on the way out. Accepting both spellings costs nothing and means
+ * a refusal that skipped that mapping still lands on the right budget.
+ */
+const ALIASES: Record<string, GatewayScope> = {
+	db_migrate: 'db/migrate',
+	db_read: 'db/read',
+	db_write: 'db/write',
+}
+
+/**
+ * Read a reported namespace as a budget, rejecting anything unrecognised.
+ *
+ * A bare `db` is deliberately unrecognised: it is not a budget any more. One
+ * path, `POST /api/v1/db`, spends from `db/read` or `db/write` depending on the
+ * operation in the body, so anything deriving the namespace from the URL alone
+ * names `db` for both — and filing them together would let the two budgets
+ * overwrite each other's readings, leaving the app pacing off a `remaining` that
+ * alternates between 900 and 300. That is why the gateway names the budget it
+ * counted in `RateLimit-Scope` and `dontcode@0.2.11` prefers that header over
+ * the path, so in practice the real name arrives on the wire. `spending` below
+ * covers what the header cannot reach: the downstream limiters that answer in
+ * their own envelope with no headers at all.
+ */
 const asScope = (raw: unknown): GatewayScope | null => {
 	if (typeof raw !== 'string') return null
-	const normalized = raw === 'db_migrate' ? 'db/migrate' : raw
+	const normalized = ALIASES[raw] ?? raw
 	return SCOPES.has(normalized) ? (normalized as GatewayScope) : null
 }
 
@@ -73,7 +107,7 @@ const asScope = (raw: unknown): GatewayScope | null => {
  * that the servers are busy because an email queue is full would be alarming
  * and untrue.
  */
-const PLAYER_FACING: GatewayScope[] = ['db', 'realtime', 'auth', 'storage']
+const PLAYER_FACING: GatewayScope[] = ['db/read', 'db/write', 'realtime', 'auth', 'storage']
 
 /** Sanity fence on a reported cooldown, so one bad number can't park us. */
 const MAX_COOLDOWN_SECONDS = 120
@@ -99,9 +133,17 @@ const budgetOf = (scope: GatewayScope): Budget =>
 /**
  * Record what the SDK observed on a counted response. Called for every request
  * the app makes, successes included, via the client's `onRateLimit` hook.
+ *
+ * `spending` names the budget the caller was drawing on, for the responses that
+ * name none themselves. Since `dontcode@0.2.11` that is rare — the gateway sends
+ * `RateLimit-Scope` and the SDK prefers it — but a response that reaches us
+ * without one still describes the ONE bucket the gateway counted, and that
+ * bucket is the direction the call went in. Pairing the numbers with the
+ * caller's own direction is therefore not a guess; it is the attribution the
+ * response was missing.
  */
-export const noteRateLimitStatus = (status: RateLimitStatus): void => {
-	const scope = asScope(status.namespace)
+export const noteRateLimitStatus = (status: RateLimitStatus, spending?: GatewayScope): void => {
+	const scope = asScope(status.namespace) ?? spending ?? null
 	if (!scope) {
 		if (status.exceeded) {
 			const wait = (status.retryAfter ?? 0) || DEFAULT_COOLDOWN_MS / 1000
@@ -264,6 +306,27 @@ export const budgetSnapshot = (): Record<
 			},
 		])
 	)
+
+/**
+ * The gateway's documented per-minute allowance for each namespace, per project
+ * (`dontcode-backend` commit `6952df6c`). Only a reference point: the authority
+ * is the `RateLimit-Limit` the gateway reports on a counted response, which is
+ * what `budgetSnapshot` carries once anything has been called. These fill in
+ * before that first response, so a cold instance can still say what share of a
+ * budget a measured call rate represents.
+ */
+export const GATEWAY_BUDGET_PER_MINUTE: Record<GatewayScope, number> = {
+	realtime: 1200,
+	cache: 1000,
+	'db/read': 900,
+	auth: 300,
+	'db/write': 300,
+	payments: 120,
+	storage: 120,
+	info: 120,
+	notifications: 60,
+	'db/migrate': 10,
+}
 
 /** Testing seam: forget everything we think we know about the budgets. */
 export const resetRateLimitState = (): void => {

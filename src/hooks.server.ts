@@ -3,10 +3,21 @@ import { building } from '$app/environment'
 import { env } from '$env/dynamic/private'
 import { auth } from '$lib/dontcode/server'
 import { resolveCachedUser } from '$lib/dontcode/sessionCache'
+import { requestSpend, withRequestSpend } from '$lib/Security/gatewayLedger'
 import { playerFacingCooldownSeconds } from '$lib/Security/rateLimit'
 import { SERVICE_BUSY_HEADER } from '$lib/Security/serviceBusy'
 
-export const handle: Handle = async ({ event, resolve }) => {
+/**
+ * Wrapped in `withRequestSpend` so every gateway call this request makes — at
+ * any depth, including the store helpers that have no idea a request exists —
+ * is attributed to the route that caused it. The route then reports its own cost
+ * back on the response (`x-gateway-calls`), which is what makes the sync path's
+ * call amplification measurable from the client rather than inferred.
+ */
+export const handle: Handle = (input) =>
+	withRequestSpend(input.event.route.id ?? input.event.url.pathname, () => handleRequest(input))
+
+const handleRequest: Handle = async ({ event, resolve }) => {
 	const protectedRoutes = [
 		'/onboarding',
 		'/me',
@@ -64,6 +75,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// reason to tell someone mid-match that the servers are busy.
 	const busyFor = playerFacingCooldownSeconds()
 	if (busyFor > 0) response.headers.set(SERVICE_BUSY_HEADER, `${busyFor}`)
+
+	// What this request cost in gateway calls, so the client can record it next
+	// to the latency it measured. A move that took two seconds because it made
+	// eight calls and a move that took two seconds because the gateway was slow
+	// are different bugs, and only this header tells them apart. Diagnostics for
+	// our own clients, not a contract — nothing depends on it being present.
+	const spend = requestSpend()
+	if (spend && spend.calls > 0) {
+		response.headers.set('x-gateway-calls', `${spend.calls}`)
+		response.headers.set('x-gateway-ms', `${spend.ms}`)
+		response.headers.append('server-timing', `gateway;dur=${spend.ms};desc="${spend.calls} calls"`)
+	}
 
 	return response
 }

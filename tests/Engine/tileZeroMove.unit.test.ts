@@ -9,6 +9,7 @@ import { get } from 'svelte/store'
 vi.mock('../../src/lib/Engine/Animator/animator', () => ({
 	animateRoute: () => Promise.resolve(),
 	animateHealthBar: () => Promise.resolve(),
+	panBoardToBuiltUnit: () => false,
 }))
 vi.mock('../../src/lib/Audio/audioEngine', () => ({ audioEngine: { playSfx: () => {} } }))
 

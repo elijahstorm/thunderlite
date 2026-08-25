@@ -90,9 +90,18 @@ describe('CPU Warfactory blocking', () => {
 		expect(onFactory).toBeCloseTo(onOil, 5)
 	})
 
-	it("does not reward sitting on the CPU's own factory", () => {
+	it("penalises sitting on the CPU's own factory, which blocks its own production", () => {
+		// This used to assert parity with a non-factory building of ours — the point
+		// being that `scoreFactoryBlock` must not pay out for our own tile. It still
+		// must not, but parity was not enough: a factory deploys nothing while ANY unit
+		// stands on it, our own included, and with `homeDefenseBonus` peaking at
+		// distance 0 the CPU's guards parked directly on the Warfactory they were
+		// guarding. In a four-way sim that cost one team 18 of its 30 build slots and
+		// left it sitting on an average bank of $2,266 it could not spend. Ending there
+		// is now strictly worse than ending on an equivalent building that produces
+		// nothing, so a guard steps one tile off and defends from beside it.
 		const onFactory = scoreOn(WARFACTORY, CPU, false)
 		const onOil = scoreOn(OIL, CPU, false)
-		expect(onFactory).toBeCloseTo(onOil, 5)
+		expect(onFactory).toBeLessThan(onOil)
 	})
 })

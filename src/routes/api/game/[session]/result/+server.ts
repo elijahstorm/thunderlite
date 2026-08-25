@@ -1,4 +1,4 @@
-import { error, json } from '@sveltejs/kit'
+import { error, isHttpError, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { db } from '$lib/dontcode/server'
 import { gameStore } from '$lib/Game/store.server'
@@ -18,7 +18,9 @@ import { matchResult } from '$lib/Notifications/templates'
  *    record one consistent winner rather than each client's own claim. (This
  *    is the lock that used to live in KV; the unique constraint now serves the
  *    same purpose with no separate store. Replaying the H2 event log to
- *    *re-derive* the winner is future hardening.)
+ *    *re-derive* the winner is future hardening — but the round count IS now
+ *    derived from the log rather than claimed, and a claim the log outright
+ *    contradicts is refused; see `logSummary`.)
  *  - mode 'hotseat' | 'campaign': there is no shared session, so we record only
  *    the signed-in caller's own row. The `session` path segment is ignored.
  *
@@ -62,8 +64,10 @@ export const POST = async ({ request, params, locals }) => {
 	const team = asTeam(body.team)
 	if (team === null) throw error(400, 'Invalid team')
 
+	// The caller's own round count. Only ever a FALLBACK online (see below): it is
+	// this client's `gameState.turnNumber`, which no other client can verify.
 	const turnsNum = Number(body.turns)
-	const turns = Number.isFinite(turnsNum) ? Math.max(0, Math.trunc(turnsNum)) : 0
+	const claimedTurns = Number.isFinite(turnsNum) ? Math.max(0, Math.trunc(turnsNum)) : 0
 	const mapSha = typeof body.mapSha === 'string' ? body.mapSha : null
 	const claimedWinner = body.winner === null ? null : asTeam(body.winner)
 
@@ -72,6 +76,7 @@ export const POST = async ({ request, params, locals }) => {
 		let outcome: Outcome
 		let matchId: number | undefined
 		let isAsyncMatch = false
+		let turns = claimedTurns
 
 		if (mode === 'online') {
 			const members = await gameStore.members(session)
@@ -89,6 +94,32 @@ export const POST = async ({ request, params, locals }) => {
 			})
 			isAsyncMatch = room?.mode === 'async'
 
+			// Round count and log position, derived from the room's own event log
+			// rather than taken from this client's engine — which is the one number
+			// in this payload that provably went wrong in match 19 (row: 46 rounds,
+			// log: 24). The claim stands in only if the log can't be read.
+			let lastEventId: number | null = null
+			try {
+				const summary = await gameStore.logSummary(session)
+				turns = summary.rounds
+				lastEventId = summary.lastEventId
+				// A side that quit cannot have won it. This is the one part of the
+				// winner claim the server can check on its own — the log records every
+				// surrender, but an elimination in combat leaves no event at all, so
+				// the rest of the claim still has to be taken on trust.
+				if (claimedWinner !== null && summary.surrendered.has(claimedWinner)) {
+					await logToErrorDb(
+						`Result claim for ${session} names team ${claimedWinner} as winner, but the log records its surrender`
+					)
+					throw error(409, 'That result contradicts the match log')
+				}
+			} catch (msg) {
+				if (isHttpError(msg)) throw msg
+				// Diagnostics and a derived count must never cost an already-finished
+				// match its row; fall back to the caller's claim.
+				await logToErrorDb(msg, 'Could not derive match turns from the event log')
+			}
+
 			// The first writer locks the winner: their row carries the
 			// authoritative `winner_team`. A later writer hits the `session_id`
 			// unique constraint, reads that row back, and records the same winner.
@@ -99,6 +130,7 @@ export const POST = async ({ request, params, locals }) => {
 				mode,
 				winner_team: claimedWinner,
 				turns,
+				last_event_id: lastEventId,
 			})
 			if (inserted) {
 				matchId = inserted.id as number | undefined
@@ -121,6 +153,17 @@ export const POST = async ({ request, params, locals }) => {
 				})
 				matchId = existing?.id
 				winnerTeam = existing ? (existing.winner_team ?? null) : null
+				// Two participants who watched the same match should not disagree about
+				// who won it. When they do, one of their boards diverged from the room
+				// and the recorded winner is a coin flip on who POSTed first — exactly
+				// what match 19 looks like from the outside. The locked row stands (an
+				// elo settlement already hangs off it), but the disagreement is worth
+				// knowing about instead of being silently resolved by arrival order.
+				if (existing && claimedWinner !== winnerTeam) {
+					await logToErrorDb(
+						`Result conflict for ${session}: locked winner ${winnerTeam}, team ${team} claims ${claimedWinner}`
+					)
+				}
 			}
 			outcome = outcomeFor(winnerTeam, team)
 		} else {

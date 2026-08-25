@@ -24,7 +24,7 @@
  * caller that wants an event on the board pushes it and waits its turn.
  */
 
-import { hasRemoteChoreography } from '$lib/Engine/remoteChoreography'
+import { hasRemoteChoreography, remoteChoreographyMs } from '$lib/Engine/remoteChoreography'
 import type { SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
 /** How the event reached this client — the field that exposes ordering bugs. */
@@ -81,24 +81,48 @@ export type EventQueueHandlers = {
 const isAnimatable = (action: SerializedAction): boolean => hasRemoteChoreography(action)
 
 /**
- * How much backlog an event may have behind it and still be animated.
+ * How much catch-up may be waiting behind an event and still let it animate,
+ * measured in playback time rather than event count.
  *
- * This used to be zero: an event with ANYTHING queued behind it was
- * fast-forwarded, and only an event alone in the queue got its choreography.
- * That reads fine when events trickle in one at a time, and badly the moment
- * they don't — a player taking their whole turn in quick succession, or a
- * reconciliation poll that hands over four actions at once after the socket
- * lagged, delivers a bunch. Every one of them but the last then teleported, so
- * the opponent's turn arrived as a single silent jump of the whole board rather
- * than as moves that happened.
+ * The count-based version of this rule was wrong in a way that only showed up
+ * once relays were batched. It began at zero — an event with ANYTHING behind it
+ * was fast-forwarded — then rose to two, so a short bunch played out. But a
+ * whole CPU turn arrives as one contiguous run now, and a turn is a dozen or
+ * more actions, so every one of them but the last two teleported. That is
+ * precisely the thing a player is watching for: the ORDER a side moved its units
+ * in, and the moves themselves. A board that rearranges itself in one silent
+ * jump does not tell you what the opponent did, and no amount of "the state is
+ * identical either way" makes it play the same.
  *
- * Zero is still the right answer for a big backlog — falling a slide-length
- * further behind the room for every event is worse than missing the slide. But a
- * short bunch is exactly the case worth playing out: three moves at ~200ms a
- * tile is around a second of catch-up, and it is the difference between watching
- * the opponent play and being told what they did.
+ * So the question is not "how many are behind this one" but "how long would it
+ * take to watch them all". A dozen moves at ~200ms a tile is a few seconds of
+ * catch-up, which is exactly the case worth playing out. A client that lost the
+ * network for a minute, or whose tab was backgrounded until its animation timers
+ * were throttled to a crawl, comes back to a backlog measured in minutes — and
+ * making someone watch that before they can act is worse than skipping it.
+ *
+ * The budget is therefore set just above a turn's worth of play. Everything a
+ * live game normally delivers, including a full CPU turn, animates in full;
+ * only a genuine backlog is fast-forwarded, and only until it fits again — the
+ * tail of it still plays out, so the player rejoins live play watching rather
+ * than mid-jump.
  */
-const SMOOTH_BACKLOG = 2
+export const CATCHUP_BUDGET_MS = 9000
+
+/**
+ * Playback time of the animatable events behind this one. Stops counting once it
+ * is over budget: the only question is which side of the line we are on, and a
+ * backlog of hundreds should not cost a full scan per event.
+ */
+const backlogMs = (pending: QueuedEvent[]): number => {
+	let total = 0
+	for (const entry of pending) {
+		if (!entry.animate || !isAnimatable(entry.action)) continue
+		total += remoteChoreographyMs(entry.action)
+		if (total > CATCHUP_BUDGET_MS) return total
+	}
+	return total
+}
 
 export const createEventQueue = (handlers: EventQueueHandlers) => {
 	const pending: QueuedEvent[] = []
@@ -116,12 +140,12 @@ export const createEventQueue = (handlers: EventQueueHandlers) => {
 					handlers.onDropped?.(entry)
 					continue
 				}
-				// Animate a live move/attack that isn't badly behind. Past
-				// SMOOTH_BACKLOG the queue fast-forwards instead: falling further behind
-				// the room is worse than missing the slide, and the state applied is
-				// identical either way.
+				// Animate a live move/attack unless watching the backlog behind it would
+				// take longer than a player should be made to wait. A normal turn — even
+				// a CPU side's whole turn, which now arrives in one batch — is inside
+				// the budget and plays out in full.
 				const animated =
-					entry.animate && pending.length <= SMOOTH_BACKLOG && isAnimatable(entry.action)
+					entry.animate && isAnimatable(entry.action) && backlogMs(pending) <= CATCHUP_BUDGET_MS
 				if (animated) await handlers.animate(entry.action, entry)
 				else handlers.apply(entry.action, entry)
 				handlers.onApplied?.(entry, animated)
@@ -144,6 +168,21 @@ export const createEventQueue = (handlers: EventQueueHandlers) => {
 		/** True while an event is mid-apply (typically mid-animation). */
 		get busy(): boolean {
 			return draining
+		},
+		/**
+		 * True while the backlog is too deep to play out, so events are being
+		 * fast-forwarded onto the board.
+		 *
+		 * This is the honest "this client is behind the room" signal, and it exists
+		 * because the obvious one stopped being trustworthy. Now that a whole turn
+		 * animates, a queue with events in it is the NORMAL state during someone
+		 * else's turn — a spectator watching a CPU side play is several seconds
+		 * behind the log on purpose, and that is the feature. Reporting that as lag
+		 * would make the diagnostics cry wolf through every turn of every match.
+		 * Falling behind is specifically the case where we gave up on watching.
+		 */
+		get catchingUp(): boolean {
+			return backlogMs(pending) > CATCHUP_BUDGET_MS
 		},
 		drain,
 	}

@@ -6,24 +6,23 @@ import { rendererStore } from '$lib/Sprites/spriteStore'
 import { clearMaterialize } from '$lib/Engine/materialize'
 import { clearBuildFade } from '$lib/Engine/buildFade'
 import { generateKey } from '$lib/Security/keys'
+import {
+	ANIMATION_TIME,
+	HEALTH_BAR_ANIMATION_TIME,
+	HEALTH_BAR_BACKSTOP_SLACK,
+	OVERLAY_ANIMATION_TIME,
+} from './timings'
 
-export const ANIMATION_TIME = 200
-
-// Health bars don't snap to their new value after a hit — they glide there with an
-// ease-out so a chunk of damage (or a heal) reads as motion. ~400ms is long enough
-// to register the slide without holding up the next combat beat.
-export const HEALTH_BAR_ANIMATION_TIME = 400
-
-// Grace on top of the ease before the wall-clock backstop finishes it by hand
-// (see `animateHealthBar`). Generous enough that a visible tab always lands the
-// real animation first, short enough that a hidden one isn't held up long.
-export const HEALTH_BAR_BACKSTOP_SLACK = 600
-
-// Per-frame playback for combat overlays (attack swings, explosions). These
-// sprite sheets run 8-14 frames; at the 200ms movement beat they dragged on for
-// 1.6-2.8s and read as unnaturally slow. ~55ms (~18fps) keeps them punchy while
-// still showing every frame. Tuned independently of movement/idle pacing.
-export const OVERLAY_ANIMATION_TIME = 55
+// The beats themselves live in a leaf module so callers that only need to know
+// how long something takes — the socket event queue, sizing up a backlog's
+// playback time — don't have to import the animator and everything under it.
+// Re-exported here so every existing import site is unchanged.
+export {
+	ANIMATION_TIME,
+	HEALTH_BAR_ANIMATION_TIME,
+	HEALTH_BAR_BACKSTOP_SLACK,
+	OVERLAY_ANIMATION_TIME,
+} from './timings'
 
 // Every animation beat is driven by a setTimeout. When the board is torn down
 // mid-animation (e.g. a dev playground switches map types while a unit is
@@ -169,6 +168,41 @@ export const panBoardToTile = (x: number, y: number, animate = true): boolean =>
 		animate
 	)
 	return true
+}
+
+/**
+ * Bring a freshly built unit into view — a factory roll-out or a Warmachine's
+ * adjacent build. Production is the other way a unit appears on the board, so it
+ * follows the same camera etiquette as a move: another player's build (a CPU or
+ * online opponent) cuts to the tile so its fade-in isn't missed off-screen, and
+ * never for a producer we can't actually see, so fog or a cloak is never given
+ * away. The local player's own builds only pan when the tile is somehow out of
+ * frame — normally they just tapped the producer, and yanking the view on every
+ * purchase would fight the player's own scrolling.
+ *
+ * Returns whether the camera moved.
+ */
+export const panBoardToBuiltUnit = (map: MapObject, tile: number): boolean => {
+	const camera = routeCamera
+	if (!camera) return false
+	const unit = map.layers.units[tile]
+	if (!unit) return false
+	if (!camera.sees(tile, unit, map)) return false
+
+	if (camera.owns(unit)) {
+		const view = camera.view()
+		if (!view) return false
+		const x = (tile % map.cols) * view.tileWidth
+		const y = Math.floor(tile / map.cols) * view.tileHeight
+		const onScreen =
+			x >= view.left &&
+			x + view.tileWidth <= view.left + view.width &&
+			y >= view.top &&
+			y + view.tileHeight <= view.top + view.height
+		if (onScreen) return false
+	}
+
+	return panBoardToTile(tile % map.cols, Math.floor(tile / map.cols))
 }
 
 // How close (in tiles) the moving unit may get to a viewport edge before the

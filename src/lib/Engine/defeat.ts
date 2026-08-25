@@ -12,20 +12,22 @@ import { NEUTRAL_TEAM } from './gameState'
 export const defeatAnimating = writable(0)
 
 /**
- * Resolve a defeated `team`'s board presence. Their units are destroyed — cleared
- * first so the sprite vanishes under the blast, then a death explosion plays on
- * each former tile. Their buildings are NOT destroyed: ownership reverts to
- * neutral (so a surviving enemy can recapture them) and capture progress resets.
+ * Board half of a defeat, with no animation: destroy the dead `team`'s units and
+ * revert its buildings to neutral. Returns the tiles a unit was cleared from, so
+ * a caller that animates can blast exactly those.
+ *
+ * Their buildings are NOT destroyed: ownership reverts to neutral (so a surviving
+ * enemy can recapture them) and capture progress resets.
  *
  * Critically, only the dead team's own units are removed. A building the dead team
  * owned may have a *surviving* enemy unit standing on it (e.g. the unit that just
- * captured the deciding tile); that unit must be left untouched. Resolves once
- * every blast finishes.
+ * captured the deciding tile); that unit must be left untouched.
  *
- * Driven from the live client (GameStateManager) when a team's `hasLost` flips,
- * so it runs for both a forfeit and a "lost your last unit/HQ" defeat.
+ * Split out from `animateTeamDefeat` for surfaces that replay a log without the
+ * live client's animation stack — see `ReplayViewer`, which has no
+ * GameStateManager to drive the defeat and must still get the same board.
  */
-export const animateTeamDefeat = async (map: MapObject, team: number): Promise<void> => {
+export const resolveTeamDefeat = (map: MapObject, team: number): number[] => {
 	const explosionTiles = new Set<number>()
 
 	// Destroy the defeated team's units only — never a tile's occupant by virtue of
@@ -50,11 +52,25 @@ export const animateTeamDefeat = async (map: MapObject, team: number): Promise<v
 		}
 	}
 
-	if (explosionTiles.size === 0) return
+	return [...explosionTiles]
+}
+
+/**
+ * Resolve a defeated `team`'s board presence and play the death blast: the units
+ * are cleared first so each sprite vanishes under its explosion. Resolves once
+ * every blast finishes.
+ *
+ * Driven from the live client (GameStateManager) when a team's `hasLost` flips,
+ * so it runs for both a forfeit and a "lost your last unit/HQ" defeat.
+ */
+export const animateTeamDefeat = async (map: MapObject, team: number): Promise<void> => {
+	const explosionTiles = resolveTeamDefeat(map, team)
+
+	if (explosionTiles.length === 0) return
 
 	defeatAnimating.update((n) => n + 1)
 	try {
-		await Promise.all([...explosionTiles].map((tile) => animateExplosion(map, tile)))
+		await Promise.all(explosionTiles.map((tile) => animateExplosion(map, tile)))
 	} finally {
 		defeatAnimating.update((n) => Math.max(0, n - 1))
 	}

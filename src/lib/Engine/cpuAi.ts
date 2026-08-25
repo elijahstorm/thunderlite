@@ -19,6 +19,7 @@ import { updateFogBelief } from './cpuAi/fogMemory'
 import { bestPlanFor } from './cpuAi/candidates'
 import { beginCpuPlanning, endCpuPlanning, planningUnits } from './cpuAi/planningContext'
 import { pickBuildOnce } from './cpuAi/production'
+import { sampleByScore } from './cpuAi/rng'
 import { isWalletUnit } from './wallet'
 import type { SerializedAction } from './Interactor/serializedAction'
 import type { ActionPlan } from './cpuAi/types'
@@ -43,6 +44,15 @@ export const CPU_AI_TURN_DELAY_MS = 150
 // planner recomputes everything every tick exactly as before — the caching bookkeeping
 // isn't worth it, and small games stay byte-for-byte identical.
 const LAZY_PLAN_THRESHOLD = 70
+
+/**
+ * How close another unit's plan has to be to the best available one for the CPU to
+ * consider acting with that unit instead. Same units as a plan score. Wider than the
+ * per-unit temperature because the choice is only about ORDER — every unit still gets
+ * its turn, so a slightly-lower-scoring unit going first costs almost nothing while
+ * changing the board that everyone after it plans against.
+ */
+const UNIT_ORDER_TEMPERATURE = 30
 
 // Chebyshev radius within which a just-committed action can alter another unit's best
 // plan. A unit's plan depends on its own reachable tiles (≤ max move = 9) and, over
@@ -129,7 +139,12 @@ const findActableUnits = (
 	return planningUnits(map).filter(({ tile, unit }) => unit.team === cpuTeam && !acted.has(tile))
 }
 
-const pickBestPlan = (map: MapObject, cpuTeam: number, cache: PlanCache): ActionPlan | null => {
+const pickBestPlan = (
+	map: MapObject,
+	cpuTeam: number,
+	cache: PlanCache,
+	startTurn: number
+): ActionPlan | null => {
 	// Open a planning window: the board is frozen for the duration of this call, so
 	// the scorer's repeated reads (unit/building lists, enemy reach, concealment)
 	// are computed once and memoised, then torn down so the next tick starts clean.
@@ -139,7 +154,7 @@ const pickBestPlan = (map: MapObject, cpuTeam: number, cache: PlanCache): Action
 		// Only trust cached plans once the army is large enough for the N² recompute to
 		// bite. Below that we recompute every unit fresh, so behaviour is unchanged.
 		const lazy = units.length >= LAZY_PLAN_THRESHOLD
-		let best: ActionPlan | null = null
+		const ready: ActionPlan[] = []
 		for (const { tile, unit } of units) {
 			// Wallet units (Warmachines) score against globals like total enemy count, so a
 			// kill anywhere can shift their plan — cheaper to always recompute the handful of
@@ -153,9 +168,14 @@ const pickBestPlan = (map: MapObject, cpuTeam: number, cache: PlanCache): Action
 				if (cacheable) cache.set(tile, plan)
 			}
 			if (!plan) continue
-			if (!best || plan.score > best.score) best = plan
+			ready.push(plan)
 		}
-		return best
+		// Which unit acts this tick. Sampling here is the cheapest source of variety the
+		// planner has: acting order changes which board the later units plan against, so
+		// two runs of the same turn diverge without any single unit ever taking a worse
+		// plan than the one it picked. Keyed by turn and the tick's remaining unit count
+		// so successive ticks in the same turn draw independently.
+		return sampleByScore(ready, UNIT_ORDER_TEMPERATURE, startTurn, cpuTeam, units.length)
 	} finally {
 		endCpuPlanning()
 	}
@@ -367,7 +387,7 @@ export const runCpuTurn = ({
 		// back to the player. Without this net a single throw leaves the turn
 		// hung, since nothing else schedules the next tick.
 		try {
-			const plan = pickBestPlan(map, startTeam, planCache)
+			const plan = pickBestPlan(map, startTeam, planCache, startTurn)
 			const actions = plan?.actions ?? []
 			if (actions.length === 0) {
 				const build = pickBuildOnce(map, startTeam)

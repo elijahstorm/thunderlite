@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { createEventQueue } from '../../src/lib/Components/Socket/eventQueue'
+import { CATCHUP_BUDGET_MS, createEventQueue } from '../../src/lib/Components/Socket/eventQueue'
+import { remoteChoreographyMs } from '../../src/lib/Engine/remoteChoreography'
 import type { SerializedAction } from '../../src/lib/Engine/Interactor/serializedAction'
 
 const deferred = () => {
@@ -36,6 +37,20 @@ const harness = (ready = () => true) => {
 		onDropped: (entry) => log.push(`dropped:${entry.id}`),
 	})
 	return { log, gates, queue }
+}
+
+/**
+ * Let the queue run to a standstill, releasing each animation gate as it opens.
+ * `animate` in the harness blocks, so a backlog can only be drained by resolving
+ * the gates one at a time.
+ */
+const drain = async (gates: ReturnType<typeof deferred>[], rounds = 200) => {
+	for (let i = 0; i < rounds; i++) {
+		const open = gates.length
+		gates.forEach((gate) => gate.resolve())
+		await flush()
+		if (gates.length === open) return
+	}
 }
 
 const move = (from: number, to: number): SerializedAction => ({ kind: 'move', from, to })
@@ -96,35 +111,80 @@ describe('socket event queue', () => {
 		])
 	})
 
-	it('fast-forwards a deep backlog instead of animating every step of it', async () => {
+	/**
+	 * A whole CPU side's turn arrives as ONE batch now that relays are batched, so
+	 * this is the case the pacing rule is really about. Play order and the moves
+	 * themselves are what a watching player is there for — a board that
+	 * rearranges itself in one silent jump does not tell them what the opponent
+	 * did. Every step of a turn-sized run must animate.
+	 */
+	it('plays out a whole turn that arrives at once', async () => {
 		const { log, gates, queue } = harness()
 
-		// One event in flight and four more delivered while it plays. The first one
-		// out of the queue still has three behind it — past SMOOTH_BACKLOG — so it
-		// fast-forwards rather than making this client fall a further slide-length
-		// behind the room. The next is within reach and gets its choreography.
-		queue.push({ id: 1, action: move(1, 2), animate: true, live: true, via: 'push' })
-		await flush()
-		queue.push({ id: 2, action: move(2, 3), animate: true, live: true, via: 'push' })
-		queue.push({ id: 3, action: move(3, 4), animate: true, live: true, via: 'push' })
-		queue.push({ id: 4, action: move(4, 5), animate: true, live: true, via: 'push' })
-		queue.push({ id: 5, action: move(5, 6), animate: true, live: true, via: 'push' })
+		// Fifteen moves is a plausible CPU turn: ~6s of playback, inside the budget.
+		const turn = Array.from({ length: 15 }, (_, i) => move(i + 1, i + 2))
+		turn.forEach((action, i) =>
+			queue.push({ id: i + 1, action, animate: true, live: true, via: 'push' })
+		)
+		await drain(gates)
 
-		gates[0].resolve()
-		await flush()
+		for (const action of turn) {
+			expect(log).toContain(`animate:start:${label(action)}`)
+			expect(log).not.toContain(`apply:${label(action)}`)
+		}
+	})
 
-		expect(log).toContain(`apply:${label(move(2, 3))}`)
-		expect(log).not.toContain(`animate:start:${label(move(2, 3))}`)
-		expect(log).toContain(`animate:start:${label(move(3, 4))}`)
+	it('fast-forwards a backlog too deep to be worth watching', async () => {
+		const { log, gates, queue } = harness()
+
+		// What a lost network or a throttled background tab leaves behind: minutes
+		// of playback. Making someone sit through that before they can act is worse
+		// than skipping it, so the front of the queue applies instantly.
+		const backlog = Array.from({ length: 40 }, (_, i) => move(i + 1, i + 2))
+		backlog.forEach((action, i) =>
+			queue.push({ id: i + 1, action, animate: true, live: true, via: 'push' })
+		)
+		await drain(gates)
+
+		// The first event out of the queue had nothing behind it yet, so it animates
+		// — the backlog only exists from the second one on, which is where the
+		// fast-forward has to bite.
+		expect(log).toContain(`apply:${label(backlog[1])}`)
+		expect(log).not.toContain(`animate:start:${label(backlog[1])}`)
+		// What bounds how much plays out is the BUDGET, not the size of the backlog:
+		// however deep it gets, the player watches about the same tail of it. Stated
+		// in terms of the real numbers so retuning either one retunes this with it
+		// (+1 for the event that dequeued before the rest had arrived).
+		const animated = log.filter((line) => line.startsWith('animate:start')).length
+		const affordable = Math.ceil(CATCHUP_BUDGET_MS / remoteChoreographyMs(backlog[0])) + 1
+		expect(animated).toBeLessThanOrEqual(affordable)
+		expect(animated).toBeLessThan(backlog.length)
 	})
 
 	/**
-	 * The complaint this threshold exists for. A player taking their whole turn in
-	 * quick succession — or a reconciliation poll handing over a few actions at
-	 * once after the socket lagged — delivers a bunch, and the old rule (animate
-	 * only when ALONE in the queue) teleported every one of them but the last. The
-	 * opponent's turn arrived as a single silent jump of the board instead of as
-	 * moves that happened.
+	 * And it must come back. Fast-forwarding is a way to catch up, not a mode: once
+	 * what is left fits the budget the tail plays out, so the player rejoins live
+	 * play watching the board move rather than mid-jump.
+	 */
+	it('resumes animating once the remaining backlog fits again', async () => {
+		const { log, gates, queue } = harness()
+
+		const backlog = Array.from({ length: 40 }, (_, i) => move(i + 1, i + 2))
+		backlog.forEach((action, i) =>
+			queue.push({ id: i + 1, action, animate: true, live: true, via: 'push' })
+		)
+		await drain(gates)
+
+		const last = backlog[backlog.length - 1]
+		expect(log).toContain(`animate:start:${label(last)}`)
+		expect(log).not.toContain(`apply:${label(last)}`)
+	})
+
+	/**
+	 * The original complaint, kept because it is the floor of the behaviour: the
+	 * first version of this rule animated an event only when it was ALONE in the
+	 * queue, so a player taking their turn in quick succession had every move but
+	 * the last teleported.
 	 */
 	it('still plays out a short bunch rather than jumping the board', async () => {
 		const { log, gates, queue } = harness()

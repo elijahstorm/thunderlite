@@ -21,9 +21,10 @@
  */
 import { db, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
-import { budgetPressure, noteRateLimit } from '$lib/Security/rateLimit'
+import { budgetPressure, gatewayThrottled, noteRateLimit } from '$lib/Security/rateLimit'
 import { clampAsyncTimeout, type GameMode } from '$lib/Game/asyncConfig'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
+import { roundsFromLog } from '$lib/Game/matchTurns'
 
 /**
  * Seat count bounds. A room's real capacity is `game_room.max_players`, derived
@@ -915,26 +916,217 @@ async function appendEvent(
 	throw new Error('Could not append game event after retries')
 }
 
-/** Events with id > `sinceId`, plus the id of the last event in the room. */
+/**
+ * A batch that landed only in part. Carries what DID land so the caller can
+ * settle those ordinals and re-send only the remainder.
+ *
+ * Without this the batch API would be strictly worse than relaying one action at
+ * a time: a rate limit halfway through twenty actions would leave ten in the log
+ * with the sender unable to tell which, and its only safe move would be to
+ * re-send from the start — which the unique index refuses, so every later action
+ * is then rejected as out of order. Reporting the partial result is what makes a
+ * batch resumable, and resumability is what lets the client batch at all.
+ */
+export class PartialAppendError extends Error {
+	constructor(
+		readonly events: GameEvent[],
+		readonly cause: unknown
+	) {
+		super(`Appended ${events.length} event(s) before failing`)
+		this.name = 'PartialAppendError'
+	}
+}
+
+/**
+ * Append a run of actions from ONE sender, in the order given, as a single
+ * operation.
+ *
+ * This exists because the per-action cost of relaying was the thing making
+ * online games lag, and it was a call-count problem rather than a latency one.
+ * Relays are chained one-in-flight-at-a-time (deliberately — see the client), so
+ * a player's actions reach the room no faster than `/move` can answer, and each
+ * answer used to require roughly eight gateway calls against budgets of 900
+ * reads and 300 writes a minute for the whole project. A client driving a CPU side
+ * produces a turn's worth of actions in a few hundred milliseconds and then
+ * spends a minute dripping them out, while its own board races ahead: the host
+ * sits on turn 29 and the opponent watches turn 14.
+ *
+ * Batching collapses the fixed part of that cost. Twenty actions cost one set of
+ * preflight reads and one `count` instead of twenty, and — because they are
+ * published as one frame — arrive at the other client as one contiguous run with
+ * no gap for the push buffer to stall on, which keeps the reconciliation poll on
+ * its slow interval instead of dropping back to 1.5s and spending the budget the
+ * writes need. The inserts themselves are still one call each; the gateway has
+ * no bulk insert, and `seq` has to stay one row per event because it IS the id
+ * clients sync on.
+ *
+ * Ordering is not weakened by this — it is strengthened. The whole run is
+ * numbered from the sender's own counter before anything is written, so a batch
+ * cannot interleave with itself the way two overlapping single requests could.
+ * Every guarantee `appendEvent` makes is preserved per item: a re-sent batch is
+ * recognised as a duplicate rather than recorded twice, a batch that overtook the
+ * sender's earlier actions is refused, and a reused ordinal carrying a DIFFERENT
+ * action is refused rather than silently swallowing a real action.
+ *
+ * All actions are attributed to one `userSession`. Callers must not span a turn
+ * handover in a single batch (the route flushes at `end-turn`), because the actor
+ * a batch is credited to is resolved once, before any of it is written.
+ */
+async function appendEvents(
+	session: string,
+	userSession: string,
+	actions: SerializedAction[],
+	options: { senderSession: string; clientSeq: number }
+): Promise<{ events: GameEvent[]; appended: number }> {
+	const { senderSession, clientSeq } = options
+	if (actions.length === 0) return { events: [], appended: 0 }
+	if (actions.length === 1) {
+		const event = await appendEvent(session, userSession, actions[0], options)
+		return { events: [event], appended: 1 }
+	}
+
+	const ts = now()
+	const expected = await nextClientSeq(session, senderSession)
+	if (clientSeq > expected) {
+		// This batch overtook the sender's own earlier actions. Recording it would
+		// put the log in an order the player never played.
+		throw new OutOfOrderEventError(expected, clientSeq)
+	}
+
+	const settled: GameEvent[] = []
+	let cursor = clientSeq
+	if (clientSeq < expected) {
+		// A re-sent batch, in whole or in part. Read the overlap in ONE query
+		// rather than one per action, and hold every stored row to the same test
+		// `appendEvent` applies: the same action at that ordinal is a duplicate to
+		// hand back, a different one means the sender's counter is stale and
+		// honouring it would swallow a real action.
+		const overlapEnd = Math.min(expected, clientSeq + actions.length)
+		const stored = await db.find<EventRow>('game_event', {
+			where: {
+				session,
+				sender_session: senderSession,
+				client_seq: { gte: clientSeq, lt: overlapEnd },
+			},
+			orderBy: { client_seq: 'asc' },
+		})
+		const byOrdinal = new Map(stored.map((row) => [Number(row.client_seq), row]))
+		for (let ordinal = clientSeq; ordinal < overlapEnd; ordinal++) {
+			const row = byOrdinal.get(ordinal)
+			// Counted but not found is a concurrent insert mid-read: stop here and
+			// let the insert loop below (and the unique index) adjudicate.
+			if (!row) break
+			if (!sameAction(row, actions[ordinal - clientSeq])) {
+				throw new OutOfOrderEventError(expected, clientSeq)
+			}
+			settled.push(toEvent(row))
+			cursor = ordinal + 1
+		}
+	}
+
+	const remaining = actions.slice(cursor - clientSeq)
+	if (remaining.length === 0) return { events: settled, appended: settled.length }
+
+	// One count for the whole run, then contiguous seqs from it. A lost race on
+	// any single insert re-reads the count and resumes from there, so a concurrent
+	// writer costs this batch a retry rather than a hole.
+	let seq = await db.count('game_event', { session })
+	for (let index = 0; index < remaining.length; index++) {
+		const action = remaining[index]
+		const ordinal = cursor + index
+		let inserted = false
+		for (let attempt = 0; attempt < APPEND_RETRIES && !inserted; attempt++) {
+			let row: { id: unknown } | null
+			try {
+				row = await db.insertIgnoreConflict('game_event', {
+					session,
+					seq,
+					user_session: userSession,
+					action,
+					ts,
+					sender_session: senderSession,
+					client_seq: ordinal,
+				})
+			} catch (err) {
+				// A gateway failure (typically a rate limit) mid-run. Everything before
+				// this point is durably recorded, so say so rather than losing track of
+				// it — the caller settles those and re-sends from here.
+				throw new PartialAppendError([...settled], err)
+			}
+			if (row) {
+				settled.push({ id: seq, userSession, action, ts })
+				seq += 1
+				inserted = true
+				break
+			}
+			// A conflict is ambiguous, exactly as in `appendEvent`: either this `seq`
+			// was taken by another writer (recompute and retry) or this ordinal is
+			// already stored (take the stored row and move on).
+			const existing = await db.findOne<EventRow>('game_event', {
+				where: { session, sender_session: senderSession, client_seq: ordinal },
+			})
+			if (existing) {
+				settled.push(toEvent(existing))
+				seq = Math.max(seq, Number(existing.seq) + 1)
+				inserted = true
+				break
+			}
+			seq = await db.count('game_event', { session })
+		}
+		if (!inserted) {
+			throw new PartialAppendError([...settled], new Error('Could not append after retries'))
+		}
+	}
+
+	return { events: settled, appended: settled.length }
+}
+
+/** The gateway caps a `find` at 1000 rows, so a full page may be truncated. */
+const EVENT_PAGE = 1000
+
+/**
+ * Events with id > `sinceId`, plus the id of the last event in the room.
+ *
+ * This runs on the poll, which is the single most-called path in the app: every
+ * client in every open room, every 1.5 seconds whenever the socket is not
+ * demonstrably delivering. So its cost in gateway calls is the app's baseline
+ * spend, and `db/read` is budgeted at 900 calls a minute for the whole project.
+ * Reads have their own budget now, so a poll that overspends it no longer takes
+ * the writes down with it — but it still stalls every room it serves.
+ *
+ * It used to always pair the page read with a `count`, to learn the room's last
+ * id for the empty-page case. That is derivable almost every time: `seq` is
+ * assigned from the row count, so it is contiguous, and the highest row of a
+ * page IS the room's last event unless the page came back full. An empty page is
+ * even simpler — a caller that already holds a cursor and is handed nothing new
+ * has, by definition, nothing newer than its cursor. Only a caller starting from
+ * scratch needs to be told a room is empty rather than unread.
+ *
+ * The count therefore survives for exactly the two cases that need it, and the
+ * common poll costs one call instead of two.
+ */
 async function events(
 	session: string,
 	sinceId: number
 ): Promise<{ events: GameEvent[]; lastEventId: number }> {
 	const startIndex = Math.max(0, sinceId + 1)
-	// Independent reads — the page of new events and the total count don't depend
-	// on each other, so run them in one barrier rather than back to back. This is
-	// the polled sync path, so the saved round-trip lands on every open game.
-	const [rows, total] = await Promise.all([
-		db.find<EventRow>('game_event', {
-			where: { session, seq: { gte: startIndex } },
-			orderBy: { seq: 'asc' },
-		}),
-		db.count('game_event', { session }),
-	])
-	return {
-		events: rows.map(toEvent),
-		lastEventId: total > 0 ? total - 1 : -1,
+	const rows = await db.find<EventRow>('game_event', {
+		where: { session, seq: { gte: startIndex } },
+		orderBy: { seq: 'asc' },
+		limit: EVENT_PAGE,
+	})
+	if (rows.length === 0) {
+		if (sinceId >= 0) return { events: [], lastEventId: sinceId }
+		const total = await db.count('game_event', { session })
+		return { events: [], lastEventId: total > 0 ? total - 1 : -1 }
 	}
+	const highest = Number(rows[rows.length - 1].seq)
+	const events = rows.map(toEvent)
+	if (rows.length < EVENT_PAGE) return { events, lastEventId: highest }
+	// A full page may have been truncated, so the last row we read is not
+	// necessarily the room's last event. Only here is the count worth its call.
+	const total = await db.count('game_event', { session })
+	return { events, lastEventId: total > 0 ? Math.max(total - 1, highest) : highest }
 }
 
 // ── Diagnostic client trace (`game_log`) ─────────────────────────────────────
@@ -958,7 +1150,7 @@ export const MAX_LOG_ENTRIES_PER_BATCH = 60
 /** Cap on one entry's serialized `detail`, to fence a runaway board snapshot. */
 export const MAX_LOG_DETAIL_BYTES = 8_000
 
-const LOG_KINDS = new Set(['out', 'in', 'state', 'chat', 'desync', 'note'])
+const LOG_KINDS = new Set(['out', 'in', 'state', 'chat', 'desync', 'note', 'perf'])
 
 /** Coerce one client-supplied entry into a storable row, or null if unusable. */
 const sanitizeLogEntry = (raw: unknown): GameLogEntry | null => {
@@ -993,9 +1185,10 @@ const sanitizeLogEntry = (raw: unknown): GameLogEntry | null => {
  * and the cost lands entirely on the read path, which one person walks
  * afterwards while debugging.
  *
- * For scale: the gateway grants the `db` namespace 600 requests a minute for the
- * whole project. A two-player match flushing every 2.5s used to be able to spend
- * several times that on diagnostics alone; packed, it costs under a hundred.
+ * For scale: the gateway grants `db/write` 300 requests a minute for the whole
+ * project, and every entry here is a write. A two-player match flushing every
+ * 2.5s used to be able to spend several times that on diagnostics alone; packed,
+ * it costs a few dozen.
  */
 const LOG_ENTRIES_PER_ROW = 30
 /** Ceiling on one row's serialized payload, so a row stays a sane size. */
@@ -1048,13 +1241,25 @@ async function appendLog(
 	if (entries.length === 0) return 0
 	// Nothing here is worth a share of a tight budget. The client never retries a
 	// flush, so a skipped batch is a gap in the trace — much cheaper than
-	// spending `db` headroom a player's next move has to get through.
+	// spending `db/write` headroom a player's next move has to get through. The
+	// trace competes with the moves specifically: both are writes, and writes are
+	// the smaller of the database's two budgets.
 	//
-	// `budgetPressure`, not "are we already refused": the gateway reports what is
-	// left on every successful response, so diagnostics can stand down while
-	// moves are still going through, instead of both of them hitting the wall
-	// together and the move being the one that visibly breaks.
-	if (budgetPressure('db')) return 0
+	// With one exception, and it is the whole reason the trace is useful. Standing
+	// down on mere `budgetPressure` meant the recorder went quiet exactly when
+	// something was going wrong: a batch carrying a desync report, or the timing
+	// and backlog numbers that explain why a room ground to a halt, was dropped
+	// precisely during the incident it documented. That is a diagnostic tool that
+	// works only when there is nothing to diagnose.
+	//
+	// So a batch with evidence in it is written while calls are still succeeding,
+	// and only an outright refusal silences everything. It costs one insert per
+	// flush window per client, against a budget that refuses us at 300 a minute —
+	// and it is the difference between measuring an outage and hearing about it
+	// second-hand.
+	const carriesEvidence = entries.some((e) => e.kind === 'desync' || e.kind === 'perf')
+	if (gatewayThrottled('db/write')) return 0
+	if (!carriesEvidence && budgetPressure('db/write')) return 0
 
 	const rows = packEntries(entries)
 	const results = await Promise.allSettled(
@@ -1074,7 +1279,7 @@ async function appendLog(
 	// Feed any 429 into the breaker so the next flush skips the gateway entirely
 	// rather than rediscovering the limit one insert at a time.
 	for (const result of results) {
-		if (result.status === 'rejected') noteRateLimit(result.reason, 'db')
+		if (result.status === 'rejected') noteRateLimit(result.reason, 'db/write')
 	}
 	return results.reduce((n, r, i) => (r.status === 'fulfilled' ? n + rows[i].length : n), 0)
 }
@@ -1183,6 +1388,52 @@ async function standing(
 		}
 	}
 	return { seats, surrendered }
+}
+
+/**
+ * What the room's own event log says about a finished match: how many rounds it
+ * ran, which sides quit, and where the log stood when we looked.
+ *
+ * This is the server-side answer to "the match row and the event log disagree".
+ * `matches.turns` used to be the winning client's `gameState.turnNumber`, a
+ * number only that browser can see — match 19 recorded 46 against a log that
+ * reaches 24, because a client whose engine has drifted reports a drifted count.
+ * The log is what every client replays, so the round count is derived from it
+ * instead of claimed (see `matchTurns.ts` for the rule, which is `nextActiveTeam`'s).
+ *
+ * `lastEventId` is stamped onto the match row so the two can be checked against
+ * each other afterwards: a row whose session log has grown past its anchor was
+ * written while the room was still playing.
+ *
+ * One roster read plus one log read, on a path that runs once per match.
+ */
+async function logSummary(session: string): Promise<{
+	rounds: number
+	surrendered: Set<number>
+	lastEventId: number
+}> {
+	const [seats, log] = await Promise.all([roster(session), events(session, -1)])
+	const teamOfSession = new Map(seats.map((seat) => [seat.userSession, seat.team ?? null]))
+	const surrendered = new Set<number>()
+	const entries: { action: SerializedAction; team: number | null }[] = []
+	for (const e of log.events) {
+		if (!e.action) continue
+		if (e.action.kind === 'surrender' && typeof e.action.team === 'number') {
+			surrendered.add(e.action.team)
+		}
+		entries.push({ action: e.action, team: teamOfSession.get(e.userSession) ?? null })
+	}
+	return { rounds: roundsFromLog(entries), surrendered, lastEventId: log.lastEventId }
+}
+
+/**
+ * Whether `team` already has a surrender in this room's log. One log read, on a
+ * path that fires at most once per player per match — the relay uses it to
+ * refuse a second forfeit for a side that is already out (see the move route).
+ */
+async function hasSurrendered(session: string, team: number): Promise<boolean> {
+	const log = await events(session, -1)
+	return log.events.some((e) => e.action?.kind === 'surrender' && e.action.team === team)
 }
 
 /**
@@ -1586,11 +1837,14 @@ export const gameStore = {
 	currentTurn,
 	setCurrentTurn,
 	appendEvent,
+	appendEvents,
 	nextClientSeq,
 	events,
 	appendLog,
 	readLog,
 	matchRecorded,
+	logSummary,
+	hasSurrendered,
 	resetTurnDeadline,
 	finishAsyncRoom,
 	enforceTurnDeadline,

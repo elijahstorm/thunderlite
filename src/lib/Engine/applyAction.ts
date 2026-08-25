@@ -30,6 +30,7 @@ import {
 import { recordFogKill } from './cpuAi/fogMemory'
 import type { SerializedAction } from './Interactor/serializedAction'
 import { recordAction } from './devLog'
+import { panBoardToBuiltUnit } from './Animator/animator'
 import { reportDesync } from './desync'
 
 /**
@@ -347,6 +348,10 @@ export const applyAction = (
 			if (built.ok && typeof built.tile === 'number') {
 				const spawned = map.layers.units[built.tile]
 				if (spawned && isStealthUnit(spawned)) recordStealthBuild(map, built.tile, building.team)
+				// Show the roll-out: an opponent's production is off-screen as often as
+				// their moves are, so the camera cuts to it the same way. Live only, so a
+				// reconnect replaying the log doesn't drag the view through every build.
+				if (opts.live) panBoardToBuiltUnit(map as MapObject, built.tile)
 			}
 			fx('build')
 			stat({ kind: 'build', team: building.team })
@@ -369,6 +374,7 @@ export const applyAction = (
 			if (built.ok && typeof built.tile === 'number') {
 				const spawned = map.layers.units[built.tile]
 				if (spawned && isStealthUnit(spawned)) recordStealthBuild(map, built.tile, builder.team)
+				if (opts.live) panBoardToBuiltUnit(map as MapObject, built.tile)
 				fx('build')
 				stat({ kind: 'build', team: builder.team })
 			}

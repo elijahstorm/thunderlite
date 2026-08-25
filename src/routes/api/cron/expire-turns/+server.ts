@@ -28,12 +28,13 @@ export const GET = async ({ request }) => {
 		let resigned = 0
 		let skipped = 0
 		for (const room of rooms) {
-			// Each room costs a handful of database calls to resign and notify, and
-			// this sweep runs unattended against the same `db` budget live matches
-			// are using. When that budget gets tight, stop: nobody is watching this
-			// run, these games have already waited half a day, and the next sweep is
-			// an hour away. A live match has none of those luxuries.
-			if (budgetPressure('db')) {
+			// Each room costs a handful of database calls to resign and notify — reads
+			// and writes both — and this sweep runs unattended against the same budgets
+			// live matches are using. Either one getting tight is reason enough to
+			// stop: nobody is watching this run, these games have already waited half a
+			// day, and the next sweep is an hour away. A live match has none of those
+			// luxuries.
+			if (budgetPressure('db/write') || budgetPressure('db/read')) {
 				skipped = rooms.length - resigned
 				break
 			}

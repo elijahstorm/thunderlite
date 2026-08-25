@@ -504,10 +504,33 @@ export const commitFactoryBuild = (
 	return true
 }
 
+/**
+ * True while `team` is still a live participant — present in the engine's roster
+ * and not already eliminated. What "can this side still act (or quit)" means.
+ */
+export const teamStillPlaying = (team: number, state = get(gameState)): boolean => {
+	if (state.phase !== 'playing') return false
+	const player = state.players.find((p) => p.team === team)
+	return !!player && !player.hasLost
+}
+
 // Forfeit the match for `team`. Routed through `commit` like any other action so
 // it applies locally (and fires its match-end flow) and relays to an online
 // opponent. Safe in single-player too — the local interactor just applies it.
+//
+// A side that is already out cannot resign again. On a two-side board the first
+// forfeit ends the match, so `phase` alone caught this; from three sides up the
+// game continues without the quitter and their client sits on a live board as a
+// spectator — with the give-up/exit paths still wired. Match 19 recorded a second
+// `{surrender, team: 2}` 640 events after the first, which lands harmlessly on an
+// already-lost team but is noise in the log the replay has to step through.
+//
+// A sync-locked client is exempt, for the same reason `commit` exempts it:
+// quitting must always be possible, and a board that has diverged from the room
+// is the last one whose "you are already out" is worth trusting. The relay
+// refuses a genuinely duplicate forfeit server-side anyway.
 export const surrender = (map: MapObject, team: number): void => {
+	if (!isSyncLocked() && !teamStillPlaying(team)) return
 	commit(map, { kind: 'surrender', team })
 }
 

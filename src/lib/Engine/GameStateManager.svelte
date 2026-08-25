@@ -13,6 +13,7 @@
 	import { outgoingActions } from './outgoingActions'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
+	import { setCpuSeed, randomCpuSeed } from './cpuAi/rng'
 	import { teamHasPendingActions } from './pendingActions'
 	import { controlsTeam } from './turnOwnership'
 	import { routeAnimation, animations, animationBusy, boardBusy } from './Animator/animator'
@@ -131,6 +132,13 @@
 			resetMatchEnd()
 			resetMatchStats()
 			resetDevLog(localTeam)
+			// Salt the CPU's tie-breaking for this match. Online, the game session gives
+			// a stable salt, so the driver client re-planning after a reload lands on the
+			// same choice it already relayed instead of diverging from the log. Offline
+			// there is no session and nothing to stay consistent with, so a fresh random
+			// salt makes every playthrough of the same level play differently. Leaving it
+			// unset (salt 0) is the reproducible default the CPU tests rely on.
+			setCpuSeed(gameSession || randomCpuSeed())
 			// F3 weather → env ambience: loop the matching track while sky weather is
 			// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
 			// re-renders and replayed states never restack the loop.

@@ -19,11 +19,23 @@
  * misses and realtime calls fail; callers are expected to degrade gracefully
  * (defaults for KV-backed config, HTTP polling for game sync).
  *
+ * Every call below is wrapped in `metered(namespace, …)` so the gateway ledger
+ * can account for it (see Security/gatewayLedger.ts). The gateway budgets each
+ * namespace per project per minute, so what a feature COSTS in calls matters as
+ * much as how fast any one of them returns — and this adapter is the only place
+ * that sees all of them. Database reads and writes are separate budgets (900 and
+ * 300 a minute) behind one endpoint, so the direction is named here too: this
+ * file is the only place that still knows which one a call is, since the URL
+ * does not say. `payments` is deliberately not metered: it never runs
+ * on a gameplay path, and wrapping its pass-through helpers would add noise to
+ * the one file that has to stay readable as the whole platform surface.
+ *
  * Env:
  *   DONTCODE_API_URL  — base URL of the DontCode backend (no trailing slash)
  *   DONTCODE_API_KEY  — this project's API key (dc_…)
  */
 import { env } from '$env/dynamic/private'
+import { currentGatewayScope, metered } from '$lib/Security/gatewayLedger'
 import { noteRateLimitStatus } from '$lib/Security/rateLimit'
 import {
 	dontcode,
@@ -64,7 +76,12 @@ function client(): DontCodeClient {
 		// that namespace's budget. Feeding it straight into the app's budget
 		// tracker is what lets optional work ease off before it gets refused,
 		// rather than discovering the ceiling by hitting it. See rateLimit.ts.
-		onRateLimit: (status) => noteRateLimitStatus(status),
+		// The second argument is the budget the in-flight call is drawing on, and
+		// it is a fallback: the gateway names the budget it counted in
+		// `RateLimit-Scope` and the SDK prefers that header. It matters for the
+		// responses that carry no scope, where `db` alone cannot say which of the
+		// database's two budgets the numbers describe — the ledger's scope can.
+		onRateLimit: (status) => noteRateLimitStatus(status, currentGatewayScope()),
 	})
 	return _client
 }
@@ -108,20 +125,28 @@ export interface FindOptions {
 	offset?: number
 }
 
+/**
+ * Reads and writes draw on separate budgets — `db/read` at 900 a minute,
+ * `db/write` at 300 — even though both go to the same endpoint. Queries count
+ * against the first, mutations against the second, and nothing in the request
+ * URL distinguishes them, so this is where the distinction has to be made. Pace
+ * them independently: a poll loop that exhausts its own budget leaves writes
+ * untouched, and treating "the database" as one number gives that back.
+ */
 export const db = {
 	find<T = Record<string, unknown>>(table: string, options: FindOptions = {}): Promise<T[]> {
-		return client().db(table).find<T>(options)
+		return metered('db/read', () => client().db(table).find<T>(options))
 	},
 
 	findOne<T = Record<string, unknown>>(
 		table: string,
 		options: Omit<FindOptions, 'limit' | 'offset'> = {}
 	): Promise<T | null> {
-		return client().db(table).findOne<T>(options)
+		return metered('db/read', () => client().db(table).findOne<T>(options))
 	},
 
 	insert(table: string, data: Record<string, unknown>): Promise<{ id: unknown }> {
-		return client().db(table).insert(data)
+		return metered('db/write', () => client().db(table).insert(data))
 	},
 
 	/**
@@ -141,7 +166,7 @@ export const db = {
 	},
 
 	update(table: string, where: Where, data: Record<string, unknown>): Promise<{ count: number }> {
-		return client().db(table).update({ where, data })
+		return metered('db/write', () => client().db(table).update({ where, data }))
 	},
 
 	/** Update-then-insert. Replaces the old `ON CONFLICT DO UPDATE` patterns. */
@@ -161,13 +186,15 @@ export const db = {
 	},
 
 	delete(table: string, where: Where): Promise<{ count: number }> {
-		return client().db(table).delete({ where })
+		return metered('db/write', () => client().db(table).delete({ where }))
 	},
 
 	count(table: string, where?: Where): Promise<number> {
-		return client()
-			.db(table)
-			.count(where ? { where } : undefined)
+		return metered('db/read', () =>
+			client()
+				.db(table)
+				.count(where ? { where } : undefined)
+		)
 	},
 }
 
@@ -177,7 +204,7 @@ export type DontCodeDb = typeof db
 export async function migrate(
 	sql: string
 ): Promise<{ success: boolean; executedStatements?: number; warnings?: string[]; error?: string }> {
-	return client().db.migrate({ sql })
+	return metered('db/migrate', () => client().db.migrate({ sql }))
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -217,7 +244,7 @@ export interface AuthResponse {
 /** Run an auth call, turning sub-500 gateway errors into in-band failures. */
 async function inBand(call: () => Promise<{ success: boolean }>): Promise<AuthResponse> {
 	try {
-		return (await call()) as AuthResponse
+		return (await metered('auth', call)) as AuthResponse
 	} catch (err) {
 		if (isDontCodeError(err) && err.status < 500) {
 			return { success: false, error: err.body.error ?? err.message, code: err.code }
@@ -254,7 +281,7 @@ export const auth = {
 	/** Resolve the current user from an access token. Null when invalid/expired. */
 	async me(accessToken: string): Promise<DontCodeUser | null> {
 		try {
-			const { user } = await client().auth.me({ accessToken })
+			const { user } = await metered('auth', () => client().auth.me({ accessToken }))
 			return user
 		} catch (err) {
 			if (isDontCodeError(err) && err.status === 401) return null
@@ -280,14 +307,14 @@ export const storage = {
 		data: Blob | Uint8Array,
 		contentType: string
 	): Promise<{ key: string; url: string }> {
-		await client().storage.public.upload(path, data, contentType)
-		const { url } = await client().storage.public.getUrl(path)
+		await metered('storage', () => client().storage.public.upload(path, data, contentType))
+		const { url } = await metered('storage', () => client().storage.public.getUrl(path))
 		return { key: path, url }
 	},
 
 	/** Delete files from the project's public storage. */
 	removePublic(paths: string[]): Promise<{ deleted: number }> {
-		return client().storage.public.remove(paths)
+		return metered('storage', () => client().storage.public.remove(paths))
 	},
 }
 
@@ -306,41 +333,41 @@ export interface KvSetOptions {
 
 export const kv = {
 	get<T = unknown>(key: string): Promise<T | null> {
-		return client().cache.get<T>(key)
+		return metered('cache', () => client().cache.get<T>(key))
 	},
 
 	/** Returns `false` when `nx` is set and the key already existed. */
 	set(key: string, value: unknown, options: KvSetOptions = {}): Promise<boolean> {
-		return client().cache.set(key, value, options)
+		return metered('cache', () => client().cache.set(key, value, options))
 	},
 
 	del(key: string): Promise<boolean> {
-		return client().cache.del(key)
+		return metered('cache', () => client().cache.del(key))
 	},
 
 	/** Set or clear (`null`) the TTL on an existing key. `false` if absent. */
 	expire(key: string, ttl: number | null): Promise<boolean> {
-		return client().cache.expire(key, ttl)
+		return metered('cache', () => client().cache.expire(key, ttl))
 	},
 
 	hset(key: string, fields: Record<string, unknown>): Promise<number> {
-		return client().cache.hset(key, fields)
+		return metered('cache', () => client().cache.hset(key, fields))
 	},
 
 	hgetAll<T = Record<string, unknown>>(key: string): Promise<T | null> {
-		return client().cache.hgetAll<T>(key)
+		return metered('cache', () => client().cache.hgetAll<T>(key))
 	},
 
 	sAdd(key: string, ...members: string[]): Promise<number> {
-		return client().cache.sAdd(key, ...members)
+		return metered('cache', () => client().cache.sAdd(key, ...members))
 	},
 
 	sMembers(key: string): Promise<string[]> {
-		return client().cache.sMembers(key)
+		return metered('cache', () => client().cache.sMembers(key))
 	},
 
 	sRem(key: string, ...members: string[]): Promise<number> {
-		return client().cache.sRem(key, ...members)
+		return metered('cache', () => client().cache.sRem(key, ...members))
 	},
 }
 
@@ -364,12 +391,12 @@ export const realtime = {
 		identity?: string
 		ttl?: number
 	}): Promise<RealtimeToken> {
-		return client().realtime.mintToken(input)
+		return metered('realtime', () => client().realtime.mintToken(input))
 	},
 
 	/** Publish to a channel. Returns how many subscribers it reached. */
 	publish(channel: string, payload: unknown): Promise<number> {
-		return client().realtime.publish(channel, payload)
+		return metered('realtime', () => client().realtime.publish(channel, payload))
 	},
 
 	/**
@@ -380,7 +407,7 @@ export const realtime = {
 	 */
 	async tryPublish(channel: string, payload: unknown): Promise<void> {
 		try {
-			await client().realtime.publish(channel, payload)
+			await metered('realtime', () => client().realtime.publish(channel, payload))
 		} catch {
 			// Swallowed by design: the mock gateway has no realtime, and a
 			// hosted-gateway hiccup only delays sync until the next poll.
@@ -389,7 +416,7 @@ export const realtime = {
 
 	/** Who is currently connected to a channel. */
 	presence(channel: string): Promise<{ id: string; identity?: string }[]> {
-		return client().realtime.presence(channel)
+		return metered('realtime', () => client().realtime.presence(channel))
 	},
 }
 
@@ -541,6 +568,6 @@ export const payments = {
 export const notifications = {
 	/** Send one transactional email. Check `.success` before assuming delivery. */
 	sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-		return client().notifications.email.send(input)
+		return metered('notifications', () => client().notifications.email.send(input))
 	},
 }

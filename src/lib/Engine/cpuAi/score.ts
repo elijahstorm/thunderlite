@@ -24,6 +24,32 @@ import {
 
 const VALUE_PER_HP = 1 / 40
 
+/**
+ * Value destroyed by landing `damage` on `victim`: a killing blow takes everything
+ * it has left, a sub-lethal one takes the fraction of its MAX health removed.
+ *
+ * This is the same pricing `expectedLossAt` uses for incoming fire, and for the same
+ * reason. Offence used to be quoted as `damage × VALUE_PER_HP × unitValue` — a flat
+ * "one HP is 1/40th of a unit", which is exactly right for the 40-HP commandos and
+ * increasingly wrong as max health climbs: against a 140-HP Annihilator Tank it
+ * over-rated chip damage by 3.5× (22 damage is 16% of that tank, but scored as 55%
+ * of its value). That is what made the CPU feed units into the biggest thing on the
+ * board for slivers of damage, and what collapsed late-game play into two Annihilator
+ * lines head-butting at a chokepoint. Scaling by the victim's own max health puts
+ * offence and defence in one currency.
+ */
+const damageValue = (victim: UnitObject, damage: number): number => {
+	const data = unitData[victim.type]
+	if (!data) return 0
+	const max = data.health || 1
+	const hp = victim.health ?? max
+	const cost = data.cost > 0 ? data.cost : 50
+	// A lethal hit is worth the target's remaining value — which is `unitValue`, so
+	// the two branches meet continuously at `damage === hp`.
+	if (damage >= hp) return cost * (hp / max)
+	return cost * (damage / max)
+}
+
 export type AttackScore = {
 	damage: number
 	score: number
@@ -68,8 +94,7 @@ const scoreLancePassthrough = (
 		role: 'attack',
 	})
 	const kills = damage >= current
-	const vv = unitValue(victim)
-	const value = kills ? vv + LANCE_KILL_BONUS : damage * VALUE_PER_HP * vv
+	const value = damageValue(victim, damage) + (kills ? LANCE_KILL_BONUS : 0)
 
 	// Same team behind the target → friendly fire: dock the score by the same
 	// amount the hit would have been worth against an enemy.
@@ -112,8 +137,7 @@ const scoreSplashDamage = (
 				attackerTile,
 				role: 'attack',
 			}) * SPLASH_MULTIPLIER
-		const vv = unitValue(splashed)
-		const value = damage >= current ? vv + SPLASH_KILL_BONUS : damage * VALUE_PER_HP * vv
+		const value = damageValue(splashed, damage) + (damage >= current ? SPLASH_KILL_BONUS : 0)
 		// Same team caught in the wash → friendly fire: dock the score by what the
 		// hit would have been worth against an enemy (mirrors scoreLancePassthrough).
 		total += splashed.team === attacker.team ? -value : value
@@ -173,10 +197,19 @@ export const scoreAttack = (
 		}
 	}
 
-	const tv = unitValue(defender)
 	const av = unitValue(attacker)
-	const damageValueOut = killsTarget ? tv : damage * VALUE_PER_HP * tv
-	const damageValueIn = returnDamage * VALUE_PER_HP * av
+	const atkStats = unitData[attacker.type]
+	const atkMax = atkStats?.health ?? 1
+	const atkCurrent = attacker.health ?? atkMax
+	// Trading the attacker away is not the same as taking a scratch. The old scorer
+	// only priced the return DAMAGE, so a half-dead tank that would die to the counter
+	// looked barely worse than one that would survive it — which is how 39% of the
+	// deaths in a real match came from the CPU walking into counterattacks it chose.
+	// A counter that kills costs the attacker's whole remaining value, weighted the
+	// same way `expectedLossAt` weights certain death so it always ranks below living.
+	const attackerDies = returnDamage >= atkCurrent
+	const damageValueOut = damageValue(defender, damage)
+	const damageValueIn = attackerDies ? av * LETHAL_PENALTY : damageValue(attacker, returnDamage)
 
 	let score = damageValueOut - damageValueIn
 	if (killsTarget) score += 25
@@ -364,6 +397,122 @@ const rangedStandoff = (enemyDist: number, minRange: number, maxRange: number): 
 	return -(minRange - enemyDist) * RANGED_CLOSE_PENALTY
 }
 
+// ── Massing: commit as an army, not as a queue ──────────────────────────────
+//
+// Every other term judges a unit alone: what it can hit from a tile, what can hit it
+// back, how far the objective is. That makes the CPU purely tactical, and on a big
+// board it shows. Reinforcements walk out of the home factory one at a time, each
+// independently deciding the advance is fine, and each arrives at an established enemy
+// line by itself and dies. In the match this came from, a Heavy Commando spent fifteen
+// rounds crossing the map to die on arrival, and it was not the only one.
+//
+// The missing idea is force ratio: whether the CPU is locally strong enough to be
+// pushing at all. This weighs friendly against enemy value around the tile being
+// considered (closer units counting for more) and turns it into a factor that scales
+// how hard the unit is pulled forward.
+//
+// The behaviour that falls out needs no explicit rally point. Far from contact there is
+// nothing to be outnumbered by, so units march at full speed. Approaching a defended
+// front the ratio drops, the pull flattens, and they settle just outside it instead of
+// walking in. Every new arrival raises the local friendly value, and once the group
+// outweighs what it faces the whole line advances together. Lose the exchange and the
+// ratio falls again, so the survivors hold for the next wave rather than trickling in.
+//
+// Scouts are exempt. `proberWeight` already scores "cheap, fast, has eyes", and going
+// forward alone is precisely a scout's job — gating recon behind a favourable force
+// ratio would blind the CPU exactly when it most needs to look.
+const SUPPORT_RADIUS = 4
+// Local value share at or below which the CPU is outmatched and should gather.
+const HOLD_SHARE = 0.35
+// Share at or above which it commits at full strength.
+const COMMIT_SHARE = 0.6
+// Floor, so a badly outnumbered unit still drifts toward the fight rather than
+// freezing forever — the advance never switches off, it only loses priority.
+const MIN_COMMITMENT = 0.15
+// Value at which a unit stops being expendable pressure and becomes an investment worth
+// protecting.
+//
+// Waiting for a decisive mass is only half the answer. On a big or many-player map that
+// decisive moment may never arrive, and a CPU that holds its whole army back concedes
+// every neutral building and every tempo advantage while it waits for a threshold that
+// only moves further away. Cheap units are supposed to keep poking — that is what they
+// are for — while the expensive core gathers behind them. So this is a gradient, not a
+// switch: a Strike Commando skirmishes almost freely, a Scorpion Tank hesitates, an
+// Annihilator Tank waits for the line.
+//
+// This deliberately does NOT use `proberWeight` (the "should this unit chase a stealth
+// rumour" score), even though "is it a scout" was the obvious question to ask. That
+// function is half mobility, so a $270 Scorpion Tank with movement 6 scores 0.775 and
+// would count as a scout — fast is not the same as expendable, and treating it that way
+// sent exactly the wrong units forward alone. What matters here is only what losing the
+// unit costs. Dedicated recon is cheap by definition and lands high on this scale
+// anyway (an Outrider at 0.66, a Kestrel Sentry at 0.57), so it still ranges freely
+// without needing a carve-out. And because `unitValue` scales with current health, a
+// badly wounded heavy becomes expendable again, which is the right instinct for
+// something about to die regardless.
+const SKIRMISHER_VALUE = 350
+
+/** 0 = an investment that should wait for support, 1 = expendable pressure. */
+const expendability = (unit: UnitObject): number =>
+	1 - Math.min(1, unitValue(unit) / SKIRMISHER_VALUE)
+
+const localCommitment = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	concealed?: ReadonlySet<number>
+): number => {
+	// Seed with the unit itself: it is part of the force it is deciding to commit.
+	let friendly = unitValue(unit)
+	let hostile = 0
+	for (const { tile: i, unit: other } of planningUnits(map)) {
+		// The mover is still sitting on its old tile in the layers; counting it there
+		// as well as in the seed would inflate its own support.
+		if (other === unit) continue
+		const distance = manhattan(map, i, tile)
+		if (distance > SUPPORT_RADIUS) continue
+		const weight = 1 - distance / (SUPPORT_RADIUS + 1)
+		if (other.team === cpuTeam) {
+			friendly += unitValue(other) * weight
+		} else {
+			// The CPU plays blind: an enemy it cannot perceive can't deter it.
+			if (concealed?.has(i)) continue
+			hostile += unitValue(other) * weight
+		}
+	}
+	if (hostile <= 0) return 1
+	const share = friendly / (friendly + hostile)
+	const ramp = (share - HOLD_SHARE) / (COMMIT_SHARE - HOLD_SHARE)
+	const commitment = Math.max(MIN_COMMITMENT, Math.min(1, ramp))
+	// Lerp back toward "commit anyway" by how expendable the unit is, so the caution
+	// lands on the units that are worth being cautious with and cheap pressure keeps
+	// flowing while the heavies gather behind it.
+	return commitment + (1 - commitment) * expendability(unit)
+}
+
+// Scaling the advance pull by `commitment` alone barely moved the CPU: `advance` is a
+// handful of points, while the threat and attack terms are worth tens to hundreds, so
+// flattening it changed almost nothing. Over-extension needs authority proportional to
+// what is actually being risked — the same shape `expectedLossAt` uses, a fraction of
+// the unit's own value — or a $525 tank will keep walking into a line on its own for
+// the sake of a 7-point objective pull.
+//
+// This is the cost of standing at the front with nobody behind you. It fades to nothing
+// at `SUPPORT_RADIUS` (out of contact, it does not apply) and vanishes when the CPU is
+// locally strong (commitment 1), so it only ever bites on the exact case it is for:
+// a unit pushing into a fight its side is losing. It is a positional cost, so a unit
+// that IS already there and has a good shot still takes it — attacks are scored
+// separately and outweigh this.
+const OVEREXTEND_WEIGHT = 0.35
+
+const overextensionCost = (unit: UnitObject, enemyDist: number, commitment: number): number => {
+	if (commitment >= 1) return 0
+	if (enemyDist <= 0 || enemyDist > SUPPORT_RADIUS) return 0
+	const frontProximity = 1 - (enemyDist - 1) / SUPPORT_RADIUS
+	return (1 - commitment) * frontProximity * unitValue(unit) * OVEREXTEND_WEIGHT
+}
+
 // How close (Manhattan) an enemy may sit to a building before the CPU treats it as
 // under threat and pulls a defender back.
 const DEFEND_RANGE = 4
@@ -416,6 +565,45 @@ const homeDefenseBonus = (map: MapObject, tile: number, cpuTeam: number): number
 // is split across the owner's factories: blocking their sole factory is devastating, one
 // of several far less so. Returns 0 for our own / neutral buildings and non-factories.
 const FACTORY_BLOCK_BONUS = 320
+
+// Only Start_Turn.Capture units (the commandos, the Intrepid) can actually take a
+// building, but the `advance` term pulls EVERY unit toward the nearest objective. A
+// tank therefore drifts onto a capturable tile it can never claim and then holds it,
+// locking out the one unit that could — in the match this came from, a neutral Oil
+// Refinery sat uncaptured for eight rounds with an Annihilator Tank parked on it,
+// repairing. Dock a non-captor for ending on the prize itself. Deliberately small: it
+// nudges the tank one tile off the building without unwinding the approach, and it is
+// an order of magnitude below FACTORY_BLOCK_BONUS so a chosen factory block still wins.
+const OBJECTIVE_SQUAT_PENALTY = 40
+
+const scoreObjectiveSquat = (map: MapObject, tile: number, unit: UnitObject, cpuTeam: number) => {
+	if (hasModifier(unit, 'Start_Turn.Capture')) return 0
+	const building = map.layers.buildings[tile]
+	if (!building) return 0
+	if (building.team === cpuTeam) return 0
+	if ((buildingData[building.type]?.stature ?? 0) <= 0) return 0
+	return OBJECTIVE_SQUAT_PENALTY
+}
+
+// A factory can't deploy while ANY unit stands on its tile (see the `select`
+// interactor and `findProducerBuildings`) — including one of ours. The CPU had no
+// term for that, and `homeDefenseBonus` peaks at distance 0, so its own defenders
+// parked directly on the Warfactory they were guarding: across a four-way sim a team's
+// factory was blocked by its own unit on 28 of 30 turns, it used 21 of 30 build slots,
+// and it sat on an average bank of $476 it had no way to spend. A newly built unit also
+// spawns on the tile, so without this nothing ever tells it to step aside.
+//
+// Priced a little above the most `homeDefenseBonus` can offer on the tile itself, so a
+// guard shifts one square off the building and defends from there — still able to shoot
+// a captor, no longer costing a unit of production every turn. It stays a penalty rather
+// than a veto: a strong attack from that tile can still be worth the slot.
+const SELF_FACTORY_BLOCK_PENALTY = 60
+
+const scoreSelfFactoryBlock = (map: MapObject, tile: number, cpuTeam: number): number => {
+	const building = map.layers.buildings[tile]
+	if (!building || building.team !== cpuTeam) return 0
+	return buildingData[building.type]?.actable ? SELF_FACTORY_BLOCK_PENALTY : 0
+}
 
 const scoreFactoryBlock = (
 	map: MapObject,
@@ -487,12 +675,19 @@ export const scorePositionBonus = (
 	// Ranged units (min range ≥ 2, and never capture-capable here) seek standoff instead
 	// of charging: hold the enemy at firing distance rather than closing onto the front.
 	const [minRange, maxRange] = unitData[unit.type]?.range ?? [0, 0]
+	// Scale the pull forward by whether this unit is part of a force that can actually
+	// win where it is going. Flattening the pull (rather than reversing it) is what
+	// makes units gather at the edge of contact instead of filing into it one by one.
+	const commitment = localCommitment(map, tile, unit, cpuTeam, concealed)
 	const advance =
-		minRange >= 2
+		commitment *
+		(minRange >= 2
 			? rangedStandoff(enemyDist, minRange, maxRange)
 			: objectiveDist > 0
 				? -objectiveDist * objWeight
-				: -enemyDist * 0.5
+				: -enemyDist * 0.5)
+	// Cost of holding a forward tile while the local force ratio is against us.
+	const overextend = overextensionCost(unit, enemyDist, commitment)
 	const defense = homeDefenseBonus(map, tile, cpuTeam)
 	const stealth = scoreStealthPositioning(map, tile, unit, cpuTeam, enemyDist)
 	const caution = lurking * Math.max(0, 6 - enemyDist) * 0.4
@@ -511,6 +706,10 @@ export const scorePositionBonus = (
 	// Choke enemy production by ending on (and thus occupying) their factory — only
 	// counted when the blocker can't be killed off it next turn (see scoreFactoryBlock).
 	const block = scoreFactoryBlock(map, tile, unit, cpuTeam, concealed)
+	// Don't park a unit that can't capture on top of the thing we're trying to capture,
+	// and don't sit on our own factory where it would block this turn's production.
+	const squat =
+		scoreObjectiveSquat(map, tile, unit, cpuTeam) + scoreSelfFactoryBlock(map, tile, cpuTeam)
 	// Vacate a tile our own reinforcement is about to land on (a blocked drop is lost),
 	// unless the positive terms above make holding worth the sacrifice.
 	const reinforcement = scoreReinforcementTile(map, tile, cpuTeam)
@@ -525,6 +724,8 @@ export const scorePositionBonus = (
 		phantom +
 		explore +
 		block -
+		squat -
+		overextend -
 		reinforcement
 	)
 }

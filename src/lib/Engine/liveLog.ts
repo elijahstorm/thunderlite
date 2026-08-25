@@ -16,6 +16,7 @@
  *   - `state`  a board digest anchored to an event id — the desync detector
  *   - `chat`   an in-game chat line (realtime-only, so otherwise unrecorded)
  *   - `desync` an action the engine could not apply (see `desync.ts`)
+ *   - `perf`   what a relay cost and how far behind the room this client is
  *
  * Entries are buffered and flushed in small batches so a match costs a handful
  * of extra requests, never one per action. Everything here is best-effort: a
@@ -27,7 +28,7 @@
 import { browser } from '$app/environment'
 import type { SerializedAction } from './Interactor/serializedAction'
 
-export type LiveLogKind = 'out' | 'in' | 'state' | 'chat' | 'desync' | 'note'
+export type LiveLogKind = 'out' | 'in' | 'state' | 'chat' | 'desync' | 'note' | 'perf'
 
 export type LiveLogEntry = {
 	kind: LiveLogKind
@@ -182,6 +183,38 @@ export const logDesync = (
 	// reloaded (by the player, or by the resync prompt) and take the buffer with it.
 	flush(false)
 }
+
+/**
+ * A timing or backlog observation. Separate from `note` because these are the
+ * entries you want to aggregate rather than read: one row per relay and per
+ * gauge tick, with numbers in fixed fields so a query can take a p95 of them.
+ *
+ * The distinction that makes this worth recording at all is between the two
+ * halves of "the game felt slow". `relayMs` and `calls` are what the round trip
+ * cost; `owed` and `logLag` are how far the client had fallen behind because of
+ * it. A room can have healthy round trips and a terrible `owed` — that is what a
+ * client relaying a CPU side's whole turn one action at a time looks like, and
+ * the latency alone would have called it fine.
+ */
+export const logPerf = (
+	eventId: number,
+	detail: {
+		what: 'relay' | 'gauge'
+		/** Actions in the batch, and how many the server settled. */
+		actions?: number
+		settled?: number
+		/** Round trip as the sender measured it. */
+		relayMs?: number
+		/** Gateway calls the server made for it (from `x-gateway-calls`). */
+		calls?: number
+		gatewayMs?: number
+		/** Actions this client has relayed locally but the room has not accepted. */
+		owed?: number
+		/** Events in the log this client has not applied yet. */
+		logLag?: number
+		[key: string]: unknown
+	}
+): void => push('perf', eventId, detail)
 
 /** Free-form breadcrumb (connection state, resync prompts, teardown reasons). */
 export const logNote = (note: string, detail: Record<string, unknown> = {}): void =>

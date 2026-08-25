@@ -12,6 +12,7 @@ import { CreateMessages } from './create_messages.sql'
 import { CreateMatches } from './create_matches.sql'
 import { CreateMatchPlayers } from './create_match_players.sql'
 import { CreateMatchHistory } from './create_match_history.sql'
+import { CreateMatchAnchor } from './create_match_anchor.sql'
 import { CreateCampaignProgress } from './create_campaign_progress.sql'
 import { CreateGameRoom } from './create_game_room.sql'
 import { CreateGameRoomSettings } from './create_game_room_settings.sql'
@@ -51,6 +52,8 @@ export const consolidatedSchema = [
 	CreateMatchPlayers,
 	// After CreateMatchPlayers: its alters target matches + match_players.
 	CreateMatchHistory,
+	// After CreateMatches: its alter targets matches.
+	CreateMatchAnchor,
 	CreateCampaignProgress,
 	CreateGameRoom,
 	CreateGameRoomSettings,

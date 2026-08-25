@@ -5,21 +5,25 @@ import { DontCodeError } from 'dontcode'
 /**
  * How the app behaves when the DontCode gateway rate limits it.
  *
- * The gateway meters each service namespace on its own budget (`db` 600/min,
- * `realtime` 1200/min, `notifications` 60/min, and so on). The two largest
- * spenders of the `db` budget were both background systems nobody was waiting
- * on: the per-client desync trace (`game_log`), written one row per entry, and
- * the error logger, which answered every failure — including a rate limit —
- * with another write. Together they could exhaust the budget a player's next
- * move needed.
+ * The gateway meters each service namespace on its own budget (`db/read`
+ * 900/min, `db/write` 300/min, `realtime` 1200/min, `notifications` 60/min, and
+ * so on). The two largest spenders of the write budget were both background
+ * systems nobody was waiting on: the per-client desync trace (`game_log`),
+ * written one row per entry, and the error logger, which answered every failure
+ * — including a rate limit — with another write. Together they could exhaust the
+ * budget a player's next move needed, and the database's tighter budget is the
+ * one they share with it.
  *
- * Since `dontcode@0.2.9` the SDK reports `RateLimit-Remaining` off every counted
- * response, successes included, so the app no longer has to be refused before
- * reacting. These tests pin the five properties that keep a limit from becoming
+ * Since `dontcode@0.2.11` the SDK reports `RateLimit-Remaining` off every
+ * counted response, successes included, and names the budget those numbers
+ * belong to from `RateLimit-Scope` rather than guessing it from the URL — which
+ * is what makes the database's two budgets separable at all. So the app no
+ * longer has to be refused before reacting. These tests pin the six properties that keep a limit from becoming
  * an outage: diagnostics collapse into few writes, optional work stands down
  * while headroom is still positive, pressure on one budget never mutes another,
- * a player's move is never the thing shed, and reporting a rate limit never
- * costs another call.
+ * a report that names no budget is still attributed to the direction it was
+ * spending, a player's move is never the thing shed, and reporting a rate limit
+ * never costs another call.
  */
 const h = vi.hoisted(() => {
 	const tables: Record<string, Record<string, unknown>[]> = {}
@@ -57,7 +61,7 @@ vi.mock('$lib/dontcode/server', () => {
 		findOne: async () => null,
 		insert: async (table: string, data: Record<string, unknown>) => {
 			h.calls.insert += 1
-			if (h.fail.rateLimit) throw refusal('db')
+			if (h.fail.rateLimit) throw refusal('db/write')
 			rowsOf(table).push({ ...data, id: rowsOf(table).length + 1 })
 			return { id: rowsOf(table).length }
 		},
@@ -149,8 +153,8 @@ describe('diagnostic trace write volume', () => {
 		expect(entries[0].eventId).toBe(7)
 	})
 
-	it('skips the gateway entirely while the db cooldown is known', async () => {
-		noteRateLimit(refusal('db'))
+	it('skips the gateway entirely while the db/write cooldown is known', async () => {
+		noteRateLimit(refusal('db/write'))
 
 		const stored = await gameStore.appendLog(SESSION, PLAYER, batch(60))
 
@@ -163,31 +167,62 @@ describe('diagnostic trace write volume', () => {
 
 		await gameStore.appendLog(SESSION, PLAYER, batch(10))
 
-		expect(gatewayThrottled('db')).toBe(true)
-		expect(gatewayCooldownSeconds('db')).toBeGreaterThan(50)
+		expect(gatewayThrottled('db/write')).toBe(true)
+		expect(gatewayCooldownSeconds('db/write')).toBeGreaterThan(50)
 	})
 
 	it('stands down before being refused, while writes are still succeeding', async () => {
-		// The capability the success-path headers exist for: 40 of 600 left is not
+		// The capability the success-path headers exist for: 40 of 300 left is not
 		// a refusal, and diagnostics should already be out of the way. Waiting for
 		// the 429 means the trace and the player's move hit the wall together, and
 		// the move is the one that visibly breaks.
-		counted('db', 40, 600)
+		counted('db/write', 40, 300)
 
 		const stored = await gameStore.appendLog(SESSION, PLAYER, batch(10))
 
 		expect(stored).toBe(0)
 		expect(h.calls.insert).toBe(0)
-		expect(gatewayThrottled('db')).toBe(false)
+		expect(gatewayThrottled('db/write')).toBe(false)
 	})
 
 	it('keeps writing while there is comfortable headroom', async () => {
-		counted('db', 480, 600)
+		counted('db/write', 240, 300)
 
 		const stored = await gameStore.appendLog(SESSION, PLAYER, batch(10))
 
 		expect(stored).toBe(10)
-		expect(budgetHeadroom('db')).toBeCloseTo(0.8, 2)
+		expect(budgetHeadroom('db/write')).toBeCloseTo(0.8, 2)
+	})
+
+	it('still records evidence while merely under pressure', async () => {
+		// The carve-out, and the reason for it: standing down on pressure alone
+		// meant the recorder went quiet during exactly the incidents it exists to
+		// explain. A batch carrying timing or a desync report is written while
+		// calls are still succeeding — one insert per flush window, against a
+		// budget that refuses at 300 a minute.
+		counted('db/write', 40, 300)
+
+		const stored = await gameStore.appendLog(SESSION, PLAYER, [
+			...batch(4),
+			{ kind: 'perf', eventId: 9, ts: 1_700_000_000_100, detail: { what: 'gauge', owed: 12 } },
+		])
+
+		expect(stored).toBe(5)
+		expect(h.calls.insert).toBeGreaterThan(0)
+	})
+
+	it('goes silent for everything once the gateway has actually refused', async () => {
+		// Pressure is a hint; a refusal is not. Nothing diagnostic is worth
+		// re-spending a budget the gateway has already closed — the player's next
+		// move has to get through it.
+		noteRateLimit(refusal('db/write'))
+
+		const stored = await gameStore.appendLog(SESSION, PLAYER, [
+			{ kind: 'perf', eventId: 9, ts: 1_700_000_000_100, detail: { what: 'gauge', owed: 12 } },
+		])
+
+		expect(stored).toBe(0)
+		expect(h.calls.insert).toBe(0)
 	})
 
 	it('keeps writing when a different budget is the one that is exhausted', async () => {
@@ -199,36 +234,96 @@ describe('diagnostic trace write volume', () => {
 		const stored = await gameStore.appendLog(SESSION, PLAYER, batch(10))
 
 		expect(stored).toBe(10)
-		expect(gatewayThrottled('db')).toBe(false)
+		expect(gatewayThrottled('db/write')).toBe(false)
+	})
+
+	it('keeps writing when the read budget is the exhausted one', async () => {
+		// The regression the split exists to prevent, now that the app has to
+		// honour it on its side too. Polling spends `db/read` at 900 a minute and
+		// is by far the app's largest consumer, so it is the budget most likely to
+		// be gone — and it says nothing about whether a write will land.
+		noteRateLimit(refusal('db/read'))
+
+		const stored = await gameStore.appendLog(SESSION, PLAYER, batch(10))
+
+		expect(stored).toBe(10)
+		expect(gatewayThrottled('db/write')).toBe(false)
 	})
 })
 
 describe('budget pressure', () => {
 	it('reads pressure per namespace, never across them', () => {
 		counted('notifications', 2, 60)
-		counted('db', 500, 600)
+		counted('db/write', 250, 300)
 
 		expect(budgetPressure('notifications')).toBe(true)
-		expect(budgetPressure('db')).toBe(false)
+		expect(budgetPressure('db/write')).toBe(false)
 	})
 
 	it('reports no headroom rather than false confidence when nothing was counted', () => {
-		expect(budgetHeadroom('db')).toBe(null)
-		expect(budgetPressure('db')).toBe(false)
+		expect(budgetHeadroom('db/write')).toBe(null)
+		expect(budgetPressure('db/write')).toBe(false)
 	})
 
 	it('treats a refusal as zero headroom for the namespace it names', () => {
-		counted('db', 500, 600)
-		noteRateLimit(refusal('db'))
+		counted('db/write', 250, 300)
+		noteRateLimit(refusal('db/write'))
 
-		expect(budgetHeadroom('db')).toBe(0)
-		expect(budgetPressure('db')).toBe(true)
+		expect(budgetHeadroom('db/write')).toBe(0)
+		expect(budgetPressure('db/write')).toBe(true)
+	})
+
+	it('keeps the two database budgets apart', () => {
+		// One `db` key would let these overwrite each other and leave the app
+		// pacing off a number that flips between 900 and 300 depending on which
+		// call answered last.
+		counted('db/read', 700, 900)
+		counted('db/write', 20, 300)
+
+		expect(budgetPressure('db/read')).toBe(false)
+		expect(budgetPressure('db/write')).toBe(true)
+		expect(budgetHeadroom('db/read')).toBeCloseTo(0.78, 2)
+	})
+
+	it('attributes a report that names only `db` to the direction being spent', () => {
+		// What a response with no `RateLimit-Scope` leaves us: `POST /api/v1/db`
+		// serves both directions, so the URL names a namespace the gateway no
+		// longer budgets. The numbers still describe the one bucket it counted, and
+		// the caller knows which that was.
+		noteRateLimitStatus(
+			{ namespace: 'db', remaining: 20, limit: 300, reset: 30, exceeded: false },
+			'db/write'
+		)
+
+		expect(budgetPressure('db/write')).toBe(true)
+		expect(budgetHeadroom('db/read')).toBe(null)
+	})
+
+	it('believes the scope the gateway reported over the direction we guessed', () => {
+		// `RateLimit-Scope` is authoritative: the gateway is the only party that
+		// knows which bucket it charged. A hint that disagrees — a helper that
+		// reads before it writes, say — must not be able to redirect a reading onto
+		// a budget the response was never about.
+		noteRateLimitStatus(
+			{ namespace: 'db/read', remaining: 40, limit: 900, reset: 30, exceeded: false },
+			'db/write'
+		)
+
+		expect(budgetPressure('db/read')).toBe(true)
+		expect(budgetHeadroom('db/write')).toBe(null)
+	})
+
+	it("accepts the gateway's internal spelling of a namespace", () => {
+		noteRateLimit(refusal('db_write'))
+
+		expect(gatewayThrottled('db/write')).toBe(true)
+		expect(gatewayThrottled('db/read')).toBe(false)
 	})
 })
 
 describe('what the player is told', () => {
 	it('announces a countdown for a budget a player would notice', () => {
-		noteRateLimit(refusal('db'))
+		noteRateLimit(refusal('db/write'))
 
 		expect(playerFacingCooldownSeconds()).toBeGreaterThan(50)
 	})
@@ -251,9 +346,9 @@ describe('what the player is told', () => {
 	it('says nothing while merely under pressure', () => {
 		// Standing optional work down early is an internal economy. A banner is a
 		// promise that something is actually unavailable, and it isn't.
-		counted('db', 10, 600)
+		counted('db/write', 10, 300)
 
-		expect(budgetPressure('db')).toBe(true)
+		expect(budgetPressure('db/write')).toBe(true)
 		expect(playerFacingCooldownSeconds()).toBe(0)
 	})
 })
@@ -262,7 +357,7 @@ describe('error logging under a rate limit', () => {
 	it('never writes a row about a rate limit', async () => {
 		// The amplification loop: reporting a 429 is itself a call against the
 		// limit being reported, so under load every error handler added traffic.
-		await logToErrorDb(refusal('db'))
+		await logToErrorDb(refusal('db/write'))
 
 		expect(h.calls.insert).toBe(0)
 	})

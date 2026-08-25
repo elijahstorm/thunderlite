@@ -27,6 +27,7 @@
 		logIncoming,
 		logNote,
 		logOutgoing,
+		logPerf,
 		logState,
 		startLiveLog,
 		stopLiveLog,
@@ -77,6 +78,17 @@
 	// us, and drives the sweep that resigns an opponent who left. Independent of the
 	// event poll, whose cadence varies with how well the socket is delivering.
 	const HEARTBEAT_INTERVAL = 10_000
+	/**
+	 * Most actions one request may carry. Matches the server's own cap; a run
+	 * longer than this simply continues in the next request.
+	 */
+	const MAX_RELAY_BATCH = 32
+	/**
+	 * How often the backlog gauges are recorded while this client is behind the
+	 * room. Only ticks that have something to say are written (see `gaugeTick`),
+	 * so a healthy match costs nothing.
+	 */
+	const GAUGE_INTERVAL = 5000
 
 	const isMultiplayer = (): boolean => {
 		if (!gameSession) return false
@@ -163,6 +175,7 @@
 	let liveIsAiDriver = $state(untrack(() => isAiDriver))
 	let clockNow = $state(Date.now())
 	let clockTimer: ReturnType<typeof setInterval> | null = null
+	let gaugeTimer: ReturnType<typeof setInterval> | null = null
 	const deadlineLeftMs = $derived(deadline != null ? deadline - clockNow : null)
 
 	// The last event id actually committed to the board (vs `lastEventId`, which is
@@ -326,6 +339,23 @@
 
 	let pollInFlight = false
 	let pollAgain = false
+	/**
+	 * Ask the next poll where our own request stream resumes.
+	 *
+	 * Answering that costs the server a count on the event table, and a client
+	 * needs it twice in a match: once on the first poll after a load, and again if
+	 * the server ever refuses an ordinal. Asking every 1.5 seconds for the rest of
+	 * the match spent a fifth of the poll's gateway budget restating a number we
+	 * already had — on the hottest path in the app, per client, per room.
+	 */
+	let wantServerSeq = true
+	/**
+	 * The id of the last event in the ROOM, as of our last poll. `appliedEventId`
+	 * is where our board is; the difference between them is how far behind the log
+	 * this client is, which is the one number that describes what a lagging
+	 * spectator actually experiences.
+	 */
+	let serverLastEventId = -1
 
 	/**
 	 * Reconciliation pass. Coalesced: a gap can fire one of these from the push
@@ -353,21 +383,28 @@
 
 	const pollOnce = async () => {
 		try {
-			const res = await fetch(`/api/game/${gameSession}/events?since=${lastEventId}`)
+			const seqQuery = wantServerSeq ? '&seq=1' : ''
+			const res = await fetch(`/api/game/${gameSession}/events?since=${lastEventId}${seqQuery}`)
 			if (!res.ok) return
 			const data = (await res.json()) as {
 				events?: GameEvent[]
+				lastEventId?: number
 				turnDeadline?: number | null
 				aiTeams?: number[]
 				isAiDriver?: boolean
 				clientSeq?: number
 			}
 			if (!data?.events) return
+			if (typeof data.lastEventId === 'number') {
+				serverLastEventId = Math.max(serverLastEventId, data.lastEventId)
+			}
 			// Where our own request stream resumes. Only ever adopted when we have
 			// nothing in flight (the relay chain is idle), so a poll landing between a
 			// relay's send and its response can't rewind the counter under it.
-			if (typeof data.clientSeq === 'number' && data.clientSeq > clientSeq && relaysPending === 0) {
-				clientSeq = data.clientSeq
+			if (typeof data.clientSeq === 'number') {
+				if (data.clientSeq > clientSeq && relaysOwed() === 0) clientSeq = data.clientSeq
+				// Answered, so stop asking until something invalidates it again.
+				wantServerSeq = false
 			}
 			if (asyncGame && data.turnDeadline !== undefined) deadline = data.turnDeadline
 			if (Array.isArray(data.aiTeams)) {
@@ -408,22 +445,47 @@
 	// directly, and on a gap (a lost push) backfill from the event log instead
 	// of applying out of order.
 	const onRealtimeEvent = (message: RealtimeMessage) => {
-		const event = (message.payload as { event?: GameEvent } | null)?.event
-		if (!event || typeof event.id !== 'number') return
-		const outcome = pushBuffer.offer(event)
-		if (outcome === 'stale') {
-			logIncoming(event.id, event.action, 'push', 'stale')
+		const payload = message.payload as { event?: GameEvent; events?: GameEvent[] } | null
+		// A frame carries a whole relayed run since batching. `event` is repeated as
+		// the first of it for older bundles; reading `events` when present is what
+		// makes a batched turn arrive as one contiguous, gapless run — which is the
+		// reason the throttled poll survives a burst instead of dropping back to
+		// 1.5s and spending the budget the writes need.
+		const batch =
+			Array.isArray(payload?.events) && payload.events.length
+				? payload.events
+				: payload?.event
+					? [payload.event]
+					: []
+		if (batch.length === 0) return
+		let accepted = 0
+		let gap = false
+		for (const event of batch) {
+			if (!event || typeof event.id !== 'number') continue
+			const outcome = pushBuffer.offer(event)
+			if (outcome === 'stale') {
+				logIncoming(event.id, event.action, 'push', 'stale')
+				continue
+			}
+			if (outcome === 'accepted') {
+				accepted += 1
+				continue
+			}
+			// Held (or dropped): there is a hole in front of it that only the log can
+			// fill. Everything waiting is applied behind whatever that recovers.
+			gap = true
+		}
+		if (batch.length) {
+			const head = batch[batch.length - 1]
+			if (typeof head?.id === 'number') serverLastEventId = Math.max(serverLastEventId, head.id)
+		}
+		if (gap) {
+			void poll()
 			return
 		}
-		if (outcome === 'accepted') {
-			// The socket handed us the next id in order. That is the only thing that
-			// earns back the throttled poll.
-			restorePushTrust()
-			return
-		}
-		// Held (or dropped): there is a hole in front of it that only the log can
-		// fill. Everything waiting is applied behind whatever this recovers.
-		void poll()
+		// The socket handed us the next ids in order. That is the only thing that
+		// earns back the throttled poll.
+		if (accepted > 0) restorePushTrust()
 	}
 
 	const connectRealtime = async () => {
@@ -505,45 +567,83 @@
 	 */
 	const reportUnrelayed = (action: SerializedAction, reason: 'action-refused' | 'action-lost') => {
 		if (!multiplayer) return
+		// Stop relaying whatever is still queued. `reportDesync` freezes the board,
+		// and everything behind this action came off the same board — the one we now
+		// know the room does not share. Sending it would keep writing the room's
+		// history from a client that has already been told it is wrong, and each of
+		// those relays would be refused in turn for the same reason. The same
+		// reasoning gates the CPU's own commits (see `cpuAi.commit`).
+		outbox.length = 0
 		reportDesync(action, reason)
 	}
 
-	const relay = async (action: SerializedAction) => {
+	/**
+	 * Relay a run of this client's own consecutive actions, retrying as needed
+	 * until every one of them is in the log or the run is given up on.
+	 *
+	 * The remainder shrinks as the server settles it, and progress resets the
+	 * failure budget: a batch that got half way and then hit a cooldown has
+	 * demonstrated the transport works, so the rest of it deserves a full budget
+	 * rather than inheriting the failure count of a delay it already survived.
+	 */
+	const relay = async (batch: SerializedAction[]) => {
 		busyNotified = false
+		let pending = batch
 		let budget = RELAY_ATTEMPTS
 		for (let attempt = 0; attempt < budget; attempt++) {
-			const outcome = await relayOnce(action, attempt)
-			if (outcome === 'done') return
-			if (typeof outcome === 'object') {
+			const outcome = await relayOnce(pending, attempt)
+			if (outcome.settled > 0) {
+				pending = pending.slice(outcome.settled)
+				if (pending.length === 0) return
+				attempt = -1
+				budget = RELAY_ATTEMPTS
+				if (outcome.waitMs === undefined) continue
+			}
+			// `stop` means the server gave an answer that retrying cannot improve;
+			// relayOnce has already logged it and reported the divergence.
+			if (outcome.stop) return
+			if (outcome.waitMs !== undefined) {
 				// The server named a wait. Honour it instead of our own back-off
 				// curve, and extend the budget so the move survives the cooldown.
 				budget = Math.max(budget, RELAY_BUSY_ATTEMPTS)
-				await wait(Math.min(outcome.retryAfterMs, MAX_BUSY_WAIT_MS))
+				await wait(Math.min(outcome.waitMs, MAX_BUSY_WAIT_MS))
 				continue
 			}
-			await wait(RELAY_BACKOFF_MS[Math.min(attempt, RELAY_BACKOFF_MS.length - 1)])
+			await wait(RELAY_BACKOFF_MS[Math.min(Math.max(attempt, 0), RELAY_BACKOFF_MS.length - 1)])
 		}
-		// Out of attempts. The action is already on our board but not in the log, so
-		// this client is ahead of the room. We deliberately do NOT consume an ordinal
-		// — blocking the stream forever over one lost action would be worse than the
-		// gap. The board is frozen from here: playing on against state the room never
-		// accepted is what turns one lost action into an unplayable match.
-		logOutgoing(action, 'failed', { error: 'exhausted-retries' })
-		reportUnrelayed(action, 'action-lost')
+		// Out of attempts. These actions are already on our board but not in the
+		// log, so this client is ahead of the room. We deliberately do NOT consume
+		// their ordinals — blocking the stream forever over a lost action would be
+		// worse than the gap. The board is frozen from here: playing on against
+		// state the room never accepted is what turns one lost action into an
+		// unplayable match.
+		logOutgoing(pending[0], 'failed', { error: 'exhausted-retries', unsent: pending.length })
+		reportUnrelayed(pending[0], 'action-lost')
 	}
 
 	/**
-	 * One relay attempt. `retry` backs off on our own curve; `{ retryAfterMs }`
-	 * is the server naming its own; `done` means stop, whatever the outcome was.
+	 * One relay attempt for a run of actions.
+	 *
+	 * `settled` is how many of them the server durably recorded — which can be
+	 * fewer than were sent, when a batch was cut short by a cooldown part way
+	 * through. Those are settled for good: their ordinals are consumed and only
+	 * the remainder is re-sent. `waitMs` is the server naming its own back-off;
+	 * `stop` means no retry can help.
 	 */
-	type RelayOutcome = 'done' | 'retry' | { retryAfterMs: number }
+	type RelayOutcome = { settled: number; stop?: boolean; waitMs?: number }
 
-	const relayOnce = async (action: SerializedAction, attempt: number): Promise<RelayOutcome> => {
+	const relayOnce = async (batch: SerializedAction[], attempt: number): Promise<RelayOutcome> => {
+		const started = performance.now()
+		// A lone action is sent in the original single-action shape. Not just for
+		// tidiness: it keeps the overwhelmingly common request byte-identical to
+		// what every deployed server already accepts, so batching cannot break the
+		// one case that was never slow.
+		const body = batch.length === 1 ? { event: batch[0], clientSeq } : { events: batch, clientSeq }
 		try {
 			const res = await fetch(`/api/game/${gameSession}/move`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ event: action, clientSeq }),
+				body: JSON.stringify(body),
 			})
 			if (res.status === 409) {
 				// Our counter is out of step with the sender stream the server has —
@@ -551,113 +651,284 @@
 				// resume; adopt it and try again rather than letting the action drop.
 				const data = (await res.json().catch(() => null)) as { expected?: number } | null
 				if (typeof data?.expected === 'number' && data.expected !== clientSeq) {
-					logOutgoing(action, 'failed', { status: 409, was: clientSeq, expected: data.expected })
+					logOutgoing(batch[0], 'failed', {
+						status: 409,
+						was: clientSeq,
+						expected: data.expected,
+					})
 					clientSeq = data.expected
-					return 'retry'
+					// The server's view of our stream moved under us, so re-seed from it
+					// on the next poll rather than trusting the local counter again.
+					wantServerSeq = true
+					return { settled: 0 }
 				}
 				// The counter already matches what the server expects and it still
-				// refused, so retrying can only produce the same answer. The action is
-				// on our board and nowhere else.
-				logOutgoing(action, 'failed', { status: 409, attempt })
-				reportUnrelayed(action, 'action-lost')
-				return 'done'
+				// refused, so retrying can only produce the same answer. The actions
+				// are on our board and nowhere else.
+				logOutgoing(batch[0], 'failed', { status: 409, attempt })
+				reportUnrelayed(batch[0], 'action-lost')
+				return { settled: 0, stop: true }
 			}
 			if (res.status === 403) {
 				// Rejected: the server disagrees about whose turn it is, so our board
 				// has already applied something the room never accepted. Worth logging
 				// loudly — it's a divergence, just one we caught at the source.
-				// Nothing was recorded, so the ordinal stays unconsumed.
-				logOutgoing(action, 'rejected', { status: 403 })
+				// Nothing was recorded, so the ordinals stay unconsumed.
+				logOutgoing(batch[0], 'rejected', { status: 403 })
 				flashWrongTurn()
 				// The flash alone was not enough. It reads as "that click didn't take",
 				// but the click DID take locally — this board and the room have disagreed
 				// about the turn since whenever the first one was refused, and every
 				// action after it compounds the split. Freeze and offer the resync.
-				reportUnrelayed(action, 'action-refused')
-				return 'done'
+				reportUnrelayed(batch[0], 'action-refused')
+				return { settled: 0, stop: true }
 			}
 			if (res.status === 429) {
-				// The backend is rate limited, not refusing this move. Nothing was
-				// recorded, so the ordinal stays unconsumed and re-sending the same
-				// one is safe (the server dedupes on sender + clientSeq).
+				// The backend is rate limited, not refusing these moves. Nothing was
+				// recorded, so the ordinals stay unconsumed and re-sending the same
+				// ones is safe (the server dedupes on sender + clientSeq).
 				const data = (await res.json().catch(() => null)) as { retryAfter?: number } | null
 				const seconds =
 					typeof data?.retryAfter === 'number' && data.retryAfter > 0 ? data.retryAfter : 2
 				noteServiceBusy(seconds)
-				logOutgoing(action, 'failed', { status: 429, attempt, retryAfter: seconds })
-				if (!busyNotified) {
-					// One toast, because the banner is already carrying the countdown —
-					// this only has to explain why the board went quiet for a moment.
-					busyNotified = true
-					addToast('Servers are busy. Holding your move and retrying.', 'warn')
-				}
-				return { retryAfterMs: seconds * 1000 }
+				logOutgoing(batch[0], 'failed', {
+					status: 429,
+					attempt,
+					retryAfter: seconds,
+					actions: batch.length,
+				})
+				notifyBusy()
+				return { settled: 0, waitMs: seconds * 1000 }
 			}
 			if (!res.ok) {
 				// 5xx is worth another go; a 4xx we don't recognise is not.
 				if (res.status >= 500) {
-					logOutgoing(action, 'failed', { status: res.status, attempt })
-					return 'retry'
+					logOutgoing(batch[0], 'failed', { status: res.status, attempt })
+					return { settled: 0 }
 				}
-				logOutgoing(action, 'failed', { status: res.status })
-				reportUnrelayed(action, 'action-lost')
-				return 'done'
+				logOutgoing(batch[0], 'failed', { status: res.status })
+				reportUnrelayed(batch[0], 'action-lost')
+				return { settled: 0, stop: true }
 			}
-			// Durably recorded — only now does this action own its ordinal.
-			clientSeq += 1
-			const result = (await res.json()) as { event?: GameEvent; turnDeadline?: number | null }
-			if (result?.event && typeof result.event.id === 'number') {
-				lastEventId = Math.max(lastEventId, result.event.id)
-				appliedEventId = Math.max(appliedEventId, result.event.id)
-				logOutgoing(action, 'sent', { eventId: result.event.id, clientSeq: clientSeq - 1 })
-			} else {
-				logOutgoing(action, 'sent', { clientSeq: clientSeq - 1 })
+			const result = (await res.json()) as {
+				event?: GameEvent
+				events?: GameEvent[]
+				appended?: number
+				partial?: boolean
+				rateLimited?: boolean
+				retryAfter?: number
+				turnDeadline?: number | null
 			}
+			const recorded = Array.isArray(result?.events)
+				? result.events
+				: result?.event
+					? [result.event]
+					: []
+			// How many ordinals this answer consumed. `appended` is authoritative;
+			// a server that predates batching answers with one event and no count,
+			// and we only ever send it one action at a time.
+			const settled =
+				typeof result?.appended === 'number'
+					? Math.min(result.appended, batch.length)
+					: Math.min(Math.max(recorded.length, 1), batch.length)
+			if (settled <= 0) {
+				// A well-formed answer that recorded nothing. Treat it as a transient
+				// failure rather than a lost move: the ordinals are unconsumed, so a
+				// re-send is safe and the alternative is freezing a live board over an
+				// answer we do not understand.
+				logOutgoing(batch[0], 'failed', { status: res.status, appended: 0, attempt })
+				return { settled: 0 }
+			}
+			// Durably recorded — only now do these actions own their ordinals.
+			const base = clientSeq
+			clientSeq += settled
+			for (const event of recorded) {
+				if (typeof event?.id !== 'number') continue
+				lastEventId = Math.max(lastEventId, event.id)
+				appliedEventId = Math.max(appliedEventId, event.id)
+			}
+			// One trace entry per action, as before: the desync forensics read this
+			// as a per-action stream and collapsing a batch into one row would hide
+			// exactly the ordering it exists to reconstruct.
+			batch.slice(0, settled).forEach((action, index) => {
+				logOutgoing(action, 'sent', {
+					eventId: recorded[index]?.id ?? recorded[recorded.length - 1]?.id,
+					clientSeq: base + index,
+					...(batch.length > 1 ? { batch: batch.length, batchIndex: index } : {}),
+				})
+			})
+			notePerf(res, started, batch.length, settled)
 			// An end-turn hands the fresh allowance to the opponent — reflect it
 			// right away instead of waiting for the next poll.
 			if (asyncGame && result?.turnDeadline !== undefined) deadline = result.turnDeadline
-			return 'done'
+			if (result?.partial && settled < batch.length) {
+				// The server recorded a prefix and stopped. Keep the settled part and
+				// re-send the rest, honouring its back-off when it named one.
+				if (result.rateLimited) {
+					const seconds = result.retryAfter && result.retryAfter > 0 ? result.retryAfter : 2
+					noteServiceBusy(seconds)
+					notifyBusy()
+					return { settled, waitMs: seconds * 1000 }
+				}
+				return { settled }
+			}
+			return { settled, stop: settled >= batch.length }
 		} catch {
 			// The request never completed, so we can't know whether it landed. The
-			// server dedupes on (sender, clientSeq), so re-sending the same ordinal is
-			// safe: a retry of a request that actually succeeded returns the stored
-			// event instead of appending a second copy.
-			logOutgoing(action, 'failed', { error: 'network', attempt })
-			return 'retry'
+			// server dedupes on (sender, clientSeq), so re-sending the same ordinals
+			// is safe: a retry of a request that actually succeeded returns the
+			// stored events instead of appending a second copy.
+			logOutgoing(batch[0], 'failed', { error: 'network', attempt, actions: batch.length })
+			return { settled: 0 }
 		}
 	}
 
-	// Outbound relays are chained, not fired in parallel. The server stamps each
-	// event's `seq` when the request ARRIVES, so two overlapping POSTs can be
-	// recorded in the opposite order to the one the player performed them in —
-	// and the log is what every other client (and the replay) plays back. An
-	// attack recorded before the move that set it up is unapplyable on arrival:
-	// the attacker isn't on the tile yet, and the exchange is lost exactly as if
-	// it had been dropped locally. One in flight at a time removes the race, at
-	// the cost of a little latency on a burst, which turn-based play can afford.
-	let relayChain: Promise<void> = Promise.resolve()
-	/**
-	 * How many relays the chain still owes. A counter, not a flag: with a flag, the
-	 * `finally` of the action that just finished would clear it while the next one
-	 * is already queued, and a poll could rewind `clientSeq` mid-stream.
-	 */
-	let relaysPending = 0
+	/** One toast per relay, however many attempts or batches it takes. */
+	const notifyBusy = () => {
+		if (busyNotified) return
+		// One toast, because the banner is already carrying the countdown — this
+		// only has to explain why the board went quiet for a moment.
+		busyNotified = true
+		addToast('Servers are busy. Holding your move and retrying.', 'warn')
+	}
 
-	const enqueueRelay = (action: SerializedAction) => {
-		// One dedupe slot per relay, released when the relay settles. By then either
+	/**
+	 * Record what a relay cost, next to how far behind the room it left us.
+	 *
+	 * `x-gateway-calls` is the server telling us how many gateway calls it made
+	 * to answer — the number that actually governs throughput here, because the
+	 * platform budgets those per minute across the whole project. A relay that
+	 * took a second because it made eight calls and one that took a second
+	 * because the gateway was slow need completely different fixes, and this is
+	 * the only place both are visible at once.
+	 */
+	const notePerf = (res: Response, startedAt: number, actions: number, settled: number): void => {
+		const calls = Number(res.headers.get('x-gateway-calls'))
+		const gatewayMs = Number(res.headers.get('x-gateway-ms'))
+		logPerf(appliedEventId, {
+			what: 'relay',
+			actions,
+			settled,
+			relayMs: Math.round(performance.now() - startedAt),
+			...(Number.isFinite(calls) && calls > 0 ? { calls } : {}),
+			...(Number.isFinite(gatewayMs) && gatewayMs > 0 ? { gatewayMs } : {}),
+			owed: relaysOwed(),
+			logLag: Math.max(0, serverLastEventId - appliedEventId),
+		})
+	}
+
+	/**
+	 * Actions waiting to go out, and the run currently in flight.
+	 *
+	 * Relays are still one-in-flight-at-a-time — the server stamps each event's
+	 * `seq` when the request ARRIVES, so two overlapping POSTs can be recorded in
+	 * the opposite order to the one the player performed them in, and the log is
+	 * what every other client (and the replay) plays back. An attack recorded
+	 * before the move that set it up is unapplyable on arrival.
+	 *
+	 * What changed is what one request carries. Sending a single action per
+	 * request made the room's throughput equal to one server round trip per
+	 * action, which a client driving a CPU side blows straight past: it produces
+	 * a turn's worth of actions in a moment and then spends a minute dripping
+	 * them out while its own board runs ahead. Batching the queue into one
+	 * request keeps the ordering guarantee — a run is numbered from our own
+	 * counter before anything is sent, so it cannot interleave with itself — and
+	 * costs the room one set of server-side reads instead of one per action.
+	 *
+	 * A lone action still goes out on its own immediately. Batches only form when
+	 * actions arrive faster than the round trip, which is exactly when the old
+	 * behaviour was falling behind.
+	 */
+	const outbox: SerializedAction[] = []
+	let inFlight: SerializedAction[] = []
+	let relayBusy = false
+
+	/** Actions this client has applied locally that the room has not accepted. */
+	const relaysOwed = (): number => outbox.length + inFlight.length
+
+	/**
+	 * Take the next run off the outbox.
+	 *
+	 * A batch is credited to one actor and the server resolves that once, before
+	 * writing any of it, so a run must not span a turn handover: it ends at the
+	 * `end-turn` that closes it. A `surrender` travels alone, because the server
+	 * rewrites it to the sender's own team and settles the room around it.
+	 */
+	const takeBatch = (): SerializedAction[] => {
+		if (outbox[0].kind === 'surrender') return outbox.splice(0, 1)
+		let size = 0
+		while (size < outbox.length && size < MAX_RELAY_BATCH) {
+			const action = outbox[size]
+			if (action.kind === 'surrender') break
+			size += 1
+			if (action.kind === 'end-turn') break
+		}
+		return outbox.splice(0, size)
+	}
+
+	const pumpRelay = () => {
+		if (relayBusy || outbox.length === 0) return
+		relayBusy = true
+		const batch = takeBatch()
+		inFlight = batch
+		// One dedupe slot per action, released when the run settles. By then either
 		// the echo has already claimed it, or `lastEventId` has moved past our own
-		// event and the echo behind it will be skipped as stale — so holding the slot
+		// events and the echoes behind them are skipped as stale — so holding a slot
 		// any longer can only swallow somebody else's identical action later.
-		const slot: SelfRelay = { fingerprint: actionFingerprint(action) }
-		pendingSelf.push(slot)
-		relaysPending += 1
-		relayChain = relayChain
-			.then(() => relay(action))
+		const slots = batch.map((action) => {
+			const slot: SelfRelay = { fingerprint: actionFingerprint(action) }
+			pendingSelf.push(slot)
+			return slot
+		})
+		void relay(batch)
 			.catch(() => {})
 			.finally(() => {
-				relaysPending -= 1
-				releaseSelf(slot)
+				for (const slot of slots) releaseSelf(slot)
+				inFlight = []
+				relayBusy = false
+				pumpRelay()
 			})
+	}
+
+	const enqueueRelay = (action: SerializedAction) => {
+		outbox.push(action)
+		pumpRelay()
+	}
+
+	/**
+	 * Record how far behind this client is, on a slow tick, while it is behind.
+	 *
+	 * The two numbers are the two ways a room falls behind, and they belong to
+	 * different players. `owed` is a SENDER's backlog: actions on our board that
+	 * the room has not accepted, which is what a client driving a CPU side
+	 * accumulates when it can produce turns faster than it can relay them.
+	 * `logLag` is a RECEIVER's: events in the log we have not applied. The host
+	 * showing turn 29 while the spectator shows turn 14 is `owed` on one client
+	 * and `logLag` on the other, and neither client could see the whole picture
+	 * before this — which is why the gap was only ever noticed by watching two
+	 * screens side by side.
+	 *
+	 * Silent while both are clear, so a healthy match writes nothing at all.
+	 */
+	const gaugeTick = () => {
+		const owed = relaysOwed()
+		const logLag = Math.max(0, serverLastEventId - appliedEventId)
+		if (owed === 0 && logLag === 0 && queue.size === 0) return
+		logPerf(appliedEventId, {
+			what: 'gauge',
+			owed,
+			logLag,
+			queued: queue.size,
+			// Whether that lag is deliberate. A queue draining through its
+			// choreography is a spectator WATCHING a turn, which is the point of the
+			// thing; `catchingUp` is the queue having given up on watching because the
+			// backlog got too deep. Without the distinction every animated turn would
+			// read as lag and the numbers would mean nothing.
+			catchingUp: queue.catchingUp,
+			pushTrusted,
+			realtimeUp,
+			held: pushBuffer.size,
+		})
 	}
 
 	const send = (data: string) => {
@@ -732,6 +1003,7 @@
 		heartbeat()
 		heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL)
 		if (asyncGame) clockTimer = setInterval(() => (clockNow = Date.now()), 1000)
+		gaugeTimer = setInterval(gaugeTick, GAUGE_INTERVAL)
 		// A last flush as the tab goes away, so the trace of a match someone walked
 		// out of still reaches the server. `pagehide` fires where `unload` doesn't
 		// (bfcache, mobile Safari), which is exactly the case we'd otherwise lose.
@@ -754,6 +1026,7 @@
 		if (heartbeatTimer) clearInterval(heartbeatTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
 		if (clockTimer) clearInterval(clockTimer)
+		if (gaugeTimer) clearInterval(gaugeTimer)
 		if (outgoingUnsubscribe) outgoingUnsubscribe()
 		realtimeConn?.close()
 	})

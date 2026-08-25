@@ -74,8 +74,9 @@ export const logToErrorDb = async (e: unknown, info?: string) => {
 	console.error(message, e)
 	if (dev) return
 
-	// A rate limit is the one error never worth a row: writing it spends the `db`
-	// budget to report a shortage. The console line above is the whole record.
+	// A rate limit is the one error never worth a row: writing it spends the
+	// `db/write` budget to report a shortage. The console line above is the whole
+	// record.
 	//
 	// No scope hint is passed, deliberately: this error came from some other call
 	// site and we don't know what it was spending. The gateway names its own
@@ -84,10 +85,11 @@ export const logToErrorDb = async (e: unknown, info?: string) => {
 	const limit = noteRateLimit(e)
 	if (limit.limited) return
 
-	// The `db` budget is spent, or close enough that what's left belongs to
+	// The `db/write` budget is spent, or close enough that what's left belongs to
 	// gameplay. A log row is never worth the last of a window: the console line
-	// above is already the durable record.
-	if (budgetPressure('db')) return
+	// above is already the durable record, and at 300 writes a minute this row and
+	// a player's move are drawing on the same one.
+	if (budgetPressure('db/write')) return
 
 	const at = Date.now()
 	const { write, suppressed } = shouldWrite(message, at)
@@ -105,10 +107,10 @@ export const logToErrorDb = async (e: unknown, info?: string) => {
 		// The breaker: a 429 here parks every subsequent write until the gateway
 		// says we're welcome again, which is the difference between one failed
 		// write and one per error for the next minute.
-		const failure = noteRateLimit(msg, 'db')
+		const failure = noteRateLimit(msg, 'db/write')
 		if (failure.limited) {
 			console.error(
-				`Error log suppressed: db budget rate limited for ${gatewayCooldownSeconds('db')}s`
+				`Error log suppressed: db/write budget rate limited for ${gatewayCooldownSeconds('db/write')}s`
 			)
 			return
 		}

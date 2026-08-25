@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte'
-	import { writable } from 'svelte/store'
+	import { get, writable } from 'svelte/store'
 	import Icon from '@iconify/svelte'
 	import MapRender from '$lib/Map/MapRender.svelte'
 	import { rendererStore } from '$lib/Sprites/spriteStore'
@@ -11,7 +11,9 @@
 		type SerializedAction,
 	} from '$lib/Engine/Interactor/serializedAction'
 	import { animateRemoteAction } from '$lib/Engine/remoteAnimate'
+	import { animateTeamDefeat, resolveTeamDefeat } from '$lib/Engine/defeat'
 	import { hasRemoteChoreography } from '$lib/Engine/remoteChoreography'
+	import { replayFinalLabel } from './finalLabel'
 
 	/**
 	 * ReplayViewer — a read-only board that marches a finished match's event log
@@ -24,7 +26,13 @@
 	 * subscribers (result recording, campaign unlocks) and drives CPU turns, and
 	 * a replay must never re-record a result or let an AI move. Win conditions
 	 * still flip `gameState.phase` as the log's own terminal action applies,
-	 * which is exactly what the "Final" banner reads.
+	 * which is what the end-of-log banner reads, in preference to the `matches`
+	 * row — a separate record, written by a different path, that can contradict
+	 * the log (see `finalLabel`). The one thing the manager does that a replay
+	 * DOES need is defeat resolution (`animateTeamDefeat` off a `hasLost` flip),
+	 * so the viewer runs that itself — without it a surrendered team's army stood
+	 * on the board for the rest of the playback and its buildings never reverted,
+	 * so later captures replayed under a dead owner.
 	 *
 	 * Seeking backward rebuilds instead of undoing: restore the pristine layers
 	 * snapshot (the same idiom as GameStateManager's rematch restore), re-seed
@@ -84,9 +92,32 @@
 
 	const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+	// Teams whose board presence has already been resolved. GameStateManager keeps
+	// this ledger in a live match; here it is rebuilt from scratch on every rewind,
+	// since the pristine layers restore puts those armies back.
+	let defeatedTeams = new Set<number>()
+
+	/** Teams the engine has just declared dead, marked handled as they're returned. */
+	const takeNewDefeats = (): number[] => {
+		const newly: number[] = []
+		for (const player of get(gameState).players) {
+			if (player.hasLost && !defeatedTeams.has(player.team)) {
+				defeatedTeams.add(player.team)
+				newly.push(player.team)
+			}
+		}
+		return newly
+	}
+
+	/** Headless defeat resolution — the seek/instant path, which stays synchronous. */
+	const clearDefeatsInstant = (): void => {
+		for (const team of takeNewDefeats()) resolveTeamDefeat(map, team)
+	}
+
 	const applyInstant = (): void => {
 		dispatchSerializedAction(map, actions[cursor])
 		cursor += 1
+		clearDefeatsInstant()
 	}
 
 	const runStep = async (animate: boolean): Promise<void> => {
@@ -102,6 +133,14 @@
 		} else {
 			dispatchSerializedAction(map, action)
 		}
+		// A surrender (or a final unit/HQ loss) only flips `hasLost` — clearing the
+		// dead army off the board is a separate step. Awaited inside this queue slot,
+		// so the blast can't overlap the next action.
+		const dead = takeNewDefeats()
+		if (dead.length > 0) {
+			if (animate) await Promise.all(dead.map((team) => animateTeamDefeat(map, team)))
+			else for (const team of dead) resolveTeamDefeat(map, team)
+		}
 		requestRedraw = performance.now()
 	}
 
@@ -113,6 +152,7 @@
 			map.layers = structuredClone(initialLayers)
 			resetMatchEnd()
 			initGameStateFromMap(map)
+			defeatedTeams = new Set<number>()
 			cursor = 0
 		}
 		while (cursor < clamped) applyInstant()
@@ -223,6 +263,11 @@
 
 	let atEnd = $derived(cursor >= total)
 	let currentTeam = $derived($gameState.currentTeam)
+
+	// The end-of-log banner. The replayed engine's own verdict comes first and the
+	// `matches` row is only a fallback claim — see `replayFinalLabel`, which is
+	// where the reasoning (and match 19) lives.
+	let finalLabel = $derived(replayFinalLabel($gameState, winnerTeam, teamName))
 </script>
 
 <MapRender
@@ -243,9 +288,7 @@
 	<span class="font-semibold">{mapName || 'Replay'}</span>
 	<span aria-hidden="true">&middot;</span>
 	{#if atEnd}
-		<span class="font-medium">
-			{winnerTeam == null ? 'Draw' : `${teamName(winnerTeam)} wins`}
-		</span>
+		<span class="font-medium">{finalLabel}</span>
 	{:else}
 		<span>Turn {$gameState.turnNumber}, {teamName(currentTeam)}</span>
 	{/if}

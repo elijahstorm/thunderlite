@@ -14,6 +14,14 @@ export type DevPage = {
 
 export const devPages: DevPage[] = [
 	{
+		href: '/dev/lag',
+		title: 'Runtime Lag',
+		blurb:
+			'Gateway spend by namespace and route, next to a live room’s relay cost and how far behind each client fell.',
+		tag: 'perf',
+		ready: true,
+	},
+	{
 		href: '/dev/units',
 		title: 'Units & FX',
 		blurb:

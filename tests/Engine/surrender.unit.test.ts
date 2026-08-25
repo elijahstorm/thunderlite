@@ -4,6 +4,8 @@ import { unitData } from '../../src/lib/GameData/unit'
 import { terrainData } from '../../src/lib/GameData/terrain'
 import { gameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import { applyAction } from '../../src/lib/Engine/applyAction'
+import { surrender, teamStillPlaying } from '../../src/lib/Engine/Interactor/interactor'
+import { outgoingActions } from '../../src/lib/Engine/outgoingActions'
 import { isValidSerializedAction } from '../../src/lib/Engine/Interactor/serializedAction'
 import { get } from 'svelte/store'
 
@@ -68,5 +70,50 @@ describe('surrender action', () => {
 		applyAction(map, { kind: 'surrender', team: 0 })
 
 		expect(get(gameState).players.find((p) => p.team === 1)?.hasLost).toBe(false)
+	})
+})
+
+// A four-side board: the match carries on after one side quits, so the quitter's
+// client sits on a live board with its resign paths still wired.
+const fourTeamMap = (): MapObject => {
+	const map = makeMap(8, 8)
+	map.layers.units[0] = unit(0, 0)
+	map.layers.units[7] = unit(0, 1)
+	map.layers.units[8 * 8 - 8] = unit(0, 2)
+	map.layers.units[8 * 8 - 1] = unit(0, 3)
+	return map
+}
+
+describe('resigning twice', () => {
+	it('relays one surrender per side, however many times it is asked for', () => {
+		const map = fourTeamMap()
+		initGameStateFromMap(map)
+
+		const relayed: unknown[] = []
+		const stop = outgoingActions.subscribe((action) => action && relayed.push(action))
+
+		surrender(map, 2)
+		// Still 'playing' — two other sides are alive — so the old `phase` gate let
+		// the give-up and exit-to-menu paths file a second forfeit for a side that
+		// was already out. Match 19 recorded exactly that, 640 events later.
+		expect(get(gameState).phase).toBe('playing')
+		surrender(map, 2)
+		surrender(map, 2)
+
+		stop()
+		expect(relayed).toEqual([{ kind: 'surrender', team: 2 }])
+		expect(get(gameState).players.find((p) => p.team === 2)?.hasLost).toBe(true)
+	})
+
+	it('reports a side as out of play once it has lost, and once the match is over', () => {
+		const map = fourTeamMap()
+		initGameStateFromMap(map)
+
+		expect(teamStillPlaying(2)).toBe(true)
+		surrender(map, 2)
+		expect(teamStillPlaying(2)).toBe(false)
+		expect(teamStillPlaying(1)).toBe(true)
+		// A team the board never fielded is not "still playing" either.
+		expect(teamStillPlaying(9)).toBe(false)
 	})
 })

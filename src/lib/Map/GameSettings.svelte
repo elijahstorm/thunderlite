@@ -4,7 +4,8 @@
 	import { audioEngine } from '$lib/Audio/audioEngine'
 	import { audioSettings } from '$lib/Stores/audioSettings'
 	import { gameState } from '$lib/Engine/gameState'
-	import { surrender } from '$lib/Engine/Interactor/interactor'
+	import { surrender, teamStillPlaying } from '$lib/Engine/Interactor/interactor'
+	import { syncLocked } from '$lib/Engine/desync'
 	import { shownThreatUnits, toggleAllThreats } from '$lib/Engine/threatOverlay'
 	import { isDevMode, downloadDevLog, devLogSize } from '$lib/Engine/devLog'
 
@@ -20,7 +21,17 @@
 	let view: 'menu' | 'confirmGiveUp' | 'confirmExit' = $state('menu')
 
 	let masterMuted = $derived($audioSettings.master.muted)
-	let playing = $derived($gameState.phase === 'playing')
+	// Whether THIS client's side is still in the match — the gate on every path
+	// that can forfeit. The board being live is not the same question: on a
+	// three-or-more-side map the game carries on after we resign, leaving us on a
+	// live board as a spectator with the give-up / exit paths still wired, happily
+	// filing a second forfeit for a side that is already out. That second
+	// surrender goes into the room's log, and every client (and the replay) has to
+	// step through it.
+	// A diverged client keeps its forfeit paths for the same reason `surrender`
+	// exempts one: its board is the last thing whose "you are already out" is
+	// worth trusting, and quitting must always be possible.
+	let stillInPlay = $derived($syncLocked || teamStillPlaying(localTeam, $gameState))
 	let threatShown = $derived($shownThreatUnits.size > 0)
 
 	// Music and SFX are independent channels — expose each so players can, say,
@@ -54,12 +65,13 @@
 	const toggleMasterMute = () => audioEngine.setMasterMute(!$audioSettings.master.muted)
 
 	const giveUp = () => {
-		if (map && playing) surrender(map, localTeam)
+		if (map && stillInPlay) surrender(map, localTeam)
 		close()
 	}
 	const exitToMenu = async () => {
-		// Auto-die so an online opponent isn't left waiting on an abandoned match.
-		if (map && playing) surrender(map, localTeam)
+		// Auto-die so an online opponent isn't left waiting on an abandoned match —
+		// but only while we still have a side to lose.
+		if (map && stillInPlay) surrender(map, localTeam)
 		close()
 		await goto(menuHref)
 	}
@@ -153,7 +165,7 @@
 				<button
 					type="button"
 					role="menuitem"
-					disabled={!playing}
+					disabled={!stillInPlay}
 					onclick={() => (view = 'confirmGiveUp')}
 					class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-red-300 transition-colors hover:bg-red-500/15 disabled:opacity-40 disabled:hover:bg-transparent"
 				>
@@ -192,7 +204,7 @@
 				<p class="px-2 py-2 text-xs leading-relaxed text-white/80">
 					{#if view === 'confirmGiveUp'}
 						Forfeit this match? You'll lose immediately.
-					{:else if playing}
+					{:else if stillInPlay}
 						Leave to the menu? This forfeits the match.
 					{:else}
 						Leave to the menu?

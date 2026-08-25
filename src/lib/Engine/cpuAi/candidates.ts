@@ -1,3 +1,4 @@
+import { get } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { hasModifier, isRanged } from '../modifiers/canAttack'
@@ -10,6 +11,8 @@ import { planningConcealed } from './planningContext'
 import { lurkingStealthCount } from './stealthMemory'
 import { rankBuildableTypes } from './production'
 import { enemyCount } from './evaluate'
+import { sampleByScore } from './rng'
+import { gameState } from '../gameState'
 import {
 	scoreAttack,
 	scoreCapture,
@@ -123,12 +126,22 @@ export const generatePlansFor = (
 		}
 
 		if (dest === unitTile && canRepairUnit(unit)) {
-			plans.push({
-				unitTile,
-				kind: 'repair',
-				score: scoreRepair(unit) + position * 0.2,
-				actions: [{ kind: 'repair', tile: dest }],
-			})
+			// Repair is a self-action on the tile the unit is already standing on, so it
+			// pays that tile's positional price in full — exactly like waiting there.
+			// Discounting it (this used to be `position * 0.2`) made "sit on the front
+			// line and patch myself" the cheapest plan available whenever the tile was
+			// dangerous, which is how a late-game army ends up half-idle. And a unit
+			// above the repair threshold scores 0 for it, so without the guard a
+			// worthless 9-HP top-up still out-ranked going somewhere useful.
+			const repairValue = scoreRepair(unit)
+			if (repairValue > 0) {
+				plans.push({
+					unitTile,
+					kind: 'repair',
+					score: repairValue + position,
+					actions: [{ kind: 'repair', tile: dest }],
+				})
+			}
 		}
 
 		plans.push({
@@ -230,6 +243,14 @@ const generateBuilderPlans = (
 	return plans
 }
 
+/**
+ * How close a plan has to be to the best one to be worth considering instead of it.
+ * In plan-score units: a decisive attack scores in the hundreds and a positional
+ * difference is worth tens, so this only ever shuffles genuinely comparable options —
+ * a good shot is never passed up for a bad one. See `sampleByScore`.
+ */
+const PLAN_TEMPERATURE = 18
+
 export const bestPlanFor = (
 	map: MapObject,
 	unitTile: number,
@@ -237,9 +258,8 @@ export const bestPlanFor = (
 	cpuTeam: number
 ): ActionPlan | null => {
 	const plans = generatePlansFor(map, unitTile, unit, cpuTeam)
-	let best: ActionPlan | null = null
-	for (const plan of plans) {
-		if (!best || plan.score > best.score) best = plan
-	}
-	return best
+	// Which of this unit's near-equal options it takes. Keyed by the unit's tile and
+	// the turn so the same unit re-planning the same turn stays on its choice.
+	const state = get(gameState)
+	return sampleByScore(plans, PLAN_TEMPERATURE, state.turnNumber, cpuTeam, unitTile)
 }

@@ -20,14 +20,18 @@ export const GET = async ({ url, params, locals }) => {
 		// tables and don't depend on each other, so fetch them in one barrier —
 		// this is the hot poll path. The events are discarded (never returned)
 		// if the 403 fires.
+		// Where this caller's own request stream resumes, answered only when asked
+		// (`?seq=1`). A client needs this once — on the first poll after a load, and
+		// again after the server refuses an ordinal — not forty times a minute for
+		// the rest of the match. It is a `count` on the event table, so on the app's
+		// hottest path it was a fifth of the poll's gateway budget spent restating
+		// something the client already knew.
+		const wantsClientSeq = url.searchParams.get('seq') === '1'
 		const [seats, page, room, clientSeq] = await Promise.all([
 			gameStore.roster(session),
 			gameStore.events(session, since),
 			gameStore.getRoom(session),
-			// Where this caller's own request stream resumes. Sent on every poll so a
-			// client that reloads mid-match seeds its relay counter from the server
-			// instead of restarting at 0 and having its first action refused.
-			gameStore.nextClientSeq(session, userSession),
+			wantsClientSeq ? gameStore.nextClientSeq(session, userSession) : Promise.resolve(null),
 		])
 		if (seats.length === 0 || !seats.some((m) => m.userSession === userSession)) {
 			throw error(403, 'Not a member of this game session')
@@ -62,7 +66,16 @@ export const GET = async ({ url, params, locals }) => {
 			}
 		}
 
-		return json({ events, lastEventId, turnDeadline, aiTeams, isAiDriver, clientSeq })
+		return json({
+			events,
+			lastEventId,
+			turnDeadline,
+			aiTeams,
+			isAiDriver,
+			// Omitted rather than null when it wasn't asked for, so a client reading
+			// `typeof clientSeq === 'number'` can't mistake "not answered" for zero.
+			...(clientSeq === null ? {} : { clientSeq }),
+		})
 	} catch (msg) {
 		// See the note on the same line in `move/+server.ts`: the SDK's
 		// `DontCodeError` also carries `status`, so a duck-typed check re-threw
