@@ -245,7 +245,15 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	// concurrently instead of only after our walk finishes. The authoritative state
 	// is applied locally when the slide ends; the relayed action is deduped when its
 	// own echo returns (see GameSocket.locallyEmitted).
-	const moveAction: SerializedAction = { kind: 'move', from: tile, to: finalTile }
+	// Relay the route the unit ACTUALLY walked, not just its endpoints. The player
+	// picked this line deliberately — around a suspected ambush, off a threatened
+	// tile — and every other client used to re-derive its own route from from/to,
+	// landing on whichever equal-cost line `pathFinder` settled first. Two boards
+	// then showed the same tank taking two different roads.
+	const moveAction: SerializedAction =
+		route.length > 1
+			? { kind: 'move', from: tile, to: finalTile, path: route.slice() }
+			: { kind: 'move', from: tile, to: finalTile }
 	emitOutgoingAction(moveAction)
 	animateRoute(map, unit, tile, finalTile, route).then(() => {
 		map.layers.units[tile] = unit

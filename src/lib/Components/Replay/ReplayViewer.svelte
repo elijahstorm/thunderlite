@@ -11,6 +11,7 @@
 		type SerializedAction,
 	} from '$lib/Engine/Interactor/serializedAction'
 	import { animateRemoteAction } from '$lib/Engine/remoteAnimate'
+	import { hasRemoteChoreography } from '$lib/Engine/remoteChoreography'
 
 	/**
 	 * ReplayViewer — a read-only board that marches a finished match's event log
@@ -91,7 +92,7 @@
 	const runStep = async (animate: boolean): Promise<void> => {
 		const action = actions[cursor]
 		cursor += 1
-		if (animate && (action.kind === 'move' || action.kind === 'attack')) {
+		if (animate && hasRemoteChoreography(action)) {
 			try {
 				await animateRemoteAction(map, action)
 			} catch {

@@ -297,10 +297,17 @@ export const runCpuTurn = ({
 				commit(map, { kind: 'wait', tile: action.from })
 				return { proceed: false, changed: [action.from] }
 			}
+			// Relay the walked route alongside the endpoints so every other client
+			// animates the road this unit really took rather than re-deriving one of
+			// its own (see the `path` field on the move action).
+			const moveAction: SerializedAction =
+				walked.length > 1
+					? { kind: 'move', from: action.from, to: finalTile, path: walked.slice() }
+					: { kind: 'move', from: action.from, to: finalTile }
 			if (hidden()) {
 				// No slide to roll the footsteps under, so let the commit voice the move.
 				recordStealthPassthrough(map, walked, unit)
-				commit(map, { kind: 'move', from: action.from, to: finalTile })
+				commit(map, moveAction)
 				return { proceed: !collided, changed: [action.from, finalTile] }
 			}
 			map.layers.units[action.from] = null
@@ -313,11 +320,7 @@ export const runCpuTurn = ({
 			// A cloaked unit caught crossing an enemy radar ring mid-route is logged so
 			// the watching player "remembers" a stealth threat is about.
 			recordStealthPassthrough(map, walked, unit)
-			commit(
-				map,
-				{ kind: 'move', from: action.from, to: finalTile },
-				{ suppressSfxActions: ['move'] }
-			)
+			commit(map, moveAction, { suppressSfxActions: ['move'] })
 			// The unit vacated `from` and now sits on `finalTile`; both flip the board for
 			// nearby planners. Intermediate path tiles hold no unit, so they don't count.
 			return { proceed: !collided, changed: [action.from, finalTile] }

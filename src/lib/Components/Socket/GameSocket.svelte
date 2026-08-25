@@ -4,6 +4,7 @@
 	import { updated } from '$app/state'
 	import LocalInteracter from '$lib/Engine/Interactor/LocalInteracter.svelte'
 	import {
+		actionFingerprint,
 		dispatchSerializedAction,
 		normalizeAction,
 		type GameEvent,
@@ -289,7 +290,7 @@
 		// while the queue is draining, which is why the digest checkpoints below are
 		// anchored to the applied one.
 		lastEventId = event.id
-		const fingerprint = JSON.stringify(action)
+		const fingerprint = actionFingerprint(action)
 		if (claimSelf(fingerprint)) {
 			// Our own action, already applied + animated locally when we made it.
 			appliedEventId = event.id
@@ -647,7 +648,7 @@
 		// the echo has already claimed it, or `lastEventId` has moved past our own
 		// event and the echo behind it will be skipped as stale — so holding the slot
 		// any longer can only swallow somebody else's identical action later.
-		const slot: SelfRelay = { fingerprint: JSON.stringify(action) }
+		const slot: SelfRelay = { fingerprint: actionFingerprint(action) }
 		pendingSelf.push(slot)
 		relaysPending += 1
 		relayChain = relayChain

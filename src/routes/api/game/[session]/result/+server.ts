@@ -146,22 +146,41 @@ export const POST = async ({ request, params, locals }) => {
 			outcome,
 		})
 
-		// Read the caller's own ladder movement back off the row settlement just
-		// stamped, so the game-over screen can show "1212 → 1224" instead of
-		// making them go find it on their profile. Null for anything unrated, and
-		// null too in the rare race where a non-locking writer arrives before the
-		// locking writer's settlement lands — the profile still shows it either
-		// way, so this is a bonus, not a source of truth.
+		// Read the ladder movement back off the player rows settlement just stamped
+		// — every human seat, not only the caller's — so the end-of-game report can
+		// show both sides' "1212 → 1224" instead of making anyone go find it on a
+		// profile. `elo` stays the caller's own movement for callers that only care
+		// about themselves. Empty for anything unrated, and empty too in the rare
+		// race where a non-locking writer arrives before the locking writer's
+		// settlement lands — the profile still shows it either way, so this is a
+		// bonus, not a source of truth.
 		let elo: { before: number; delta: number } | null = null
+		let ratings: { team: number; before: number; delta: number }[] = []
 		if (mode === 'online') {
+			type SettledRow = {
+				user_auth: string
+				team: number | null
+				elo_before: number | null
+				elo_delta: number | null
+			}
 			const settled = await db
-				.findOne<{ elo_before: number | null; elo_delta: number | null }>('match_players', {
-					where: { match_id: matchId, user_auth: userAuth },
-					select: ['elo_before', 'elo_delta'],
+				.find<SettledRow>('match_players', {
+					where: { match_id: matchId },
+					select: ['user_auth', 'team', 'elo_before', 'elo_delta'],
 				})
-				.catch(() => null)
-			if (settled?.elo_before != null) {
-				elo = { before: Number(settled.elo_before), delta: Number(settled.elo_delta ?? 0) }
+				.catch(() => [] as SettledRow[])
+
+			ratings = settled
+				.filter((row) => row.elo_before != null && row.team != null)
+				.map((row) => ({
+					team: Number(row.team),
+					before: Number(row.elo_before),
+					delta: Number(row.elo_delta ?? 0),
+				}))
+
+			const own = settled.find((row) => row.user_auth === userAuth)
+			if (own?.elo_before != null) {
+				elo = { before: Number(own.elo_before), delta: Number(own.elo_delta ?? 0) }
 			}
 		}
 
@@ -194,7 +213,7 @@ export const POST = async ({ request, params, locals }) => {
 			})
 		}
 
-		return json({ matchId, outcome, elo })
+		return json({ matchId, outcome, elo, ratings })
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		await logToErrorDb(msg)

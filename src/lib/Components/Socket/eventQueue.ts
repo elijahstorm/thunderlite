@@ -24,6 +24,7 @@
  * caller that wants an event on the board pushes it and waits its turn.
  */
 
+import { hasRemoteChoreography } from '$lib/Engine/remoteChoreography'
 import type { SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
 /** How the event reached this client — the field that exposes ordering bugs. */
@@ -70,9 +71,14 @@ export type EventQueueHandlers = {
 	onDropped?: (entry: QueuedEvent) => void
 }
 
-/** Only these two kinds have choreography worth waiting on. */
-const isAnimatable = (action: SerializedAction): boolean =>
-	action.kind === 'move' || action.kind === 'attack'
+/**
+ * Which kinds have choreography worth waiting on. Deliberately delegated to
+ * `animateRemoteAction`'s own list rather than restated here: this used to be a
+ * local `move || attack` check, so a repair — which HAS an animation (its health
+ * bar eases up, exactly as it does for the player who ordered it) — was routed
+ * down the instant path and the watching opponent just saw the HP snap.
+ */
+const isAnimatable = (action: SerializedAction): boolean => hasRemoteChoreography(action)
 
 /**
  * How much backlog an event may have behind it and still be animated.

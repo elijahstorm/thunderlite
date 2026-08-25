@@ -150,13 +150,34 @@ describe('socket event queue', () => {
 		expect(log).toEqual([`apply:${label(move(1, 2))}`, 'applied:1'])
 	})
 
-	it('only animates move and attack; every other kind applies instantly', async () => {
+	it('applies a kind with no choreography instantly', async () => {
 		const { log, queue } = harness()
 
 		queue.push({ id: 1, action: { kind: 'end-turn' }, animate: true, live: true, via: 'push' })
 		await flush()
 
 		expect(log).toEqual([`apply:${label({ kind: 'end-turn' })}`, 'applied:1'])
+	})
+
+	/**
+	 * A repair HAS an animation — its health bar eases up, exactly as it does for
+	 * the player who ordered it — but the queue used to keep its own `move ||
+	 * attack` list and never called the animator for one. The watching opponent
+	 * just saw the HP snap to its new value. The list now comes from
+	 * `hasRemoteChoreography`, the same source `animateRemoteAction` describes
+	 * itself with, so the two can't drift apart again.
+	 */
+	it('animates a repair rather than snapping the health bar', async () => {
+		const { log, gates, queue } = harness()
+		const repair = { kind: 'repair' as const, tile: 8 }
+
+		queue.push({ id: 1, action: repair, animate: true, live: true, via: 'push' })
+		await flush()
+
+		expect(log).toEqual([`animate:start:${label(repair)}`])
+		gates[0].resolve()
+		await flush()
+		expect(log).not.toContain(`apply:${label(repair)}`)
 	})
 
 	it('drops events (loudly) when the board has gone away', async () => {

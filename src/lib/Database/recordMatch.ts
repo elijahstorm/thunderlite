@@ -1,5 +1,10 @@
 import { onMatchEnd, type MatchResult } from '$lib/Engine/matchEnd'
-import { clearMatchRating, matchRating } from '$lib/Game/matchRating'
+import {
+	clearMatchRating,
+	matchRating,
+	type MatchRating,
+	type RatingMove,
+} from '$lib/Game/matchRating'
 
 /**
  * recordMatch — a J1 `onMatchEnd` subscriber that persists match results. It is
@@ -19,7 +24,13 @@ import { clearMatchRating, matchRating } from '$lib/Game/matchRating'
  * game-over screen shows. A failure there just leaves the rating line off.
  */
 
-type ResultResponse = { elo?: { before?: unknown; delta?: unknown } | null }
+type RawMove = { before?: unknown; delta?: unknown }
+type ResultResponse = {
+	/** The caller's own movement. */
+	elo?: RawMove | null
+	/** Every settled seat, so the report can show both sides of a rated 1v1. */
+	ratings?: (RawMove & { team?: unknown })[] | null
+}
 
 const post = (path: string, payload: unknown, onResult?: (data: ResultResponse) => void): void => {
 	if (typeof fetch !== 'function') return
@@ -35,12 +46,43 @@ const post = (path: string, payload: unknown, onResult?: (data: ResultResponse) 
 		})
 }
 
+const asMove = (raw: RawMove | null | undefined): RatingMove | null => {
+	// Nullish checked before Number(), which reads null/'' as a very convincing 0.
+	if (raw?.before == null || raw?.delta == null) return null
+	const before = Number(raw.before)
+	const delta = Number(raw.delta)
+	if (!Number.isFinite(before) || !Number.isFinite(delta)) return null
+	return { before, delta }
+}
+
+/**
+ * Fold a result response into the ladder movement the report renders. Both
+ * sides are kept (keyed by team) so the report can show the whole exchange;
+ * the local player's own row is what decides whether there is anything to show
+ * at all, so an unrated match folds to null. Exported for tests — the response
+ * is untrusted JSON and every field needs a numeric guard.
+ */
+export const parseRatingResponse = (
+	data: ResultResponse,
+	localTeam: number
+): MatchRating | null => {
+	const byTeam: Record<number, RatingMove> = {}
+	for (const row of data?.ratings ?? []) {
+		const move = asMove(row)
+		if (!move || !Number.isInteger(row?.team)) continue
+		byTeam[Number(row.team)] = move
+	}
+
+	const local = asMove(data?.elo) ?? byTeam[localTeam]
+	if (!local) return null
+	byTeam[localTeam] ??= local
+	return { ...local, byTeam }
+}
+
 /** Publish the ladder movement the server settled, if this match was rated. */
-const publishRating = (data: ResultResponse): void => {
-	const before = Number(data?.elo?.before)
-	const delta = Number(data?.elo?.delta)
-	if (!Number.isFinite(before) || !Number.isFinite(delta)) return
-	matchRating.set({ before, delta })
+const publishRating = (data: ResultResponse, localTeam: number): void => {
+	const rating = parseRatingResponse(data, localTeam)
+	if (rating) matchRating.set(rating)
 }
 
 export const recordMatch = (result: MatchResult): void => {
@@ -61,7 +103,7 @@ export const recordMatch = (result: MatchResult): void => {
 				turns: result.turns,
 				mapSha: result.mapSha ?? null,
 			},
-			publishRating
+			(data) => publishRating(data, local.team)
 		)
 		return
 	}
