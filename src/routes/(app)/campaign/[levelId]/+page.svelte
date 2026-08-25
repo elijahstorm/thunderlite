@@ -5,7 +5,7 @@
 	import { onMount } from 'svelte'
 	import CampaignMatch from '$lib/Campaign/CampaignMatch.svelte'
 	import { getLevelById, getLevelByOrder } from '$lib/Campaign/levels'
-	import { isUnlocked } from '$lib/Campaign/progress'
+	import { isPlayable } from '$lib/Campaign/progress'
 
 	let levelId = $derived($page.params.levelId ?? '')
 	let level = $derived(getLevelById(levelId))
@@ -14,7 +14,7 @@
 	// the local mirror (guest bucket — see progress.ts), so this runs client-side.
 	onMount(() => {
 		if (!browser) return
-		if (!level || !isUnlocked(level.id, undefined)) {
+		if (!level || !isPlayable(level.id, undefined)) {
 			void goto('/campaign')
 		}
 	})

@@ -82,16 +82,17 @@ const writeOrder = (user: CampaignUser, order: number, storage: StorageLike | nu
 }
 
 /**
- * The highest campaign order the player has unlocked. A fresh account or
- * signed-out player has only the first level unlocked. In dev (`pnpm dev`)
- * every level is unlocked so any map can be play-tested directly.
+ * The highest campaign order the player has earned. A fresh account or
+ * signed-out player has only the first level unlocked. This is the persisted
+ * truth and stays free of any dev/play-test override so it round-trips with
+ * `campaignProgress` and `hydrateProgress`; the UI reads `getPlayableOrder`.
  */
 export const getUnlockedOrder = (
 	user: CampaignUser,
 	storage: StorageLike | null = defaultStorage()
-): number => (import.meta.env.DEV ? lastLevelOrder : readOrder(user, storage))
+): number => readOrder(user, storage)
 
-/** Whether a specific level is unlocked for the player. */
+/** Whether a specific level is unlocked (earned) by the player. */
 export const isUnlocked = (
 	levelId: string,
 	user: CampaignUser,
@@ -100,6 +101,34 @@ export const isUnlocked = (
 	const level = getLevelById(levelId)
 	if (!level) return false
 	return level.order <= getUnlockedOrder(user, storage)
+}
+
+/**
+ * Whether the play-test override is active: under `pnpm dev` every level is
+ * openable so any map can be jumped into directly. Production builds (and so
+ * the e2e suite, which runs a real build) always follow earned progress.
+ */
+const unlockAll = (): boolean => import.meta.env.DEV
+
+/**
+ * The highest order the UI should let the player *open*: earned progress, or
+ * every level when the dev override is on. Campaign screens use this pair; the
+ * persistence layer uses `getUnlockedOrder` / `isUnlocked`.
+ */
+export const getPlayableOrder = (
+	user: CampaignUser,
+	storage: StorageLike | null = defaultStorage()
+): number => (unlockAll() ? lastLevelOrder : getUnlockedOrder(user, storage))
+
+/** Whether a specific level can be opened from the UI. */
+export const isPlayable = (
+	levelId: string,
+	user: CampaignUser,
+	storage: StorageLike | null = defaultStorage()
+): boolean => {
+	const level = getLevelById(levelId)
+	if (!level) return false
+	return level.order <= getPlayableOrder(user, storage)
 }
 
 /**

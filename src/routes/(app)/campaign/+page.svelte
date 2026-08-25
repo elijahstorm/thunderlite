@@ -5,13 +5,13 @@
 	import Header from '$lib/Components/Branding/Header.svelte'
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import { campaignLevels, firstLevelOrder } from '$lib/Campaign/levels'
-	import { getUnlockedOrder } from '$lib/Campaign/progress'
+	import { getPlayableOrder } from '$lib/Campaign/progress'
 
 	// SSR renders with only the first level unlocked; the real value is read from
 	// the local progress mirror after mount (localStorage is browser-only).
 	let unlockedOrder = $state(firstLevelOrder)
 	onMount(() => {
-		unlockedOrder = getUnlockedOrder(undefined)
+		unlockedOrder = getPlayableOrder(undefined)
 	})
 
 	// Set when the player beat the final level and pressed Continue (see the host

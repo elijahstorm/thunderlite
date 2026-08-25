@@ -2,9 +2,16 @@
 	import { onMount } from 'svelte'
 	import { ANIMATION_TIME } from '$lib/Engine/Animator/animator'
 	import { audioEngine } from '$lib/Audio/audioEngine'
+	import type { MusicBedStatus } from '$lib/Audio/musicBed'
 	import { sfxManifest, envManifest } from '$lib/Audio/assetManifest'
 	import { MusicClock } from '$lib/Audio/musicClock'
-	import { MUSIC_PACKS, packLayers, phraseSecondsFor, type MusicPack } from '$lib/Audio/musicPacks'
+	import {
+		MUSIC_PACKS,
+		packLayers,
+		phraseSecondsFor,
+		phraseSecondsForLoop,
+		type MusicPack,
+	} from '$lib/Audio/musicPacks'
 	import {
 		FATIGUE_PHRASES,
 		MOOD_SPECS,
@@ -55,8 +62,14 @@
 	/** Let the phrase clock drive variation, i.e. behave like a real match. */
 	let auto = $state(true)
 	let stems: ReadonlyMap<string, { currentGain: number; targetGain: number }> = $state(new Map())
+	// Bed diagnostics. Layer drift is not measurable here because it is not
+	// representable: every layer is one scheduled offset on a single audio clock.
+	// What is worth watching is whether the bed got as far as being scheduled, and
+	// the loop length it actually decoded (the registry figure is rounded).
+	let bedStatus = $state<MusicBedStatus | null>(null)
 
 	const layers = $derived(packLayers(pack))
+	const gridPhraseSeconds = $derived(phraseSecondsForLoop(pack, bedStatus?.loopSeconds))
 	const arrangement = $derived(arrangementFor(mood, variation, dwell, seed, pack.extras.length))
 	const fatigueLevel = $derived(Math.floor(dwell / FATIGUE_PHRASES))
 
@@ -73,6 +86,7 @@
 		audioEngine.stopMusicStems()
 		bedRunning = false
 		stems = new Map()
+		bedStatus = null
 	}
 
 	const startBed = () => {
@@ -82,7 +96,7 @@
 		dwell = 0
 		phrase = 0
 		clock = new MusicClock({
-			phraseSeconds: phraseSecondsFor(pack),
+			phraseSeconds: () => phraseSecondsForLoop(pack, audioEngine.getMusicBedStatus()?.loopSeconds),
 			position: () => audioEngine.getMusicPosition(),
 			onPhrase: (p) => {
 				phrase = p
@@ -127,7 +141,9 @@
 
 	onMount(() => {
 		const timer = setInterval(() => {
-			if (bedRunning) stems = audioEngine.getMusicStems()
+			if (!bedRunning) return
+			stems = audioEngine.getMusicStems()
+			bedStatus = audioEngine.getMusicBedStatus()
 		}, ANIMATION_TIME)
 		return () => {
 			clearInterval(timer)
@@ -220,7 +236,9 @@
 				</button>
 			{/each}
 			<span class="text-xs text-slate-600">
-				phrase {phraseSecondsFor(pack).toFixed(2)}s · {pack.credit ?? 'uncredited'}
+				phrase {gridPhraseSeconds.toFixed(3)}s{bedStatus?.loopSeconds
+					? ' (measured)'
+					: ` (registry ${phraseSecondsFor(pack).toFixed(2)}s)`} · {pack.credit ?? 'uncredited'}
 			</span>
 		</div>
 
@@ -273,6 +291,36 @@
 			</div>
 
 			<dl class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-400">
+				<div>
+					<dt class="inline text-slate-500">bed</dt>
+					<dd class="inline {bedStatus?.scheduled ? 'text-emerald-400' : 'text-amber-400'}">
+						{bedStatus === null
+							? 'off'
+							: bedStatus.scheduled
+								? 'locked'
+								: bedStatus.ready
+									? 'held'
+									: 'loading'}
+					</dd>
+				</div>
+				<div>
+					<dt class="inline text-slate-500">ctx</dt>
+					<dd class="inline">{bedStatus?.contextState ?? 'none'}</dd>
+				</div>
+				<div>
+					<dt class="inline text-slate-500">loop</dt>
+					<dd class="inline tabular-nums">
+						{bedStatus?.loopSeconds ? `${bedStatus.loopSeconds.toFixed(3)}s` : '—'}
+					</dd>
+				</div>
+				<div>
+					<dt class="inline text-slate-500">pos</dt>
+					<dd class="inline tabular-nums">
+						{bedStatus?.position !== null && bedStatus?.position !== undefined
+							? `${bedStatus.position.toFixed(2)}s`
+							: '—'}
+					</dd>
+				</div>
 				<div>
 					<dt class="inline text-slate-500">phrase</dt>
 					<dd class="inline tabular-nums">{phrase}</dd>
@@ -328,6 +376,14 @@
 			<p class="text-xs text-slate-600">
 				Green is the foundation, up in every mood but silent. Blue are the freely combinable extras.
 				If the demo pack reads 0% across the board, run scripts/audio/gen-demo-layers.sh.
+			</p>
+			<p class="text-xs text-slate-600">
+				The bed reads <span class="text-amber-400">loading</span> while its layers decode,
+				<span class="text-amber-400">held</span> if sound is off, and
+				<span class="text-emerald-400">locked</span> once every layer is scheduled on one instant of the
+				audio clock. Locked is permanent: the layers share a clock and a sample-exact loop, so no amount
+				of elapsed time can separate them. Compare the measured loop against the registry figure the pack
+				buttons show, since the phrase grid is derived from the measured one.
 			</p>
 		{/if}
 	</section>

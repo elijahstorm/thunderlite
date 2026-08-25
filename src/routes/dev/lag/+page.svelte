@@ -50,6 +50,7 @@
 		maxOwed: number
 		maxLogLag: number
 		catchingUpShare: number
+		maxQueueLagMs: number
 	}
 	type RoomTrace = {
 		session: string
@@ -337,6 +338,7 @@
 								<th class="py-1 text-right">p95</th>
 								<th class="py-1 text-right">owed</th>
 								<th class="py-1 text-right">lag</th>
+								<th class="py-1 text-right">q lag</th>
 								<th class="py-1 text-right">ff</th>
 							</tr>
 						</thead>
@@ -358,6 +360,18 @@
 									</td>
 									<td class="py-1 text-right {backlogColor(p.maxLogLag)}">
 										{p.maxLogLag}
+									</td>
+									<!-- How long an inbound event sat before this client played it. This
+									     is what the receiving queue paces choreography on: under the
+									     budget it watches the turn, over it fast-forwards. -->
+									<td
+										class="py-1 text-right {(p.maxQueueLagMs ?? 0) >= 6000
+											? 'text-red-300'
+											: (p.maxQueueLagMs ?? 0) >= 3000
+												? 'text-amber-300'
+												: 'text-slate-500'}"
+									>
+										{Math.round((p.maxQueueLagMs ?? 0) / 100) / 10}s
 									</td>
 									<td
 										class="py-1 text-right font-semibold {p.catchingUpShare >= 0.2

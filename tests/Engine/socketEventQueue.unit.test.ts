@@ -1,6 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { CATCHUP_BUDGET_MS, createEventQueue } from '../../src/lib/Components/Socket/eventQueue'
+import {
+	BACKLOG_CEILING_MS,
+	BACKLOG_TAIL_MS,
+	LIVE_LAG_BUDGET_MS,
+	createEventQueue,
+} from '../../src/lib/Components/Socket/eventQueue'
 import { remoteChoreographyMs } from '../../src/lib/Engine/remoteChoreography'
 import type { SerializedAction } from '../../src/lib/Engine/Interactor/serializedAction'
 
@@ -23,20 +28,29 @@ const label = (action: SerializedAction): string => JSON.stringify(action)
 const harness = (ready = () => true) => {
 	const log: string[] = []
 	const gates: ReturnType<typeof deferred>[] = []
+	// Fake wall clock. The queue's pacing rule asks how long the event it is about
+	// to apply has been waiting, so playback has to COST time here or every test
+	// would look like a client that is perfectly on top of the room. Releasing an
+	// animation gate advances the clock by that action's real playback estimate —
+	// the same number the queue reasons about — so a backlog that would take
+	// twenty seconds to watch takes twenty fake seconds to watch.
+	const clock = { now: 0 }
 	const queue = createEventQueue({
 		ready,
+		now: () => clock.now,
 		animate: async (action) => {
 			log.push(`animate:start:${label(action)}`)
 			const gate = deferred()
 			gates.push(gate)
 			await gate.promise
+			clock.now += remoteChoreographyMs(action)
 			log.push(`animate:done:${label(action)}`)
 		},
 		apply: (action) => log.push(`apply:${label(action)}`),
 		onApplied: (entry) => log.push(`applied:${entry.id}`),
 		onDropped: (entry) => log.push(`dropped:${entry.id}`),
 	})
-	return { log, gates, queue }
+	return { log, gates, queue, clock }
 }
 
 /**
@@ -112,9 +126,9 @@ describe('socket event queue', () => {
 	})
 
 	/**
-	 * A whole CPU side's turn arrives as ONE batch now that relays are batched, so
-	 * this is the case the pacing rule is really about. Play order and the moves
-	 * themselves are what a watching player is there for — a board that
+	 * A whole CPU side's turn arrives as a run of bursts now that relays are
+	 * batched, so this is the case the pacing rule is really about. Play order and
+	 * the moves themselves are what a watching player is there for — a board that
 	 * rearranges itself in one silent jump does not tell them what the opponent
 	 * did. Every step of a turn-sized run must animate.
 	 */
@@ -134,50 +148,135 @@ describe('socket event queue', () => {
 		}
 	})
 
-	it('fast-forwards a backlog too deep to be worth watching', async () => {
-		const { log, gates, queue } = harness()
+	/**
+	 * The bug this rule was rewritten for, and the shape a real relayed turn
+	 * actually arrives in.
+	 *
+	 * A client driving a CPU side ships an action and keeps playing while the
+	 * request is in flight, so each request carries the run that piled up behind
+	 * the last one. The receiver gets a few seconds of playback per round trip,
+	 * every round trip, in a completely healthy match — and once relayed moves
+	 * carry their route (long routes) and attacks cost ~2s each, a couple of those
+	 * bursts is more projected playback than any fixed budget wants to allow.
+	 *
+	 * Judging the queue by its depth therefore condemned a client that was keeping
+	 * up perfectly well: it animated the first action or two of a turn, decided the
+	 * pile behind them was too deep to watch, and snapped the rest of the turn onto
+	 * the board — then emptied, and did it again next turn. The receiving player
+	 * saw two units move and the rest teleport, every turn, all match. Nothing here
+	 * is late: each burst is fully drained before the next arrives.
+	 */
+	it('animates every action of a turn delivered as batched bursts', async () => {
+		const { log, gates, queue, clock } = harness()
 
-		// What a lost network or a throttled background tab leaves behind: minutes
-		// of playback. Making someone sit through that before they can act is worse
-		// than skipping it, so the front of the queue applies instantly.
-		const backlog = Array.from({ length: 40 }, (_, i) => move(i + 1, i + 2))
-		backlog.forEach((action, i) =>
-			queue.push({ id: i + 1, action, animate: true, live: true, via: 'push' })
-		)
-		await drain(gates)
+		let id = 0
+		const actions: SerializedAction[] = []
+		// Eight relays, each carrying a unit's route and its attack — well past any
+		// projected-playback budget in total, and never once behind.
+		for (let unit = 0; unit < 8; unit++) {
+			const burst: SerializedAction[] = [
+				{ kind: 'move', from: unit, to: unit + 6, path: [unit, unit + 1, unit + 2, unit + 6] },
+				attack(unit + 6, unit + 7),
+			]
+			burst.forEach((action) => {
+				actions.push(action)
+				queue.push({ id: (id += 1), action, animate: true, live: true, via: 'push' })
+			})
+			// The burst plays out before the next relay lands, which is the whole
+			// point: the host is producing at the same speed we are playing.
+			await drain(gates)
+			clock.now += 300
+		}
 
-		// The first event out of the queue had nothing behind it yet, so it animates
-		// — the backlog only exists from the second one on, which is where the
-		// fast-forward has to bite.
-		expect(log).toContain(`apply:${label(backlog[1])}`)
-		expect(log).not.toContain(`animate:start:${label(backlog[1])}`)
-		// What bounds how much plays out is the BUDGET, not the size of the backlog:
-		// however deep it gets, the player watches about the same tail of it. Stated
-		// in terms of the real numbers so retuning either one retunes this with it
-		// (+1 for the event that dequeued before the rest had arrived).
-		const animated = log.filter((line) => line.startsWith('animate:start')).length
-		const affordable = Math.ceil(CATCHUP_BUDGET_MS / remoteChoreographyMs(backlog[0])) + 1
-		expect(animated).toBeLessThanOrEqual(affordable)
-		expect(animated).toBeLessThan(backlog.length)
+		for (const action of actions) {
+			expect(log).toContain(`animate:start:${label(action)}`)
+			expect(log).not.toContain(`apply:${label(action)}`)
+		}
 	})
 
 	/**
-	 * And it must come back. Fast-forwarding is a way to catch up, not a mode: once
-	 * what is left fits the budget the tail plays out, so the player rejoins live
-	 * play watching the board move rather than mid-jump.
+	 * Falling behind, on the other hand, is real and has to be caught up on. A
+	 * rate-limit cooldown that held a turn's worth of relays back, or a tab whose
+	 * animation timers were throttled while it was hidden, leaves events sitting in
+	 * the queue for seconds — and making someone watch all of that before they can
+	 * act is worse than skipping it.
 	 */
-	it('resumes animating once the remaining backlog fits again', async () => {
+	it('fast-forwards once events are genuinely sitting in the queue', async () => {
 		const { log, gates, queue } = harness()
 
-		const backlog = Array.from({ length: 40 }, (_, i) => move(i + 1, i + 2))
+		// One frame, one turn's worth of routes: far more playback than we can watch
+		// and still be anywhere near live.
+		const backlog = Array.from({ length: 40 }, (_, i) => ({
+			kind: 'move' as const,
+			from: i,
+			to: i + 3,
+			path: [i, i + 1, i + 2, i + 3],
+		}))
 		backlog.forEach((action, i) =>
 			queue.push({ id: i + 1, action, animate: true, live: true, via: 'push' })
 		)
 		await drain(gates)
 
+		// The front of the run animates — nothing has had time to go stale yet — and
+		// what plays out is bounded by the LAG budget, not by how deep the pile is.
+		expect(log).toContain(`animate:start:${label(backlog[0])}`)
+		const animated = log.filter((line) => line.startsWith('animate:start')).length
+		const affordable = Math.ceil(LIVE_LAG_BUDGET_MS / remoteChoreographyMs(backlog[0])) + 1
+		expect(animated).toBeLessThanOrEqual(affordable)
+		expect(animated).toBeLessThan(backlog.length)
+		// And the rest is caught up on rather than watched.
+		expect(log).toContain(`apply:${label(backlog[backlog.length - 1])}`)
+	})
+
+	/**
+	 * A single event can be late all by itself. The queue idles while the board is
+	 * gone, a hidden tab's timers crawl — either way, an event that has been
+	 * waiting past the budget is applied rather than played out.
+	 */
+	it('fast-forwards an event that waited past the budget on its own', async () => {
+		const { log, queue, clock } = harness()
+
+		queue.push({
+			id: 1,
+			action: move(1, 2),
+			animate: true,
+			live: true,
+			via: 'push',
+			receivedAt: clock.now - (LIVE_LAG_BUDGET_MS + 1),
+		})
+		await flush()
+
+		expect(log).toEqual([`apply:${label(move(1, 2))}`, 'applied:1'])
+	})
+
+	/**
+	 * A reconnect is the one case lag alone cannot see coming: a minute of history
+	 * lands in a single frame, and every event in it was received a moment ago, so
+	 * nothing is late until we have already sat through several seconds of it. The
+	 * ceiling catches that on arrival — and it skips down to a watchable tail
+	 * rather than all the way to empty, so the player rejoins live play watching
+	 * the board move rather than mid-jump.
+	 */
+	it('skips a backlog too deep to be live play, then watches the tail', async () => {
+		const { log, gates, queue } = harness()
+
+		const per = remoteChoreographyMs(attack(1, 2))
+		const count = Math.ceil((BACKLOG_CEILING_MS * 2) / per)
+		const backlog = Array.from({ length: count }, (_, i) => attack(i + 1, i + 2))
+		backlog.forEach((action, i) =>
+			queue.push({ id: i + 1, action, animate: true, live: true, via: 'push' })
+		)
+		await drain(gates)
+
+		// The body of it is skipped — there is no watching a backlog that size. (The
+		// very first event dequeued before the rest of the frame had been accepted,
+		// so it had nothing behind it yet and played out.)
+		expect(log).toContain(`apply:${label(backlog[1])}`)
+		// The tail plays out, and only about a tail's worth of it.
 		const last = backlog[backlog.length - 1]
 		expect(log).toContain(`animate:start:${label(last)}`)
-		expect(log).not.toContain(`apply:${label(last)}`)
+		const animated = log.filter((line) => line.startsWith('animate:start')).length
+		expect(animated).toBeLessThanOrEqual(Math.ceil(BACKLOG_TAIL_MS / per) + 2)
 	})
 
 	/**

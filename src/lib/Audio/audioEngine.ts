@@ -13,6 +13,12 @@ import {
 	type AudioChannel,
 	type AudioFormat,
 } from '$lib/Audio/assetManifest'
+import {
+	browserMusicBed,
+	type MusicBed,
+	type MusicBedStatus,
+	type StemSource,
+} from '$lib/Audio/musicBed'
 
 /**
  * Audio playback engine with three independent channels:
@@ -23,11 +29,14 @@ import {
  *  - `env`   — single-active looping track (weather).
  *  - `sfx`   — pooled, fire-and-forget; the same effect can overlap itself.
  *
- * The stem layer keeps every mood track loaded and running together once the
- * match begins. State changes (turn flips, AI thinking, etc.) move the
- * per-stem target gains and the engine tweens them — never stopping/restarting
- * a stem, so the loops stay phase-locked and crossfades sound musical. One-shot
- * stings (win/lose) still take the legacy single-active path.
+ * The stem layer keeps every layer of the match's pack loaded and running
+ * together once the match begins. State changes (turn flips, AI thinking, etc.)
+ * move the per-stem target gains and the bed ramps them — never stopping or
+ * restarting a layer, so the loops stay phase-locked and crossfades sound
+ * musical. That bed is Web Audio, not audio elements; `musicBed.ts` explains
+ * why nothing else can hold several loops in sync for a whole match. One-shot
+ * stings (win/lose) still take the single-active element path, where being a
+ * few milliseconds late costs nothing.
  *
  * The "which track is active per channel + volume/mute flags" portion is a
  * plain object manipulated by pure functions (see `AudioState` below), so the
@@ -137,18 +146,6 @@ export interface AudioElementLike {
 
 export type AudioElementFactory = () => AudioElementLike
 
-/**
- * Pluggable scheduler for stem-fade tweens. Lets tests advance fades
- * deterministically (no rAF / wall-clock) and lets the browser path use
- * `requestAnimationFrame` + `performance.now`.
- */
-export interface FadeScheduler {
-	/** Current time in ms (monotonic; only deltas are used). */
-	now: () => number
-	/** Schedule a frame callback. Returns a cancel handle. */
-	requestFrame: (cb: () => void) => () => void
-}
-
 export interface AudioEngineOptions {
 	/** `null` disables playback (SSR / headless); state machine still works. */
 	factory?: AudioElementFactory | null
@@ -158,18 +155,8 @@ export interface AudioEngineOptions {
 	persist?: (settings: AudioSettings) => void
 	/** Max simultaneous voices per distinct sfx before stealing the oldest. */
 	maxSfxVoices?: number
-	/** Stem-fade scheduler. Defaults to rAF + `performance.now` in the browser. */
-	fadeScheduler?: FadeScheduler
-}
-
-interface MusicStem {
-	el: AudioElementLike
-	/** Currently rendered gain (animated toward `targetGain`). */
-	currentGain: number
-	/** Gain the active fade is approaching. */
-	targetGain: number
-	/** Gain at the time the active fade started (interp origin). */
-	fadeFromGain: number
+	/** Phase-locked stem bed. `null` disables the music bed (SSR / headless). */
+	bed?: MusicBed | null
 }
 
 const SINGLE_CHANNELS: SingleChannel[] = ['music', 'env']
@@ -180,7 +167,7 @@ export class AudioEngine {
 	private readonly format: AudioFormat
 	private readonly persist: (settings: AudioSettings) => void
 	private readonly maxSfxVoices: number
-	private readonly fadeScheduler: FadeScheduler
+	private readonly bed: MusicBed | null
 
 	/** One live element per single-active channel. */
 	private readonly singleEls: Record<SingleChannel, AudioElementLike | null> = {
@@ -192,12 +179,12 @@ export class AudioEngine {
 	/** Overlapping voice pool per sfx logical name. */
 	private readonly sfxPool = new Map<string, AudioElementLike[]>()
 
-	/** Loaded music stems — all looping in lockstep once started. */
-	private readonly musicStems = new Map<string, MusicStem>()
-	/** Pending fade tween, if any. */
-	private fadeStart = 0
-	private fadeDuration = 0
-	private fadeCancel: (() => void) | null = null
+	/**
+	 * Target gain per loaded stem. Only the targets live here — the rendered
+	 * gains are `AudioParam` values owned by the bed, so there is no second copy
+	 * of them to fall out of step.
+	 */
+	private readonly stemTargets = new Map<string, number>()
 
 	/**
 	 * Runtime-only ducking multiplier for the `env` channel (0..1). Lets weather
@@ -211,7 +198,7 @@ export class AudioEngine {
 		this.format = opts.preferredFormat ?? 'ogg'
 		this.persist = opts.persist ?? (() => {})
 		this.maxSfxVoices = opts.maxSfxVoices ?? 8
-		this.fadeScheduler = opts.fadeScheduler ?? defaultFadeScheduler()
+		this.bed = opts.bed ?? null
 		this.state = createAudioState(opts.settings)
 	}
 
@@ -247,138 +234,98 @@ export class AudioEngine {
 		this.stopSingle('music')
 	}
 
-	// ── Music stem layer (adaptive, BPM-aligned, crossfaded) ─────────────────
+	// ── Music stem layer (phase-locked bed, gain-crossfaded) ─────────────────
 
 	/**
-	 * Load and start every named music stem together. All stems begin at
-	 * `currentTime = 0`, loop, and play at gain 0 — so they're audible only
-	 * once `setMusicMix` raises a stem's target. Starting them in lockstep is
-	 * what keeps the BPM-/key-aligned crossfades sounding musical; we never
-	 * stop and restart a stem afterward.
+	 * Load and start every named music stem together on the phase-locked bed.
+	 * All layers begin on one scheduled instant at gain 0 — audible only once
+	 * `setMusicMix` raises a target — and stay sample-aligned for the rest of the
+	 * match. We never stop and restart a layer afterward.
 	 *
-	 * Safe to call when no factory is configured (SSR/headless): the state is
-	 * tracked but no Audio elements are created.
+	 * Safe to call with no bed (SSR / headless): targets are tracked, nothing is
+	 * fetched, decoded or played.
 	 */
 	startMusicStems(names: readonly string[]): void {
 		// Reset any prior stem set — switching maps or restarting a match.
 		this.stopMusicStems()
-		if (!this.factory) return
+		const sources: StemSource[] = []
 		for (const name of names) {
 			const base = lookupAudio('music', name)
 			if (base === undefined) {
 				console.warn(`[audio] unknown music stem "${name}"`)
 				continue
 			}
-			const el = this.acquireTrackElement(resolveAudioPath(base, this.format))
-			el.loop = true
-			el.currentTime = 0
-			el.volume = 0
-			this.musicStems.set(name, {
-				el,
-				currentGain: 0,
-				targetGain: 0,
-				fadeFromGain: 0,
-			})
-			// Stay primed but silent when sound is off; un-muting resumes the stems
-			// in lockstep (they never advanced past currentTime 0).
-			if (!this.playbackSuppressed) void el.play()
+			this.stemTargets.set(name, 0)
+			sources.push({ name, url: resolveAudioPath(base, this.format) })
 		}
+		if (!this.bed || sources.length === 0) return
+		// Stay decoded but unscheduled when sound is off; un-muting then starts the
+		// whole bed on one instant, so nothing has drifted in the meantime.
+		this.bed.setSuppressed(this.playbackSuppressed)
+		this.bed.setOutputGain(effectiveVolume(this.state, 'music'))
+		this.bed.start(sources)
 	}
 
 	/**
-	 * Set the target gain of every loaded stem and crossfade toward it.
-	 * Stems not present in `mix` are driven to 0. A `fadeMs` of `0` snaps
-	 * instantly (useful for tests and hard cuts).
+	 * Set the target gain of every loaded stem and crossfade toward it. Stems not
+	 * present in `mix` are driven to 0. A `fadeMs` of `0` snaps instantly (useful
+	 * for tests and hard cuts).
+	 *
+	 * Re-targeting mid-fade continues from wherever the ramp actually is rather
+	 * than jumping, and the ramp is `AudioParam` automation on the audio thread —
+	 * so unlike the old `requestAnimationFrame` tween it still completes at the
+	 * right rate while the tab is hidden.
 	 */
 	setMusicMix(mix: MusicMix, opts: MusicMixOptions = {}): void {
 		const fadeMs = Math.max(0, opts.fadeMs ?? 800)
-		// Snapshot current gains as the fade origin so re-targets mid-fade
-		// don't jump — they continue smoothly from where they were.
-		for (const [name, stem] of this.musicStems) {
-			stem.fadeFromGain = stem.currentGain
-			stem.targetGain = clampVolume(mix[name] ?? 0)
+		for (const name of this.stemTargets.keys()) {
+			this.stemTargets.set(name, clampVolume(mix[name] ?? 0))
 		}
-		this.cancelFade()
-		// Snap when there's nothing to animate, no work requested, or no
-		// scheduler (SSR / headless — no Audio is sounding anyway).
-		if (fadeMs === 0 || this.musicStems.size === 0 || !this.factory) {
-			for (const stem of this.musicStems.values()) stem.currentGain = stem.targetGain
-			this.syncMusicStemVolumes()
-			return
-		}
-		this.fadeDuration = fadeMs
-		this.fadeStart = this.fadeScheduler.now()
-		this.scheduleFadeFrame()
+		this.bed?.setGains(this.stemTargets, fadeMs)
 	}
 
 	/** Snapshot of the loaded stems and their current gains (for tests / UI). */
 	getMusicStems(): ReadonlyMap<string, { currentGain: number; targetGain: number }> {
+		const live = this.bed?.gains()
 		const out = new Map<string, { currentGain: number; targetGain: number }>()
-		for (const [name, stem] of this.musicStems) {
-			out.set(name, { currentGain: stem.currentGain, targetGain: stem.targetGain })
+		for (const [name, targetGain] of this.stemTargets) {
+			// No bed means no automation to read, so the target *is* the gain.
+			out.set(name, { currentGain: live?.get(name) ?? targetGain, targetGain })
 		}
 		return out
 	}
 
 	/**
 	 * Playback position of the stem bed in seconds, or `null` when it is not
-	 * running. Every stem is started in lockstep and shares a length, so any one
-	 * of them speaks for the whole bed and we just read the first.
+	 * running. Read off the audio clock rather than off any one layer, so it
+	 * speaks for the whole bed — every layer sits at this position by
+	 * construction, not by luck.
 	 *
-	 * `null` while suppressed (muted) is intentional: it tells the phrase clock to
-	 * re-baseline rather than to interpret the resume as a huge forward jump.
+	 * `null` before the bed is scheduled (still decoding, or held back because
+	 * sound is off) is intentional: it tells the phrase clock to re-baseline
+	 * rather than to read the eventual start as a huge forward jump.
 	 */
 	getMusicPosition(): number | null {
-		for (const stem of this.musicStems.values()) {
-			if (stem.el.paused) return null
-			return stem.el.currentTime
-		}
-		return null
+		return this.bed?.position() ?? null
 	}
 
-	/** Pause and discard every loaded stem. Cancels any in-flight fade. */
+	/** Bed diagnostics for the audio dev board. `null` when there is no bed. */
+	getMusicBedStatus(): MusicBedStatus | null {
+		return this.bed?.status() ?? null
+	}
+
+	/**
+	 * Stop the bed and release its sources and gain nodes. Its decoded layers are
+	 * kept, so restarting the same pack does not pay for the download again.
+	 */
 	stopMusicStems(): void {
-		this.cancelFade()
-		for (const stem of this.musicStems.values()) {
-			stem.el.pause()
-			stem.el.volume = 0
-		}
-		this.musicStems.clear()
+		this.stemTargets.clear()
+		this.bed?.stop()
 	}
 
-	private cancelFade(): void {
-		if (this.fadeCancel) {
-			this.fadeCancel()
-			this.fadeCancel = null
-		}
-	}
-
-	private scheduleFadeFrame(): void {
-		this.fadeCancel = this.fadeScheduler.requestFrame(() => {
-			this.fadeCancel = null
-			this.tickFade()
-		})
-	}
-
-	private tickFade(): void {
-		const elapsed = this.fadeScheduler.now() - this.fadeStart
-		const t = this.fadeDuration > 0 ? Math.min(1, Math.max(0, elapsed / this.fadeDuration)) : 1
-		let active = false
-		for (const stem of this.musicStems.values()) {
-			const next = stem.fadeFromGain + (stem.targetGain - stem.fadeFromGain) * t
-			stem.currentGain = next
-			if (next !== stem.targetGain) active = true
-		}
-		this.syncMusicStemVolumes()
-		if (active && t < 1) this.scheduleFadeFrame()
-	}
-
-	/** Push current effective volume × per-stem gain onto each stem element. */
+	/** Push the music channel's effective volume onto the bed's master gain. */
 	private syncMusicStemVolumes(): void {
-		const channelVol = effectiveVolume(this.state, 'music')
-		for (const stem of this.musicStems.values()) {
-			stem.el.volume = clampVolume(channelVol * stem.currentGain)
-		}
+		this.bed?.setOutputGain(effectiveVolume(this.state, 'music'))
 	}
 
 	// ── Environment / weather (single-active) ─────────────────────────────────
@@ -530,26 +477,28 @@ export class AudioEngine {
 			if (el) el.volume = this.outputVolume(channel)
 		}
 		this.syncMusicStemVolumes()
+		// Sound-off gate for the bed: one that is still decoding while muted must
+		// not schedule itself, and un-muting has to let it start.
+		this.bed?.setSuppressed(this.playbackSuppressed)
 		const sfxVol = effectiveVolume(this.state, 'sfx')
 		for (const pool of this.sfxPool.values()) {
 			for (const el of pool) if (!el.paused) el.volume = sfxVol
 		}
 		// Sound was off and is now back on: start the looping elements we kept
-		// primed but never played (one per single channel + every music stem).
+		// primed but never played (one per single channel).
 		if (!this.playbackSuppressed) this.resumeSuppressedPlayback()
 	}
 
 	/**
 	 * Resume looping playback for elements that were primed while muted. SFX are
 	 * transient and intentionally not resumed — a missed effect just stays missed.
+	 * The stem bed is handled by `setSuppressed`, which starts every layer
+	 * together rather than resuming them one at a time.
 	 */
 	private resumeSuppressedPlayback(): void {
 		for (const channel of SINGLE_CHANNELS) {
 			const el = this.singleEls[channel]
 			if (el && el.paused) void el.play()
-		}
-		for (const stem of this.musicStems.values()) {
-			if (stem.el.paused) void stem.el.play()
 		}
 	}
 }
@@ -559,24 +508,6 @@ export class AudioEngine {
 function browserFactory(): AudioElementFactory | null {
 	if (!browser || typeof Audio === 'undefined') return null
 	return () => new Audio() as unknown as AudioElementLike
-}
-
-/**
- * Default stem-fade scheduler. Uses `requestAnimationFrame` + `performance.now`
- * in the browser; degrades to a no-op (which makes the engine snap straight to
- * the target gain on each `setMusicMix`) during SSR / headless tests.
- */
-function defaultFadeScheduler(): FadeScheduler {
-	if (!browser || typeof requestAnimationFrame === 'undefined') {
-		return { now: () => 0, requestFrame: () => () => {} }
-	}
-	return {
-		now: () => performance.now(),
-		requestFrame: (cb) => {
-			const id = requestAnimationFrame(cb)
-			return () => cancelAnimationFrame(id)
-		},
-	}
 }
 
 let preferredFormat: AudioFormat | null = null
@@ -601,6 +532,7 @@ function detectPreferredFormat(): AudioFormat {
 /** Shared, app-wide engine instance. Safe to import during SSR. */
 export const audioEngine = new AudioEngine({
 	factory: browserFactory(),
+	bed: browserMusicBed(),
 	preferredFormat: detectPreferredFormat(),
 	settings: get(audioSettings),
 	persist: (settings) => audioSettings.set(settings),

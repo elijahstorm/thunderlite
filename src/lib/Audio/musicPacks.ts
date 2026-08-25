@@ -112,6 +112,22 @@ export function phraseSecondsFor(pack: MusicPack): number {
 	return pack.loopSeconds / Math.max(1, pack.phrasesPerLoop)
 }
 
+/**
+ * Seconds per phrase given the loop length the bed actually decoded. A pack's
+ * `loopSeconds` is a rounded figure and the encoded assets run a few tens of
+ * milliseconds shorter than it (more so on mp3 than ogg), so a phrase length
+ * derived from the registry slowly walks off the loop point over a long match.
+ * Prefer this wherever the real length is known; it falls back to the registry
+ * before anything has decoded.
+ */
+export function phraseSecondsForLoop(
+	pack: MusicPack,
+	loopSeconds: number | null | undefined
+): number {
+	if (typeof loopSeconds !== 'number' || !(loopSeconds > 0)) return phraseSecondsFor(pack)
+	return loopSeconds / Math.max(1, pack.phrasesPerLoop)
+}
+
 /** Look a pack up by id, across dev-only ones too. */
 export function packById(id: string): MusicPack | undefined {
 	return MUSIC_PACKS.find((p) => p.id === id)

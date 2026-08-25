@@ -24,8 +24,18 @@
 export type TimerHandle = ReturnType<typeof setInterval>
 
 export interface MusicClockOptions {
-	/** Seconds of audio per phrase. One loop should be a whole number of these. */
-	phraseSeconds: number
+	/**
+	 * Seconds of audio per phrase. One loop should be a whole number of these.
+	 *
+	 * Pass a function to resolve it per sample. The pack registry only knows a
+	 * rounded loop length, and the encoded assets are a few tens of milliseconds
+	 * shorter than that (worse on mp3 than ogg), so a fixed phrase length walks
+	 * off the loop point over a long match — which is exactly the misalignment
+	 * `phrasesPerLoop` exists to prevent. A resolver reading the bed's decoded
+	 * loop length keeps every edge on the grid. Non-finite or non-positive
+	 * results fall back to the last usable value.
+	 */
+	phraseSeconds: number | (() => number)
 	/** Bed playback position in seconds, or `null` when nothing is running. */
 	position: () => number | null
 	/** Fired on each phrase edge with the monotonic phrase count (starts at 1). */
@@ -41,7 +51,9 @@ export interface MusicClockOptions {
 const DEFAULT_POLL_MS = 250
 
 export class MusicClock {
-	private readonly phraseSeconds: number
+	private readonly resolvePhraseSeconds: () => number
+	/** Last usable phrase length, held so a bad resolve cannot break the grid. */
+	private phraseSeconds: number
 	private readonly position: () => number | null
 	private readonly onPhrase: (phrase: number) => void
 	private readonly pollMs: number
@@ -55,7 +67,9 @@ export class MusicClock {
 	private phrase = 0
 
 	constructor(opts: MusicClockOptions) {
-		this.phraseSeconds = Math.max(0.001, opts.phraseSeconds)
+		const spec = opts.phraseSeconds
+		this.resolvePhraseSeconds = typeof spec === 'function' ? spec : () => spec
+		this.phraseSeconds = Math.max(0.001, typeof spec === 'function' ? spec() : spec)
 		this.position = opts.position
 		this.onPhrase = opts.onPhrase
 		this.pollMs = Math.max(1, opts.pollMs ?? DEFAULT_POLL_MS)
@@ -91,6 +105,13 @@ export class MusicClock {
 	 * Sample the bed position and emit a phrase edge if we crossed one. Exposed
 	 * for tests so they can step the clock without a timer.
 	 */
+	/** Phrase length for this sample, ignoring a resolver that returns garbage. */
+	private phraseLength(): number {
+		const resolved = this.resolvePhraseSeconds()
+		if (Number.isFinite(resolved) && resolved > 0) this.phraseSeconds = resolved
+		return this.phraseSeconds
+	}
+
 	sample(): void {
 		const pos = this.position()
 		if (pos === null || !Number.isFinite(pos) || pos < 0) {
@@ -99,7 +120,7 @@ export class MusicClock {
 			return
 		}
 
-		const slot = Math.floor(pos / this.phraseSeconds)
+		const slot = Math.floor(pos / this.phraseLength())
 		if (this.lastSlot === null) {
 			// First sighting: adopt the position silently. The consumer already has
 			// an arrangement for phrase 0; firing here would re-arrange immediately.

@@ -7,7 +7,12 @@ import {
 	type PlaySingleOptions,
 } from '$lib/Audio/audioEngine'
 import { MusicClock } from '$lib/Audio/musicClock'
-import { packForMatch, packLayers, phraseSecondsFor, type MusicPack } from '$lib/Audio/musicPacks'
+import {
+	packForMatch,
+	packLayers,
+	phraseSecondsForLoop,
+	type MusicPack,
+} from '$lib/Audio/musicPacks'
 import { mixForMood, type MusicMood } from '$lib/Audio/musicVariation'
 
 /**
@@ -172,8 +177,9 @@ export interface MusicDirectorOptions {
 	 */
 	pack?: MusicPack
 	/**
-	 * Seconds of audio per phrase. Defaults to the pack's own subdivision, which
-	 * divides its loop exactly — override only to deliberately go off-grid.
+	 * Seconds of audio per phrase. Defaults to the pack's subdivision measured
+	 * against the loop length the bed actually decoded, so every phrase edge lands
+	 * on the grid — override only to deliberately go off-grid.
 	 */
 	phraseSeconds?: number
 	/** Phrases to hold an arrangement before rolling the next one. */
@@ -272,7 +278,9 @@ export class MusicDirector {
 		this.clock =
 			opts.phraseSource?.(onPhrase) ??
 			new MusicClock({
-				phraseSeconds: opts.phraseSeconds ?? phraseSecondsFor(this.pack),
+				phraseSeconds:
+					opts.phraseSeconds ??
+					(() => phraseSecondsForLoop(this.pack, audioEngine.getMusicBedStatus()?.loopSeconds)),
 				position: () => audioEngine.getMusicPosition(),
 				onPhrase,
 			})

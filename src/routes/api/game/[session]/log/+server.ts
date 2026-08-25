@@ -169,6 +169,7 @@ const summarizeLag = (
 		batched: number
 		gauges: number
 		catchingUp: number
+		maxQueueLag: number
 	}
 	const blank = (): Acc => ({
 		relays: 0,
@@ -182,6 +183,7 @@ const summarizeLag = (
 		batched: 0,
 		gauges: 0,
 		catchingUp: 0,
+		maxQueueLag: 0,
 	})
 	const byPlayer = new Map<string, Acc>()
 	let first = Infinity
@@ -205,6 +207,7 @@ const summarizeLag = (
 		if (detail.what === 'gauge') {
 			acc.gauges += 1
 			if (detail.catchingUp === true) acc.catchingUp += 1
+			acc.maxQueueLag = Math.max(acc.maxQueueLag, num('queueLagMs') ?? 0)
 		}
 		if (detail.what !== 'relay') continue
 		acc.relays += 1
@@ -246,6 +249,13 @@ const summarizeLag = (
 				 * play out.
 				 */
 				catchingUpShare: acc.gauges > 0 ? Number((acc.catchingUp / acc.gauges).toFixed(2)) : 0,
+				/**
+				 * Longest an inbound event sat in the queue before this client got to
+				 * it. This is what the receiving client paces its choreography on, so it
+				 * is the number that says whether a turn was watched or jumped: a room
+				 * whose spectators stay under the budget never fast-forwards anything.
+				 */
+				maxQueueLagMs: acc.maxQueueLag,
 			}
 		})
 		.sort((a, b) => b.maxLogLag + b.maxOwed - (a.maxLogLag + a.maxOwed))

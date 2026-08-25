@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { MusicClock, type TimerHandle } from '../../src/lib/Audio/musicClock'
 
 /** A clock whose position we drive by hand, collecting the phrases it emits. */
-function harness(phraseSeconds = 8) {
+function harness(phraseSeconds: number | (() => number) = 8) {
 	let position: number | null = 0
 	const fired: number[] = []
 	let tick: (() => void) | null = null
@@ -145,5 +145,32 @@ describe('MusicClock', () => {
 
 		h.clock.reset()
 		expect(h.clock.current()).toBe(0)
+	})
+
+	it('resolves the phrase length per sample, so a corrected loop stays on grid', () => {
+		// The pack registry only carries a rounded loop length; the decoded asset is
+		// a few tens of ms shorter. A resolver lets the clock switch to the real
+		// figure the moment the bed reports it, instead of walking off the grid.
+		let phraseSeconds = 10
+		const h = harness(() => phraseSeconds)
+		h.seek(0)
+		phraseSeconds = 8 // bed decoded: true phrase length is shorter
+
+		h.seek(9) // past 8 on the corrected grid, short of 10 on the stale one
+		expect(h.fired).toEqual([1])
+	})
+
+	it('ignores a resolver that returns garbage and keeps the last good length', () => {
+		let phraseSeconds = 8
+		const h = harness(() => phraseSeconds)
+		h.seek(0)
+
+		phraseSeconds = NaN
+		h.seek(9)
+		expect(h.fired).toEqual([1]) // still on the 8s grid
+
+		phraseSeconds = 0
+		h.seek(17)
+		expect(h.fired).toEqual([1, 2])
 	})
 })

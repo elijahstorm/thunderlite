@@ -919,11 +919,16 @@
 			owed,
 			logLag,
 			queued: queue.size,
-			// Whether that lag is deliberate. A queue draining through its
-			// choreography is a spectator WATCHING a turn, which is the point of the
-			// thing; `catchingUp` is the queue having given up on watching because the
-			// backlog got too deep. Without the distinction every animated turn would
-			// read as lag and the numbers would mean nothing.
+			// How long the front of that queue has been waiting. A deep queue is
+			// normal — relays arrive in bursts, and a burst that drains before the
+			// next one lands is a spectator WATCHING a turn, which is the point of the
+			// thing. This is the number that separates that from actually running
+			// late, and it is what the queue itself paces on (see `eventQueue`).
+			queueLagMs: queue.lagMs,
+			// Whether that lag is deliberate. `catchingUp` is the queue having given
+			// up on watching because this client fell behind the room. Without the
+			// distinction every animated turn would read as lag and the numbers would
+			// mean nothing.
 			catchingUp: queue.catchingUp,
 			pushTrusted,
 			realtimeUp,
