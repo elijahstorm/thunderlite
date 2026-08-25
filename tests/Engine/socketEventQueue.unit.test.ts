@@ -96,13 +96,39 @@ describe('socket event queue', () => {
 		])
 	})
 
-	it('fast-forwards a backlog instead of animating every step of it', async () => {
+	it('fast-forwards a deep backlog instead of animating every step of it', async () => {
 		const { log, gates, queue } = harness()
 
-		// One event in flight, two more delivered while it plays. When it finishes,
-		// the middle one has another behind it, so it fast-forwards rather than
-		// making this client fall a further slide-length behind the room; only the
-		// last one — alone in the queue — gets its choreography.
+		// One event in flight and four more delivered while it plays. The first one
+		// out of the queue still has three behind it — past SMOOTH_BACKLOG — so it
+		// fast-forwards rather than making this client fall a further slide-length
+		// behind the room. The next is within reach and gets its choreography.
+		queue.push({ id: 1, action: move(1, 2), animate: true, live: true, via: 'push' })
+		await flush()
+		queue.push({ id: 2, action: move(2, 3), animate: true, live: true, via: 'push' })
+		queue.push({ id: 3, action: move(3, 4), animate: true, live: true, via: 'push' })
+		queue.push({ id: 4, action: move(4, 5), animate: true, live: true, via: 'push' })
+		queue.push({ id: 5, action: move(5, 6), animate: true, live: true, via: 'push' })
+
+		gates[0].resolve()
+		await flush()
+
+		expect(log).toContain(`apply:${label(move(2, 3))}`)
+		expect(log).not.toContain(`animate:start:${label(move(2, 3))}`)
+		expect(log).toContain(`animate:start:${label(move(3, 4))}`)
+	})
+
+	/**
+	 * The complaint this threshold exists for. A player taking their whole turn in
+	 * quick succession — or a reconciliation poll handing over a few actions at
+	 * once after the socket lagged — delivers a bunch, and the old rule (animate
+	 * only when ALONE in the queue) teleported every one of them but the last. The
+	 * opponent's turn arrived as a single silent jump of the board instead of as
+	 * moves that happened.
+	 */
+	it('still plays out a short bunch rather than jumping the board', async () => {
+		const { log, gates, queue } = harness()
+
 		queue.push({ id: 1, action: move(1, 2), animate: true, live: true, via: 'push' })
 		await flush()
 		queue.push({ id: 2, action: move(2, 3), animate: true, live: true, via: 'push' })
@@ -111,9 +137,8 @@ describe('socket event queue', () => {
 		gates[0].resolve()
 		await flush()
 
-		expect(log).toContain(`apply:${label(move(2, 3))}`)
-		expect(log).toContain(`animate:start:${label(move(3, 4))}`)
-		expect(log).not.toContain(`animate:start:${label(move(2, 3))}`)
+		expect(log).toContain(`animate:start:${label(move(2, 3))}`)
+		expect(log).not.toContain(`apply:${label(move(2, 3))}`)
 	})
 
 	it('never animates a catch-up backlog', async () => {

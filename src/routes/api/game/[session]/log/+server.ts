@@ -1,6 +1,7 @@
-import { error, json } from '@sveltejs/kit'
+import { error, isHttpError, json } from '@sveltejs/kit'
 import { dev } from '$app/environment'
 import { gameStore } from '$lib/Game/store.server'
+import { noteRateLimit } from '$lib/Security/rateLimit'
 
 /**
  * Client diagnostic trace for an online room (see `create_game_log.sql.ts`).
@@ -48,7 +49,13 @@ export const POST = async ({ request, params, locals }) => {
 		const stored = await gameStore.appendLog(session, userSession, entries)
 		return json({ stored })
 	} catch (msg) {
-		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
+		// `isHttpError`, not a duck-typed `'status' in msg`. That looser check was
+		// meant to let our own `error(403)` through untouched, but the SDK's
+		// `DontCodeError` carries a `status` too — so a gateway rate limit on this
+		// path was re-thrown and rendered as a 500. A logging endpoint answering
+		// 500 is precisely the outcome the rest of this file exists to prevent.
+		if (isHttpError(msg)) throw msg
+		noteRateLimit(msg)
 		// Swallowed on purpose: see the note above. Logging is never load-bearing.
 		return json({ stored: 0 })
 	}

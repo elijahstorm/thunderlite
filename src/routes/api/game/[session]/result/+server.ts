@@ -71,6 +71,7 @@ export const POST = async ({ request, params, locals }) => {
 		let winnerTeam: number | null
 		let outcome: Outcome
 		let matchId: number | undefined
+		let isAsyncMatch = false
 
 		if (mode === 'online') {
 			const members = await gameStore.members(session)
@@ -80,11 +81,13 @@ export const POST = async ({ request, params, locals }) => {
 
 			// The played map, read from the room row (which outlives its logical
 			// TTL) and pinned onto the match so the replay viewer can rebuild the
-			// board long after the room itself is gone.
-			const room = await db.findOne<{ map_id: string | null }>('game_room', {
+			// board long after the room itself is gone. The room's own mode rides
+			// along: only async matches get a result email (see below).
+			const room = await db.findOne<{ map_id: string | null; mode: string | null }>('game_room', {
 				where: { session },
-				select: ['map_id'],
+				select: ['map_id', 'mode'],
 			})
+			isAsyncMatch = room?.mode === 'async'
 
 			// The first writer locks the winner: their row carries the
 			// authoritative `winner_team`. A later writer hits the `session_id`
@@ -170,23 +173,26 @@ export const POST = async ({ request, params, locals }) => {
 		// (cron and lazy checks) never resigns anyone in an already-decided game.
 		if (mode === 'online') await gameStore.finishAsyncRoom(session)
 
-		// Match summary email. Each participant records their own result row, so
-		// this reaches every player once (deduped per match + player). For online
-		// play we name an opponent; hot-seat / campaign has none.
-		let opponentName: string | null = null
-		if (mode === 'online') {
+		await rememberEmail(userAuth, locals.userEmail)
+
+		// Match summary email, async matches only. A live game ends with both
+		// players watching the game-over screen, so mailing them the result they
+		// just saw is noise; an async opponent may be days away from opening the
+		// app, and the result is genuinely news to them. Each participant records
+		// their own result row, so this reaches every player once (deduped per
+		// match + player).
+		if (isAsyncMatch) {
 			const others = await gameStore.roster(session)
 			const other = others.find((m) => m.userAuth && m.userAuth !== userAuth && !m.isAi)
-			if (other?.userAuth) opponentName = await profileName(other.userAuth)
+			const opponentName = other?.userAuth ? await profileName(other.userAuth) : null
+			await notify({
+				userAuth,
+				category: 'game',
+				dedupKey: `match-result:${matchId}:${userAuth}`,
+				email: locals.userEmail,
+				content: matchResult(outcome, opponentName),
+			})
 		}
-		await rememberEmail(userAuth, locals.userEmail)
-		await notify({
-			userAuth,
-			category: 'game',
-			dedupKey: `match-result:${matchId}:${userAuth}`,
-			email: locals.userEmail,
-			content: matchResult(outcome, opponentName),
-		})
 
 		return json({ matchId, outcome, elo })
 	} catch (msg) {

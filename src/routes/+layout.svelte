@@ -4,6 +4,8 @@
 	import { browser } from '$app/environment'
 	import { initSession, refreshSession } from '$lib/dontcode/client'
 	import NavigationProgress from '$lib/Components/Feedback/NavigationProgress.svelte'
+	import ServiceBanner from '$lib/Components/Feedback/ServiceBanner.svelte'
+	import { watchServiceHealth } from '$lib/Stores/serviceHealth'
 	import '../app.css'
 
 	interface Props {
@@ -32,6 +34,12 @@
 		if (data.prerendered) refreshSession()
 		else initSession(data.user)
 	})
+
+	// One observational wrapper around fetch, installed before anything else runs
+	// a request, so every existing call site reports backend health for free.
+	$effect(() => {
+		watchServiceHealth()
+	})
 </script>
 
 <svelte:head>
@@ -56,6 +64,7 @@
 </svelte:head>
 
 <NavigationProgress />
+<ServiceBanner />
 
 {@render children?.()}
 

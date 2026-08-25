@@ -118,13 +118,6 @@ ${line}${prefsFooter}`,
 	}
 }
 
-export const yourTurn = (opponentName: string | null): EmailContent => ({
-	subject: 'It is your turn on ThunderLite',
-	markdownText: `# Your move
-
-${opponentName ? `**${opponentName}** has moved. ` : ''}It is your turn in your ThunderLite match. Jump back in when you are ready.${prefsFooter}`,
-})
-
 // ── Async (correspondence) games ─────────────────────────────────────────────
 
 /** It is your turn in an async match; `timeLabel` is the per-turn clock, e.g. '3 days'. */

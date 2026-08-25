@@ -5,6 +5,7 @@
 	import { browser } from '$app/environment'
 	import { writable, type Writable } from 'svelte/store'
 	import { onDestroy, onMount } from 'svelte'
+	import { isServiceBusy } from '$lib/Stores/serviceHealth'
 
 	interface Props {
 		socketMessages: Writable<
@@ -33,11 +34,33 @@
 
 	const ONLINE_POLL_MS = 12_000
 
-	const refreshOnline = () =>
-		fetch('/api/chat/online')
+	/**
+	 * Presence is unavailable right now. Worth saying, because an empty list is
+	 * otherwise indistinguishable from "nobody is online" — and quietly showing
+	 * someone an empty room is a worse lie than admitting we can't tell. It stays
+	 * a label rather than a toast: nothing here is blocking anything.
+	 */
+	let degraded = $state(false)
+
+	// Presence is the app's most disposable feature and its most frequent caller:
+	// every open client polls it, and it shares one rate limit with the moves
+	// people are actually waiting on. So when the backend reports a cooldown, the
+	// poll steps aside entirely — a stale friends list costs nobody a match.
+	const refreshOnline = () => {
+		if (isServiceBusy()) {
+			degraded = true
+			return Promise.resolve()
+		}
+		return fetch('/api/chat/online')
 			.then((r) => r.json())
-			.then((data) => ($online = (data.users as UserDBData[]) ?? []))
-			.catch(() => {})
+			.then((data) => {
+				degraded = data?.degraded === true
+				$online = (data.users as UserDBData[]) ?? []
+			})
+			.catch(() => {
+				degraded = true
+			})
+	}
 
 	const loadFriends = () =>
 		fetch('/api/users/friends?page=0')
@@ -159,6 +182,8 @@
 		<div>
 			<h3 class="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
 				Online now
+				{#if degraded}<span class="ml-1 font-normal normal-case opacity-70">(unavailable)</span
+					>{/if}
 			</h3>
 			{#if $online.length}
 				{#each $online as user (user.auth)}
@@ -179,6 +204,10 @@
 						</div>
 					</button>
 				{/each}
+			{:else if degraded}
+				<p class="px-2 py-2 text-sm text-muted-foreground">
+					Online status is unavailable right now. Your friends are still listed below.
+				</p>
 			{:else}
 				<p class="px-2 py-2 text-sm text-muted-foreground">No one else is online right now.</p>
 			{/if}

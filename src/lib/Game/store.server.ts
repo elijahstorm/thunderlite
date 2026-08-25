@@ -21,6 +21,7 @@
  */
 import { db, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
+import { gatewayThrottled, noteRateLimit } from '$lib/Security/rateLimit'
 import { clampAsyncTimeout, type GameMode } from '$lib/Game/asyncConfig'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
@@ -965,7 +966,8 @@ const sanitizeLogEntry = (raw: unknown): GameLogEntry | null => {
 	const v = raw as Record<string, unknown>
 	const kind = typeof v.kind === 'string' && LOG_KINDS.has(v.kind) ? v.kind : null
 	if (!kind) return null
-	const detail = v.detail && typeof v.detail === 'object' ? (v.detail as Record<string, unknown>) : {}
+	const detail =
+		v.detail && typeof v.detail === 'object' ? (v.detail as Record<string, unknown>) : {}
 	// Oversized details are truncated to a marker rather than rejected — losing the
 	// payload of one entry is much better than losing the entry (and its position
 	// in the trace) entirely.
@@ -974,17 +976,61 @@ const sanitizeLogEntry = (raw: unknown): GameLogEntry | null => {
 		serialized.length > MAX_LOG_DETAIL_BYTES
 			? { truncated: true, bytes: serialized.length, head: serialized.slice(0, 512) }
 			: detail
-	const eventId =
-		typeof v.eventId === 'number' && Number.isInteger(v.eventId) ? v.eventId : -1
+	const eventId = typeof v.eventId === 'number' && Number.isInteger(v.eventId) ? v.eventId : -1
 	const ts = typeof v.ts === 'number' && Number.isFinite(v.ts) ? v.ts : now()
 	return { kind, eventId, detail: safeDetail, ts }
 }
 
 /**
+ * How many entries ride in one row. The trace used to be written one row per
+ * entry, which meant a single flush from one client fanned out into as many as
+ * 60 parallel gateway inserts — every 2.5 seconds, for every player, for the
+ * whole match. Diagnostics were comfortably the app's largest source of write
+ * traffic, and they were the reason gameplay calls started coming back 429.
+ *
+ * Packing the batch into one row keeps every entry (the trace is only useful
+ * intact) while collapsing a flush into a single insert. `readLog` unrolls it,
+ * and the cost lands entirely on the read path, which one person walks
+ * afterwards while debugging.
+ */
+const LOG_ENTRIES_PER_ROW = 30
+/** Ceiling on one row's serialized payload, so a row stays a sane size. */
+const MAX_LOG_ROW_BYTES = 60_000
+/** Marks a row holding a packed batch, as opposed to a legacy one-entry row. */
+export const LOG_BATCH_KIND = 'batch'
+
+/**
+ * Split entries into row-sized groups, bounded by both count and serialized
+ * size — a burst of board snapshots hits the byte ceiling long before the
+ * count, and one enormous row is its own kind of problem.
+ */
+const packEntries = (entries: GameLogEntry[]): GameLogEntry[][] => {
+	const rows: GameLogEntry[][] = []
+	let current: GameLogEntry[] = []
+	let bytes = 0
+	for (const entry of entries) {
+		const size = JSON.stringify(entry).length
+		if (
+			current.length > 0 &&
+			(current.length >= LOG_ENTRIES_PER_ROW || bytes + size > MAX_LOG_ROW_BYTES)
+		) {
+			rows.push(current)
+			current = []
+			bytes = 0
+		}
+		current.push(entry)
+		bytes += size
+	}
+	if (current.length > 0) rows.push(current)
+	return rows
+}
+
+/**
  * Append a batch of client observations. Rows are written independently so one
- * bad entry can't lose the rest of the batch, and every failure is swallowed:
- * diagnostics must never be able to break the game they are diagnosing.
- * Returns how many rows landed.
+ * oversized group can't lose the rest of the batch, and every failure is
+ * swallowed: diagnostics must never be able to break the game they are
+ * diagnosing — least of all by exhausting the rate limit that the game's own
+ * moves need. Returns how many entries landed.
  */
 async function appendLog(
 	session: string,
@@ -996,22 +1042,46 @@ async function appendLog(
 		.map(sanitizeLogEntry)
 		.filter((e): e is GameLogEntry => e !== null)
 	if (entries.length === 0) return 0
+	// Nothing here is worth waiting out a cooldown for. The client never retries
+	// a flush, so a skipped batch is simply a gap in the trace — much cheaper
+	// than lengthening a limit that a player's next move has to get through.
+	if (gatewayThrottled()) return 0
+
+	const rows = packEntries(entries)
 	const results = await Promise.allSettled(
-		entries.map((entry) =>
+		rows.map((group) =>
 			db.insert('game_log', {
 				session,
 				user_session: userSession,
-				kind: entry.kind,
-				event_id: entry.eventId,
-				detail: entry.detail,
-				ts: entry.ts,
+				kind: LOG_BATCH_KIND,
+				// The row is anchored to where its first entry sat, which keeps the
+				// column meaningful for the session-ordered index.
+				event_id: group[0].eventId,
+				detail: { entries: group },
+				ts: group[0].ts,
 			})
 		)
 	)
-	return results.filter((r) => r.status === 'fulfilled').length
+	// Feed any 429 into the breaker so the next flush skips the gateway entirely
+	// rather than rediscovering the limit one insert at a time.
+	for (const result of results) {
+		if (result.status === 'rejected') noteRateLimit(result.reason)
+	}
+	return results.reduce((n, r, i) => (r.status === 'fulfilled' ? n + rows[i].length : n), 0)
 }
 
-/** The whole trace for a room, oldest first — what the debug reader renders. */
+/**
+ * The whole trace for a room, oldest first — what the debug reader renders.
+ *
+ * Rows come back in two shapes: packed batches (`kind: 'batch'`, holding an
+ * array of entries) and legacy one-entry rows from before batching. Both unroll
+ * to the same flat, chronological list, so the reader never has to know which
+ * it's looking at.
+ *
+ * `limit` counts ROWS, not entries, so a packed trace reads back further than
+ * an unpacked one for the same limit — which is the direction you want when
+ * you're trying to see the whole match.
+ */
 async function readLog(
 	session: string,
 	limit = 1000
@@ -1030,14 +1100,45 @@ async function readLog(
 		orderBy: { id: 'asc' },
 		limit,
 	})
-	return rows.map((row) => ({
-		id: Number(row.id),
-		userSession: row.user_session,
-		kind: row.kind,
-		eventId: Number(row.event_id),
-		detail: typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail,
-		ts: Number(row.ts),
-	}))
+
+	const entries: {
+		id: number
+		userSession: string
+		kind: string
+		eventId: number
+		detail: unknown
+		ts: number
+	}[] = []
+	for (const row of rows) {
+		const detail = typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail
+		const packed =
+			row.kind === LOG_BATCH_KIND ? (detail as { entries?: GameLogEntry[] })?.entries : null
+		if (Array.isArray(packed)) {
+			// `id` is the entry's position in the trace rather than a row id: after
+			// unrolling, a row id no longer identifies one entry, and position is
+			// what a reader actually uses to talk about "the one before this".
+			for (const entry of packed) {
+				entries.push({
+					id: entries.length,
+					userSession: row.user_session,
+					kind: entry.kind,
+					eventId: Number(entry.eventId),
+					detail: entry.detail,
+					ts: Number(entry.ts),
+				})
+			}
+			continue
+		}
+		entries.push({
+			id: entries.length,
+			userSession: row.user_session,
+			kind: row.kind,
+			eventId: Number(row.event_id),
+			detail,
+			ts: Number(row.ts),
+		})
+	}
+	return entries
 }
 
 // ── Async (correspondence) play ───────────────────────────────────────────────

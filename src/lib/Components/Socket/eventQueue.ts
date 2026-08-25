@@ -38,7 +38,8 @@ export type QueuedEvent = {
 	 * backfill, which fast-forward instantly so a reconnect doesn't replay the
 	 * whole match in slow motion. Eligibility is decided when the event is
 	 * accepted; whether it actually animates is decided at drain time (an event
-	 * with others queued behind it is fast-forwarded to keep up).
+	 * with a long backlog behind it is fast-forwarded to keep up — see
+	 * SMOOTH_BACKLOG).
 	 */
 	animate: boolean
 	/**
@@ -73,6 +74,26 @@ export type EventQueueHandlers = {
 const isAnimatable = (action: SerializedAction): boolean =>
 	action.kind === 'move' || action.kind === 'attack'
 
+/**
+ * How much backlog an event may have behind it and still be animated.
+ *
+ * This used to be zero: an event with ANYTHING queued behind it was
+ * fast-forwarded, and only an event alone in the queue got its choreography.
+ * That reads fine when events trickle in one at a time, and badly the moment
+ * they don't — a player taking their whole turn in quick succession, or a
+ * reconciliation poll that hands over four actions at once after the socket
+ * lagged, delivers a bunch. Every one of them but the last then teleported, so
+ * the opponent's turn arrived as a single silent jump of the whole board rather
+ * than as moves that happened.
+ *
+ * Zero is still the right answer for a big backlog — falling a slide-length
+ * further behind the room for every event is worse than missing the slide. But a
+ * short bunch is exactly the case worth playing out: three moves at ~200ms a
+ * tile is around a second of catch-up, and it is the difference between watching
+ * the opponent play and being told what they did.
+ */
+const SMOOTH_BACKLOG = 2
+
 export const createEventQueue = (handlers: EventQueueHandlers) => {
 	const pending: QueuedEvent[] = []
 	let draining = false
@@ -89,10 +110,12 @@ export const createEventQueue = (handlers: EventQueueHandlers) => {
 					handlers.onDropped?.(entry)
 					continue
 				}
-				// Animate a lone, live move/attack. When events have piled up (a burst,
-				// or catching up) fast-forward instead: falling behind the room is worse
-				// than missing the slide, and the state applied is identical either way.
-				const animated = entry.animate && pending.length === 0 && isAnimatable(entry.action)
+				// Animate a live move/attack that isn't badly behind. Past
+				// SMOOTH_BACKLOG the queue fast-forwards instead: falling further behind
+				// the room is worse than missing the slide, and the state applied is
+				// identical either way.
+				const animated =
+					entry.animate && pending.length <= SMOOTH_BACKLOG && isAnimatable(entry.action)
 				if (animated) await handlers.animate(entry.action, entry)
 				else handlers.apply(entry.action, entry)
 				handlers.onApplied?.(entry, animated)

@@ -11,6 +11,7 @@
 	} from '$lib/Engine/Interactor/serializedAction'
 	import { animateRemoteAction } from '$lib/Engine/remoteAnimate'
 	import { createEventQueue } from './eventQueue'
+	import { createPushBuffer } from './pushBuffer'
 	import { outgoingActions } from '$lib/Engine/outgoingActions'
 	import {
 		desyncReports,
@@ -31,6 +32,8 @@
 	} from '$lib/Engine/liveLog'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import { formatTimeLeft } from '$lib/Game/asyncConfig'
+	import { noteServiceBusy } from '$lib/Stores/serviceHealth'
+	import { addToast } from 'as-toast'
 	import { fly } from 'svelte/transition'
 
 	interface Props {
@@ -59,12 +62,19 @@
 	}: Props = $props()
 
 	const POLL_INTERVAL = 1500
-	// With a live websocket, polling drops to a slow reconciliation pass that
-	// only exists to catch a push the fire-and-forget channel lost.
+	// With a live websocket that is demonstrably delivering, polling drops to a
+	// slow reconciliation pass that only exists to catch a push the fire-and-forget
+	// channel lost. `pushTrusted` is what decides whether it has earned that: the
+	// moment a poll turns up an event the socket never pushed, we go back to the
+	// fast interval (see `notePushMiss`).
 	const CONNECTED_POLL_EVERY_TICKS = 20
+	// A push that overtakes its predecessor is held here until the hole in front of
+	// it fills, rather than being thrown away and re-fetched. Bounded so a socket
+	// that starts spraying ids from the far future can't grow this without limit.
+	const MAX_HELD_PUSHES = 64
 	// Presence ping — keeps our `last_seen` fresh so the server doesn't auto-resign
 	// us, and drives the sweep that resigns an opponent who left. Independent of the
-	// event poll, which throttles to ~30s once realtime is connected.
+	// event poll, whose cadence varies with how well the socket is delivering.
 	const HEARTBEAT_INTERVAL = 10_000
 
 	const isMultiplayer = (): boolean => {
@@ -81,11 +91,63 @@
 	let pollTick = 0
 	let realtimeConn: RealtimeConnection | null = null
 	let realtimeUp = false
+	/**
+	 * Whether the socket is actually delivering, as opposed to merely being open.
+	 *
+	 * `realtimeUp` only tracks the WebSocket's own lifecycle. A connection can be
+	 * open and useless — the server's publish is best-effort and swallows its
+	 * failures, a frame can be dropped in the gateway, and a socket wedged by a
+	 * dead NAT binding never fires `onclose` at all. In every one of those cases
+	 * `realtimeUp` stays true and the poll stays throttled to one pass every 30
+	 * seconds, which is how an opponent's whole turn can go unseen and then land
+	 * in one lump.
+	 *
+	 * So the poll reports on the socket. Any fresh event the poll has to fetch is
+	 * one the push never delivered; that drops trust and restores fast polling
+	 * until a push arrives in order and earns it back. The bias is deliberate:
+	 * when in doubt, poll.
+	 */
+	let pushTrusted = true
 	let outgoingUnsubscribe: (() => void) | null = null
 	let requestRedraw: number = $state(0)
 	let wrongTurn = $state(false)
 	let wrongTurnTimer: ReturnType<typeof setTimeout> | null = null
-	const locallyEmitted = new Set<string>()
+	/**
+	 * One dedupe slot per action this client relayed and has not yet heard back
+	 * about. The echo of our own action comes back around the room like anyone
+	 * else's, and re-applying it would double the move.
+	 *
+	 * This used to be a Set of action fingerprints, which was wrong in two ways
+	 * that both get worse the laggier the socket is. A `SerializedAction` carries
+	 * no actor — `{kind:'capture',tile:40}` is byte-identical whoever performed it
+	 * — and a Set collapses duplicates, so two identical actions in flight shared
+	 * one slot. Worse, the slot was only ever released by the echo arriving through
+	 * `applyEvent`, and it usually doesn't: `relayOnce` advances `lastEventId` past
+	 * our own event the moment the POST answers, so the echo behind it is skipped
+	 * as stale and the fingerprint stayed in the Set forever. A match therefore
+	 * accumulated one permanent entry per action taken — and the next time the
+	 * OPPONENT captured that same tile, or walked that same from/to, their action
+	 * was silently swallowed as "ours". That is a real divergence, it never heals,
+	 * and it is likeliest exactly when the HTTP response beats the push.
+	 *
+	 * A slot now belongs to one relay, is consumed by whichever of the two arrives
+	 * first, and is always released when the relay settles.
+	 */
+	type SelfRelay = { fingerprint: string }
+	const pendingSelf: SelfRelay[] = []
+
+	/** Consume the oldest outstanding slot for this action, if we own one. */
+	const claimSelf = (fingerprint: string): boolean => {
+		const index = pendingSelf.findIndex((slot) => slot.fingerprint === fingerprint)
+		if (index === -1) return false
+		pendingSelf.splice(index, 1)
+		return true
+	}
+
+	const releaseSelf = (slot: SelfRelay) => {
+		const index = pendingSelf.indexOf(slot)
+		if (index !== -1) pendingSelf.splice(index, 1)
+	}
 
 	// Async turn clock: the deadline the current player must END their turn by.
 	// Seeded from the loader (initial value only — polls own it after that),
@@ -189,6 +251,26 @@
 		onDropped: (entry) => logIncoming(entry.id, entry.action, entry.via, 'no-map'),
 	})
 
+	/**
+	 * The socket was open and still didn't hand us this event. Stop taking its word
+	 * for it and go back to the fast poll until a push turns up in order again.
+	 *
+	 * Only an in-order, fresh push restores trust — deliberately. A socket whose
+	 * frames consistently lose the race to a 1.5s poll arrives stale every time,
+	 * and a transport that is always last is not one to throttle the poll for.
+	 */
+	const notePushMiss = () => {
+		if (!realtimeUp || !pushTrusted) return
+		pushTrusted = false
+		logNote('realtime-unreliable', { lastEventId, appliedEventId })
+	}
+
+	const restorePushTrust = () => {
+		if (pushTrusted) return
+		pushTrusted = true
+		logNote('realtime-reliable', { lastEventId, appliedEventId })
+	}
+
 	const applyEvent = (event: GameEvent, via: 'push' | 'poll'): boolean => {
 		const m = map()
 		if (!m) return false
@@ -208,25 +290,67 @@
 		// anchored to the applied one.
 		lastEventId = event.id
 		const fingerprint = JSON.stringify(action)
-		if (locallyEmitted.has(fingerprint)) {
+		if (claimSelf(fingerprint)) {
 			// Our own action, already applied + animated locally when we made it.
-			locallyEmitted.delete(fingerprint)
 			appliedEventId = event.id
 			logIncoming(event.id, action, via, 'deduped')
 			if (action.kind === 'end-turn') checkpoint(m, event.id, 'local-end-turn')
 			requestRedraw = performance.now()
 			return true
 		}
+		// A remote event we had to fetch is one the socket never handed us. Say so
+		// before queueing it — the poll is the only place this is observable.
+		if (via === 'poll' && caughtUp) notePushMiss()
 		// Queue it — never apply here. Applying an event while an earlier one is
 		// still animating is exactly what desynced matches; see `eventQueue.ts`.
-		queue.push({ id: event.id, action, animate: via === 'push' && caughtUp, live: caughtUp, via })
+		//
+		// Eligible to animate on either transport. Gating this on `via === 'push'`
+		// meant every event the reconciliation poll recovered teleported onto the
+		// board, so one lost frame turned the rest of an opponent's turn into a
+		// silent jump. Live play is live play however it reached us; the queue
+		// decides at drain time whether there's room to play it out.
+		queue.push({ id: event.id, action, animate: caughtUp, live: caughtUp, via })
 		logIncoming(event.id, action, via, 'queued')
 		requestRedraw = performance.now()
 		return true
 	}
 
-	const poll = async () => {
+	// Pushes that overtook their predecessor wait here rather than being thrown
+	// away and re-fetched — see `pushBuffer.ts`.
+	const pushBuffer = createPushBuffer({
+		lastId: () => lastEventId,
+		accept: (event) => void applyEvent(event, 'push'),
+		max: MAX_HELD_PUSHES,
+	})
+
+	let pollInFlight = false
+	let pollAgain = false
+
+	/**
+	 * Reconciliation pass. Coalesced: a gap can fire one of these from the push
+	 * handler while the interval's own pass is still open, and stampeding the
+	 * endpoint to race ourselves to the same rows helps nobody. Anyone who asks
+	 * during a pass gets one more immediately after it, so no request is dropped.
+	 */
+	const poll = async (): Promise<void> => {
 		if (!multiplayer) return
+		if (pollInFlight) {
+			pollAgain = true
+			return
+		}
+		pollInFlight = true
+		try {
+			await pollOnce()
+		} finally {
+			pollInFlight = false
+		}
+		if (pollAgain) {
+			pollAgain = false
+			await poll()
+		}
+	}
+
+	const pollOnce = async () => {
 		try {
 			const res = await fetch(`/api/game/${gameSession}/events?since=${lastEventId}`)
 			if (!res.ok) return
@@ -259,6 +383,8 @@
 			for (const evt of data.events) {
 				if (!applyEvent(evt, 'poll')) break
 			}
+			// The fetch may have closed the hole a held push was waiting behind.
+			pushBuffer.drain()
 		} catch {
 			// network errors are expected occasionally; keep polling.
 		}
@@ -266,7 +392,13 @@
 
 	const pollTimerTick = () => {
 		pollTick += 1
-		if (realtimeUp && pollTick % CONNECTED_POLL_EVERY_TICKS !== 0) return
+		// Throttle only while the socket has earned it. A hole we're holding pushes
+		// behind, or a socket already caught missing one, keeps the fast interval —
+		// the throttle is a reward for a transport that is demonstrably working, not
+		// the default. At 20 ticks it is a 30-second blind spot, which is long enough
+		// for a whole turn to go unseen and then land in one lump.
+		const throttled = realtimeUp && pushTrusted && pushBuffer.size === 0
+		if (throttled && pollTick % CONNECTED_POLL_EVERY_TICKS !== 0) return
 		void poll()
 	}
 
@@ -277,11 +409,20 @@
 	const onRealtimeEvent = (message: RealtimeMessage) => {
 		const event = (message.payload as { event?: GameEvent } | null)?.event
 		if (!event || typeof event.id !== 'number') return
-		if (event.id > lastEventId + 1) {
-			void poll()
+		const outcome = pushBuffer.offer(event)
+		if (outcome === 'stale') {
+			logIncoming(event.id, event.action, 'push', 'stale')
 			return
 		}
-		applyEvent(event, 'push')
+		if (outcome === 'accepted') {
+			// The socket handed us the next id in order. That is the only thing that
+			// earns back the throttled poll.
+			restorePushTrust()
+			return
+		}
+		// Held (or dropped): there is a hole in front of it that only the log can
+		// fill. Everything waiting is applied behind whatever this recovers.
+		void poll()
 	}
 
 	const connectRealtime = async () => {
@@ -289,6 +430,9 @@
 			channels: [`game:${gameSession}`],
 			onStatus: (connected) => {
 				realtimeUp = connected
+				// A fresh socket starts trusted; it has not missed anything yet, and the
+				// catch-up poll below covers whatever it slept through.
+				if (connected) pushTrusted = true
 				logNote(connected ? 'realtime-up' : 'realtime-down', { lastEventId, appliedEventId })
 				// Anything pushed while we were down is only in the event log.
 				if (connected) void poll()
@@ -328,6 +472,19 @@
 	/** Transient failures worth riding out before giving up on an action. */
 	const RELAY_ATTEMPTS = 3
 	const RELAY_BACKOFF_MS = [250, 750]
+	/**
+	 * A rate limit gets its own, longer budget. Every other retryable failure is
+	 * a guess about whether waiting helps; this one is the server telling us the
+	 * exact second it will accept the move. Spending three quick attempts against
+	 * a 56-second cooldown would burn the budget in a second and then declare a
+	 * move lost that was never lost — and losing a move freezes the board, which
+	 * is a far worse outcome than a pause the player can see counting down.
+	 */
+	const RELAY_BUSY_ATTEMPTS = 6
+	/** Cap on one honoured back-off, so a bad number can't hang a turn. */
+	const MAX_BUSY_WAIT_MS = 20_000
+	/** Only one "server is busy" toast per relay, however many attempts it takes. */
+	let busyNotified = false
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -351,9 +508,18 @@
 	}
 
 	const relay = async (action: SerializedAction) => {
-		for (let attempt = 0; attempt < RELAY_ATTEMPTS; attempt++) {
+		busyNotified = false
+		let budget = RELAY_ATTEMPTS
+		for (let attempt = 0; attempt < budget; attempt++) {
 			const outcome = await relayOnce(action, attempt)
-			if (outcome !== 'retry') return
+			if (outcome === 'done') return
+			if (typeof outcome === 'object') {
+				// The server named a wait. Honour it instead of our own back-off
+				// curve, and extend the budget so the move survives the cooldown.
+				budget = Math.max(budget, RELAY_BUSY_ATTEMPTS)
+				await wait(Math.min(outcome.retryAfterMs, MAX_BUSY_WAIT_MS))
+				continue
+			}
 			await wait(RELAY_BACKOFF_MS[Math.min(attempt, RELAY_BACKOFF_MS.length - 1)])
 		}
 		// Out of attempts. The action is already on our board but not in the log, so
@@ -365,10 +531,13 @@
 		reportUnrelayed(action, 'action-lost')
 	}
 
-	const relayOnce = async (
-		action: SerializedAction,
-		attempt: number
-	): Promise<'done' | 'retry'> => {
+	/**
+	 * One relay attempt. `retry` backs off on our own curve; `{ retryAfterMs }`
+	 * is the server naming its own; `done` means stop, whatever the outcome was.
+	 */
+	type RelayOutcome = 'done' | 'retry' | { retryAfterMs: number }
+
+	const relayOnce = async (action: SerializedAction, attempt: number): Promise<RelayOutcome> => {
 		try {
 			const res = await fetch(`/api/game/${gameSession}/move`, {
 				method: 'POST',
@@ -405,6 +574,23 @@
 				// action after it compounds the split. Freeze and offer the resync.
 				reportUnrelayed(action, 'action-refused')
 				return 'done'
+			}
+			if (res.status === 429) {
+				// The backend is rate limited, not refusing this move. Nothing was
+				// recorded, so the ordinal stays unconsumed and re-sending the same
+				// one is safe (the server dedupes on sender + clientSeq).
+				const data = (await res.json().catch(() => null)) as { retryAfter?: number } | null
+				const seconds =
+					typeof data?.retryAfter === 'number' && data.retryAfter > 0 ? data.retryAfter : 2
+				noteServiceBusy(seconds)
+				logOutgoing(action, 'failed', { status: 429, attempt, retryAfter: seconds })
+				if (!busyNotified) {
+					// One toast, because the banner is already carrying the countdown —
+					// this only has to explain why the board went quiet for a moment.
+					busyNotified = true
+					addToast('Servers are busy. Holding your move and retrying.', 'warn')
+				}
+				return { retryAfterMs: seconds * 1000 }
 			}
 			if (!res.ok) {
 				// 5xx is worth another go; a 4xx we don't recognise is not.
@@ -457,12 +643,19 @@
 	let relaysPending = 0
 
 	const enqueueRelay = (action: SerializedAction) => {
+		// One dedupe slot per relay, released when the relay settles. By then either
+		// the echo has already claimed it, or `lastEventId` has moved past our own
+		// event and the echo behind it will be skipped as stale — so holding the slot
+		// any longer can only swallow somebody else's identical action later.
+		const slot: SelfRelay = { fingerprint: JSON.stringify(action) }
+		pendingSelf.push(slot)
 		relaysPending += 1
 		relayChain = relayChain
 			.then(() => relay(action))
 			.catch(() => {})
 			.finally(() => {
 				relaysPending -= 1
+				releaseSelf(slot)
 			})
 	}
 
@@ -475,7 +668,6 @@
 		}
 		const action: SerializedAction | null = normalizeAction(parsed)
 		if (!action) return
-		locallyEmitted.add(JSON.stringify(action))
 		enqueueRelay(action)
 	}
 
@@ -484,7 +676,6 @@
 	const onOutgoing = (action: SerializedAction | null) => {
 		if (!action) return
 		if (!multiplayer) return
-		locallyEmitted.add(JSON.stringify(action))
 		enqueueRelay(action)
 	}
 

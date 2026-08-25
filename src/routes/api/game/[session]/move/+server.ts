@@ -1,5 +1,6 @@
 import { error, isHttpError, json } from '@sveltejs/kit'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { gatewayCooldownSeconds, noteRateLimit } from '$lib/Security/rateLimit'
 import { isValidSerializedAction } from '$lib/Engine/Interactor/serializedAction.js'
 import { gameStore, OutOfOrderEventError } from '$lib/Game/store.server'
 import { realtime } from '$lib/dontcode/server'
@@ -196,6 +197,21 @@ export const POST = async ({ request, params, locals }) => {
 			// the client resets its counter to that and retries, which self-heals a
 			// reload without a round of guessing.
 			return json({ expected: msg.expected, received: msg.received }, { status: 409 })
+		}
+		// A gateway rate limit is not this move's fault and not a lost move — the
+		// action simply never reached the log, and the gateway told us exactly how
+		// long until it will. Answer 429 with that budget rather than a blank 500:
+		// the client backs off and re-sends the same ordinal (which the server
+		// dedupes), instead of concluding the action was lost and freezing the
+		// board over a delay that resolves itself.
+		const limit = noteRateLimit(msg)
+		if (limit.limited) {
+			const retryAfter = gatewayCooldownSeconds()
+			await logToErrorDb(msg, 'Move relay rate limited')
+			return json(
+				{ error: 'Server is busy', rateLimited: true, retryAfter },
+				{ status: 429, headers: { 'retry-after': `${retryAfter}` } }
+			)
 		}
 		await logToErrorDb(msg)
 		throw error(500, 'Could not record move')

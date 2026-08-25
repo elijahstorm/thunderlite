@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit'
 import { realtime } from '$lib/dontcode/server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
-import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { gatewayCooldownSeconds, noteRateLimit } from '$lib/Security/rateLimit'
 
 /**
  * Who is signed in right now. Every client subscribes to `chat:global` purely
@@ -28,7 +28,17 @@ export const GET = async ({ locals }) => {
 		return json({ users })
 	} catch (msg) {
 		// No realtime service here — treat as "nobody resolvable is online".
-		await logToErrorDb(msg)
-		return json({ users: [] })
+		//
+		// Deliberately not logged as an error. This endpoint is polled every 12
+		// seconds by every open client, and a gateway with no realtime (the local
+		// mock, or a throttled production gateway) fails it every single time —
+		// so logging it wrote a row per client per 12s for a condition the comment
+		// above calls normal. The response tells the client how long to back off
+		// instead, which is the part anybody can act on.
+		const limit = noteRateLimit(msg)
+		return json(
+			{ users: [], degraded: true, retryAfter: gatewayCooldownSeconds() },
+			limit.limited ? { headers: { 'retry-after': `${gatewayCooldownSeconds()}` } } : {}
+		)
 	}
 }
