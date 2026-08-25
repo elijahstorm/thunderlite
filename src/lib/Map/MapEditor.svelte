@@ -13,6 +13,7 @@
 	import { terrainData } from '$lib/GameData/terrain'
 	import { unitData } from '$lib/GameData/unit'
 	import { activeMapIdStore, mapStore, playMapStore } from './mapStore'
+	import { canResumeInMemoryMap } from './mapContent'
 	import { rendererStore, spriteStore } from '$lib/Sprites/spriteStore'
 	import { deriveFromHash, deriveFromData, exportMapData } from './Editor/mapExporter'
 	import { mapHasherAsync } from './Editor/mapHashAsync'
@@ -84,22 +85,32 @@
 	// is the pending promise resolver the modal's buttons call.
 	let confirmOverwriteOpen = $state(false)
 	let resolveOverwrite: ((ok: boolean) => void) | null = null
+	// Whether the in-memory board belongs to THIS editing context, and may therefore
+	// be resumed instead of re-deriving from the route's hash. See `mapContent` for
+	// why an unconditional resume silently overwrote saved maps.
+	const resumable = untrack(() =>
+		canResumeInMemoryMap({
+			hasStoredMap: $mapStore != null,
+			routeMapId: mapId,
+			storedMapId: $activeMapIdStore,
+		})
+	)
 	// The saved map's id, adopted on first save so later saves update in place.
 	// On a bare-route remount that resumed the in-memory board (e.g. bounced back
 	// from Play, or reopened /editor), re-adopt the id that board was linked to so
 	// a save updates the same row instead of forking a duplicate.
 	let currentMapId: string | undefined = $state(
-		untrack(() => mapId ?? ($mapStore != null ? $activeMapIdStore : undefined))
+		untrack(() => mapId ?? (resumable ? $activeMapIdStore : undefined))
 	)
 	// The passenger a placed transport carries (a unit type), or null for empty.
 	// Persists across placements so several loaded transports drop without reselecting.
 	let cargoType: number | null = $state(null)
 	let map: MapObject = $state.raw(
 		untrack(() => {
-			const initial = $mapStore ?? deriveFromHash(mapHash)
+			const initial = resumable ? ($mapStore as MapObject) : deriveFromHash(mapHash)
 			// A board freshly derived from a saved map's hash has no title (the hash
 			// omits it), so adopt the DB name; a resumed in-memory board keeps its own.
-			if (!$mapStore && mapName) initial.title = mapName
+			if (!resumable && mapName) initial.title = mapName
 			return initial
 		})
 	)
@@ -107,7 +118,7 @@
 	// bounced back from the Play page). That in-memory map is always the freshest
 	// copy, so we must never clobber it with a (possibly older) localStorage
 	// recovery — only a genuinely fresh load (reload / crash) triggers recovery.
-	const resumedFromMemory = $mapStore != null
+	const resumedFromMemory = resumable
 
 	/** Brushes that place a team-owned object (so the team picker is shown). */
 	const teamedBrush = (brush: Brush) => brush === 'units' || brush === 'buildings'
@@ -199,7 +210,8 @@
 	// Instead bump `repaintSignal` — the same store MapRender's autotile pass listens to
 	// — so the board repaints in place from the (mutated) `map.layers`, and tick an
 	// edit counter the autosave effect watches. (Reassignment stays for genuine identity
-	// changes: resize apply / recovered draft.)
+	// changes: resize apply / recovered draft — those remount the renderer via the
+	// `{#key map}` below, which is what makes the swapped-in board actually visible.)
 	let editVersion = $state(0)
 	const commitEdit = () => {
 		editVersion++
@@ -649,7 +661,23 @@
 		</aside>
 
 		<div class="relative min-w-0 flex-1 overflow-hidden">
-			<MapRender pause editor {map} {select} {contextLoaded} backdrop="bg-surface-2 grid-pattern" />
+			<!-- Keyed on the board's identity. `map` is `$state.raw`, and MapRender's
+			     Scroller closes over the map it mounted with, so swapping the object
+			     (resize apply / draft recovery / New map) used to leave the canvas
+			     painting the PREVIOUS board indefinitely — the editor showed one map
+			     and Save wrote another. Remounting on identity change is what keeps
+			     what you see and what you save the same board. Paints don't reassign
+			     `map` (they bump `repaintSignal`), so this never fires mid-edit. -->
+			{#key map}
+				<MapRender
+					pause
+					editor
+					{map}
+					{select}
+					{contextLoaded}
+					backdrop="bg-surface-2 grid-pattern"
+				/>
+			{/key}
 		</div>
 	</div>
 

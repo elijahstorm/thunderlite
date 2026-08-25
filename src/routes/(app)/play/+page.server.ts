@@ -47,24 +47,31 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// this client's team back. This replaces the old client-side re-derivation
 	// that let two players both resolve to team 0.
 	const teams = await teamsFromHash(mapHash)
-	if (teams.length) {
-		await gameStore.assignTeamsIfNeeded(gameSession, teams)
-		// Align the server's turn pointer with the engine's first team before the
-		// first move, so the player on the starting side (not necessarily the host)
-		// actually gets turn one.
-		const starter = await gameStore.seedFirstTurn(gameSession, teams)
-		// Async: the game may be released by the OTHER player's load (the host can
-		// be offline when the lobby fills). If the first move belongs to someone
-		// who isn't here, email them — deduped, so repeat loads send it once.
-		if (asyncGame && starter && starter.userSession !== userSession) {
-			await notifyAsyncYourTurn({
-				session: gameSession,
-				eventId: 'seed',
-				nextUserAuth: starter.userAuth,
-				opponentAuth: null,
-				turnTimeoutMs: clampAsyncTimeout(room?.turn_timeout_ms),
-			})
-		}
+	// No sides means no team can be assigned, so every client falls through to
+	// `teams[seat] ?? 0` and commands team 0 — including the opponent. That is an
+	// unplayable room, not a degraded one, so fail loudly here instead of rendering
+	// a board that looks fine and can never resolve. Room creation refuses these
+	// maps now; this covers rooms opened before that guard existed.
+	if (!teams.length) {
+		await logToErrorDb(`Room ${gameSession} is on map ${mapId}, which fields no playable sides`)
+		throw error(500, 'This map has no playable sides, so the match cannot start.')
+	}
+	await gameStore.assignTeamsIfNeeded(gameSession, teams)
+	// Align the server's turn pointer with the engine's first team before the
+	// first move, so the player on the starting side (not necessarily the host)
+	// actually gets turn one.
+	const starter = await gameStore.seedFirstTurn(gameSession, teams)
+	// Async: the game may be released by the OTHER player's load (the host can
+	// be offline when the lobby fills). If the first move belongs to someone
+	// who isn't here, email them — deduped, so repeat loads send it once.
+	if (asyncGame && starter && starter.userSession !== userSession) {
+		await notifyAsyncYourTurn({
+			session: gameSession,
+			eventId: 'seed',
+			nextUserAuth: starter.userAuth,
+			opponentAuth: null,
+			turnTimeoutMs: clampAsyncTimeout(room?.turn_timeout_ms),
+		})
 	}
 
 	const [localTeam, roster, seats, aiDriver] = await Promise.all([

@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit'
 import { db, storage, isDontCodeError } from '$lib/dontcode/server'
 import { generateMapId } from '$lib/Security/keys'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { wouldWipeBoard } from '$lib/Map/mapContent'
 
 // Generous cap on the inbound thumbnail data URL (~3MB of base64). A PNG of a
 // pixel-art board is far smaller; this just bounds an abusive/garbage payload.
@@ -62,13 +63,28 @@ export const POST = async ({ request, locals }) => {
 	// ── Update in place ──────────────────────────────────────────────────────
 	// Re-saving an existing map the caller owns updates the row and keeps its link.
 	if (typeof id === 'string' && id) {
-		const existing = await db.findOne<{ public_id: string; owner_auth: string }>('maps', {
+		const existing = await db.findOne<{
+			public_id: string
+			owner_auth: string
+			map_data: string
+		}>('maps', {
 			where: { public_id: id },
-			select: ['public_id', 'owner_auth'],
+			select: ['public_id', 'owner_auth', 'map_data'],
 		})
 		if (!existing) throw error(404, { message: 'That map no longer exists.' })
 		if (existing.owner_auth !== owner) {
 			throw error(403, { message: 'You can only edit maps you own.' })
+		}
+
+		// Never let a save replace a real board with bare terrain. This is the last
+		// line of defence behind the editor bug that let a stale in-memory board adopt
+		// another map's id (see `canResumeInMemoryMap`): the save looked normal, the
+		// canvas showed the right map, and the row was wiped with no way back.
+		if (wouldWipeBoard(encoded, existing.map_data)) {
+			throw error(409, {
+				message:
+					'This save has no units or buildings, but the saved map does. Reload the editor and check the board before saving again.',
+			})
 		}
 
 		const { url: thumbnailUrl } = await storage.uploadPublic(

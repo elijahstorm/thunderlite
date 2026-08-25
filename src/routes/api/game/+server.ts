@@ -21,6 +21,17 @@ export const POST = async ({ request, locals }) => {
 	// three-seat room. Anything less and the sides nobody takes have no commander
 	// at all, which deadlocks the match when the turn rotation reaches them.
 	const maxPlayers = await seatsForMap(mapId)
+	// A map that fields fewer than two sides can't host a match, and opening the
+	// room anyway is worse than refusing: `seatsForMap` returning null used to fall
+	// back to a 2-seat room, which filled, counted down, and dropped both players
+	// onto a board where neither could be assigned a team. Both then resolved to
+	// team 0 and the room deadlocked with no error anywhere (room h3XftLdnJ4NuMtAC).
+	if (maxPlayers == null || maxPlayers < 2) {
+		throw error(
+			400,
+			'This map has no playable sides yet. Add units or buildings for at least two teams.'
+		)
+	}
 
 	try {
 		// `locals.user` is the DontCode id, which is the player's public
