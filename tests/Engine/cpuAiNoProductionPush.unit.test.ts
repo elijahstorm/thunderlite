@@ -164,10 +164,15 @@ describe('CPU with no way to reinforce', () => {
 	const snapshots = play(8)
 
 	it('advances instead of camping its corner', () => {
-		// It starts at x=3. A CPU that waits for a mass that can never arrive never
-		// crosses the map; one that spends its first-strike edge reaches the enemy half.
-		const front = snapshots[snapshots.length - 1].cpuFront
-		expect(front).toBeGreaterThan(COLS / 2)
+		// It starts at x=3. A CPU that waits for a mass that can never arrive never leaves
+		// its corner. One that spends its first-strike edge either reaches the enemy half
+		// or meets the enemy line short of it and destroys it there — measured over the
+		// whole run, not off the final frame, because once the enemy army is gone there is
+		// nothing left to advance toward and the front stops wherever the last fight was.
+		const peak = Math.max(...snapshots.map((s) => s.cpuFront))
+		const wonTheField = snapshots.some((s) => s.foeAlive === 0)
+		expect(peak).toBeGreaterThan(COLS / 3)
+		expect(peak > COLS / 2 || wonTheField).toBe(true)
 	})
 
 	it('keeps pushing forward round on round rather than milling', () => {

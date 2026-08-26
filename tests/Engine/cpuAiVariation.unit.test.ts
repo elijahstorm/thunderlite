@@ -78,6 +78,34 @@ describe('sampleByScore', () => {
 		expect(draws.size).toBeGreaterThan(50)
 	})
 
+	it('separates the band from the softmax scale', () => {
+		// The band alone is a bad pickiness knob: one strong plan against a few merely
+		// acceptable ones inside a band-wide scale loses the roll most of the time. With
+		// a narrow scale the same band still admits them, but the best one wins outright.
+		const board = [{ score: 100 }, { score: 92 }, { score: 91 }, { score: 90 }, { score: 89 }]
+		const rate = (t: number | { band: number; scale: number }) => {
+			let bestPicks = 0
+			for (let seed = 0; seed < 400; seed++) {
+				setCpuSeed(seed)
+				if (sampleByScore(board, t, seed)!.score === 100) bestPicks++
+			}
+			return bestPicks / 400
+		}
+		expect(rate(18)).toBeLessThan(0.4)
+		expect(rate({ band: 18, scale: 3 })).toBeGreaterThan(0.75)
+	})
+
+	it('still splits the roll between plans it genuinely cannot separate', () => {
+		// The narrow scale must not turn into argmax: two plans a point apart are noise
+		// to the scorer and both have to come up.
+		const seen = new Set<number>()
+		for (let seed = 0; seed < 200; seed++) {
+			setCpuSeed(seed)
+			seen.add(sampleByScore([{ score: 100 }, { score: 99.5 }], { band: 18, scale: 3 }, seed)!.score)
+		}
+		expect(seen.size).toBe(2)
+	})
+
 	it('handles an empty candidate list', () => {
 		expect(sampleByScore([], 10, 1)).toBeNull()
 	})

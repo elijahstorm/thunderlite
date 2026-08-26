@@ -270,6 +270,24 @@ const PLAN_SPREAD_FRACTION = 0.25
  * to whichever one happens to be generated first. */
 const MIN_PLAN_TEMPERATURE = 1
 
+/**
+ * ...and how much of a gap inside that band actually decides the draw. Separate from
+ * the band, and much smaller, because they do opposite jobs: the band is a safety rail
+ * ("never reach past here"), the scale is the CPU's actual pickiness.
+ *
+ * Sharing one number made the band the pickiness too, and a band wide enough to be a
+ * useful rail is far too wide to choose with: a plan 8 points off the best still drew
+ * ~64% of its weight, so a board with one strong move and four merely acceptable ones
+ * handed the strong move barely a quarter of the roll. The unit then usually took an
+ * acceptable move — the exact "randomization is too strong" symptom, and it was never
+ * the band leaking, it was the weights inside it being nearly flat.
+ *
+ * At 3, an option 3 points down draws ~37%, 8 points down ~7%, 15 points down ~1%. So
+ * plans the scorer genuinely can't separate still share the roll (which is the whole
+ * point of sampling), and anything it CAN separate loses.
+ */
+const PLAN_SOFTMAX_SCALE = 3
+
 const planTemperature = (plans: readonly ActionPlan[]): number => {
 	if (plans.length < 2) return 0
 	let best = -Infinity
@@ -292,5 +310,11 @@ export const bestPlanFor = (
 	// Which of this unit's near-equal options it takes. Keyed by the unit's tile and
 	// the turn so the same unit re-planning the same turn stays on its choice.
 	const state = get(gameState)
-	return sampleByScore(plans, planTemperature(plans), state.turnNumber, cpuTeam, unitTile)
+	return sampleByScore(
+		plans,
+		{ band: planTemperature(plans), scale: PLAN_SOFTMAX_SCALE },
+		state.turnNumber,
+		cpuTeam,
+		unitTile
+	)
 }

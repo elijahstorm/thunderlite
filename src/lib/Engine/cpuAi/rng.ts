@@ -74,36 +74,53 @@ export const cpuRandom = (...parts: number[]): number => {
 }
 
 /**
- * Choose from `items` by score, sampling among those within `temperature` of the best
- * with a softmax weight, rather than always taking the maximum.
+ * Choose from `items` by score, sampling among those close to the best rather than
+ * always taking the maximum.
  *
- * `temperature` is in the same units as the scores, and acts as a hard band as well as
- * the softmax scale: anything more than `temperature` below the best is never chosen.
- * That is the property that keeps this safe — the CPU never picks a move it rates as
- * clearly worse, it only stops being predictable between options it rates as close. A
- * temperature of 0 (or a single candidate) collapses back to plain argmax.
+ * Two separate knobs, because conflating them was a real bug:
+ *
+ *  - `band` is a hard cutoff in score units. Anything more than `band` below the best
+ *    is never chosen, at any roll. That is the safety property: the CPU never picks a
+ *    move it rates as clearly worse.
+ *  - `scale` is the softmax width, also in score units. It is how big a score gap has
+ *    to be before it actually decides the draw: an option `scale` below the best is
+ *    picked about a third as often, `2 * scale` below about a seventh, and so on.
+ *
+ * Passing a single number sets both, which is what the order and production draws want
+ * — there, everything inside the band is genuinely interchangeable and near-uniform is
+ * the point. It is NOT what a per-unit plan wants. With one band-wide scale, a plan 8
+ * points below a band of 18 still draws 64% of the best plan's weight, so four merely
+ * acceptable moves out-vote the one good one and the CPU takes a mediocre move most of
+ * the time. Where the ranking is the whole decision, pass a `scale` well under the
+ * `band`: the band keeps the trash out, and the narrow scale means only near-ties
+ * actually share the roll.
+ *
+ * A band or scale of 0 (or a single candidate) collapses back to plain argmax.
  *
  * `key` seeds the draw; pass coordinates that identify this decision.
  */
 export const sampleByScore = <T extends { score: number }>(
 	items: readonly T[],
-	temperature: number,
+	temperature: number | { band: number; scale: number },
 	...key: number[]
 ): T | null => {
 	if (items.length === 0) return null
 
+	const band = typeof temperature === 'number' ? temperature : temperature.band
+	const scale = typeof temperature === 'number' ? temperature : temperature.scale
+
 	let best = items[0]
 	for (const item of items) if (item.score > best.score) best = item
-	if (!(temperature > 0) || items.length === 1) return best
+	if (!(band > 0) || !(scale > 0) || items.length === 1) return best
 
-	const cutoff = best.score - temperature
+	const cutoff = best.score - band
 	const pool: T[] = []
 	const weights: number[] = []
 	let total = 0
 	for (const item of items) {
 		if (item.score < cutoff) continue
 		// Relative to the best, so the exponent is always <= 0 and can't overflow.
-		const weight = Math.exp((item.score - best.score) / temperature)
+		const weight = Math.exp((item.score - best.score) / scale)
 		pool.push(item)
 		weights.push(weight)
 		total += weight
