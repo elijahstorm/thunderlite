@@ -24,12 +24,23 @@ add unit: 1,"Scorpion Tank",10,6
 talk Vance: "There's the landing. Meet it on the sand, but keep both lines manned and the Rocket firing."
 </turn>
 
+<turn 1,0>
+wait: 0.5
+move: 5,3
+talk Vance: "Before you move anybody, look down your front rank. Anyone carrying damage can patch it up right where they stand. Select the unit, then select it a second time without moving it, and take Repair off the menu that opens.", "Repair puts back a quarter of a unit's health and costs it the rest of its turn. That is not a turn thrown away, Reyes. A whole trooper in a canyon is the hardest thing on this field to kill. A thin one is how a line starts to come apart."
+</turn>
+
 <turn 1,1>
 wait: 1
 move: 10,3
 talk Kael: "More steel to the front. Bury them."
 add unit: 1,"Scorpion Tank",10,3
-talk Vance: "Hold the canyons and let his charge spend itself. Once it's broken, we step out and finish them."
+talk Vance: "Hold the canyons and let his charge spend itself. Every step out of the cut is a step into his gunsights."
+</turn>
+
+<turn 2,0>
+wait: 0.5
+talk Vance: "Run that check every turn. Anyone hurt and not in contact should be repairing, not shuffling around behind the line.", "I know what that column looks like from where you're standing. It has a bottom to it. We only have to still be here when he reaches it."
 </turn>
 
 <turn 2,1>
@@ -46,7 +57,7 @@ random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5
 <turn 4,1>
 wait: 1
 random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5|9,6|11,6|12,6|13,6
-talk Vance: "He's still coming. Rotate the pressed trooper back to the reserve trench and put a fresh one in the front. The line only breaks if you let it thin."
+talk Vance: "He's still coming. Rotate the pressed trooper back to the reserve trench and put a fresh one in the front. Back there he repairs instead of standing idle. That is what a second line is for. The front only breaks if you let it thin."
 </turn>
 
 <turn 5,1>
@@ -55,7 +66,7 @@ random unit: 1,"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5
 wait: 0.8
 random unit: 1,"Scorpion Tank" @ 9,6|11,6|12,6|13,6
 talk Kael: "Road and beach together now. Squeeze them from both ends."
-talk Vance: "Two at once, and he isn't finished. Rotate the pressed men back to the reserve trench and keep the Rocket working. Do not let the front thin."
+talk Vance: "Two at once, and he isn't finished. Rotate the pressed men back, let them repair in the reserve trench, and keep the Rocket working. And do not chase a cripple out into the open to finish it. Anything you kill out there, you pay for twice."
 </turn>
 
 <turn 6,1>
@@ -74,5 +85,5 @@ talk Vance: "The assault's spent, the landing's thrown back, and our lines never
 </win>
 
 <lose>
-talk Vance: "They've broken through, or the beach turned our flank.", "Keep the front solid so they come one at a time, fall back to the reserve when pressed, and let the Rocket soften the charge. Again."
+talk Vance: "They've broken through, or the beach turned our flank.", "Keep the front solid so they come one at a time, fall back to the reserve and repair when pressed, and let the Rocket soften the charge. Again."
 </lose>
