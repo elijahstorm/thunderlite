@@ -99,7 +99,7 @@ describe('terrain sprite sheet dimensions', () => {
 				// coastline of their own, so only the border connectors are held to this.
 				expect(columns).toBeGreaterThanOrEqual(20)
 			}
-			if (terrain.beach) expect(columns).toBeGreaterThanOrEqual(28)
+			if (terrain.beach) expect(columns).toBeGreaterThanOrEqual(40)
 		})
 	}
 })

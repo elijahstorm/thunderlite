@@ -50,6 +50,22 @@ CAP_STATE = {
     ("right", "bottom"): (27, (1, 1)),
 }
 CORNER_QUAD = {16: (0, 0), 17: (0, 1), 18: (1, 1), 19: (1, 0)}
+# (inner corner, the border its pocket's beach runs out through) -> [column, quadrant]
+POCKET_CAP_STATE = {
+    (16, "left"): (28, (0, 0)),
+    (16, "top"): (29, (0, 0)),
+    (16, "both"): (30, (0, 0)),
+    (17, "left"): (31, (0, 1)),
+    (17, "bottom"): (32, (0, 1)),
+    (17, "both"): (33, (0, 1)),
+    (18, "right"): (34, (1, 1)),
+    (18, "bottom"): (35, (1, 1)),
+    (18, "both"): (36, (1, 1)),
+    (19, "right"): (37, (1, 0)),
+    (19, "top"): (38, (1, 0)),
+    (19, "both"): (39, (1, 0)),
+}
+POCKET_EXITS = {16: ("top", "left"), 17: ("bottom", "left"), 18: ("bottom", "right"), 19: ("top", "right")}
 
 
 def hash_variant(col, row):
@@ -92,14 +108,16 @@ def tile_draw(scene, c, r):
         (1, -1): scene.water(c - 1, r + 1),
         (1, 1): scene.water(c + 1, r + 1),
     }
+    pockets = []
     if U and L and not diag[(-1, -1)]:
-        overlays.append((16, CORNER_QUAD[16]))
+        pockets.append(16)
     if D and L and not diag[(1, -1)]:
-        overlays.append((17, CORNER_QUAD[17]))
+        pockets.append(17)
     if D and R and not diag[(1, 1)]:
-        overlays.append((18, CORNER_QUAD[18]))
+        pockets.append(18)
     if U and R and not diag[(-1, 1)]:
-        overlays.append((19, CORNER_QUAD[19]))
+        pockets.append(19)
+    overlays.extend((p, CORNER_QUAD[p]) for p in pockets)
 
     # Beach caps: only a Shore tile grows a beach, and only where the beach would
     # otherwise run on into water that is NOT beach.
@@ -123,6 +141,15 @@ def tile_draw(scene, c, r):
                 if land[p] or cont[p]:
                     continue
                 overlays.append(CAP_STATE[(land_edge, p)])
+        # ... and the same for a pocket's, which runs out through both borders its
+        # corner sits between.
+        for pocket in pockets:
+            ends = [e for e in POCKET_EXITS[pocket] if not cont[e]]
+            if not ends:
+                continue
+            # Both at once is ONE overlay: two would land on the same quadrant and
+            # the second would leave the other border uncapped.
+            overlays.append(POCKET_CAP_STATE[(pocket, "both" if len(ends) == 2 else ends[0])])
     return state, overlays
 
 
@@ -146,7 +173,7 @@ def render(scene, frame, sheet_shore, sheet_sea, grass):
                 )
                 for idx, (qx, qy) in overlays:
                     if idx > 19:
-                        continue
+                        continue  # the Sea sheet has no caps of any kind
                     sy = frame * CELL + qy * half
                     sx = idx * CELL + qx * half
                     img.paste(
@@ -163,6 +190,14 @@ def render(scene, frame, sheet_shore, sheet_sea, grass):
                 dst,
             )
             for idx, (qx, qy) in overlays:
+                # A cap reaches past its quadrant, so it is a whole cell that is
+                # transparent wherever it should not repaint (see paint.corners).
+                if idx >= 20:
+                    tile = sheet_shore.crop(
+                        (idx * CELL, row * CELL, (idx + 1) * CELL, (row + 1) * CELL)
+                    )
+                    img.paste(tile, dst, tile)
+                    continue
                 sy = row * CELL + qy * half
                 sx = idx * CELL + qx * half
                 img.paste(

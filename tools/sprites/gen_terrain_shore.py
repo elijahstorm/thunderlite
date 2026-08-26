@@ -58,7 +58,7 @@ OUT = f"{BASE}/shore.png"
 CELL = 60
 FRAMES = 3
 VARIANTS = 8
-COLS = 28  # 16 border base + 4 inner corner + 8 beach cap
+COLS = 40  # 16 border base + 4 inner corner + 8 edge cap + 12 pocket cap
 
 # --- palette (sampled from the original shore.png / sea.png) ---
 GRASS_RIM = (95, 147, 104)
@@ -118,11 +118,52 @@ MIN_MARGIN = 0.8
 # into sand.
 CORNER_ROUND = 20.0
 
-# A cap's rock headland: how deep the rock runs at the tile border it caps, and how
-# far the purple underwater shadow trails past it. Both match sea.png's cliff so the
-# two tiles meet as one rock face.
-ROCK_DEPTH = 15.0
-ROCK_SHADOW = 3.0
+# A cap's headland has to ARRIVE at sea.png's coastline, not merely resemble it:
+# the two tiles share a border, so anything that does not line up there reads as the
+# coast breaking in half.
+#
+# And sea.png's coastline is NOT the same on all four sides, because the board is
+# read at a 2.5D angle. Land to the NORTH shows you its south-facing cliff, so the
+# water tile below it carries a tall brown wall. Land to the SOUTH shows you its top
+# surface only — its cliff faces away, off the bottom of the tile — so that border
+# gets grass running straight into the water and no rock whatsoever. Land to the
+# EAST or WEST is seen edge-on and gets a thin sliver of rock. Reusing the north
+# profile on the other three (which is what the first pass did) hangs a wall off a
+# beach whose neighbouring Sea draws none, which is exactly the break: a cliff
+# dropping off into nothing.
+#
+# Measured off sea.png at a tile border: where its grass runs out, where its rock
+# face ends, and where the underwater shadow under that face ends — all in px inward
+# from the land-facing border.
+SEA_PROFILE = {
+    "top": (2.5, 17.5, 20.5),
+    "bottom": (5.5, 5.5, 5.5),  # no rock: the cliff faces away from the camera
+    "left": (6.5, 12.5, 12.5),
+    "right": (6.5, 13.0, 13.0),
+}
+
+# How far from the land edge a cap has to keep repainting. A quadrant is 30px, but
+# the beach's own cross-section reaches the coastline's margin plus D_SHELF and its
+# feather — about 35 — so a quadrant-sized cap left the last few px of the shelf
+# band poking past the headland as a turquoise stub in the Sea's open water. The cap
+# is drawn as a whole cell now, transparent everywhere it has no business repainting
+# (paint.corners), which lets it run past the quadrant's edge to here and stop.
+CAP_REACH = 37.0
+
+# render_bands lays the shaded rim and the damp ink line in the GRASS_BAND px ABOVE
+# the coastline, so seating the coastline this far in ends the grass exactly where
+# sea.png ends it, and the rim doubles as the top of the rock face.
+GRASS_BAND = 2.2
+
+
+def cliff_of(land_edge):
+    """(coastline, rock depth, shadow depth) for a cap ending a beach that hugs
+    `land_edge`, in px of depth from that coastline. A negative rock depth means
+    sea.png draws no rock on this side at all."""
+    grass_ends, rock_ends, shadow_ends = SEA_PROFILE[land_edge]
+    margin = grass_ends + GRASS_BAND
+    return margin, rock_ends - margin, shadow_ends - rock_ends
+
 
 # Sheet column -> (left, up, right, down) neighbour-is-water, inverted from
 # spriteConnector.borderDecision. Column N must be the tile that decision picks.
@@ -166,6 +207,36 @@ CAP_EDGES = {
     25: ("left", "bottom"),
     26: ("right", "top"),
     27: ("right", "bottom"),
+}
+
+# An inner corner's sand needs ending too, and the caps above cannot do it. Those
+# taper a straight edge band; a corner overlay draws a POCKET around a lone land
+# tile poking in diagonally, and its beach runs out through BOTH borders flanking
+# that corner. Where the neighbour across one of them is open sea rather than more
+# beach, the sand was simply sliced off at the tile edge.
+#
+# `(inner corner column, the border its sand runs out through)`. Each occupies the
+# corner's own quadrant and is drawn over it, so paint.cornerQuadrant maps these to
+# the same quadrant as the corner they cap. Kept in lockstep with
+# spriteConnector.POCKET_CAP_STATE.
+# A pocket often has to end at BOTH of its borders at once, and two overlays cannot
+# do it: they land on the same quadrant, so the second simply paints over the first
+# and one of the two borders comes out uncapped — its sand cut flat at the tile edge,
+# which against open Sea reads as a slab of beach floating offshore. `both` is one
+# overlay that ends the pocket on both sides.
+POCKET_CAP_EDGES = {
+    28: (16, "left"),
+    29: (16, "top"),
+    30: (16, "both"),
+    31: (17, "left"),
+    32: (17, "bottom"),
+    33: (17, "both"),
+    34: (18, "right"),
+    35: (18, "bottom"),
+    36: (18, "both"),
+    37: (19, "right"),
+    38: (19, "top"),
+    39: (19, "both"),
 }
 
 
@@ -593,60 +664,194 @@ def build_corner(grass, deep, idx, frame, variant):
     return cell
 
 
+# Distance from the border a cap runs out through, and the along-edge coordinate
+# `margin` is a function of for a given coastline.
+ALONG_OF = {
+    "left": lambda x, y: x,
+    "right": lambda x, y: CELL - 1 - x,
+    "top": lambda x, y: y,
+    "bottom": lambda x, y: CELL - 1 - y,
+}
+COORD_OF = {
+    "top": lambda x, y: x,
+    "bottom": lambda x, y: x,
+    "left": lambda x, y: y,
+    "right": lambda x, y: y,
+}
+# Distance from the LAND-facing edge, which is the direction the beach's bands run
+# in and so how far out a cap has to keep repainting.
+ACROSS_OF = ALONG_OF
+
+
+def clear_beyond(cell, keep):
+    """Punch out everything the cap has no business repainting, so the whole cell can
+    be drawn over the tile and only its own corner of it lands."""
+    px = cell.load()
+    for y in range(CELL):
+        for x in range(CELL):
+            if not keep(x, y):
+                px[x, y] = (0, 0, 0, 0)
+    return cell
+
+
+def cliff_cap(px, deep_px, depth, taper_of, profile_of, variant):
+    """Hang sea.png's coastline off `depth`'s waterline, at full strength where the
+    cap meets the border it caps and gone by the middle of the tile.
+
+    `profile_of` returns the (rock depth, shadow depth) to arrive at, which is a
+    function of the pixel rather than a constant because a cap ending a pocket at
+    BOTH its borders has to arrive at a different one on each — the two land
+    directions either side of the pocket."""
+    for y in range(CELL):
+        for x in range(CELL):
+            t = taper_of(x, y)
+            if t >= 1.0:
+                continue
+            rock_depth, shadow_depth = profile_of(x, y)
+            d = depth(x, y) + (hash01(x, y, 11 + variant) - 0.5) * 1.5
+            # The headland's own outline wavers along the coast rather than tapering
+            # on a straight diagonal, which would read as a cut. A face this thin has
+            # no room to waver, and a south-facing coast has no face at all, so the
+            # wobble is scaled by how much rock there is to wobble.
+            phase = (1.0 - t) * (CELL / 2)
+            ragged = clamp(rock_depth / 12.0, 0.0, 1.0) * (
+                1.6 * math.sin(phase * 0.55 + variant * 1.7)
+                + 1.4 * math.sin(phase * 0.9 + 0.6)
+            )
+            # Rock from the grass line down, so the beach's damp rim and ink line go
+            # under the cliff instead of hanging above it as a green seam.
+            if d < -GRASS_BAND * (1.0 - t):
+                continue
+            rock_to = max((rock_depth + ragged) * (1.0 - t), 0.0)
+            shadow_to = rock_to + max(shadow_depth, 0.0) * (1.0 - t)
+            # Open water starts where sea.png's does at the border, and falls back to
+            # the beach's own shelf by the middle of the tile.
+            shelf_to = D_SHELF - (D_SHELF - rock_depth - shadow_depth) * (1.0 - t)
+            if d < rock_to:
+                px[x, y] = (*rock_tone(x, y, max(d, 0.0), variant), 255)
+            elif d < shadow_to:
+                px[x, y] = (*DEEP_SHADOW, 255)
+            elif d >= shelf_to:
+                px[x, y] = (*deep_px[x, y][:3], 255)
+
+
 def build_cap(grass, deep, idx, frame, variant):
     """A beach end cap. The base tile has already laid a full beach along
-    `land_edge`; this overlay re-paints one quadrant of it, raising a rock headland
-    that is a full sea-cliff at the `exit` border and has faded to nothing by the
-    middle of the tile. Drawn over the same coastline the base uses, so the grass
-    line and whatever sand survives past the taper stay continuous with it."""
+    `land_edge`; this overlay re-paints one quadrant of it, walking the beach out to
+    sea.png's coastline at the `exit` border and back to the untouched beach by the
+    middle of the tile.
+
+    Both ends of that walk are hard constraints. At the middle of the tile the cap
+    has to be the base tile exactly, or the overlay's own quadrant edge shows. At the
+    border it has to be sea.png's coastline for THAT land direction exactly, or the
+    coast steps where the two tiles meet: the beach's waterline sits ~8px inside the
+    tile and the Sea's sits anywhere from 2.5 to 6.5 depending on the side. So the
+    waterline itself is what tapers, and the rock is hung off it."""
     land_edge, exit_edge = CAP_EDGES[idx]
     cell = grass.copy()
     px = cell.load()
-    render_bands(
+    deep_px = deep.load()
+    along_of = ALONG_OF[exit_edge]
+    coord_of = COORD_OF[land_edge]
+    cap_margin = cliff_of(land_edge)[0]
+
+    def depth(x, y):
+        # Slide the waterline from the beach's own margin to sea.png's. This is a
+        # SHIFT of the base tile's depth field, not a different field, so the sand,
+        # the tide ripples and the surf all carry on across the taper unbroken and
+        # the cap still lands exactly on the base at the quadrant's inner edge.
+        m = margin(land_edge, coord_of(x, y), variant)
+        return edge_depth_one(land_edge, x, y, variant) + (m - cap_margin) * (
+            1.0 - smoothstep(along_of(x, y) / (CELL / 2))
+        )
+
+    _, rock_depth, shadow_depth = cliff_of(land_edge)
+    render_bands(px, grass.load(), deep_px, depth, frame, variant)
+    cliff_cap(
         px,
-        grass.load(),
-        deep.load(),
-        lambda x, y: edge_depth_one(land_edge, x, y, variant),
-        frame,
+        deep_px,
+        depth,
+        lambda x, y: smoothstep(along_of(x, y) / (CELL / 2)),
+        lambda x, y: (rock_depth, shadow_depth),
         variant,
     )
+    return clear_beyond(cell, lambda x, y: along_of(x, y) < CELL / 2 and ACROSS_OF[land_edge](x, y) < CAP_REACH)
+
+
+def build_pocket_cap(grass, deep, idx, frame, variant):
+    """An inner corner's end cap: the same walk out to sea.png's coastline, but
+    starting from the corner POCKET's field rather than an edge band's, and ending it
+    at one of the pocket's two borders or at both.
+
+    Which coastline to land on at a border is not the pocket's own. A pocket at the
+    top-left is a land tile touching this one only diagonally, so the neighbour
+    across the LEFT border has that land squarely ABOVE it and draws the north
+    coastline — the tall one. Sure enough `corner_depth` collapses to exactly that
+    edge's depth at the border (one of its two terms goes negative there), which is
+    what makes the same shift work here: take the OTHER edge's margin out to
+    sea.png's and the two tiles meet on one line, with the right face on it.
+
+    Capping both borders means arriving at a DIFFERENT coastline on each, so the two
+    are blended by which border a pixel is nearer. The weights are exact at either
+    border (there the far border's distance is the near one's whole share), so each
+    is met on its own terms and the handover between them is smooth.
+
+    Unlike an edge cap this keeps to its quadrant. It has nothing to overhang into:
+    the pocket's sand comes from the corner overlay, which is clipped to the quadrant
+    too, so none of it leaks past the way a border state's bands do."""
+    corner, exit_edge = POCKET_CAP_EDGES[idx]
+    edge_a, edge_b = CORNER_EDGES[corner]
+    borders = (edge_a, edge_b) if exit_edge == "both" else (exit_edge,)
+    # The border the beach carries on through, when only one of the two is capped.
+    carrying = [e for e in (edge_a, edge_b) if e not in borders]
+    # The land direction each capped border hands over to, and how far along it we are.
+    others = [edge_b if border == edge_a else edge_a for border in borders]
+    alongs = [ALONG_OF[border] for border in borders]
+
+    def weights(x, y):
+        if len(borders) == 1:
+            return (1.0,)
+        a, b = alongs[0](x, y), alongs[1](x, y)
+        total = a + b
+        return (0.5, 0.5) if total <= 0 else (b / total, a / total)
+
+    def taper_of(x, y):
+        capped = min(smoothstep(along(x, y) / (CELL / 2)) for along in alongs)
+        if not carrying:
+            return capped
+        # A headland has to die out before it reaches the border the beach carries
+        # on through, or it meets the next tile's uninterrupted sand head-on and cuts
+        # a razor line across the seam. Fading it out over the same half-tile leaves
+        # the two beaches to meet as one and the headland to rise behind them.
+        return 1.0 - (1.0 - capped) * smoothstep(
+            ALONG_OF[carrying[0]](x, y) / (CELL / 2)
+        )
+
+    def profile_of(x, y):
+        w = weights(x, y)
+        cliffs = [cliff_of(other) for other in others]
+        return (
+            sum(w[i] * cliffs[i][1] for i in range(len(cliffs))),
+            sum(w[i] * cliffs[i][2] for i in range(len(cliffs))),
+        )
+
+    def depth(x, y):
+        # Slide the waterline from the pocket's own margin out to sea.png's, blended
+        # across the two borders exactly as the face above it is.
+        w = weights(x, y)
+        shift = sum(
+            w[i] * (margin(other, COORD_OF[other](x, y), variant) - cliff_of(other)[0])
+            for i, other in enumerate(others)
+        )
+        return corner_depth(x, y, edge_a, edge_b, variant) + shift * (1.0 - taper_of(x, y))
+
+    cell = grass.copy()
+    px = cell.load()
     deep_px = deep.load()
-    along_of = {
-        "left": lambda x, y: x,
-        "right": lambda x, y: CELL - 1 - x,
-        "top": lambda x, y: y,
-        "bottom": lambda x, y: CELL - 1 - y,
-    }[exit_edge]
-    # The headland's own outline wavers along the coast rather than tapering on a
-    # straight diagonal, which would read as a cut.
-    across_of = {
-        "left": lambda x, y: y,
-        "right": lambda x, y: y,
-        "top": lambda x, y: x,
-        "bottom": lambda x, y: x,
-    }[exit_edge]
-    for y in range(CELL):
-        for x in range(CELL):
-            along = along_of(x, y)
-            t = smoothstep(along / (CELL / 2))
-            if t >= 1.0:
-                continue
-            d = edge_depth_one(land_edge, x, y, variant) + (
-                hash01(x, y, 11 + variant) - 0.5
-            ) * 1.5
-            if d < 0:
-                continue
-            ragged = 1.6 * math.sin(across_of(x, y) * 0.55 + variant * 1.7) + 1.4 * math.sin(
-                along * 0.9 + 0.6
-            )
-            rock_to = ROCK_DEPTH * (1.0 - t) + ragged * (1.0 - t)
-            if d < rock_to:
-                px[x, y] = (*rock_tone(x, y, d, variant), 255)
-            elif d < rock_to + ROCK_SHADOW * (1.0 - t):
-                px[x, y] = (*DEEP_SHADOW, 255)
-            elif d >= D_SHELF - 6.0 * (1.0 - t):
-                px[x, y] = (*deep_px[x, y][:3], 255)
-    return cell
+    render_bands(px, grass.load(), deep_px, depth, frame, variant)
+    cliff_cap(px, deep_px, depth, taper_of, profile_of, variant)
+    quadrant = (ALONG_OF[edge_a], ALONG_OF[edge_b])
+    return clear_beyond(cell, lambda x, y: all(a(x, y) < CELL / 2 for a in quadrant))
 
 
 def build(grass, deep, idx, frame, variant):
@@ -654,7 +859,9 @@ def build(grass, deep, idx, frame, variant):
         return build_base(grass, deep, idx, frame, variant)
     if idx in CORNER_EDGES:
         return build_corner(grass, deep, idx, frame, variant)
-    return build_cap(grass, deep, idx, frame, variant)
+    if idx in CAP_EDGES:
+        return build_cap(grass, deep, idx, frame, variant)
+    return build_pocket_cap(grass, deep, idx, frame, variant)
 
 
 def main():

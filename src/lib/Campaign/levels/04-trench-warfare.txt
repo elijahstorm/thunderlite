@@ -34,33 +34,44 @@ talk Vance: "Hold the canyons and let his charge spend itself. Once it's broken,
 
 <turn 2,1>
 wait: 1
-random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5|9,6|11,6|12,6|13,6
 talk Kael: "The eastern road is mine and so are the boats. I can feed this all day."
 </turn>
 
 <turn 3,1>
 wait: 1
-random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5|9,6|11,6|12,6|13,6
 </turn>
 
 <turn 4,1>
 wait: 1
-random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5|9,6|11,6|12,6|13,6
 talk Vance: "He's still coming. Rotate the pressed trooper back to the reserve trench and put a fresh one in the front. The line only breaks if you let it thin."
 </turn>
 
 <turn 5,1>
 wait: 1
-random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5|9,6|11,6|12,6|13,6
 </turn>
 
 <turn 6,1>
 wait: 1
-random unit: 1,"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5
+random unit: 1,"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5
 wait: 0.8
 random unit: 1,"Scorpion Tank" @ 9,6|11,6|12,6|13,6
-talk Kael: "Everything left, all at once. Road and beach together. Bury them."
-talk Vance: "That's the last of his reserve on the board. Hold both lines through this push and there's nothing behind it."
+talk Kael: "Road and beach together now. Squeeze them from both ends."
+talk Vance: "Two at once, and he isn't finished. Rotate the pressed men back to the reserve trench and keep the Rocket working. Do not let the front thin."
+</turn>
+
+<turn 7,1>
+wait: 1
+random unit: 1,"Lance Tank" @ 13,1|12,1|12,2
+wait: 0.8
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 12,4|12,5|13,5
+wait: 0.8
+random unit: 1,"Scorpion Tank" @ 9,6|11,6|12,6|13,6
+talk Kael: "Everything left, all at once. Road, spur, and beach. Bury them."
+talk Vance: "Three abreast, and that is the last of his reserve on the board. Hold both lines through this push and there is nothing behind it."
 </turn>
 
 <win>

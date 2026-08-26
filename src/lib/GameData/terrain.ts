@@ -311,7 +311,8 @@ export const terrainData: TerrainData[] = [
 		yOffset: 0,
 		connector: 3,
 		editorState: 11,
-		// 28 sheet columns (16 border states, 4 inner corners, 8 beach end caps) x 8
+		// 40 sheet columns (16 border states, 4 inner corners, 8 caps ending an edge's
+		// beach and 12 ending an inner corner's — either border or both at once) x 8
 		// variants x 3 surf frames — see tools/sprites/gen_terrain_shore.py.
 		variants: 8,
 		beach: true,

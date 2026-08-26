@@ -66,6 +66,15 @@ const family = (map: GroundObject[], location: number) => familyToken[map[locati
 
 type Reader = (map: GroundObject[], location: number) => number | boolean
 
+// The Sea is the one terrain that does not end where the board does: the map is a
+// window onto a coastline, so water running off the edge is open ocean continuing
+// past it, not a shore. Every sea-border lookup (base frame, inner corners, beach
+// caps, the underlay beneath obstacles and bridges) therefore answers "connected"
+// for a neighbour outside the board, so a water tile on the border draws plain
+// water instead of cutting a bank and its sliver of grass along the map's rim.
+// Land terrains keep the old answer: a road or an ore bed genuinely stops there.
+const OFF_MAP_WATER = true
+
 export const connectionDecision = (object: GroundObject) =>
 	flowDecision[terrainData[object.type].connector]
 
@@ -85,7 +94,7 @@ export const connectionDecision = (object: GroundObject) =>
 export const cornerDecision = (object: GroundObject): CornerDecision => {
 	const connector = terrainData[object.type].connector
 	if (connector === 3) {
-		const inner = borderCornersWith(ocean)
+		const inner = borderCornersWith(ocean, OFF_MAP_WATER)
 		// A beach also needs its ends. Both kinds of overlay are quadrant copies over
 		// the base tile (paint.corners), so they travel in one list.
 		if (terrainData[object.type].beach) {
@@ -99,7 +108,9 @@ export const cornerDecision = (object: GroundObject): CornerDecision => {
 }
 
 // Sheet columns for the beach end caps, keyed `<land edge>:<border it runs out
-// through>`. Kept in lockstep with paint.cornerQuadrant and
+// through>`. A cap is a whole-cell overlay (paint.FIRST_CAP_STATE) that is
+// transparent wherever it should not repaint, so which corner of the tile it lands
+// on is baked into the art. Kept in lockstep with
 // tools/sprites/gen_terrain_shore.py's CAP_EDGES.
 const CAP_STATE: Record<string, number> = {
 	'top:left': 20,
@@ -127,20 +138,21 @@ const capDecision =
 	(map, location) => {
 		const ground = map.layers.ground
 		const water = {
-			left: left(map, location, ocean),
-			right: right(map, location, ocean),
-			top: up(map, location, ocean),
-			bottom: down(map, location, ocean),
+			left: left(map, location, ocean, OFF_MAP_WATER),
+			right: right(map, location, ocean, OFF_MAP_WATER),
+			top: up(map, location, ocean, OFF_MAP_WATER),
+			bottom: down(map, location, ocean, OFF_MAP_WATER),
 		}
-		// Off the edge of the map reads as land (left/right/up/down are false there),
-		// so a beach running to the map border is capped by the border itself.
+		// A beach that runs out through the edge of the map is not running out at all:
+		// off-map counts as open water above, so the sand has to count as carrying on
+		// off-map too, or every coast would raise a headland right on the map's rim.
 		const col = location % map.cols
 		const row = (location / map.cols) | 0
 		const carries = {
-			left: col > 0 && beachContinues(ground, location - 1),
-			right: col < map.cols - 1 && beachContinues(ground, location + 1),
-			top: row > 0 && beachContinues(ground, location - map.cols),
-			bottom: location + map.cols < ground.length && beachContinues(ground, location + map.cols),
+			left: col === 0 || beachContinues(ground, location - 1),
+			right: col === map.cols - 1 || beachContinues(ground, location + 1),
+			top: row === 0 || beachContinues(ground, location - map.cols),
+			bottom: location + map.cols >= ground.length || beachContinues(ground, location + map.cols),
 		}
 		const caps: number[] = []
 		for (const [edge, exits] of CAP_EXITS) {
@@ -150,8 +162,63 @@ const capDecision =
 				caps.push(CAP_STATE[`${edge}:${exit}`])
 			}
 		}
+		// The inner corners need ending too, and the loop above cannot see them: it
+		// only walks LAND-facing edges, so a beach whose sand comes from a diagonal
+		// land tile — a tile with water on all four sides and a headland poking into
+		// one corner — was capped nowhere at all and simply got sliced off at the
+		// tile edge. A pocket's sand runs out through BOTH borders flanking its
+		// corner, so each is capped on the same terms as an edge's.
+		const diag = diagonal(ocean, OFF_MAP_WATER)
+		for (const [corner, [a, b]] of POCKET_EXITS) {
+			if (!water[a] || !water[b]) continue // not a corner overlay: an edge owns this
+			if (diag(...CORNER_DIAGONAL[corner])(map, location)) continue // no land pocket
+			// Both borders at once is ONE overlay, not two. Both would land on the same
+			// quadrant, so the second would paint over the first and leave that border
+			// uncapped — its sand cut flat at the tile edge, which against open Sea
+			// reads as a slab of beach floating offshore.
+			const ends = [a, b].filter((exit) => !carries[exit])
+			if (ends.length === 0) continue
+			caps.push(POCKET_CAP_STATE[`${corner}:${ends.length === 2 ? 'both' : ends[0]}`])
+		}
 		return caps
 	}
+
+// The inner-corner overlays (borderCornersWith below picks them), each with the two
+// borders its land pocket sits between — which are exactly the two its beach runs
+// out through — and the diagonal step to the land tile itself.
+const POCKET_EXITS = [
+	['tl', ['top', 'left']],
+	['bl', ['bottom', 'left']],
+	['br', ['bottom', 'right']],
+	['tr', ['top', 'right']],
+] as const satisfies readonly (readonly [
+	string,
+	readonly ('top' | 'bottom' | 'left' | 'right')[],
+])[]
+const CORNER_DIAGONAL: Record<string, [-1 | 1, -1 | 1]> = {
+	tl: [-1, -1],
+	bl: [1, -1],
+	br: [1, 1],
+	tr: [-1, 1],
+}
+
+// Sheet columns for the inner-corner caps, keyed `<corner>:<border it runs out
+// through>`. Whole-cell overlays like the edge caps above. In lockstep with
+// gen_terrain_shore.py's POCKET_CAP_EDGES.
+const POCKET_CAP_STATE: Record<string, number> = {
+	'tl:left': 28,
+	'tl:top': 29,
+	'tl:both': 30,
+	'bl:left': 31,
+	'bl:bottom': 32,
+	'bl:both': 33,
+	'br:right': 34,
+	'br:bottom': 35,
+	'br:both': 36,
+	'tr:right': 37,
+	'tr:top': 38,
+	'tr:both': 39,
+}
 
 // Each land-facing edge, with the two borders its beach band runs out through.
 const CAP_EXITS = [
@@ -173,13 +240,13 @@ const noCorners: CornerDecision = () => []
 // any shape (fully enclosed → all four, a concave notch → one). For water the
 // "different" diagonal is land; for a burn scar it's grass.
 const borderCornersWith =
-	(reader: Reader): CornerDecision =>
+	(reader: Reader, offMap = false): CornerDecision =>
 	(map, location) => {
-		const l = left(map, location, reader)
-		const u = up(map, location, reader)
-		const r = right(map, location, reader)
-		const d = down(map, location, reader)
-		const diag = diagonal(reader)
+		const l = left(map, location, reader, offMap)
+		const u = up(map, location, reader, offMap)
+		const r = right(map, location, reader, offMap)
+		const d = down(map, location, reader, offMap)
+		const diag = diagonal(reader, offMap)
 
 		const corners: number[] = []
 		if (u && l && !diag(-1, -1)(map, location)) corners.push(16) // top-left diagonal differs
@@ -191,17 +258,64 @@ const borderCornersWith =
 
 const singular: ConnectionDecision = (map, location) => 0
 
+// A road or canyon that runs into the edge of the map should read as carrying on
+// past it, not stopping dead in an end cap laid right on the border — the board is
+// a window onto the world, and a highway does not simply stop because the window
+// does. But a route may only leave through a border it was already heading for, or
+// every tile along the map's rim would sprout a stub into the void and the coast
+// road would look like a comb.
+//
+// So the test is per border, and it is the narrowest one that does the job: run
+// through this edge only when the tile's sole in-map connection is the OPPOSITE
+// side. That is exactly the cap-pointing-at-the-border case, and it becomes a
+// straight. A route running ALONG the edge (connected up and down at the right
+// border) fails it, as does a corner turning away and a junction already busy in
+// three directions — all of them keep the border as their end.
+//
+// Judged from the in-map connections alone, so the four borders can't cascade: a
+// route entering the top-left corner tile from the east and leaving south is an L,
+// and stays one, rather than each missing side talking itself into a junction.
+const continuesOffMap = (
+	map: MapObject,
+	location: number,
+	l: boolean,
+	u: boolean,
+	r: boolean,
+	d: boolean
+) => {
+	const col = location % map.cols
+	const row = (location / map.cols) | 0
+	return {
+		left: col === 0 && r && !u && !d,
+		right: col === map.cols - 1 && l && !u && !d,
+		up: row === 0 && d && !l && !r,
+		down: location + map.cols >= map.layers.ground.length && u && !l && !r,
+	}
+}
+
 // Directional 16-frame autotile (indexed by `rollDecision`): the frame is chosen by
 // which cardinal neighbours "connect" under `reader`. Roads connect along the path
-// family; a bridge deck connects to any bank (see the readers below).
+// family; a bridge deck connects to any bank (see the readers below). `offMapEnds`
+// lets a route run off the edge of the map where it was already headed there — see
+// `continuesOffMap`; a bridge deck leaves it off, since its span ends on a bank.
 const rollIntoWith =
-	(reader: Reader): ConnectionDecision =>
-	(map, location) =>
-		rollDecision[left(map, location, reader) ? 'true' : 'false'][
-			up(map, location, reader) ? 'true' : 'false'
-		][right(map, location, reader) ? 'true' : 'false'][
-			down(map, location, reader) ? 'true' : 'false'
+	(reader: Reader, offMapEnds = false): ConnectionDecision =>
+	(map, location) => {
+		let l = left(map, location, reader)
+		let u = up(map, location, reader)
+		let r = right(map, location, reader)
+		let d = down(map, location, reader)
+		if (offMapEnds) {
+			const off = continuesOffMap(map, location, l, u, r, d)
+			l = l || off.left
+			u = u || off.up
+			r = r || off.right
+			d = d || off.down
+		}
+		return rollDecision[l ? 'true' : 'false'][u ? 'true' : 'false'][r ? 'true' : 'false'][
+			d ? 'true' : 'false'
 		]
+	}
 
 // `location % 5` walks 0,1,2,3,4,0,1… straight across each row, so adjacent tiles
 // almost always differ by exactly one frame and the map reads as diagonal stripes.
@@ -233,12 +347,12 @@ export const variantDecision =
 	}
 
 const borderWith =
-	(reader: Reader): ConnectionDecision =>
+	(reader: Reader, offMap = false): ConnectionDecision =>
 	(map, location) =>
-		borderDecision[left(map, location, reader) ? 'true' : 'false'][
-			up(map, location, reader) ? 'true' : 'false'
-		][right(map, location, reader) ? 'true' : 'false'][
-			down(map, location, reader) ? 'true' : 'false'
+		borderDecision[left(map, location, reader, offMap) ? 'true' : 'false'][
+			up(map, location, reader, offMap) ? 'true' : 'false'
+		][right(map, location, reader, offMap) ? 'true' : 'false'][
+			down(map, location, reader, offMap) ? 'true' : 'false'
 		]
 
 // A bridge deck lands on any solid bank (or another path/bridge tile) and spans
@@ -257,9 +371,9 @@ const landward = (map: GroundObject[], location: number) =>
 // which is its own type unless it declares one).
 const flowDecision: ConnectionDecision[] = [
 	singular,
-	rollIntoWith(path),
+	rollIntoWith(path, true),
 	random,
-	borderWith(ocean),
+	borderWith(ocean, OFF_MAP_WATER),
 	rollIntoWith(landward),
 	borderWith(family),
 ]
@@ -284,8 +398,8 @@ const isOceanObstacle = (t: number) => terrainData[t].ocean && terrainData[t].co
 // water (and the shore where the deck meets a bank) reads beneath the span. Unlike an
 // obstacle the deck draws full size, not shrunk (see paint.ts groundLayer).
 const isBridge = (t: number) => terrainData[t].connector === 4
-const seaBorder = borderWith(ocean)
-const seaBorderCorners = borderCornersWith(ocean)
+const seaBorder = borderWith(ocean, OFF_MAP_WATER)
+const seaBorderCorners = borderCornersWith(ocean, OFF_MAP_WATER)
 
 export const seaUnderlayDecision =
 	(object: GroundObject) =>
@@ -458,31 +572,40 @@ export const skyFlowReversed =
 		return false
 	}
 
-const up = (map: MapObject, location: number, reader: Reader = type) =>
-	location - map.cols >= 0 &&
-	reader(map.layers.ground, location - map.cols) === reader(map.layers.ground, location)
-const down = (map: MapObject, location: number, reader: Reader = type) =>
-	location + map.cols < map.layers.ground.length &&
-	reader(map.layers.ground, location + map.cols) === reader(map.layers.ground, location)
+// Cardinal neighbour equality against `reader`. `offMap` is the answer when the
+// neighbour would fall outside the board: false ("a different tile") for everything
+// that ends at the border, true for the Sea, whose water is understood to carry on
+// past the edge of the map (see OFF_MAP_WATER).
+const up = (map: MapObject, location: number, reader: Reader = type, offMap = false) =>
+	location - map.cols >= 0
+		? reader(map.layers.ground, location - map.cols) === reader(map.layers.ground, location)
+		: offMap
+const down = (map: MapObject, location: number, reader: Reader = type, offMap = false) =>
+	location + map.cols < map.layers.ground.length
+		? reader(map.layers.ground, location + map.cols) === reader(map.layers.ground, location)
+		: offMap
 
-const left = (map: MapObject, location: number, reader: Reader = type) =>
-	location % map.cols !== 0 &&
-	reader(map.layers.ground, location - 1) === reader(map.layers.ground, location)
-const right = (map: MapObject, location: number, reader: Reader = type) =>
-	(location + 1) % map.cols !== 0 &&
-	reader(map.layers.ground, location + 1) === reader(map.layers.ground, location)
+const left = (map: MapObject, location: number, reader: Reader = type, offMap = false) =>
+	location % map.cols !== 0
+		? reader(map.layers.ground, location - 1) === reader(map.layers.ground, location)
+		: offMap
+const right = (map: MapObject, location: number, reader: Reader = type, offMap = false) =>
+	(location + 1) % map.cols !== 0
+		? reader(map.layers.ground, location + 1) === reader(map.layers.ground, location)
+		: offMap
 
 // Diagonal neighbour equality against `reader` (ocean flag or terrain type), with
 // explicit row/column bounds so a lookup never wraps onto the wrong row or reads
-// out of bounds. Used only for inner-corner detection; `false` (treat as a
-// different tile) is the safe answer off the edge of the map.
+// out of bounds. Used only for inner-corner detection; off the edge of the map it
+// answers `offMap` — false (a different tile) for a terrain that ends at the
+// border, true for the Sea, whose water carries on past it.
 const diagonal =
-	(reader: Reader) =>
+	(reader: Reader, offMap = false) =>
 	(rowDelta: -1 | 1, colDelta: -1 | 1) =>
 	(map: MapObject, location: number) => {
 		const col = location % map.cols
-		if (col + colDelta < 0 || col + colDelta >= map.cols) return false
+		if (col + colDelta < 0 || col + colDelta >= map.cols) return offMap
 		const target = location + rowDelta * map.cols + colDelta
-		if (target < 0 || target >= map.layers.ground.length) return false
+		if (target < 0 || target >= map.layers.ground.length) return offMap
 		return reader(map.layers.ground, target) === reader(map.layers.ground, location)
 	}

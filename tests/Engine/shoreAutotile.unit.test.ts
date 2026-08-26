@@ -6,6 +6,11 @@ import {
 	connectionDecision,
 	variantDecision,
 } from '../../src/lib/Sprites/spriteConnector'
+import { cornerQuadrant, FIRST_CAP_STATE } from '../../src/lib/Engine/paint'
+
+// Which quadrant a pocket cap belongs to, from its position in POCKETS below: the
+// twelve run corner by corner, three to a corner.
+const cornerQuadrantOf = (state: number) => Math.floor((state - 28) / 3)
 
 // The Shore's beach is drawn as one continuous coastline across a run of tiles.
 // Two things have to hold for that, and both are easy to break silently:
@@ -75,8 +80,9 @@ describe('shore coastline autotiling', () => {
 	})
 
 	it('does not cap a beach that runs to the edge of the map', () => {
-		// Off-map reads as land, so the border itself ends the beach and the base
-		// state already turns the sand around the corner.
+		// Off-map reads as open water for the coastline, so the sand is taken to
+		// carry on off the board too — a beach never raises a headland on the map's
+		// own rim (see OFF_MAP_WATER in spriteConnector).
 		const rows = ['....', 'SSSS', '~~~~']
 		const edge = draw(rows, 0, 1)
 		expect(edge.overlays).not.toContain(CAPS.TL_H)
@@ -151,5 +157,95 @@ describe('shore coastline autotiling', () => {
 		const sea = ground[at(1, 1)] as unknown as GroundObject
 		expect(terrainData[SEA].variants ?? 1).toBe(1)
 		expect(variantDecision(sea)(map, at(1, 1))).toBe(0)
+	})
+})
+
+// A beach's sand does not only come from the border state's edge bands. An inner
+// corner overlay draws a POCKET around a land tile touching the beach diagonally,
+// and that pocket's sand runs out through both borders flanking its corner. Those
+// borders are invisible to the edge caps above, which only walk LAND-facing edges —
+// so a tile with water on all four sides and land on a diagonal was capped nowhere
+// and its beach was sliced flat against the open Sea beside it.
+const POCKETS = {
+	TL_L: 28, TL_T: 29, TL_BOTH: 30,
+	BL_L: 31, BL_B: 32, BL_BOTH: 33,
+	BR_R: 34, BR_B: 35, BR_BOTH: 36,
+	TR_R: 37, TR_T: 38, TR_BOTH: 39,
+}
+
+describe('shore inner-corner caps', () => {
+	it('ends a corner pocket at each border it spills into open Sea through', () => {
+		//   . ~ .      the middle tile has water on all four sides and land on all
+		//   S S ~      four diagonals, so its whole beach comes from pockets
+		//   . ~ .
+		const rows = ['.~.', 'SS~', '.~.']
+		const { overlays } = draw(rows, 1, 1)
+		expect(overlays).toEqual(expect.arrayContaining([16, 17, 18, 19]))
+		// Its left neighbour is beach, so the two pockets on that side keep the border
+		// they spill into open Sea through and only that one. The two on the right have
+		// Sea both ways, which is one overlay ending both — never two, since the second
+		// would paint over the first and leave a border uncapped.
+		expect(overlays).toEqual(
+			expect.arrayContaining([POCKETS.TL_T, POCKETS.BL_B, POCKETS.TR_BOTH, POCKETS.BR_BOTH])
+		)
+		expect(overlays).not.toContain(POCKETS.TL_L)
+		expect(overlays).not.toContain(POCKETS.TL_BOTH)
+		expect(overlays).not.toContain(POCKETS.BL_L)
+		expect(overlays).not.toContain(POCKETS.TR_T)
+		expect(overlays).not.toContain(POCKETS.TR_R)
+	})
+
+	it('leaves a pocket uncapped where the beach carries on into more beach', () => {
+		const rows = ['.S.', 'SSS', '.S.']
+		const { overlays } = draw(rows, 1, 1)
+		expect(overlays).toEqual(expect.arrayContaining([16, 17, 18, 19]))
+		for (const cap of Object.values(POCKETS)) expect(overlays).not.toContain(cap)
+	})
+
+	it('caps nothing where there is no pocket to cap', () => {
+		// Land above the whole row: every tile's sand comes from its top edge, which
+		// the edge caps own. No diagonal pockets, so no pocket caps.
+		const rows = ['...', 'SS~', '~~~']
+		const { overlays } = draw(rows, 0, 1)
+		for (const cap of Object.values(POCKETS)) expect(overlays).not.toContain(cap)
+	})
+
+	it('ends a pocket boxed in by open Sea with one overlay, not two', () => {
+		// The checkerboard: every cardinal is Sea and every diagonal is land, so all
+		// four pockets have to end both ways at once. Two overlays per pocket would
+		// share a quadrant and the loser's border would come out uncapped.
+		const { overlays } = draw(['.~.~.', '~S~S~', '.~.~.'], 1, 1)
+		const caps = overlays.filter((o) => o >= 28)
+		expect(caps.sort((a, b) => a - b)).toEqual([
+			POCKETS.TL_BOTH,
+			POCKETS.BL_BOTH,
+			POCKETS.BR_BOTH,
+			POCKETS.TR_BOTH,
+		].sort((a, b) => a - b))
+		expect(new Set(caps.map((c) => cornerQuadrantOf(c))).size, 'one per quadrant').toBe(4)
+	})
+})
+
+// The two overlay mechanisms have to stay separable. An inner corner is a quadrant
+// copy, a cap is a whole cell that carries its own transparency, and paint.corners
+// tells them apart purely by `corner >= FIRST_CAP_STATE`. If a cap ever slipped
+// below that line it would be drawn as a quadrant — which is exactly the bug the
+// whole-cell caps fixed, since a cap reaches further than a quadrant.
+describe('overlay states stay on the right side of the cap boundary', () => {
+	it('keeps the quadrant table to inner corners only', () => {
+		for (const state of Object.keys(cornerQuadrant).map(Number))
+			expect(state).toBeLessThan(FIRST_CAP_STATE)
+	})
+
+	it('emits inner corners below the boundary and every cap above it', () => {
+		// Land above (an edge band) and land at the bottom-left diagonal (a pocket),
+		// with open Sea on every water side, so both kinds of overlay appear at once.
+		const { overlays } = draw(['...', '~S~', '.~~'], 1, 1)
+		const inner = overlays.filter((o) => o < FIRST_CAP_STATE)
+		const caps = overlays.filter((o) => o >= FIRST_CAP_STATE)
+		expect(inner.length, 'at least one inner corner').toBeGreaterThan(0)
+		expect(caps.length, 'at least one cap').toBeGreaterThan(0)
+		for (const state of inner) expect(cornerQuadrant[state]).toBeDefined()
+		for (const state of caps) expect(cornerQuadrant[state]).toBeUndefined()
 	})
 })

@@ -22,6 +22,14 @@ export const devPages: DevPage[] = [
 		ready: true,
 	},
 	{
+		href: '/dev/shore',
+		title: 'Shore Combinations',
+		blurb:
+			'Every coastline case the autotiler can make — paintable board, realistic shapes, and the full neighbourhood enumeration.',
+		tag: 'visuals',
+		ready: true,
+	},
+	{
 		href: '/dev/units',
 		title: 'Units & FX',
 		blurb:

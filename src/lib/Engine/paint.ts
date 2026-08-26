@@ -803,27 +803,32 @@ const always =
 // running along a horizontal land edge or a vertical one and the headland has to
 // grow the right way. Kept in lockstep with spriteConnector.CAP_STATE and
 // tools/sprites/gen_terrain_shore.py's CAP_EDGES.
-const cornerQuadrant: Record<number, [0 | 1, 0 | 1]> = {
+// Which quadrant of the tile each INNER CORNER overlay (16-19) redraws. The beach
+// caps above 19 are whole-cell overlays instead (see FIRST_CAP_STATE below), so they
+// have no entry here — where each of those sits is baked into its own transparency.
+//
+// Exported so the /dev/shore playground can composite overlays exactly as the board
+// does, instead of keeping a second copy of this table that could drift.
+export const cornerQuadrant: Record<number, [0 | 1, 0 | 1]> = {
 	16: [0, 0],
 	17: [0, 1],
 	18: [1, 1],
 	19: [1, 0],
-	20: [0, 0], // beach along the top edge, ending at the left border
-	21: [1, 0], // beach along the top edge, ending at the right border
-	22: [0, 1], // beach along the bottom edge, ending at the left border
-	23: [1, 1], // beach along the bottom edge, ending at the right border
-	24: [0, 0], // beach along the left edge, ending at the top border
-	25: [0, 1], // beach along the left edge, ending at the bottom border
-	26: [1, 0], // beach along the right edge, ending at the top border
-	27: [1, 1], // beach along the right edge, ending at the bottom border
 }
 
-// Quadrant overlays for coastline water: inner corners, and on a beach its end
-// caps. The base tile is already drawn; each listed frame differs from it in only
-// one quadrant, so we copy just that quadrant over the matching quadrant of the
-// tile. This lets a single water tile show several land corners at once — something
-// the one-frame `state` can't express on its own. Overlays read from the SAME
-// variant block as the base tile, or the coastline would step where they meet.
+// The first beach cap column. An inner corner (16-19) differs from the base tile in
+// exactly one quadrant, so only that quadrant is copied. A CAP has to reach further:
+// the beach's bands run about 35px out from the land edge, past a quadrant's 30, and
+// stopping at the quadrant left the last of the shelf poking past the headland as a
+// turquoise stub in open water. Caps are therefore drawn as a whole cell, and the
+// sheet leaves them transparent everywhere they have no business repainting.
+export const FIRST_CAP_STATE = 20
+
+// Overlays for coastline water: inner corners, and on a beach its end caps. The base
+// tile is already drawn and each overlay is a partial redraw on top of it, which is
+// what lets a single water tile show several land corners at once — something the
+// one-frame `state` cannot express. Overlays read from the SAME variant block as the
+// base tile, or the coastline would step where they meet.
 const corners =
 	(width: number, height: number, frame: number) =>
 	(context: CanvasRenderingContext2D) =>
@@ -844,6 +849,20 @@ const corners =
 		const destHalfWidth = width / 2
 		const destHalfHeight = height / 2
 		for (const corner of list) {
+			if (corner >= FIRST_CAP_STATE) {
+				context.drawImage(
+					sprite,
+					corner * (spriteSize + render.xOffset),
+					sourceY,
+					spriteSize + render.xOffset,
+					spriteSize + render.yOffset,
+					0,
+					0,
+					width,
+					height
+				)
+				continue
+			}
 			const quadrant = cornerQuadrant[corner]
 			if (!quadrant) continue
 			const [qx, qy] = quadrant
