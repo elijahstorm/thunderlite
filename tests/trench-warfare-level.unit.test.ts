@@ -1,5 +1,5 @@
 // Validation for the 04-trench-warfare reinforcement pass: the ocean was shrunk
-// to two rows, an eastern supply road was added, and turns 2-7 feed randomised
+// to two rows, an eastern supply road was added, and turns 2-6 feed randomised
 // armor in off that road or the beach. Those rolls come off the match seed, so
 // the wave assertions sweep a range of seeds rather than trusting one.
 import { afterEach, describe, expect, it } from 'vitest'
@@ -121,8 +121,8 @@ describe('04-trench-warfare board', () => {
 })
 
 describe('04-trench-warfare reinforcement waves', () => {
-	it('drops exactly one randomised tank on each of turns 2-5', () => {
-		for (const round of [2, 3, 4, 5]) {
+	it('drops exactly one randomised tank on each of turns 2-4', () => {
+		for (const round of [2, 3, 4]) {
 			const runs = rolledSpawns(round)
 			for (const spawns of runs) expect(spawns).toHaveLength(1)
 
@@ -136,8 +136,8 @@ describe('04-trench-warfare reinforcement waves', () => {
 		}
 	})
 
-	it('sends one of each type up both approaches on turn 6', () => {
-		for (const spawns of rolledSpawns(6, 60)) {
+	it('sends one of each type up both approaches on turn 5', () => {
+		for (const spawns of rolledSpawns(5, 60)) {
 			expect(spawns).toHaveLength(2)
 			expect(spawns.map((s) => s.unit).sort()).toEqual(['Lance Tank', 'Scorpion Tank'])
 			// Split pools, so the pair can never roll onto the same tile and forfeit.
@@ -146,8 +146,8 @@ describe('04-trench-warfare reinforcement waves', () => {
 		}
 	})
 
-	it('escalates the finale to three tanks on turn 7, one per pool', () => {
-		const runs = rolledSpawns(7, 120)
+	it('escalates the finale to three tanks on turn 6, one per pool', () => {
+		const runs = rolledSpawns(6, 120)
 		for (const spawns of runs) {
 			expect(spawns).toHaveLength(3)
 			// Three disjoint pools: north road, southern road, beach. No two rolls can
@@ -165,13 +165,13 @@ describe('04-trench-warfare reinforcement waves', () => {
 	})
 
 	it('ramps the wave size 1 -> 1 -> 2 -> 3 across the closing rounds', () => {
-		expect([4, 5, 6, 7].map((round) => wavesOn(round).length)).toEqual([1, 1, 2, 3])
-		// Turn 7 is the last word: nothing is scheduled behind it.
-		expect(script.turns[8]).toBeUndefined()
+		expect([3, 4, 5, 6].map((round) => wavesOn(round).length)).toEqual([1, 1, 2, 3])
+		// Turn 6 is the last word: nothing is scheduled behind it.
+		expect(script.turns[7]).toBeUndefined()
 	})
 
 	it('only ever picks tiles a tank can actually be placed on', () => {
-		for (const round of [2, 3, 4, 5, 6, 7]) {
+		for (const round of [2, 3, 4, 5, 6]) {
 			for (const spawns of rolledSpawns(round, 60)) {
 				for (const s of spawns) {
 					expect(s.team).toBe(1)
@@ -190,7 +190,7 @@ describe('04-trench-warfare reinforcement waves', () => {
 
 	it('re-resolves to the same wave after a fresh parse, so a reload cannot drift', () => {
 		setMatchSeed(seedFromSession('trench-reload'))
-		for (const round of [2, 3, 4, 5, 6, 7]) {
+		for (const round of [2, 3, 4, 5, 6]) {
 			const before = wavesOn(round).map((w) => resolveRandomSpawn(w))
 			const reparsed = wavesOn(round, parseCutsceneScript(scriptText)).map((w) =>
 				resolveRandomSpawn(w)

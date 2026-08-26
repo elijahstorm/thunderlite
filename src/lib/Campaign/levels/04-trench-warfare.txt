@@ -51,11 +51,6 @@ talk Vance: "He's still coming. Rotate the pressed trooper back to the reserve t
 
 <turn 5,1>
 wait: 1
-random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5|9,6|11,6|12,6|13,6
-</turn>
-
-<turn 6,1>
-wait: 1
 random unit: 1,"Lance Tank" @ 13,1|12,1|12,2|12,3|12,4|12,5|13,5
 wait: 0.8
 random unit: 1,"Scorpion Tank" @ 9,6|11,6|12,6|13,6
@@ -63,7 +58,7 @@ talk Kael: "Road and beach together now. Squeeze them from both ends."
 talk Vance: "Two at once, and he isn't finished. Rotate the pressed men back to the reserve trench and keep the Rocket working. Do not let the front thin."
 </turn>
 
-<turn 7,1>
+<turn 6,1>
 wait: 1
 random unit: 1,"Lance Tank" @ 13,1|12,1|12,2
 wait: 0.8
