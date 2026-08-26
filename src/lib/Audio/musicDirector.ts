@@ -197,6 +197,12 @@ export interface MusicDirectorOptions {
 	clearTimer?: (handle: TimerHandle) => void
 }
 
+/**
+ * The opening window: the bed holds at `rest` while the intro sting plays. The
+ * sting asset is currently silence (see `assetManifest.ts`), so this reads as a
+ * soft fade-in rather than a fanfare — the window is kept so a real sting can be
+ * dropped back in without touching the director.
+ */
 const DEFAULT_INTRO_MS = 3500
 const DEFAULT_FADE_MS = 800
 const DEFAULT_VARIATION_FADE_MS = 2500

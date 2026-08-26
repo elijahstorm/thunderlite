@@ -38,10 +38,18 @@ const packLayerEntries: Record<string, string> = Object.fromEntries(
  * they were finished mixes of differing lengths, so looping them together could
  * never stay phase-locked, and only one was ever audible at a time. `game/intro`
  * survives as a sting, which is what its 6-second one-shot always was.
+ *
+ * `game/intro` is currently a SILENT PLACEHOLDER (3.5s of digital silence, the
+ * length of the director's intro window). The old fanfare did not earn the
+ * moment it interrupted, so it was cut, but the slot is kept wired: the bed
+ * still holds back at `rest` for the intro window, which reads as a soft opening
+ * on its own. Drop a real 3.5s sting over these files and it plays again with no
+ * code change. Regenerate the silence with `scripts/audio/gen-silent-track.sh`.
  */
 export const musicManifest: Record<string, string> = {
 	...packLayerEntries,
 	// One-shot stings.
+	// Silent placeholder — see the note above.
 	'game/intro': `${ROOT}/music/game/intro`,
 	'game/win': `${ROOT}/music/game/win`,
 	'game/lose': `${ROOT}/music/game/lose`,
