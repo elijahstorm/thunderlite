@@ -31,6 +31,7 @@
  * unhl: 8,6
  * wait: 1
  * add unit: 2,"Annihilator Tank",8,6
+ * random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,2|13,4|11,6
  * kill unit: 8,5
  * terrain: "Mountain",3,4
  * weather: "Storm",3,4
@@ -82,6 +83,11 @@ interface ArgField {
 
 /**
  * Parse a level script into ordered, typed events grouped by block.
+ *
+ * Pure, including `random unit` — that command parses to a `randomSpawn` event
+ * carrying its alternatives, and the roll happens later against the match seed
+ * (see `randomSpawn.ts`). Keeping the parse deterministic is what lets the spawn
+ * telegraph, the runner and a post-reload re-parse all agree on one outcome.
  *
  * @throws {CutsceneParseError} on any malformed line, carrying its line number.
  */
@@ -380,6 +386,13 @@ const parseCommandInto = (
 			}
 			throw new CutsceneParseError(`unknown command "add ${qualifier}"`, lineNo)
 		}
+		case 'random': {
+			if (qualifier !== 'unit') {
+				throw new CutsceneParseError(`unknown command "random ${qualifier}"`, lineNo)
+			}
+			events.push(parseRandomSpawn(argStr, lineNo))
+			return i
+		}
 		case 'kill': {
 			if (qualifier !== 'unit') {
 				throw new CutsceneParseError(`unknown command "kill ${qualifier}"`, lineNo)
@@ -510,6 +523,69 @@ const parseCommandInto = (
 		default:
 			throw new CutsceneParseError(`unknown command "${keyword}"`, lineNo)
 	}
+}
+
+/**
+ * Parse a `random unit` line into an unresolved {@link CutsceneEvent}. Grammar:
+ *
+ * ```
+ * random unit: team,"Name"["|"Name"]… @ x,y[|x,y]…
+ * ```
+ *
+ * The two alternation lists are rolled independently later, so `"A"|"B" @ 1,1|9,9`
+ * can produce any of the four combinations. Splitting type from tile (rather than
+ * enumerating every pairing) is what keeps a wave of randomised reinforcements to
+ * one line per turn.
+ */
+const parseRandomSpawn = (argStr: string, lineNo: number): CutsceneEvent => {
+	const at = argStr.indexOf('@')
+	if (at === -1) {
+		throw new CutsceneParseError(
+			'random unit expects \'team,"Name"|"Name" @ x,y|x,y\' (missing "@")',
+			lineNo
+		)
+	}
+
+	const head = argStr
+		.slice(0, at)
+		.trim()
+		.match(/^(\d+)\s*,\s*(.+)$/s)
+	if (!head) {
+		throw new CutsceneParseError(
+			`random unit expects a team then a "Name" list before "@", got "${argStr.slice(0, at).trim()}"`,
+			lineNo
+		)
+	}
+
+	const units = head[2].split('|').map((part) => {
+		const m = part.trim().match(/^"([^"]+)"$/)
+		if (!m) {
+			throw new CutsceneParseError(
+				`random unit names must be quoted and separated by "|", got "${part.trim()}"`,
+				lineNo
+			)
+		}
+		if (!VALID_UNIT_NAMES.has(m[1])) {
+			throw new CutsceneParseError(`unknown unit "${m[1]}"`, lineNo)
+		}
+		return m[1]
+	})
+
+	const tiles = argStr
+		.slice(at + 1)
+		.split('|')
+		.map((part) => {
+			const m = part.trim().match(/^(\d+)\s*,\s*(\d+)$/)
+			if (!m) {
+				throw new CutsceneParseError(
+					`random unit tiles must be "x,y" separated by "|", got "${part.trim()}"`,
+					lineNo
+				)
+			}
+			return { x: parseInt(m[1], 10), y: parseInt(m[2], 10) }
+		})
+
+	return { kind: 'randomSpawn', team: parseInt(head[1], 10), units, tiles, line: lineNo }
 }
 
 const requireNoQualifier = (keyword: string, qualifier: string, lineNo: number): void => {

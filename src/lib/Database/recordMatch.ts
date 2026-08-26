@@ -1,4 +1,5 @@
 import { onMatchEnd, type MatchResult } from '$lib/Engine/matchEnd'
+import { currentMatchSeed } from '$lib/Engine/matchSeed'
 import {
 	clearMatchRating,
 	matchRating,
@@ -120,6 +121,10 @@ export const recordMatch = (result: MatchResult): void => {
 		winner: result.winner,
 		turns: result.turns,
 		mapSha: result.mapSha ?? null,
+		// The seed this match was played under, so the row records which of the
+		// many possible runs of this board actually happened. Online results take
+		// theirs from the room row instead — the client has no authority there.
+		seed: currentMatchSeed(),
 	})
 }
 

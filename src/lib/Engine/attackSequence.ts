@@ -15,6 +15,7 @@ import { computeBehindTile } from './modifiers/lance'
 import { splashTargetTiles, splashEffectFor, SPLASH_DAMAGE_SCALE } from './modifiers/splash'
 import { burnableForestTiles, scorchTile } from './modifiers/burn'
 import { beginMaterialize } from './materialize'
+import { invalidateThreatOverlay } from './threatOverlay'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
 import type { CommitOptions } from './applyAction'
 import type { SerializedAction } from './Interactor/serializedAction'
@@ -178,6 +179,9 @@ export const animateAttackSequence = async (
 			beginMaterialize(t, 'burn', {
 				onReveal: () => {
 					scorchTile(map, t)
+					// Burnt-out forest drives differently, so any enemy reach painted
+					// through it has to be re-derived.
+					invalidateThreatOverlay()
 					repaintSignal.update((n) => n + 1)
 				},
 			})

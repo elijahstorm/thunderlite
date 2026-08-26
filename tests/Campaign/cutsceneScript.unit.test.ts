@@ -33,9 +33,7 @@ talk Vance: "Keep it up!"
 		expect(script.win).toEqual([{ kind: 'talk', speaker: 'Vance', lines: ['Victory.'] }])
 		expect(script.lose).toEqual([{ kind: 'talk', speaker: 'Vance', lines: ['Try again.'] }])
 		// `<turn 4>` is shorthand for `<turn 4,0>` — team defaults to 0.
-		expect(script.turns[4][0]).toEqual([
-			{ kind: 'talk', speaker: 'Vance', lines: ['Keep it up!'] },
-		])
+		expect(script.turns[4][0]).toEqual([{ kind: 'talk', speaker: 'Vance', lines: ['Keep it up!'] }])
 	})
 
 	it('keys turn blocks by round AND team, with team defaulting to 0', () => {
@@ -387,5 +385,49 @@ funds: 1,-200
 			{ kind: 'funds', team: 0, amount: 500 },
 			{ kind: 'funds', team: 1, amount: -200 },
 		])
+	})
+})
+
+describe('parseCutsceneScript — random unit', () => {
+	const parse = (line: string) => parseCutsceneScript(`<start>\n${line}\n</start>`).start
+
+	it('parses to an unresolved randomSpawn carrying both alternative lists', () => {
+		expect(parse('random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,2|9,6')).toEqual([
+			{
+				kind: 'randomSpawn',
+				team: 1,
+				units: ['Scorpion Tank', 'Lance Tank'],
+				tiles: [
+					{ x: 13, y: 2 },
+					{ x: 9, y: 6 },
+				],
+				line: 2,
+			},
+		])
+	})
+
+	it('is deterministic: the roll is deferred, so parsing twice gives the same event', () => {
+		const line = 'random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,2|9,6'
+		expect(parse(line)).toEqual(parse(line))
+	})
+
+	it('accepts a single-option list on either side', () => {
+		expect(parse('random unit: 2,"Lance Tank" @ 4,5')).toEqual([
+			{ kind: 'randomSpawn', team: 2, units: ['Lance Tank'], tiles: [{ x: 4, y: 5 }], line: 2 },
+		])
+	})
+
+	it('rejects a malformed line with its line number', () => {
+		const cases = [
+			['random unit: 1,"Lance Tank" 4,5', '"@"'],
+			['random unit: 1,Lance Tank @ 4,5', 'must be quoted'],
+			['random unit: 1,"Lance Tank" @ 4,5|nope', 'must be "x,y"'],
+			['random unit: 1,"Nonexistent Tank" @ 4,5', 'unknown unit'],
+			['random building: 1,"Airfield" @ 4,5', 'unknown command'],
+		] as const
+		for (const [line, fragment] of cases) {
+			expect(() => parseCutsceneScript(`<start>\n${line}\n</start>`)).toThrow(fragment)
+			expect(() => parseCutsceneScript(`<start>\n${line}\n</start>`)).toThrow('line 2')
+		}
 	})
 })

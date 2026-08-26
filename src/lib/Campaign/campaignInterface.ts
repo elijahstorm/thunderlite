@@ -19,6 +19,7 @@ import { buildingData } from '$lib/GameData/building'
 import { skyData } from '$lib/GameData/sky'
 import { gameState, refreshControlsFromMap } from '$lib/Engine/gameState'
 import { repaintSignal, animateExplosion } from '$lib/Engine/Animator/animator'
+import { invalidateThreatOverlay } from '$lib/Engine/threatOverlay'
 import { beginMaterialize } from '$lib/Engine/materialize'
 import { beginScriptedMutation, endScriptedMutation } from './scriptGate'
 import { fogOfWarEnabled } from '$lib/Engine/fogState'
@@ -94,6 +95,10 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 	const destroyUnitAt = (tile: number, unit: UnitObject): void => {
 		void animateExplosion(map, tile)
 		map.layers.units[tile] = null
+		// A scripted death never runs through an action, so nothing else tells the
+		// enemy-range overlay the board moved — without this it keeps painting the
+		// dead unit's reach (see threatOverlay.invalidateThreatOverlay).
+		invalidateThreatOverlay()
 		runModifiers(unit, 'Death', { kind: 'unit', tile, state: get(gameState), map })
 	}
 
@@ -151,6 +156,9 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 				destroyUnitAt(tile, occupant)
 			}
 			map.layers.units[tile] = incoming
+			// Same as a scripted kill: the arrival is invisible to `gameState`, so the
+			// threat overlay has to be told the units layer changed under it.
+			invalidateThreatOverlay()
 			// Pixel warp-in so the unit assembles onto the board instead of popping
 			// into being between frames. The unit is placed now (so sight and win
 			// conditions are correct) but stays hidden under the assemble; hold the
@@ -203,6 +211,9 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 						destroyUnitAt(tile, occupant)
 						applyWinConditions(map)
 					}
+					// Reshaped ground changes what units can drive over, and so the reach
+					// painted around them.
+					invalidateThreatOverlay()
 					repaintSignal.update((n) => n + 1)
 				},
 				onDone: endScriptedMutation,
@@ -260,7 +271,8 @@ export const createCampaignInterface = (config: CampaignInterfaceConfig): Campai
 			// winner. GameStateManager observes the transition and emits the match
 			// result, which drives the `lose` block.
 			const state = get(gameState)
-			const enemy = state.players.find((p) => p.team !== localTeam)?.team ?? (localTeam === 0 ? 1 : 0)
+			const enemy =
+				state.players.find((p) => p.team !== localTeam)?.team ?? (localTeam === 0 ? 1 : 0)
 			gameState.update((s) => ({ ...s, phase: 'gameOver', winner: enemy }))
 		},
 

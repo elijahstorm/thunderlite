@@ -15,10 +15,17 @@ type TeamObject = {
 
 type GroundObject = ObjectType &
 	AnimatedObject & {
-		// Transient render hint: inner-corner sprite frames (16-19) to composite over
-		// the base tile. A water tile can need several at once, which `state` alone
-		// (one frame) can't express. Recomputed alongside `state`; see spriteConnector.
+		// Transient render hint: overlay sprite frames to composite over the base tile
+		// — inner corners (16-19) and, on a beach, its end caps (20-27). A tile can need
+		// several at once, which `state` alone (one frame) can't express. Recomputed
+		// alongside `state`; see spriteConnector.
 		corners?: number[]
+		// Transient render hint: which stretch of coast this tile draws. A terrain whose
+		// sheet carries variants (TerrainData.variants) stacks one animation loop per
+		// variant down the sheet, and this picks the block — a position hash, so a tile
+		// keeps its look across reloads while its neighbours differ. Undefined (row 0)
+		// for every terrain with a single variant. See spriteConnector.variantDecision.
+		variant?: number
 		// Transient render hints for a singular ocean obstacle (Reef / Archipelago /
 		// Rock Formation) that touches land: the Sea coastline border frame and inner
 		// corners to draw *beneath* the obstacle so the shore reads around it. Undefined

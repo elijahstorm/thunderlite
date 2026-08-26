@@ -33,7 +33,38 @@ const path = (map: GroundObject[], location: number) => {
 	return isPath(t) ? PATH_TOKEN : t
 }
 
-type Reader = typeof type | typeof ocean
+// A beach knows where it ENDS, which the `ocean` reader above cannot tell it:
+// `ocean` folds Sea and Shore into one body of water, so a beach tile reads its
+// neighbouring Sea as "connected" and lays sand right up to the border, where the
+// Sea tile draws a cliff instead. `beachContinues` is the second opinion — true
+// only where the sand genuinely carries on. A bridge deck counts, because it bakes
+// its own banks and the beach simply runs under the span.
+const beachContinues = (map: GroundObject[], location: number) => {
+	const t = terrainData[map[location].type]
+	return t.beach === true || t.connector === 4
+}
+
+// The reader behind the connector-5 border. Terrains that declare the same
+// `TerrainData.family` autotile as ONE body: the three Ore Deposits are a single
+// mineral bed at three stages of being mined out, so a rich patch and a worked-out
+// one share a continuous rim rather than each cutting its own edge into the other.
+// A terrain with no family falls back to its own index, which is exactly the plain
+// type-matching the Charred Forest scar and Wasteland want — so this generalises
+// connector 5 without changing what a family-less terrain does.
+//
+// Family tokens are negative so they can never collide with a real terrain index,
+// and the table is built once at module load since `terrainData` is static.
+const familyToken: number[] = (() => {
+	const ids = new Map<string, number>()
+	return terrainData.map((t, index) => {
+		if (!t.family) return index
+		if (!ids.has(t.family)) ids.set(t.family, -100 - ids.size)
+		return ids.get(t.family) as number
+	})
+})()
+const family = (map: GroundObject[], location: number) => familyToken[map[location].type]
+
+type Reader = (map: GroundObject[], location: number) => number | boolean
 
 export const connectionDecision = (object: GroundObject) =>
 	flowDecision[terrainData[object.type].connector]
@@ -46,15 +77,92 @@ export const connectionDecision = (object: GroundObject) =>
 // need several inner corners on the same water tile, so we return the full list
 // here and let the renderer composite each corner's quadrant over the base tile.
 // connector 3 (Sea) borders against the `ocean` flag so every water terrain reads
-// as one body; connector 5 (Charred Forest) borders against terrain *type* so a
-// burn scar autotiles only against itself. Both share the border-base + inner-corner
-// machinery below, just with a different neighbour-equality reader.
+// as one body; connector 5 (Charred Forest, Wasteland, the Ore Deposits) borders
+// against terrain *family*, which is a terrain's own type unless it declares one —
+// so a burn scar autotiles only against itself while the three ore richnesses
+// autotile as one bed. Both share the border-base + inner-corner machinery below,
+// just with a different neighbour-equality reader.
 export const cornerDecision = (object: GroundObject): CornerDecision => {
 	const connector = terrainData[object.type].connector
-	if (connector === 3) return borderCornersWith(ocean)
-	if (connector === 5) return borderCornersWith(type)
+	if (connector === 3) {
+		const inner = borderCornersWith(ocean)
+		// A beach also needs its ends. Both kinds of overlay are quadrant copies over
+		// the base tile (paint.corners), so they travel in one list.
+		if (terrainData[object.type].beach) {
+			const caps = capDecision(object)
+			return (map, location) => [...inner(map, location), ...caps(map, location)]
+		}
+		return inner
+	}
+	if (connector === 5) return borderCornersWith(family)
 	return noCorners
 }
+
+// Sheet columns for the beach end caps, keyed `<land edge>:<border it runs out
+// through>`. Kept in lockstep with paint.cornerQuadrant and
+// tools/sprites/gen_terrain_shore.py's CAP_EDGES.
+const CAP_STATE: Record<string, number> = {
+	'top:left': 20,
+	'top:right': 21,
+	'bottom:left': 22,
+	'bottom:right': 23,
+	'left:top': 24,
+	'left:bottom': 25,
+	'right:top': 26,
+	'right:bottom': 27,
+}
+
+// Which tile borders a beach runs out through, and so where it has to raise a
+// headland instead of spilling its sand into open water.
+//
+// The beach hugs each LAND-facing edge, and that band leaves the tile through the
+// two borders running perpendicular to it. Take a tile with land above: its beach
+// runs along the top and exits left and right. Through each of those borders the
+// sand either carries on (the neighbour is beach too — nothing to draw, the two
+// tiles' coastlines already meet) or it stops dead against deep water, and that is
+// where the cap goes. A border facing land isn't an exit at all: the beach turns
+// the corner there and the base state has already drawn it.
+const capDecision =
+	(object: GroundObject): CornerDecision =>
+	(map, location) => {
+		const ground = map.layers.ground
+		const water = {
+			left: left(map, location, ocean),
+			right: right(map, location, ocean),
+			top: up(map, location, ocean),
+			bottom: down(map, location, ocean),
+		}
+		// Off the edge of the map reads as land (left/right/up/down are false there),
+		// so a beach running to the map border is capped by the border itself.
+		const col = location % map.cols
+		const row = (location / map.cols) | 0
+		const carries = {
+			left: col > 0 && beachContinues(ground, location - 1),
+			right: col < map.cols - 1 && beachContinues(ground, location + 1),
+			top: row > 0 && beachContinues(ground, location - map.cols),
+			bottom: location + map.cols < ground.length && beachContinues(ground, location + map.cols),
+		}
+		const caps: number[] = []
+		for (const [edge, exits] of CAP_EXITS) {
+			if (water[edge]) continue // that side is water: no beach along it to cap
+			for (const exit of exits) {
+				if (!water[exit] || carries[exit]) continue
+				caps.push(CAP_STATE[`${edge}:${exit}`])
+			}
+		}
+		return caps
+	}
+
+// Each land-facing edge, with the two borders its beach band runs out through.
+const CAP_EXITS = [
+	['top', ['left', 'right']],
+	['bottom', ['left', 'right']],
+	['left', ['top', 'bottom']],
+	['right', ['top', 'bottom']],
+] as const satisfies readonly (readonly [
+	'top' | 'bottom' | 'left' | 'right',
+	readonly ('top' | 'bottom' | 'left' | 'right')[],
+])[]
 
 const noCorners: CornerDecision = () => []
 
@@ -91,7 +199,9 @@ const rollIntoWith =
 	(map, location) =>
 		rollDecision[left(map, location, reader) ? 'true' : 'false'][
 			up(map, location, reader) ? 'true' : 'false'
-		][right(map, location, reader) ? 'true' : 'false'][down(map, location, reader) ? 'true' : 'false']
+		][right(map, location, reader) ? 'true' : 'false'][
+			down(map, location, reader) ? 'true' : 'false'
+		]
 
 // `location % 5` walks 0,1,2,3,4,0,1… straight across each row, so adjacent tiles
 // almost always differ by exactly one frame and the map reads as diagonal stripes.
@@ -99,14 +209,28 @@ const rollIntoWith =
 // the result is still a pure function of the tile's position (so a tile keeps its
 // frame across reloads) but neighbours land on uncorrelated frames, which reads as
 // random scatter without ever storing per-tile state.
-const random: ConnectionDecision = (map, location) => {
+const positionHash = (map: MapObject, location: number) => {
 	const col = location % map.cols
 	const row = (location / map.cols) | 0
 	let h = (col * 0x1f1f1f1f) ^ (row * 0x27d4eb2d)
 	h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
 	h ^= h >>> 13
-	return (h >>> 0) % 5
+	return h >>> 0
 }
+
+const random: ConnectionDecision = (map, location) => positionHash(map, location) % 5
+
+// Which variant block of the sheet a tile draws from, for a terrain that ships
+// several (TerrainData.variants). Autotiling picks a tile's SHAPE; this picks which
+// version of that shape it wears, so a long beach reads as one coast that keeps
+// changing rather than one motif stamped out N times. Uses the same position hash
+// as `random` above: stable across reloads, uncorrelated between neighbours.
+export const variantDecision =
+	(object: GroundObject) =>
+	(map: MapObject, location: number): number => {
+		const count = terrainData[object.type].variants ?? 1
+		return count > 1 ? positionHash(map, location) % count : 0
+	}
 
 const borderWith =
 	(reader: Reader): ConnectionDecision =>
@@ -128,15 +252,16 @@ const landward = (map: GroundObject[], location: number) =>
 	terrainData[map[location].type].ocean ? 0 : 1
 
 // Indexed by TerrainData.connector: 0 singular, 1 rollInto (path family), 2 random,
-// 3 sea-border (ocean), 4 bridge deck (rollInto against banks), 5 type-border (a
-// scar autotiling against its own type).
+// 3 sea-border (ocean), 4 bridge deck (rollInto against banks), 5 family-border (a
+// scar, a blighted patch or an ore bed autotiling against everything in its family,
+// which is its own type unless it declares one).
 const flowDecision: ConnectionDecision[] = [
 	singular,
 	rollIntoWith(path),
 	random,
 	borderWith(ocean),
 	rollIntoWith(landward),
-	borderWith(type),
+	borderWith(family),
 ]
 
 // Reef, Archipelago and Rock Formation are singular obstacle sprites flagged
@@ -333,17 +458,17 @@ export const skyFlowReversed =
 		return false
 	}
 
-const up = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
+const up = (map: MapObject, location: number, reader: Reader = type) =>
 	location - map.cols >= 0 &&
 	reader(map.layers.ground, location - map.cols) === reader(map.layers.ground, location)
-const down = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
+const down = (map: MapObject, location: number, reader: Reader = type) =>
 	location + map.cols < map.layers.ground.length &&
 	reader(map.layers.ground, location + map.cols) === reader(map.layers.ground, location)
 
-const left = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
+const left = (map: MapObject, location: number, reader: Reader = type) =>
 	location % map.cols !== 0 &&
 	reader(map.layers.ground, location - 1) === reader(map.layers.ground, location)
-const right = (map: MapObject, location: number, reader: typeof type | typeof ocean = type) =>
+const right = (map: MapObject, location: number, reader: Reader = type) =>
 	(location + 1) % map.cols !== 0 &&
 	reader(map.layers.ground, location + 1) === reader(map.layers.ground, location)
 

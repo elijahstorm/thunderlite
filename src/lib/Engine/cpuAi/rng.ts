@@ -12,10 +12,16 @@
  *  - The seed defaults to 0, so with no salt set every decision is reproducible. That is
  *    what keeps the CPU unit tests and the sim harness (`cpuAiSim.unit.test.ts`) stable
  *    — they never set a salt, so they see one fixed, repeatable CPU.
- *  - A real match calls `setCpuSeed` once at start (see GameStateManager) with the game
- *    session, or a fresh random salt offline. Within a match the stream is a pure
- *    function of (salt, turn, team, tile), so a driver client that reloads mid-turn
- *    replans to the same choice rather than diverging from what it already relayed.
+ *  - A real match installs the salt once at start through `Engine/matchSeed`, which owns
+ *    where a match's seed comes from (the room row online, a campaign save on resume, a
+ *    fresh roll otherwise) and drives every other seeded system off the same number.
+ *    Within a match the stream is a pure function of (salt, turn, team, tile), so a
+ *    driver client that reloads mid-turn replans to the same choice rather than
+ *    diverging from what it already relayed.
+ *
+ * `cpuRandom` draws *un-namespaced* on purpose, unlike the named streams in
+ * `matchSeed.ts`: the planner was here first and its whole regression suite is pinned to
+ * this exact sequence. New seeded systems take a stream name instead.
  *
  * Multiplayer safety: only the designated driver client runs CPU seats and relays their
  * actions (`isAiDriver`); every other client applies the relayed action and replays walk
@@ -43,9 +49,6 @@ const hashString = (value: string): number => {
 export const setCpuSeed = (seed: string | number): void => {
 	salt = typeof seed === 'number' ? seed >>> 0 : seed ? hashString(seed) : 0
 }
-
-/** A fresh unpredictable salt, for offline matches that have no session id. */
-export const randomCpuSeed = (): number => Math.floor(Math.random() * 0xffffffff) >>> 0
 
 /** mulberry32 — small, fast, good enough for tie-breaking. */
 const mulberry32 = (seed: number): number => {

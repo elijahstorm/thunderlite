@@ -5,6 +5,7 @@ import { join } from 'path'
 import { unitData } from '../../src/lib/GameData/unit'
 import { animationData } from '../../src/lib/GameData/animation'
 import { skyData } from '../../src/lib/GameData/sky'
+import { terrainData } from '../../src/lib/GameData/terrain'
 
 // Sprite sheets must agree with the geometry the renderers assume, or frames
 // sample across cell boundaries and units visually drift/jump mid-animation
@@ -68,6 +69,37 @@ describe('tile animation sheet dimensions', () => {
 			const { width, height } = pngSize(join(STATIC, fx.url))
 			expect(width).toBe(fx.width)
 			expect(height).toBe(fx.frames * fx.height)
+		})
+	}
+})
+
+// Terrain sheets: `state` picks the column, and the row is the tile's variant block
+// plus the animation frame inside it (paint.renderObject). Both indices are computed
+// from data, so a sheet that is short a row or a column doesn't error — it silently
+// samples past the edge and the tile comes out blank or wearing another state's art.
+//
+// Columns carry meaning for the autotiled terrains: a border connector (3 = the Sea's
+// ocean-matched coastline, 5 = the family-matched scar / blighted patch / ore bed)
+// needs all 16 border states plus the 4 inner corners, and a beach needs 8 more for
+// its end caps (see spriteConnector.CAP_STATE and tools/sprites/gen_terrain_shore.py).
+describe('terrain sprite sheet dimensions', () => {
+	for (const terrain of terrainData) {
+		it(`${terrain.name} sheet holds every state, variant and frame it declares`, () => {
+			const { width, height } = pngSize(join(STATIC, terrain.url))
+			const cellWidth = 60 + terrain.xOffset
+			const cellHeight = 60 + terrain.yOffset
+			const variants = terrain.variants ?? 1
+			expect(width % cellWidth).toBe(0)
+			expect(height % cellHeight).toBe(0)
+			expect(height / cellHeight).toBeGreaterThanOrEqual(terrain.frames * variants)
+
+			const columns = width / cellWidth
+			if (terrain.connector === 3 || terrain.connector === 5) {
+				// Singular ocean obstacles (Reef and friends) are flagged ocean but draw no
+				// coastline of their own, so only the border connectors are held to this.
+				expect(columns).toBeGreaterThanOrEqual(20)
+			}
+			if (terrain.beach) expect(columns).toBeGreaterThanOrEqual(28)
 		})
 	}
 })

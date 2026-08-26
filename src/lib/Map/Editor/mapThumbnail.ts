@@ -5,6 +5,7 @@ import {
 	connectionDecision,
 	cornerDecision,
 	skyConnectionDecision,
+	variantDecision,
 	skyFlowReversed,
 } from '$lib/Sprites/spriteConnector'
 
@@ -63,6 +64,7 @@ export const renderMapThumbnail = (map: MapObject): string | null => {
 	map.layers.ground.forEach((object, index) => {
 		object.state = connectionDecision(object)(map, index)
 		object.corners = cornerDecision(object)(map, index)
+		object.variant = variantDecision(object)(map, index)
 	})
 	map.layers.sky.forEach((object, index) => {
 		if (!object) return

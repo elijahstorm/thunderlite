@@ -8,7 +8,8 @@ import { computeTeamVisibility, computeUnitSight, isConcealingTerrain } from '..
 // JSON — every seed, the resulting hunch, and why. Off by default; never logs in
 // normal play.
 export const fogDebugLog = writable<boolean>(false)
-const xy = (map: Pick<MapObject, 'cols'>, t: number) => `(${t % map.cols},${Math.floor(t / map.cols)})`
+const xy = (map: Pick<MapObject, 'cols'>, t: number) =>
+	`(${t % map.cols},${Math.floor(t / map.cols)})`
 const dbg = (label: string, payload: unknown) => {
 	if (get(fogDebugLog)) console.log(`[fog] ${label}`, JSON.stringify(payload))
 }
@@ -208,17 +209,16 @@ export const recordFogKill = (
 	if (vis.has(killerTile)) return
 	const tiles = [killerTile, ...adjacentTiles(map, killerTile)].filter((t) => !vis.has(t))
 	seedBelief(victimTeam, tiles)
-	dbg(`kill seed team ${victimTeam}`, { killer: xy(map, killerTile), seeded: tiles.map((t) => xy(map, t)) })
+	dbg(`kill seed team ${victimTeam}`, {
+		killer: xy(map, killerTile),
+		seeded: tiles.map((t) => xy(map, t)),
+	})
 }
 
 // The believed exposure at `tile` from `observerTeam`'s fog hunch: every hot cell
 // within FOG_REACH projects danger that falls off with distance. Fed into position
 // scoring as caution. Zero when nothing is believed (so fog-off play is unaffected).
-export const phantomThreatAt = (
-	map: MapObject,
-	observerTeam: number,
-	tile: number
-): number => {
+export const phantomThreatAt = (map: MapObject, observerTeam: number, tile: number): number => {
 	const belief = get(gameState).players.find((p) => p.team === observerTeam)?.fogBelief
 	if (!belief) return 0
 	let danger = 0
@@ -312,9 +312,7 @@ export const exploreValue = (
 
 // The hottest believed-contact tile — the CPU's best guess at where a lost enemy is.
 // Exposed for the dev HUD / inspection; scoring uses the spatial `phantomThreatAt`.
-export const strongestFogBelief = (
-	observerTeam: number
-): { tile: number; heat: number } | null => {
+export const strongestFogBelief = (observerTeam: number): { tile: number; heat: number } | null => {
 	const belief = get(gameState).players.find((p) => p.team === observerTeam)?.fogBelief
 	if (!belief) return null
 	let best: { tile: number; heat: number } | null = null

@@ -16,6 +16,7 @@
 	import { createCampaignInterface } from '$lib/Campaign/campaignInterface'
 	import { upcomingSpawns } from '$lib/Campaign/spawnTelegraph'
 	import { repaintSignal } from '$lib/Engine/Animator/animator'
+	import { invalidateThreatOverlay } from '$lib/Engine/threatOverlay'
 	import { scriptReferencedTypeIndices } from '$lib/Campaign/cutsceneScript'
 	import { mineReachableTerrainTypes } from '$lib/Engine/modifiers/miner'
 	import { burnResultTerrainTypes } from '$lib/Engine/modifiers/burn'
@@ -294,6 +295,10 @@
 		const resume = (snap: CampaignSnapshot) => {
 			applySnapshot(map, snap)
 			if (snap.runner) runner.restore(snap.runner)
+			// The snapshot rebuilds the units layer from scratch, so every object the
+			// threat overlay was tracking is now a ghost — let it re-derive from the
+			// restored board instead of holding references to the pre-resume units.
+			invalidateThreatOverlay()
 			repaintSignal.update((n) => n + 1)
 			begin()
 		}

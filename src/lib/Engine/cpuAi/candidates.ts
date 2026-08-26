@@ -251,6 +251,37 @@ const generateBuilderPlans = (
  */
 const PLAN_TEMPERATURE = 18
 
+/**
+ * ...but only when the decision is actually that wide. A unit crossing open ground has
+ * no such spread: the advance pull is a couple of points per tile, so every tile in its
+ * move range scores within a dozen points of every other, and a flat band of 18 sweeps
+ * the WHOLE range into the pool at near-equal weight. The unit then takes an essentially
+ * uniform draw over everywhere it can reach, every turn — which is the aimless shuffling
+ * the slow heavies were doing on the approach. It was never indecision about where to
+ * go; the sampler simply had more slack than the decision had signal.
+ *
+ * So the band is a fraction of the spread of the options on the table, capped at the
+ * full temperature. A wide decision (a real shot against a mediocre one) keeps all of
+ * it; a narrow one narrows with it, so the CPU still varies freely between tiles it
+ * genuinely rates as equal and stops wandering off the one it rates best.
+ */
+const PLAN_SPREAD_FRACTION = 0.25
+/** Floor, so a set of exactly-equal plans still samples uniformly instead of collapsing
+ * to whichever one happens to be generated first. */
+const MIN_PLAN_TEMPERATURE = 1
+
+const planTemperature = (plans: readonly ActionPlan[]): number => {
+	if (plans.length < 2) return 0
+	let best = -Infinity
+	let worst = Infinity
+	for (const plan of plans) {
+		if (plan.score > best) best = plan.score
+		if (plan.score < worst) worst = plan.score
+	}
+	const spread = best - worst
+	return Math.max(MIN_PLAN_TEMPERATURE, Math.min(PLAN_TEMPERATURE, spread * PLAN_SPREAD_FRACTION))
+}
+
 export const bestPlanFor = (
 	map: MapObject,
 	unitTile: number,
@@ -261,5 +292,5 @@ export const bestPlanFor = (
 	// Which of this unit's near-equal options it takes. Keyed by the unit's tile and
 	// the turn so the same unit re-planning the same turn stays on its choice.
 	const state = get(gameState)
-	return sampleByScore(plans, PLAN_TEMPERATURE, state.turnNumber, cpuTeam, unitTile)
+	return sampleByScore(plans, planTemperature(plans), state.turnNumber, cpuTeam, unitTile)
 }

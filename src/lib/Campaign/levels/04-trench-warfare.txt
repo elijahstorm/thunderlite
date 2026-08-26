@@ -12,6 +12,7 @@ move: 9,3
 talk Kael: "A ditch won't save you. My guns will dig you out, and my landing party takes your flank."
 move: 5,3
 talk Vance: "His guns can't touch you in cover, so make him bleed for every tile. Hold the front one trooper to one tank, fall back to the reserve trench if a man gets pressed, and let the Rocket thin the charge. Swing your Scorpion to meet the beach. Their assault breaks here."
+talk Vance: "One more thing. That road running down the eastern edge is his supply line, and the beach behind it is his second one. Fresh armor will come up both of them, so keep a reserve for each."
 talk Reyes: "Two lines, hold the beach, let the Rocket work. We hold."
 </start>
 
@@ -29,6 +30,37 @@ move: 10,3
 talk Kael: "More steel to the front. Bury them."
 add unit: 1,"Scorpion Tank",10,3
 talk Vance: "Hold the canyons and let his charge spend itself. Once it's broken, we step out and finish them."
+</turn>
+
+<turn 2,1>
+wait: 1
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+talk Kael: "The eastern road is mine and so are the boats. I can feed this all day."
+</turn>
+
+<turn 3,1>
+wait: 1
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+</turn>
+
+<turn 4,1>
+wait: 1
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+talk Vance: "He's still coming. Rotate the pressed trooper back to the reserve trench and put a fresh one in the front. The line only breaks if you let it thin."
+</turn>
+
+<turn 5,1>
+wait: 1
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5|9,6|11,6|12,6|13,6
+</turn>
+
+<turn 6,1>
+wait: 1
+random unit: 1,"Lance Tank" @ 13,1|13,2|13,3|13,4|13,5
+wait: 0.8
+random unit: 1,"Scorpion Tank" @ 9,6|11,6|12,6|13,6
+talk Kael: "Everything left, all at once. Road and beach together. Bury them."
+talk Vance: "That's the last of his reserve on the board. Hold both lines through this push and there's nothing behind it."
 </turn>
 
 <win>

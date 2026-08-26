@@ -13,7 +13,7 @@
 	import { outgoingActions } from './outgoingActions'
 	import { setSelectedTile } from './uiState'
 	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
-	import { setCpuSeed, randomCpuSeed } from './cpuAi/rng'
+	import { beginMatchWithSeed, randomMatchSeed, setMatchSeed } from './matchSeed'
 	import { teamHasPendingActions } from './pendingActions'
 	import { controlsTeam } from './turnOwnership'
 	import { routeAnimation, animations, animationBusy, boardBusy } from './Animator/animator'
@@ -44,6 +44,12 @@
 		isAiDriver?: boolean
 		userSession?: string
 		gameSession?: string
+		/**
+		 * The seed this match plays under, when something already decided it: the
+		 * room row online, or a resumed campaign save. Left null the match rolls a
+		 * fresh one, so an offline board never replays identically. See matchSeed.ts.
+		 */
+		seed?: number | null
 		map?: MapObject | undefined
 		/** Surface the corner overview map in the HUD stack (currently the play route). */
 		minimap?: boolean
@@ -68,6 +74,7 @@
 		aiTeams = [],
 		isAiDriver = false,
 		gameSession = '',
+		seed = null,
 		map = undefined,
 		minimap = false,
 		fogOfWar = false,
@@ -132,13 +139,13 @@
 			resetMatchEnd()
 			resetMatchStats()
 			resetDevLog(localTeam)
-			// Salt the CPU's tie-breaking for this match. Online, the game session gives
-			// a stable salt, so the driver client re-planning after a reload lands on the
-			// same choice it already relayed instead of diverging from the log. Offline
-			// there is no session and nothing to stay consistent with, so a fresh random
-			// salt makes every playthrough of the same level play differently. Leaving it
-			// unset (salt 0) is the reproducible default the CPU tests rely on.
-			setCpuSeed(gameSession || randomCpuSeed())
+			// Install this match's seed before anything can draw from it — the CPU's
+			// first plan, the first scripted spawn telegraph. Online this is the room's
+			// stored seed, so a client that rejoins mid-match resolves exactly what the
+			// others already did; offline it is a fresh roll, so the same board never
+			// replays identically. A campaign resume re-installs the saved seed once the
+			// player picks Continue (see Game.svelte) — this is the fresh-start value.
+			beginMatchWithSeed({ seed, gameSession })
 			// F3 weather → env ambience: loop the matching track while sky weather is
 			// on the board, stop it otherwise. Idempotent (no-op when unchanged), so
 			// re-renders and replayed states never restack the loop.
@@ -332,6 +339,10 @@
 			}
 		}
 		if (!map) return
+		// A rematch is a new match, so it gets a new seed — replaying the same board
+		// should not replay the same CPU lines and the same scripted waves. (The
+		// online branch above already gets one: it creates a whole new room.)
+		setMatchSeed(randomMatchSeed())
 		if (initialLayers) map.layers = structuredClone(initialLayers)
 		map.route = []
 		map.highlights = new Array(map.cols * map.rows)

@@ -27,6 +27,24 @@ export type CutsceneEvent =
 	| { kind: 'wait'; seconds: number }
 	/** Spawn a unit for `team` at a tile. `unit` matches a `unitData` name. */
 	| { kind: 'spawn'; team: number; unit: string; x: number; y: number }
+	/**
+	 * A spawn whose type and tile are rolled from the match seed rather than
+	 * authored. Deliberately *not* resolved by the parser: the roll is a pure
+	 * function of the match salt and `line`, so every consumer that resolves it —
+	 * the runner when the block fires, the telegraph a turn earlier, a re-parse
+	 * after a mid-match reload — independently computes the same answer, and a
+	 * replay run at the same seed reproduces it. See `randomSpawn.ts`.
+	 */
+	| {
+			kind: 'randomSpawn'
+			team: number
+			/** Candidate `unitData` names, one of which is rolled. */
+			units: string[]
+			/** Candidate tiles, one of which is rolled (independently of `units`). */
+			tiles: { x: number; y: number }[]
+			/** 1-based source line — the roll's stable coordinate within the script. */
+			line: number
+	  }
 	/** Remove whatever unit occupies a tile. */
 	| { kind: 'kill'; x: number; y: number }
 	/** Set the current health of the unit at a tile (clamped to 1..max; never kills). */

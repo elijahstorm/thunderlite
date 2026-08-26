@@ -24,6 +24,7 @@ import { gameState, type GameState } from '$lib/Engine/gameState'
 import { smokeTiles } from '$lib/Engine/smokeState'
 import { fogOfWarEnabled } from '$lib/Engine/fogState'
 import { speakerColorOverrides } from './speakerColors'
+import { currentMatchSeed, setMatchSeed } from '$lib/Engine/matchSeed'
 import { get } from 'svelte/store'
 import type { CampaignRunnerState } from './campaignRunner'
 
@@ -36,8 +37,13 @@ import type { CampaignRunnerState } from './campaignRunner'
  */
 export const currentCampaignLevelId = writable<string | null>(null)
 
-/** Bump when the on-disk shape changes so old saves are ignored, not misread. */
-const SCHEMA_VERSION = 1
+/**
+ * Bump when the on-disk shape changes so old saves are ignored, not misread.
+ * v2 added `seed`: a v1 save has no seed to resume under, and silently rolling a
+ * new one would hand the player a different match than the one they left.
+ */
+export const CAMPAIGN_SAVE_VERSION = 2
+const SCHEMA_VERSION = CAMPAIGN_SAVE_VERSION
 const STORAGE_PREFIX = 'thunderlite.campaign.save.v1'
 
 /** gameState with its non-JSON `Set` flattened to an array for storage. */
@@ -60,6 +66,13 @@ export type CampaignSnapshot = {
 	fogEnabled: boolean
 	speakerColors: Record<string, string>
 	pointers: number[]
+	/**
+	 * The seed this attempt is being played under. Resuming re-installs it, so
+	 * Continue picks the match back up with the same scripted waves and CPU lines
+	 * still ahead of it; Restart deliberately drops the save and takes a fresh
+	 * seed, which is what makes a second run of a level play differently.
+	 */
+	seed: number
 }
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
@@ -135,6 +148,7 @@ export const captureSnapshot = (
 		fogEnabled: get(fogOfWarEnabled),
 		speakerColors: { ...get(speakerColorOverrides) },
 		pointers: map.pointers ? [...map.pointers] : [],
+		seed: currentMatchSeed(),
 	}
 }
 
@@ -148,7 +162,11 @@ const padLayer = <T>(layer: (T | null)[] | undefined, tiles: number): (T | null)
 /**
  * Restore a snapshot onto the live match: swap in the saved board (reassigning
  * `map.layers`, mirroring the rematch path), reset transient overlay state, and
- * push the saved engine + smoke state back into their stores.
+ * push the saved engine + smoke state back into their stores — including the
+ * match seed, so the rest of the level rolls as this attempt was going to.
+ *
+ * Call this before wiring the live match up: the spawn telegraph resolves
+ * scripted waves off the seed the moment it subscribes.
  */
 export const applySnapshot = (map: MapObject, snap: CampaignSnapshot): void => {
 	const tiles = map.cols * map.rows
@@ -169,6 +187,10 @@ export const applySnapshot = (map: MapObject, snap: CampaignSnapshot): void => {
 	// changes, so setting it here (after mount) sticks for the resumed match.
 	fogOfWarEnabled.set(snap.fogEnabled ?? false)
 	speakerColorOverrides.set({ ...(snap.speakerColors ?? {}) })
+	// Play the rest of the level under the seed it started with, so the waves and
+	// CPU lines still ahead of the player are the ones this attempt was going to
+	// get. Without this, Continue would quietly hand back a different match.
+	setMatchSeed(snap.seed)
 }
 
 /**

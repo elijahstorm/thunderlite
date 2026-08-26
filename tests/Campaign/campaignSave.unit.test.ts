@@ -1,12 +1,23 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
 import {
+	applySnapshot,
+	captureSnapshot,
 	computeSignature,
 	loadSnapshot,
 	saveSnapshot,
 	clearSnapshot,
+	CAMPAIGN_SAVE_VERSION,
 	type CampaignSnapshot,
 } from '../../src/lib/Campaign/campaignSave'
+import { currentMatchSeed, setMatchSeed } from '../../src/lib/Engine/matchSeed'
+
+/**
+ * The schema version `captureSnapshot` writes today. Read off a real capture so
+ * this file does not have to be edited every time the shape moves; the "old save
+ * is rejected" test below pins the behaviour, not a specific number.
+ */
+const CURRENT_VERSION = CAMPAIGN_SAVE_VERSION
 
 /** A minimal in-memory `localStorage` so the helpers run headless. */
 const makeStorage = (init: Record<string, string> = {}) => {
@@ -32,8 +43,11 @@ const makeMap = (unitTeam = 0): MapObject =>
 		},
 	}) as unknown as MapObject
 
-const makeSnapshot = (signature: string, over: Partial<CampaignSnapshot> = {}): CampaignSnapshot => ({
-	version: 1,
+const makeSnapshot = (
+	signature: string,
+	over: Partial<CampaignSnapshot> = {}
+): CampaignSnapshot => ({
+	version: CURRENT_VERSION,
 	signature,
 	savedAt: 123,
 	turnNumber: 3,
@@ -56,6 +70,7 @@ const makeSnapshot = (signature: string, over: Partial<CampaignSnapshot> = {}): 
 	fogEnabled: true,
 	speakerColors: { Rook: '#ff0000' },
 	pointers: [3, 9],
+	seed: 0x1234abcd,
 	...over,
 })
 
@@ -117,5 +132,30 @@ describe('load / save / clear', () => {
 
 	it('returns null when nothing is stored', () => {
 		expect(loadSnapshot('lvl', 'sig-1', makeStorage())).toBeNull()
+	})
+})
+
+describe('match seed', () => {
+	it('captures the seed the attempt is being played under', () => {
+		setMatchSeed(0xfeed1234)
+		expect(captureSnapshot(makeMap(), 'sig', null).seed).toBe(0xfeed1234)
+	})
+
+	it('re-installs the saved seed on resume, so Continue is the same match', () => {
+		setMatchSeed(0xaaaaaaaa)
+		const snap = captureSnapshot(makeMap(), 'sig', null)
+		// Simulate the reload: a fresh mount rolls its own seed before the player
+		// chooses Continue.
+		setMatchSeed(0xbbbbbbbb)
+		applySnapshot(makeMap(), snap)
+		expect(currentMatchSeed()).toBe(0xaaaaaaaa)
+	})
+
+	it('rejects a pre-seed save rather than resuming under a rolled one', () => {
+		const storage = makeStorage()
+		// A v1 snapshot has no seed; resuming it would silently hand the player a
+		// different match than the one they left.
+		saveSnapshot('lvl', makeSnapshot('sig-1', { version: 1 }), storage)
+		expect(loadSnapshot('lvl', 'sig-1', storage)).toBeNull()
 	})
 })

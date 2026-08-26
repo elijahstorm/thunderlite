@@ -124,7 +124,20 @@
 		role="dialog"
 		aria-modal="true"
 	>
-		<div class="bg-neutral-900 text-white rounded p-4 max-w-3xl w-auto shadow-2xl">
+		<!-- Backdrop: clicking the dimmed area outside the panel dismisses the menu,
+		     same as Cancel/Escape. A button (rather than a click handler on the
+		     overlay div) so it is a real interactive element; tabindex -1 keeps it
+		     out of the tab order since Escape and Cancel already cover keyboards. -->
+		<button
+			type="button"
+			class="absolute inset-0 cursor-default"
+			aria-label="Close build menu"
+			tabindex="-1"
+			data-testid="build-menu-backdrop"
+			onclick={handleCancel}
+		></button>
+
+		<div class="relative bg-neutral-900 text-white rounded p-4 max-w-3xl w-auto shadow-2xl">
 			<div class="flex items-center justify-between mb-3">
 				<h2 class="text-base font-mono">Build Unit</h2>
 				<button

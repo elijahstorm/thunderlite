@@ -28,6 +28,7 @@ type MatchRow = {
 	ended_at: string | null
 	map_id: string | null
 	rated: boolean | null
+	seed: number | null
 }
 
 type PlayerRow = {
@@ -48,7 +49,17 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	try {
 		const match = await db.findOne<MatchRow>('matches', {
 			where: { id: matchId },
-			select: ['id', 'session_id', 'mode', 'winner_team', 'turns', 'ended_at', 'map_id', 'rated'],
+			select: [
+				'id',
+				'session_id',
+				'mode',
+				'winner_team',
+				'turns',
+				'ended_at',
+				'map_id',
+				'rated',
+				'seed',
+			],
 		})
 		if (!match) throw error(404, 'No such match')
 		if (match.mode !== 'online' || !match.session_id) {
@@ -107,6 +118,11 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			winnerTeam: match.winner_team == null ? null : Number(match.winner_team),
 			rated: !!match.rated,
 			endedAt: match.ended_at ?? null,
+			// The seed the match was played under. Matches recorded before seeds were
+			// stored carry NULL; the viewer re-derives one from the session id, which
+			// is what those rooms actually played under (see Engine/matchSeed).
+			seed: match.seed == null ? null : Number(match.seed),
+			sessionId: match.session_id,
 		}
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg

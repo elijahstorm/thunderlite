@@ -21,6 +21,7 @@
  */
 import { db, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
+import { randomMatchSeed, resolveMatchSeed } from '$lib/Engine/matchSeed'
 import { budgetPressure, gatewayThrottled, noteRateLimit } from '$lib/Security/rateLimit'
 import { clampAsyncTimeout, type GameMode } from '$lib/Game/asyncConfig'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction'
@@ -76,6 +77,7 @@ type RoomRow = {
 	turn_timeout_ms?: number | null
 	turn_deadline?: number | null
 	max_players?: number | null
+	seed?: number | null
 }
 
 /**
@@ -85,6 +87,18 @@ type RoomRow = {
  */
 export const roomCapacity = (room: RoomRow | null): number =>
 	room?.max_players == null ? DEFAULT_MAX_PLAYERS : clampCapacity(room.max_players)
+
+/**
+ * The seed this room is played under. Rooms created before seeds were stored
+ * have none; those fall back to a hash of the session id, which every client
+ * derives identically — so a room already in flight when this shipped keeps its
+ * clients agreeing rather than forking mid-match.
+ */
+export const roomSeed = (room: RoomRow | null): number =>
+	resolveMatchSeed({
+		seed: room?.seed == null ? null : Number(room.seed),
+		gameSession: room?.session,
+	})
 
 /** A room created with mode 'async' — turns carry multi-day deadlines. */
 const isAsyncRoom = (room: RoomRow | null): room is RoomRow => !!room && room.mode === 'async'
@@ -377,6 +391,10 @@ async function createRoom(
 		mode,
 		turn_timeout_ms,
 		max_players,
+		// The room's random seed, fixed for its whole life: every client draws
+		// from it, a rejoin re-reads it, and a rematch (a NEW room) gets a new one
+		// so the same map never plays out identically twice. See Engine/matchSeed.
+		seed: randomMatchSeed(),
 	})
 	await db.insert('game_member', {
 		session,

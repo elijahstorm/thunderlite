@@ -8,14 +8,19 @@
  * next turn, and where", producing {@link SpawnTelegraph} markers the renderer
  * and the AI consume off `map.scheduledSpawns`.
  *
- * It is engine-free and side-effect-free (mirrors the runner's "headless"
- * rule): given the script, the turn order and the current position, it returns
- * the spawns. `<when>` conditional spawns are deliberately not telegraphed — they
- * fire on a game-state condition, not a fixed turn, so they can't be predicted.
+ * It is side-effect-free (mirrors the runner's "headless" rule): given the
+ * script, the turn order and the current position, it returns the spawns. A
+ * `random unit` beat is resolved through `randomSpawn.ts`, whose roll is a pure
+ * function of the match seed, so telegraphing one is as stable as reading an
+ * authored spawn off the script.
+ *
+ * `<when>` conditional spawns are deliberately not telegraphed — they fire on a
+ * game-state condition, not a fixed turn, so they can't be predicted.
  */
 
 import { unitData } from '$lib/GameData/unit'
 import type { CutsceneScript } from './cutsceneTypes'
+import { asSpawn } from './randomSpawn'
 
 /** The slice of a `Player` this lookahead needs: turn order + who's still in. */
 export interface TelegraphPlayer {
@@ -57,14 +62,17 @@ export const upcomingSpawns = (
 		const block = script.turns[round]?.[team]
 		if (!block) continue
 		for (const event of block) {
-			if (event.kind !== 'spawn') continue
-			const unitType = unitTypeByName(event.unit)
+			// `randomSpawn` resolves off the match seed, not a draw counter, so the
+			// answer here is the same one the runner will reach when the block fires.
+			const spawn = asSpawn(event)
+			if (!spawn) continue
+			const unitType = unitTypeByName(spawn.unit)
 			if (unitType < 0) continue
 			telegraphs.push({
-				tile: event.y * cols + event.x,
+				tile: spawn.y * cols + spawn.x,
 				team,
 				unitType,
-				unitName: event.unit,
+				unitName: spawn.unit,
 			})
 		}
 	}

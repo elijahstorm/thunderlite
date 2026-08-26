@@ -15,7 +15,7 @@ import { campaignScriptActive } from '$lib/Campaign/scriptGate'
 import { devHudEnabled } from '$lib/Dev/devHud'
 import { get } from 'svelte/store'
 
-type ActiveObject = { state: number; type: number; team?: number }
+type ActiveObject = { state: number; type: number; team?: number; variant?: number }
 
 const spriteSize = 60
 
@@ -766,9 +766,14 @@ const renderObject =
 		// seamless loop backwards, flipping the flow 180° with no extra art — so a
 		// source cap streams outward and a turn runs downstream, matching neighbours.
 		const step = frame % render.frames
-		const row = (object as { flowReversed?: boolean }).flowReversed
+		const loop = (object as { flowReversed?: boolean }).flowReversed
 			? render.frames - 1 - step
 			: step
+		// A sheet with per-tile variants (the Shore's eight stretches of coast) stacks a
+		// whole animation loop per variant down the image, so the row is the variant's
+		// block plus the frame inside it. Every other terrain has one block and leaves
+		// `variant` undefined, which lands straight back on `loop`.
+		const row = (object.variant ?? 0) * render.frames + loop
 		context.drawImage(
 			sprite,
 			object.state * (spriteSize + render.xOffset),
@@ -791,20 +796,34 @@ const always =
 	) =>
 		renderObject(width, height, frame, scale)(context)(object, renderer(object.type))
 
-// Quadrant a corner sprite frame occupies, as [x, y] halves of the tile:
-// 16=top-left, 17=bottom-left, 18=bottom-right, 19=top-right.
+// Quadrant an overlay sprite frame occupies, as [x, y] halves of the tile.
+// 16-19 are the inner corners: 16=top-left, 17=bottom-left, 18=bottom-right,
+// 19=top-right. 20-27 are the Shore's beach end caps, which ride the same
+// quadrant-copy path — two per corner, because a beach can arrive at a corner
+// running along a horizontal land edge or a vertical one and the headland has to
+// grow the right way. Kept in lockstep with spriteConnector.CAP_STATE and
+// tools/sprites/gen_terrain_shore.py's CAP_EDGES.
 const cornerQuadrant: Record<number, [0 | 1, 0 | 1]> = {
 	16: [0, 0],
 	17: [0, 1],
 	18: [1, 1],
 	19: [1, 0],
+	20: [0, 0], // beach along the top edge, ending at the left border
+	21: [1, 0], // beach along the top edge, ending at the right border
+	22: [0, 1], // beach along the bottom edge, ending at the left border
+	23: [1, 1], // beach along the bottom edge, ending at the right border
+	24: [0, 0], // beach along the left edge, ending at the top border
+	25: [0, 1], // beach along the left edge, ending at the bottom border
+	26: [1, 0], // beach along the right edge, ending at the top border
+	27: [1, 1], // beach along the right edge, ending at the bottom border
 }
 
-// Inner-corner overlays for coastline water. The base tile is already drawn; each
-// listed corner frame (16-19) is plain water except in one quadrant, so we copy
-// just that quadrant over the matching quadrant of the tile. This lets a single
-// water tile show several land corners at once — something the one-frame `state`
-// can't express on its own.
+// Quadrant overlays for coastline water: inner corners, and on a beach its end
+// caps. The base tile is already drawn; each listed frame differs from it in only
+// one quadrant, so we copy just that quadrant over the matching quadrant of the
+// tile. This lets a single water tile show several land corners at once — something
+// the one-frame `state` can't express on its own. Overlays read from the SAME
+// variant block as the base tile, or the coastline would step where they meet.
 const corners =
 	(width: number, height: number, frame: number) =>
 	(context: CanvasRenderingContext2D) =>
@@ -819,7 +838,9 @@ const corners =
 		const sprite = render?.sprite?.[0]
 		if (!sprite) return
 		const half = spriteSize / 2
-		const sourceY = (frame % render.frames) * (spriteSize + render.yOffset)
+		const sourceY =
+			((object.variant ?? 0) * render.frames + (frame % render.frames)) *
+			(spriteSize + render.yOffset)
 		const destHalfWidth = width / 2
 		const destHalfHeight = height / 2
 		for (const corner of list) {

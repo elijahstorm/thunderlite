@@ -7,6 +7,23 @@ type TerrainData = ObjectAssetMeta & {
 	// connector) render their state-0 frame as open water, so Shore would look
 	// identical to Sea in the palette. Point it at a coastline frame instead.
 	editorState?: number
+	// How many interchangeable versions of this terrain's sheet are stacked down the
+	// image, each a full `frames` animation loop. A tile picks one from its position
+	// (spriteConnector.variantDecision) so a long run of the same terrain stops
+	// reading as one motif repeated. Absent (or 1) means a single block, row 0.
+	variants?: number
+	// Beach: sand that meets the land, as opposed to the open Sea's cliffs. The
+	// coastline autotile only sees `ocean`, which cannot tell a beach from deep
+	// water — this is what lets a beach know where it runs out and needs to end in a
+	// headland rather than spill into the Sea. See spriteConnector.capDecision.
+	beach?: boolean
+	// Terrains that autotile as ONE body under the connector-5 border, even though
+	// they are separate types. The three Ore Deposits share `family: 'ore'` because
+	// they are one mineral bed at different stages of being mined out — so a rich
+	// patch and a worked-out one share a continuous rim instead of each drawing its
+	// own. A terrain that declares no family borders against its own type alone
+	// (the Charred Forest scar, Wasteland). See spriteConnector.family.
+	family?: string
 	name: string
 	description: string
 	details: 'clean' | 'dirty' | 'rough' | 'slippery' | 'rugged' | 'impassable'
@@ -120,7 +137,18 @@ export const terrainData: TerrainData[] = [
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
-		connector: 0,
+		// connector 5 (family-border) with no family declared, so a spill of poisoned
+		// ground autotiles against its own type into one contiguous bog — concave
+		// junctions between its arms fill instead of leaving notches. 20 columns
+		// (16 border states + 4 inner corners) x 5 variant rows of an acid marsh: sour
+		// standing water in churned sludge, with the trees it killed still upright in
+		// it. The rows differ in how WET they are, so drier tiles between the wet ones
+		// keep the water reading as water. Art: tools/sprites/gen_terrain_wasteland.py.
+		connector: 5,
+		variants: 5,
+		// State 0 is fully-enclosed interior, which in the palette reads as bare crust
+		// with no edge. Show the isolated tile (state 11) so it looks like one patch.
+		editorState: 11,
 		name: 'Wasteland',
 		description: 'Provides lots of defense, but costs health to rest on',
 		details: 'dirty',
@@ -152,7 +180,18 @@ export const terrainData: TerrainData[] = [
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
-		connector: 0,
+		// The three Ore Deposits are one bed at three stages of being mined out, so
+		// they share a family and autotile together: an enriched patch beside a
+		// worked-out one reads as a single excavation whose ore runs thin, not as two
+		// props side by side. 20 columns (16 border states + 4 inner corners) x 5
+		// variant rows. All three sheets share the same rock masses, seams and pockets
+		// and differ only in how far the bed has been worked: solid rock with whole
+		// seams, then fractures opening as the pockets empty, then loose stone with
+		// nothing left. Art: tools/sprites/gen_terrain_ore.py.
+		connector: 5,
+		family: 'ore',
+		variants: 5,
+		editorState: 11,
 		name: 'Enriched Ore Deposit',
 		description: 'Can be mined for money',
 		details: 'clean',
@@ -168,7 +207,10 @@ export const terrainData: TerrainData[] = [
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
-		connector: 0,
+		connector: 5,
+		family: 'ore',
+		variants: 5,
+		editorState: 11,
 		name: 'Ore Deposit',
 		description: 'Can be mined for money',
 		details: 'rough',
@@ -184,7 +226,10 @@ export const terrainData: TerrainData[] = [
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
-		connector: 0,
+		connector: 5,
+		family: 'ore',
+		variants: 5,
+		editorState: 11,
 		name: 'Depleted Ore Deposit',
 		description: 'Mined out, no funds left',
 		details: 'rugged',
@@ -266,6 +311,10 @@ export const terrainData: TerrainData[] = [
 		yOffset: 0,
 		connector: 3,
 		editorState: 11,
+		// 28 sheet columns (16 border states, 4 inner corners, 8 beach end caps) x 8
+		// variants x 3 surf frames — see tools/sprites/gen_terrain_shore.py.
+		variants: 8,
+		beach: true,
 		name: 'Shore',
 		description: 'An easy access to the sea',
 		details: 'rough',
@@ -339,12 +388,17 @@ export const terrainData: TerrainData[] = [
 		frames: 1,
 		xOffset: 0,
 		yOffset: 0,
-		// connector 5 (type-border): the burn scar autotiles against other Charred
-		// Forest tiles using the Sea's border-plus-inner-corner scheme (matched on
-		// terrain type instead of the ocean flag), so concave junctions between arms of
-		// a scar fill cleanly instead of leaving jagged notches. 20-frame sheet: 16
-		// border-base states + 4 inner-corner overlays (see spriteConnector / paint).
+		// connector 5 (family-border): the burn scar declares no family, so it autotiles
+		// against other Charred Forest tiles alone, using the Sea's border-plus-inner-
+		// corner scheme (matched on terrain family instead of the ocean flag). Concave
+		// junctions between arms of a scar fill cleanly instead of leaving jagged
+		// notches. 20 columns: 16 border-base states + 4 inner-corner overlays (see
+		// spriteConnector / paint), x 4 variant rows. The rows carry the trees that
+		// survived standing — a real burn leaves a few big trunks upright in the middle
+		// of the scar, not just a fringe of stumps round its edge — kept sparse so a
+		// scar shows a scattering of survivors rather than one per tile.
 		connector: 5,
+		variants: 4,
 		name: 'Charred Forest',
 		description:
 			'Burnt-out woodland — charred stumps and ash. Almost no cover, and no concealment.',

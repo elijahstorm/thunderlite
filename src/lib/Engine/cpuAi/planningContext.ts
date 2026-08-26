@@ -32,6 +32,8 @@ type PlanningContext = {
 	concealed: Map<number, ReadonlySet<number>>
 	attackReach: Map<number, number[]>
 	threatTiles: Map<string, Set<number>>
+	growth: Map<number, number>
+	flock: Map<UnitObject, unknown>
 }
 
 let ctx: PlanningContext | null = null
@@ -47,6 +49,8 @@ export const beginCpuPlanning = (map: MapObject): void => {
 		concealed: new Map(),
 		attackReach: new Map(),
 		threatTiles: new Map(),
+		growth: new Map(),
+		flock: new Map(),
 	}
 }
 
@@ -134,4 +138,37 @@ export const planningThreatTiles = (
 		c.threatTiles.set(key, set)
 	}
 	return set
+}
+
+/**
+ * Per-team scalar about the shape of the match (currently massing patience — see
+ * growth.ts), memoised for the tick. Unlike the reach caches this one is derived
+ * from the economy as well as the board, so it is keyed by team and computed by
+ * the caller; the context only holds the result.
+ */
+export const planningGrowth = (map: MapObject, team: number, compute: () => number): number => {
+	const c = active(map)
+	if (!c) return compute()
+	let value = c.growth.get(team)
+	if (value === undefined) {
+		value = compute()
+		c.growth.set(team, value)
+	}
+	return value
+}
+
+/**
+ * A per-mover value that is invariant across the candidate tiles being scored for it
+ * — currently the flock anchor (score.ts), which depends on where the unit is *now*,
+ * not on where it is thinking of going. Keyed by the unit object, which is stable for
+ * the tick. Stored as `unknown` so this module stays free of scoring types; the single
+ * caller owns the shape.
+ */
+export const planningFlock = <T>(map: MapObject, unit: UnitObject, compute: () => T): T => {
+	const c = active(map)
+	if (!c) return compute()
+	if (c.flock.has(unit)) return c.flock.get(unit) as T
+	const value = compute()
+	c.flock.set(unit, value)
+	return value
 }

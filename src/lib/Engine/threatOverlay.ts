@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store'
 import { unitThreatTiles } from './Interactor/Pathing/threat'
+import { routeAnimation } from './Animator/animator'
 import { viewerVisibility } from './fogState'
 import { isUnitStealthed, unitSeenByViewer } from './visibility'
 
@@ -40,6 +41,44 @@ export const visibleEnemyUnits = (map: MapObject): UnitObject[] => {
 	return out
 }
 
+// Bumped whenever the board's units or terrain change *outside* the normal action
+// path — i.e. by a campaign script (`spawn`, `kill`, a terrain swap that drowns
+// its occupant). Those mutations never touch `gameState`, so the renderer's
+// threat-overlay pass had nothing to react to and kept painting the tile sets it
+// computed before the script ran: the reach of a unit the script had just killed,
+// with its crimson source outline still on that tile — which then framed whatever
+// the script spawned there next, so the overlay looked like it had jumped to a
+// different unit. Anything that adds, removes or relocates a unit without going
+// through an action must bump this.
+export const threatOverlayRevision = writable(0)
+
+export const invalidateThreatOverlay = (): void => threatOverlayRevision.update((n) => n + 1)
+
+// Forget units that have left the board for good — killed, or folded into a
+// transport as cargo. The paint already skips them (see `liveShownUnits`), but the
+// SET kept them forever: the overlay then reported itself as "on" in the settings
+// panel with nothing drawn, and the master toggle counted ghosts when deciding
+// whether everything was already shown. A unit mid-walk is deliberately spared:
+// `animateRoute` lifts it off its source tile for the length of the slide, so it is
+// genuinely absent from the layer while still very much alive.
+export const pruneThreatOverlay = (map: MapObject): void => {
+	const shown = get(shownThreatUnits)
+	if (shown.size === 0) return
+	const onBoard = new Set<UnitObject>()
+	for (const unit of map.layers.units) if (unit) onBoard.add(unit)
+	const walking = get(routeAnimation)?.unit
+	if (walking) onBoard.add(walking)
+	let gone = false
+	for (const unit of shown) {
+		if (!onBoard.has(unit)) {
+			gone = true
+			break
+		}
+	}
+	if (!gone) return
+	shownThreatUnits.set(new Set([...shown].filter((unit) => onBoard.has(unit))))
+}
+
 export const isThreatUnitShown = (unit: UnitObject): boolean => get(shownThreatUnits).has(unit)
 
 // Add or remove a single enemy's reach from the overlay.
@@ -68,7 +107,10 @@ export const clearThreatOverlay = (): void => shownThreatUnits.set(new Set())
 // tile each currently occupies. Stale entries (a unit that has died or slipped
 // into fog/stealth) are simply skipped, so the overlay self-heals. Both the reach
 // painter and the source-unit marker derive from this single filtered pass.
-const liveShownUnits = (map: MapObject, shown: Set<UnitObject>): Array<{ unit: UnitObject; tile: number }> => {
+const liveShownUnits = (
+	map: MapObject,
+	shown: Set<UnitObject>
+): Array<{ unit: UnitObject; tile: number }> => {
 	const out: Array<{ unit: UnitObject; tile: number }> = []
 	if (shown.size === 0) return out
 	const team = get(viewerTeam)
@@ -99,7 +141,10 @@ export const computeShownThreatTiles = (map: MapObject, shown: Set<UnitObject>):
 // The tiles currently occupied by the shown enemy units themselves — used to
 // frame each source unit with a red outline/tint so the player can tell which
 // unit owns the crimson reach painted around it.
-export const computeShownThreatUnitTiles = (map: MapObject, shown: Set<UnitObject>): Set<number> => {
+export const computeShownThreatUnitTiles = (
+	map: MapObject,
+	shown: Set<UnitObject>
+): Set<number> => {
 	const out = new Set<number>()
 	for (const { tile } of liveShownUnits(map, shown)) out.add(tile)
 	return out

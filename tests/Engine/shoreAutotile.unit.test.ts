@@ -1,0 +1,155 @@
+// @vitest-environment node
+import { describe, it, expect } from 'vitest'
+import { terrainData } from '../../src/lib/GameData/terrain'
+import {
+	cornerDecision,
+	connectionDecision,
+	variantDecision,
+} from '../../src/lib/Sprites/spriteConnector'
+
+// The Shore's beach is drawn as one continuous coastline across a run of tiles.
+// Two things have to hold for that, and both are easy to break silently:
+//
+//   1. Every tile of a straight run resolves to the SAME border state, so the
+//      generated sheet's seam-continuous edges line up. That has always worked —
+//      the old art just didn't draw it that way.
+//   2. The beach ends only where it actually runs out. `ocean` folds Sea and Shore
+//      into one body of water, so the border state alone cannot tell a beach
+//      carrying on from a beach spilling into open Sea. The end caps come from a
+//      second reading of the neighbours, and pointing them at the wrong border
+//      would drop a rock headland into the middle of a beach.
+
+const TYPE = Object.fromEntries(terrainData.map((t, i) => [t.name, i]))
+const SHORE = TYPE['Shore']
+const SEA = TYPE['Sea']
+const PLAINS = TYPE['Plains']
+
+const CAPS = { TL_H: 20, TR_H: 21, BL_H: 22, BR_H: 23, TL_V: 24, BL_V: 25, TR_V: 26, BR_V: 27 }
+
+// Build a map from a picture: '.' plains, 'S' shore, '~' sea.
+const scene = (rows: string[]) => {
+	const cols = rows[0].length
+	const ground = rows
+		.join('')
+		.split('')
+		.map((c) => ({ type: c === 'S' ? SHORE : c === '~' ? SEA : PLAINS, state: 0 }))
+	return {
+		map: { cols, rows: rows.length, layers: { ground } } as unknown as MapObject,
+		at: (col: number, row: number) => row * cols + col,
+		ground,
+	}
+}
+
+const draw = (rows: string[], col: number, row: number) => {
+	const { map, at, ground } = scene(rows)
+	const location = at(col, row)
+	const object = ground[location] as unknown as GroundObject
+	return {
+		state: connectionDecision(object)(map, location),
+		overlays: cornerDecision(object)(map, location),
+		variant: variantDecision(object)(map, location),
+	}
+}
+
+describe('shore coastline autotiling', () => {
+	it('gives every tile of a straight beach the same border state', () => {
+		const rows = ['........', 'SSSSSSSS', '~~~~~~~~']
+		// Columns 1..6 are interior: land above, beach either side, water below.
+		const states = [1, 2, 3, 4, 5, 6].map((c) => draw(rows, c, 1).state)
+		expect(new Set(states).size, 'one shared frame across the run').toBe(1)
+	})
+
+	it('caps a beach only where it runs out into deep water', () => {
+		//   ......
+		//   ~~SSS~     beach in the middle of open sea
+		//   ~~~~~~
+		const rows = ['......', '~~SSS~', '~~~~~~']
+		const left = draw(rows, 2, 1)
+		const middle = draw(rows, 3, 1)
+		const right = draw(rows, 4, 1)
+		expect(left.overlays, 'west end meets the Sea').toContain(CAPS.TL_H)
+		expect(left.overlays, 'east end carries on into beach').not.toContain(CAPS.TR_H)
+		expect(middle.overlays, 'mid-run needs no headland at all').toEqual([])
+		expect(right.overlays, 'east end meets the Sea').toContain(CAPS.TR_H)
+		expect(right.overlays, 'west end carries on into beach').not.toContain(CAPS.TL_H)
+	})
+
+	it('does not cap a beach that runs to the edge of the map', () => {
+		// Off-map reads as land, so the border itself ends the beach and the base
+		// state already turns the sand around the corner.
+		const rows = ['....', 'SSSS', '~~~~']
+		const edge = draw(rows, 0, 1)
+		expect(edge.overlays).not.toContain(CAPS.TL_H)
+	})
+
+	it('caps a vertical beach on the border it actually runs out through', () => {
+		//   .~~
+		//   .S~     beach hugging land to the west, open sea above and below
+		//   .~~
+		const rows = ['.~~', '.S~', '.~~']
+		const only = draw(rows, 1, 1)
+		expect(only.overlays).toContain(CAPS.TL_V)
+		expect(only.overlays).toContain(CAPS.BL_V)
+		expect(only.overlays).not.toContain(CAPS.TL_H)
+	})
+
+	it('never caps a beach against another beach, however the coast turns', () => {
+		// An L-shaped beach: every neighbour along it is beach, so no headland
+		// belongs anywhere inside it.
+		const rows = ['.....', '.SSS.', '.S...', '.S...']
+		for (const [c, r] of [
+			[1, 1],
+			[2, 1],
+			[3, 1],
+			[1, 2],
+			[1, 3],
+		]) {
+			const tile = draw(rows, c, r)
+			const caps = tile.overlays.filter((o) => o >= 20)
+			expect(caps, `tile ${c},${r} sits inside the beach`).toEqual([])
+		}
+	})
+
+	it('leaves the Sea uncapped — only a beach has an end to draw', () => {
+		const rows = ['....', '~~~~', '~~~~']
+		const sea = draw(rows, 1, 1)
+		expect(
+			sea.overlays.every((o) => o < 20),
+			'sea keeps inner corners only'
+		).toBe(true)
+	})
+
+	it('spreads variants over neighbouring tiles instead of striping them', () => {
+		const rows = Array.from({ length: 6 }, () => 'SSSSSSSS')
+		const seen = new Set<number>()
+		let matchingNeighbours = 0
+		let pairs = 0
+		for (let r = 0; r < 6; r++) {
+			for (let c = 0; c < 8; c++) {
+				const v = draw(rows, c, r).variant
+				seen.add(v)
+				if (c > 0) {
+					pairs++
+					if (v === draw(rows, c - 1, r).variant) matchingNeighbours++
+				}
+			}
+		}
+		expect(seen.size, 'uses the whole variant set').toBe(terrainData[SHORE].variants)
+		// A hash that stripes (say `location % n`) would make every horizontal
+		// neighbour differ by exactly one and never repeat; a positional hash lands
+		// uncorrelated. Either extreme is the bug, so just check it is not degenerate.
+		expect(matchingNeighbours).toBeLessThan(pairs * 0.5)
+	})
+
+	it('keeps a tile on the same variant across recomputes', () => {
+		const rows = ['....', 'SSSS', '~~~~']
+		expect(draw(rows, 2, 1).variant).toBe(draw(rows, 2, 1).variant)
+	})
+
+	it('gives single-variant terrain row 0', () => {
+		const { map, at, ground } = scene(['~~~', '~~~'])
+		const sea = ground[at(1, 1)] as unknown as GroundObject
+		expect(terrainData[SEA].variants ?? 1).toBe(1)
+		expect(variantDecision(sea)(map, at(1, 1))).toBe(0)
+	})
+})

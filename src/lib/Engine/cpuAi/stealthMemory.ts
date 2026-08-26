@@ -107,7 +107,10 @@ const seedSuspicion = (observer: number, tiles: Iterable<number>): void => {
 // Age `observerTeam`'s hunch by one of its turns: decay every tile and diffuse a
 // slice outward, then drop whatever fell below the floor. Called at the CPU's turn
 // start. With nothing remembered this is a no-op.
-export const decayStealthSuspicion = (map: MapObject | MapProcesser, observerTeam: number): void => {
+export const decayStealthSuspicion = (
+	map: MapObject | MapProcesser,
+	observerTeam: number
+): void => {
 	gameState.update((s) => ({
 		...s,
 		players: s.players.map((p) => {
@@ -154,7 +157,10 @@ export const strongestSuspicion = (observerTeam: number): { tile: number; heat: 
 // "searched". Any searched tile that holds no enemy is cleared from the hunch, so the
 // CPU's best guess MOVES on instead of camping a spot it has already swept. Called at
 // the CPU's turn start, after sightings are reconciled.
-export const clearSearchedSuspicion = (map: MapObject | MapProcesser, observerTeam: number): void => {
+export const clearSearchedSuspicion = (
+	map: MapObject | MapProcesser,
+	observerTeam: number
+): void => {
 	const heat = get(gameState).players.find((p) => p.team === observerTeam)?.stealthSuspicion
 	if (!heat || Object.keys(heat).length === 0) return
 

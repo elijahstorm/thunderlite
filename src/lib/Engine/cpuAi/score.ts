@@ -9,7 +9,8 @@ import { tilesInRange } from '../modifiers/radar'
 import { strongestSuspicion } from './stealthMemory'
 import { phantomThreatAt, exploreValue } from './fogMemory'
 import { NEUTRAL_TEAM } from '../gameState'
-import { planningUnits, planningBuildings } from './planningContext'
+import { planningUnits, planningBuildings, planningFlock } from './planningContext'
+import { cachedMassingPatience } from './growth'
 import {
 	unitValue,
 	terrainProtection,
@@ -421,6 +422,11 @@ const rangedStandoff = (enemyDist: number, minRange: number, maxRange: number): 
 // Scouts are exempt. `proberWeight` already scores "cheap, fast, has eyes", and going
 // forward alone is precisely a scout's job — gating recon behind a favourable force
 // ratio would blind the CPU exactly when it most needs to look.
+//
+// All of this rests on one assumption: that waiting makes the ratio better. Where it
+// doesn't — a factory-less or broke side that will never be stronger than it is right
+// now — the whole term is switched off by `massingPatience` (growth.ts), or the CPU
+// would talk itself into a corner and be dismantled a unit at a time.
 const SUPPORT_RADIUS = 4
 // Local value share at or below which the CPU is outmatched and should gather.
 const HOLD_SHARE = 0.35
@@ -456,6 +462,139 @@ const SKIRMISHER_VALUE = 350
 const expendability = (unit: UnitObject): number =>
 	1 - Math.min(1, unitValue(unit) / SKIRMISHER_VALUE)
 
+// ── Flocking: an army that travels as a group ───────────────────────────────
+//
+// `localCommitment` decides whether a unit should push; it says nothing about who it
+// should push WITH. Nothing did, so the CPU's army had no shape. Units left the
+// factory on their own headings, took the shortest line to whatever objective was
+// nearest them, and arrived at the front strung out over half the map — which is the
+// same "killed one at a time" loss as trickling in, just spread across more tiles.
+//
+// It hurt the heavies most. An Annihilator Tank is not a Scorpion: it is slow, it is
+// the most expensive thing on the board, and it wins by being the anchor of a line
+// that other units screen for. Left to score alone it read every forward tile as
+// dangerous (the threat term is scaled by its own value, which is the whole point)
+// and never found a reason to be anywhere in particular.
+//
+// These are the two boid rules that survive on a turn-based grid — cohesion and
+// separation. There is no alignment term: units have no velocity here, and the shared
+// objective pull already supplies the common heading that alignment would.
+//
+// Cohesion is weighted by how much the unit wants an escort, which is the exact
+// inverse of the `expendability` scale the massing gate uses: an Annihilator Tank
+// (1.0) hugs the group hard, a Scorpion Tank (0.77) stays with it but ranges ahead,
+// a Strike Commando (0.21) is free to go be a skirmisher. Weighted that way the
+// formation falls out on its own — cheap units screen, expensive ones ride in the
+// middle of the pack — without anything modelling a formation.
+//
+// Crucially the pull is toward the group's CENTRE, not toward home, and the group's
+// centre is itself dragged forward every turn by the objective pull acting on all of
+// its members. So the flock advances rather than pooling: whoever steps forward this
+// tick moves the anchor, and the rest follow it next tick.
+const COHESION_RADIUS = 6
+// Per tile of distance to the flock anchor, for a unit that fully wants the escort.
+// Deliberately the same order as `objWeight` (1.5–3 per tile of objective distance):
+// enough to keep the group together on the way in, never enough to out-argue the
+// objective and freeze it in place.
+const COHESION_WEIGHT = 2
+// Distance past which extra separation from the flock stops adding pull. Keeps a unit
+// that got cut off from carrying a huge constant into cross-unit plan comparison; the
+// gradient near the group, which is what actually steers, is untouched.
+const COHESION_CAP = 10
+// How far from the anchor still counts as "with the group". Inside this the term is
+// silent, and that matters more than the weight does: a cohesion pull that bites at
+// zero distance fights the objective pull head-on, and since it is the stronger of the
+// two for a heavy the whole formation would assemble and then refuse to leave. Slack
+// makes it a catch-up term instead — free movement within the pack, a rope on anyone
+// drifting out of it — so the leading edge advances uncontested and tows the rest.
+const FLOCK_SLACK = 2
+
+type FlockAnchor = { x: number; y: number } | null
+
+/**
+ * Value-weighted centre of the friendly units around this one, excluding itself.
+ * Measured from where the mover currently STANDS, not from the tile being scored, so
+ * one anchor serves the whole candidate scan (and neighbours are grouped by who is
+ * actually near the unit rather than near each tile it might reach).
+ *
+ * Neighbours are limited to {@link COHESION_RADIUS} so two battle groups on opposite
+ * flanks stay two groups instead of averaging into a meaningless midpoint. A unit with
+ * nobody in radius falls back to the nearest friendly anywhere on the map — a straggler
+ * that lost its group should walk back to the army, not adopt the empty tile it is on.
+ */
+const flockAnchor = (map: MapObject, unit: UnitObject, cpuTeam: number): FlockAnchor => {
+	const cols = map.cols
+	let origin = -1
+	for (const { tile, unit: other } of planningUnits(map)) {
+		if (other === unit) {
+			origin = tile
+			break
+		}
+	}
+	let wx = 0
+	let wy = 0
+	let weight = 0
+	let nearest = -1
+	let nearestDist = Infinity
+	for (const { tile, unit: other } of planningUnits(map)) {
+		if (other === unit || other.team !== cpuTeam) continue
+		const distance = origin >= 0 ? manhattan(map, tile, origin) : 0
+		if (distance < nearestDist) {
+			nearestDist = distance
+			nearest = tile
+		}
+		if (distance > COHESION_RADIUS) continue
+		const value = unitValue(other)
+		if (value <= 0) continue
+		wx += (tile % cols) * value
+		wy += Math.floor(tile / cols) * value
+		weight += value
+	}
+	if (weight > 0) return { x: wx / weight, y: wy / weight }
+	if (nearest >= 0) return { x: nearest % cols, y: Math.floor(nearest / cols) }
+	return null
+}
+
+/** 0 = happy alone, 1 = only works with the army around it. */
+const escortNeed = (unit: UnitObject): number => 1 - expendability(unit)
+
+const cohesionPull = (map: MapObject, tile: number, unit: UnitObject, cpuTeam: number): number => {
+	const need = escortNeed(unit)
+	if (need <= 0) return 0
+	const anchor = planningFlock(map, unit, () => flockAnchor(map, unit, cpuTeam))
+	if (!anchor) return 0
+	const cols = map.cols
+	const distance = Math.abs((tile % cols) - anchor.x) + Math.abs(Math.floor(tile / cols) - anchor.y)
+	const strayed = Math.min(distance, COHESION_CAP) - FLOCK_SLACK
+	if (strayed <= 0) return 0
+	return -strayed * COHESION_WEIGHT * need
+}
+
+// The other half of the rule. Cohesion alone builds a blob, and a blob is what splash
+// weapons are for — the CPU already scores its OWN splash hits (`scoreSplashDamage`),
+// so it should understand the same shape pointed the other way. Two neighbours is a
+// line; past that it is a target. Priced off the unit's own value, like every other
+// risk term here, and small enough to shuffle a unit one tile sideways rather than
+// break the formation up.
+const CROWD_TOLERANCE = 2
+const SEPARATION_WEIGHT = 0.012
+
+const separationCost = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	cpuTeam: number
+): number => {
+	let neighbours = 0
+	for (const adjacent of adjacentTiles(map, tile)) {
+		const other = map.layers.units[adjacent]
+		if (other && other !== unit && other.team === cpuTeam) neighbours++
+	}
+	const crowd = neighbours - CROWD_TOLERANCE
+	if (crowd <= 0) return 0
+	return crowd * unitValue(unit) * SEPARATION_WEIGHT
+}
+
 const localCommitment = (
 	map: MapObject,
 	tile: number,
@@ -488,7 +627,15 @@ const localCommitment = (
 	// Lerp back toward "commit anyway" by how expendable the unit is, so the caution
 	// lands on the units that are worth being cautious with and cheap pressure keeps
 	// flowing while the heavies gather behind it.
-	return commitment + (1 - commitment) * expendability(unit)
+	const byValue = commitment + (1 - commitment) * expendability(unit)
+	// ...and lerp again by whether gathering is even a plan. Every reason to hold
+	// assumes the wait makes the force ratio better; when the CPU can't reinforce,
+	// waiting only lets the player dismantle it one unit at a time, so the caution
+	// switches off and it spends the first-strike edge `scoreAttack` already prices
+	// in (see growth.ts). Between the extremes it hesitates in proportion to how
+	// badly it is being out-produced.
+	const patience = cachedMassingPatience(map, cpuTeam)
+	return byValue + (1 - byValue) * (1 - patience)
 }
 
 // Scaling the advance pull by `commitment` alone barely moved the CPU: `advance` is a
@@ -688,6 +835,10 @@ export const scorePositionBonus = (
 				: -enemyDist * 0.5)
 	// Cost of holding a forward tile while the local force ratio is against us.
 	const overextend = overextensionCost(unit, enemyDist, commitment)
+	// Travel as an army: stay with the group (hard for a heavy, loosely for a
+	// skirmisher) without balling up into one splash template.
+	const cohesion = cohesionPull(map, tile, unit, cpuTeam)
+	const separation = separationCost(map, tile, unit, cpuTeam)
 	const defense = homeDefenseBonus(map, tile, cpuTeam)
 	const stealth = scoreStealthPositioning(map, tile, unit, cpuTeam, enemyDist)
 	const caution = lurking * Math.max(0, 6 - enemyDist) * 0.4
@@ -725,7 +876,9 @@ export const scorePositionBonus = (
 		explore +
 		block -
 		squat -
-		overextend -
+		overextend +
+		cohesion -
+		separation -
 		reinforcement
 	)
 }

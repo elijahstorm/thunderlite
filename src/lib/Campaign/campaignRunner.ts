@@ -18,6 +18,7 @@
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import type { CompareOp, CutsceneEvent, CutsceneScript } from './cutsceneTypes'
+import { resolveRandomSpawn } from './randomSpawn'
 
 /** A value that may be produced synchronously or asynchronously. */
 type MaybePromise<T> = T | Promise<T>
@@ -132,6 +133,17 @@ const dispatchEvent = (event: CutsceneEvent, iface: CampaignInterface): MaybePro
 			return iface.unhighlight(event.x, event.y)
 		case 'spawn':
 			return iface.spawn(event.team, event.unit, event.x, event.y)
+		case 'randomSpawn': {
+			// Rolled off the match seed, so this lands on exactly the unit and tile
+			// the telegraph showed the owner a turn ago (see `randomSpawn.ts`).
+			const spawn = resolveRandomSpawn(event)
+			// Pan first: the author cannot write a `move:` for a tile they do not
+			// pick, and enemy telegraphs are owner-only, so an unannounced
+			// reinforcement would otherwise land completely offscreen.
+			return Promise.resolve(iface.camera(spawn.x, spawn.y)).then(() =>
+				iface.spawn(spawn.team, spawn.unit, spawn.x, spawn.y)
+			)
+		}
 		case 'kill':
 			return iface.kill(event.x, event.y)
 		case 'hurt':

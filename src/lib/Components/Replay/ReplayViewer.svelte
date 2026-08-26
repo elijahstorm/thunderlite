@@ -14,6 +14,7 @@
 	import { animateTeamDefeat, resolveTeamDefeat } from '$lib/Engine/defeat'
 	import { hasRemoteChoreography } from '$lib/Engine/remoteChoreography'
 	import { replayFinalLabel } from './finalLabel'
+	import { beginMatchWithSeed } from '$lib/Engine/matchSeed'
 
 	/**
 	 * ReplayViewer — a read-only board that marches a finished match's event log
@@ -48,6 +49,14 @@
 		seats?: Record<number, { auth: string; name: string; avatarUrl: string | null }>
 		mapName?: string
 		winnerTeam?: number | null
+		/**
+		 * The seed the match was recorded under, so anything that draws from it
+		 * during playback lands where it landed live. NULL for matches recorded
+		 * before seeds were stored — `sessionId` re-derives what those rooms
+		 * actually played under.
+		 */
+		seed?: number | null
+		sessionId?: string | null
 		menuHref?: string
 	}
 
@@ -57,8 +66,17 @@
 		seats = {},
 		mapName = '',
 		winnerTeam = null,
+		seed = null,
+		sessionId = null,
 		menuHref = '/my/games',
 	}: Props = $props()
+
+	// Put the match's own seed back in place before a single action applies. The
+	// logged actions carry their own outcomes, but anything the board resolves off
+	// the seed rather than off the log — a scripted `random unit` wave on a map
+	// with an embedded script — would otherwise roll fresh and diverge from what
+	// the players actually saw.
+	untrack(() => beginMatchWithSeed({ seed, gameSession: sessionId }))
 
 	// A vantage no seat holds: with fog off the whole board renders, and stealth
 	// draws as a true outside observer would see it.

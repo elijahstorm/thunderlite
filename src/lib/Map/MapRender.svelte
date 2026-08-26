@@ -26,6 +26,7 @@
 		cornerDecision,
 		seaUnderlayDecision,
 		skyConnectionDecision,
+		variantDecision,
 		skyFlowReversed,
 	} from '$lib/Sprites/spriteConnector'
 	import { imageColorizer } from '$lib/Sprites/imageColorizer'
@@ -41,6 +42,8 @@
 	import { buildFadeBusy } from '$lib/Engine/buildFade'
 	import {
 		shownThreatUnits,
+		threatOverlayRevision,
+		pruneThreatOverlay,
 		computeShownThreatTiles,
 		computeShownThreatUnitTiles,
 	} from '$lib/Engine/threatOverlay'
@@ -254,16 +257,30 @@
 	})
 
 	// Persistent enemy-threat overlay. Recompute the painted tiles whenever the
-	// player toggles units on/off, a unit acts/moves/dies ($gameState), or fog
-	// shifts what's visible — then request a redraw. Gameplay boards only: the
+	// player toggles units on/off, a unit acts/moves/dies ($gameState), a campaign
+	// script mutates the board behind the engine's back ($threatOverlayRevision), or
+	// fog shifts what's visible — then request a redraw. Gameplay boards only: the
 	// minimap and editor never show it.
+	//
+	// The revision dependency is what keeps the overlay honest across scripted
+	// spawns and kills: those never touch `gameState`, so without it these tile sets
+	// stayed frozen at whatever the board looked like before the script ran, and the
+	// source-unit outline went on framing a tile whose original occupant was dead —
+	// reading as the overlay having switched to a different unit.
 	$effect.pre(() => {
 		if (!mini && !editor) {
 			$shownThreatUnits
 			$gameState
 			$fogOfWarEnabled
-			map.threatTiles = computeShownThreatTiles(map, $shownThreatUnits)
-			map.threatUnitTiles = computeShownThreatUnitTiles(map, $shownThreatUnits)
+			$threatOverlayRevision
+			// Drop units that have left the board before painting, so the settings
+			// panel's "on" state matches what's actually drawn. Re-read the store
+			// afterwards rather than reusing the captured value: this pass should paint
+			// the pruned set, not wait for the write to schedule another one.
+			pruneThreatOverlay(map)
+			const shown = get(shownThreatUnits)
+			map.threatTiles = computeShownThreatTiles(map, shown)
+			map.threatUnitTiles = computeShownThreatUnitTiles(map, shown)
 			render()
 		}
 	})
@@ -390,6 +407,8 @@
 		map.layers.ground.forEach((object, index) => {
 			object.state = connectionDecision(object)(map, index)
 			object.corners = cornerDecision(object)(map, index)
+			// Which stretch of coast (or other multi-variant terrain) this tile wears.
+			object.variant = variantDecision(object)(map, index)
 			// Singular ocean obstacles (Reef / Archipelago / Rock Formation) that touch
 			// land get a Sea coastline drawn beneath them; paint reads these two hints to
 			// composite the shore and shrink the obstacle. Undefined everywhere else.

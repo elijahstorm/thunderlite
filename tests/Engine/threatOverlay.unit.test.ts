@@ -13,7 +13,11 @@ import {
 	clearThreatOverlay,
 	computeShownThreatTiles,
 	computeShownThreatUnitTiles,
+	pruneThreatOverlay,
+	threatOverlayRevision,
+	invalidateThreatOverlay,
 } from '../../src/lib/Engine/threatOverlay'
+import { routeAnimation } from '../../src/lib/Engine/Animator/animator'
 
 const unitIndex = (name: string) => {
 	const idx = unitData.findIndex((u) => u.name === name)
@@ -179,6 +183,45 @@ describe('threat overlay store', () => {
 		expect(shown.has(second)).toBe(false)
 		// The source markers cover the toggled first unit, never the second.
 		expect(computeShownThreatUnitTiles(map, shown)).toEqual(new Set([xy(cols, 6, 7)]))
+	})
+
+	it('prunes units that have left the board, so the overlay does not report itself on', () => {
+		const cols = 15
+		const map = makeMap(cols, 15)
+		const alive = unit(STRIKE_COMMANDO, 1)
+		const doomed = unit(STRIKE_COMMANDO, 1)
+		map.layers.units[xy(cols, 7, 7)] = alive
+		map.layers.units[xy(cols, 3, 3)] = doomed
+		toggleThreatUnit(alive)
+		toggleThreatUnit(doomed)
+
+		// A scripted kill drops the unit from the layer.
+		map.layers.units[xy(cols, 3, 3)] = null
+		pruneThreatOverlay(map)
+
+		expect(get(shownThreatUnits)).toEqual(new Set([alive]))
+	})
+
+	it('keeps a unit that is only off the board because it is mid-walk', () => {
+		const cols = 15
+		const map = makeMap(cols, 15)
+		const walker = unit(STRIKE_COMMANDO, 1)
+		toggleThreatUnit(walker)
+		// animateRoute lifts the unit off its source tile for the length of the slide.
+		routeAnimation.set({ map, unit: walker, route: [xy(cols, 7, 7), xy(cols, 6, 7)] })
+
+		pruneThreatOverlay(map)
+		expect(get(shownThreatUnits)).toEqual(new Set([walker]))
+
+		routeAnimation.set(null)
+		pruneThreatOverlay(map)
+		expect(get(shownThreatUnits).size).toBe(0)
+	})
+
+	it('invalidateThreatOverlay bumps the revision the renderer recomputes on', () => {
+		const before = get(threatOverlayRevision)
+		invalidateThreatOverlay()
+		expect(get(threatOverlayRevision)).toBe(before + 1)
 	})
 
 	it('computeShownThreatTiles ignores enemies hidden in fog', () => {

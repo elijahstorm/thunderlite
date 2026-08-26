@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types'
 import { dev } from '$app/environment'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapData } from '$lib/Map/hashLoader'
-import { gameStore } from '$lib/Game/store.server'
+import { gameStore, roomSeed } from '$lib/Game/store.server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
 import { teamsFromHash } from '$lib/Game/mapTeams'
 import { notifyAsyncYourTurn } from '$lib/Game/asyncNotify.server'
@@ -32,6 +32,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			asyncGame: false,
 			turnDeadline: null,
 			turnTimeoutMs: null,
+			// No room, so no shared seed to honour — the client rolls a fresh one
+			// per match (see Engine/matchSeed).
+			seed: null as number | null,
 		}
 	}
 
@@ -103,6 +106,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		asyncGame,
 		turnDeadline: room?.turn_deadline == null ? null : Number(room.turn_deadline),
 		turnTimeoutMs: room?.turn_timeout_ms == null ? null : Number(room.turn_timeout_ms),
+		// The room's seed, so every client — including one that rejoins mid-match —
+		// resolves scripted spawns and CPU tie-breaks the same way.
+		seed: roomSeed(room),
 	}
 }
 

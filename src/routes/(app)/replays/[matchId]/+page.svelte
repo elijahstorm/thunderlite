@@ -23,6 +23,8 @@
 				seats={data.seats}
 				mapName={data.mapName}
 				winnerTeam={data.winnerTeam}
+				seed={data.seed}
+				sessionId={data.sessionId}
 				menuHref="/my/games"
 			/>
 		{/snippet}

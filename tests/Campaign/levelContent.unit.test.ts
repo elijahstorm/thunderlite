@@ -13,12 +13,24 @@ const HEAVY_COMMANDO = unitData.findIndex((u) => u.name === 'Heavy Commando')
 const STRIKE_COMMANDO = unitData.findIndex((u) => u.name === 'Strike Commando')
 const ANNIHILATOR = unitData.findIndex((u) => u.name === 'Annihilator Tank')
 
-/** Every (x,y)-bearing event in a parsed script, flattened across all blocks. */
-const positionedEvents = (script: ReturnType<typeof parseCutsceneScript>): CutsceneEvent[] => {
+const allEvents = (script: ReturnType<typeof parseCutsceneScript>): CutsceneEvent[] => {
 	const turnEvents = Object.values(script.turns).flatMap((byTeam) => Object.values(byTeam).flat())
-	const all: CutsceneEvent[] = [...script.start, ...script.win, ...script.lose, ...turnEvents]
-	return all.filter((e) => 'x' in e && 'y' in e)
+	return [...script.start, ...script.win, ...script.lose, ...turnEvents]
 }
+
+/** Every (x,y)-bearing event in a parsed script, flattened across all blocks. */
+const positionedEvents = (script: ReturnType<typeof parseCutsceneScript>): CutsceneEvent[] =>
+	allEvents(script).filter((e) => 'x' in e && 'y' in e)
+
+/**
+ * Every tile a `random unit` beat could roll. These carry a *list* of candidates
+ * rather than an `x`/`y`, so `positionedEvents` cannot see them — without this a
+ * typo'd alternative would only surface as an off-board spawn on the unlucky seed.
+ */
+const candidateTiles = (
+	script: ReturnType<typeof parseCutsceneScript>
+): { x: number; y: number }[] =>
+	allEvents(script).flatMap((e) => (e.kind === 'randomSpawn' ? e.tiles : []))
 
 describe('campaign registry (K3 + K5)', () => {
 	it('registers exactly 10 levels in a contiguous 1..10 order with unique ids', () => {
@@ -94,6 +106,12 @@ describe.each(campaignLevels.map((l) => [l.id, l] as const))('level %s', (id, le
 			if (event.kind === 'setTerrain') {
 				expect(terrainData.some((t) => t.name === event.terrain)).toBe(true)
 			}
+		}
+		for (const tile of candidateTiles(script)) {
+			expect(tile.x).toBeGreaterThanOrEqual(0)
+			expect(tile.x).toBeLessThan(map.cols)
+			expect(tile.y).toBeGreaterThanOrEqual(0)
+			expect(tile.y).toBeLessThan(map.rows)
 		}
 	})
 })

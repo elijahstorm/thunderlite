@@ -21,13 +21,13 @@ A script is a list of **blocks**. Each block fires at a specific moment in the
 match. Commands inside a block run top-to-bottom, one after another; a command
 that pauses (`talk`, `wait`) blocks the ones after it until it finishes.
 
-| Block | Fires |
-| --- | --- |
-| `<start> … </start>` | Once, when the map loads. |
-| `<turn N> … </turn>` | At the start of round `N` for **team 0** (the player). Shorthand for `<turn N,0>`. |
-| `<turn N,T> … </turn>` | At the start of round `N` for team `T`. |
-| `<win> … </win>` | Once, when the local player wins. |
-| `<lose> … </lose>` | Once, when the local player loses or draws. |
+| Block                  | Fires                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `<start> … </start>`   | Once, when the map loads.                                                          |
+| `<turn N> … </turn>`   | At the start of round `N` for **team 0** (the player). Shorthand for `<turn N,0>`. |
+| `<turn N,T> … </turn>` | At the start of round `N` for team `T`.                                            |
+| `<win> … </win>`       | Once, when the local player wins.                                                  |
+| `<lose> … </lose>`     | Once, when the local player loses or draws.                                        |
 
 Rounds and teams are **zero-based**. One round covers every team's side-turn, so
 a 2-team match runs `<turn 0,0>` (player's first turn), then `<turn 0,1>` (the
@@ -202,6 +202,44 @@ win conditions afterward.
 add unit: 1,"Strike Commando",8,2
 ```
 
+### `random unit` — spawn a seeded-random unit
+
+```
+random unit: team,"Name"|"Name" @ x,y|x,y|x,y
+```
+
+Like `add unit`, but rolls the unit type and the tile from the two `|`-separated
+lists. The lists roll **independently**, so two types times four tiles is eight
+possible outcomes off one line, which is what keeps a wave of reinforcements to
+one line per turn instead of one line per combination.
+
+```
+random unit: 1,"Scorpion Tank"|"Lance Tank" @ 13,2|13,4|11,6
+```
+
+**The roll is seeded, not `Math.random`.** It draws from the match's own seed
+(see [match-seed.md](./match-seed.md)), keyed by the command's source line.
+Consequences worth knowing:
+
+- A replay or review run at the match's seed reproduces the wave exactly, the
+  same way it reproduces every CPU decision.
+- Online, every client resolves the wave off the room's shared seed. This matters:
+  script beats never reach the action log, so clients that disagreed here would
+  fork their boards with nothing to reconcile them.
+- A campaign level resumed with Continue keeps its seed, so the waves still ahead
+  are the ones that attempt was going to get. Restart takes a new seed, so a second
+  run of the level plays differently.
+- Reloading mid-level re-parses the script but re-rolls to the _same_ answer, so
+  a wave already telegraphed to its owner cannot change under them.
+- The spawn telegraph resolves the roll a turn early and the runner resolves it
+  again when the block fires; both land on the same unit and tile because the
+  roll is stateless, not a draw counter.
+- Editing the script shifts line numbers, which reshuffles rolls. That is only
+  ever a level-design-time change, never a mid-match one.
+
+`random unit` also pans the camera to the tile it rolled, since an author cannot
+write a `move:` for a tile they do not pick.
+
 ### `kill unit` — remove a unit
 
 ```
@@ -349,6 +387,7 @@ hl: x,y                            highlight a tile
 unhl: x,y                          remove a highlight
 wait: seconds                      pause (decimals ok)
 add unit: team,"Name",x,y          spawn a unit
+random unit: team,"A"|"B" @ x,y|x,y seeded-random spawn (type and tile)
 kill unit: x,y                     remove a unit
 hurt unit: x,y,health              injure a unit (never kills)
 defeat                             end the match as a loss

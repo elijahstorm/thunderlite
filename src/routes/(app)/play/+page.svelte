@@ -30,6 +30,10 @@
 	// human) can change mid-match when a player is swept for absence.
 	let aiTeams = $derived(data.aiTeams ?? [])
 	let isAiDriver = $derived(data.isAiDriver ?? false)
+	// The room's stored seed. Shared by every client so a rejoin — or a client
+	// that has never planned a CPU turn — draws the same randomness as everyone
+	// else; null only for the editor's ephemeral hand-off.
+	let seed = $derived(data.seed ?? null)
 </script>
 
 <section class="h-screen overflow-clip">
@@ -49,6 +53,7 @@
 					<GameStateManager
 						{userSession}
 						{gameSession}
+						{seed}
 						{map}
 						minimap
 						{localTeam}

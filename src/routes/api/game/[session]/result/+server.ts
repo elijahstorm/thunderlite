@@ -37,6 +37,9 @@ type Outcome = 'win' | 'loss' | 'draw'
 const isOutcome = (v: unknown): v is Outcome => v === 'win' || v === 'loss' || v === 'draw'
 
 const asTeam = (v: unknown): number | null => (Number.isInteger(v) ? (v as number) : null)
+/** A 32-bit match seed from an untrusted body, or null. */
+const asSeed = (v: unknown): number | null =>
+	typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) >>> 0 : null
 const outcomeFor = (winner: number | null, team: number): Outcome =>
 	winner === null ? 'draw' : winner === team ? 'win' : 'loss'
 
@@ -88,9 +91,13 @@ export const POST = async ({ request, params, locals }) => {
 			// TTL) and pinned onto the match so the replay viewer can rebuild the
 			// board long after the room itself is gone. The room's own mode rides
 			// along: only async matches get a result email (see below).
-			const room = await db.findOne<{ map_id: string | null; mode: string | null }>('game_room', {
+			const room = await db.findOne<{
+				map_id: string | null
+				mode: string | null
+				seed: number | null
+			}>('game_room', {
 				where: { session },
-				select: ['map_id', 'mode'],
+				select: ['map_id', 'mode', 'seed'],
 			})
 			isAsyncMatch = room?.mode === 'async'
 
@@ -131,6 +138,11 @@ export const POST = async ({ request, params, locals }) => {
 				winner_team: claimedWinner,
 				turns,
 				last_event_id: lastEventId,
+				// The seed the room was played under, read from the room row rather
+				// than the payload — every client shares it, so there is nothing here
+				// worth trusting a claim for. Legacy rooms carry NULL; a replay of one
+				// re-derives the seed from the session id (see Engine/matchSeed).
+				seed: room?.seed == null ? null : Number(room.seed),
 			})
 			if (inserted) {
 				matchId = inserted.id as number | undefined
@@ -176,6 +188,10 @@ export const POST = async ({ request, params, locals }) => {
 				mode,
 				winner_team: winnerTeam,
 				turns,
+				// No room to read from, so the client's own seed is all there is. It
+				// only ever describes that client's private match, so a bad value costs
+				// nobody anything.
+				seed: asSeed(body.seed),
 			})
 			matchId = inserted.id as number | undefined
 		}

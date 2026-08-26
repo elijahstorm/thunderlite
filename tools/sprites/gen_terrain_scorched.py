@@ -2,7 +2,7 @@
 """Charred Forest terrain tile — pixel-art burn scar left where a Scorcher's flame
 razed woodland (see src/lib/Engine/modifiers/burn.ts).
 
-A 20-frame connector-5 (type-border) autotile — the same border-base + inner-corner
+A 20-frame connector-5 (family-border) autotile — the same border-base + inner-corner
 scheme the Sea uses, but matched on terrain TYPE instead of the ocean flag (see
 spriteConnector). That fixes the jagged concave junctions a plain 4-bit cardinal
 autotile leaves: where two arms of a scar meet, the diagonal-aware corner overlays
@@ -19,6 +19,19 @@ fill the notch cleanly.
 Drawn, not recoloured: a gritty tileable ash floor, burnt snags along the tree line,
 a crisp scorch boundary and soot flecks scattering onto grass. Grass is sampled from
 the plains tile so the border meets neighbouring plains seamlessly.
+
+The jagged, wavy scorch line is DELIBERATE and specific to this terrain — fire tears
+through a treeline, it does not erode a smooth bank. The natural terrains that share
+this autotile (the ore beds, the wasteland bog) take the opposite treatment; see
+tools/sprites/terrain_border.py.
+
+VARIANTS (rows) carry the trees that survived standing. A real burn leaves a few big
+trunks upright in the middle of the scar, not just a fringe of stumps around its edge,
+and those silhouettes are what make a scar read as a burnt FOREST rather than a patch
+of ash. They are kept sparse on purpose: two of the four rows have a standing trunk,
+one has a fallen log, one is bare, so a scar gets a scattering of them instead of one
+per tile. The ash floor and the scorch boundary are identical in every row, so any two
+rows still butt together with no seam.
 """
 import math
 import os
@@ -30,7 +43,8 @@ SRC_PLAINS = f"{BASE}/plains.png"
 OUT = f"{BASE}/scorched.png"
 
 CELL = 60
-FRAMES = 20  # 16 border-base + 4 inner-corner
+FRAMES = 20  # columns: 16 border-base + 4 inner-corner
+VARIANTS = 4  # rows: interchangeable versions of the whole 20-state set
 
 # --- palette (warm ash + charcoal, sharing the ember tones of the VFX sheets) ---
 SCORCH_INK = (24, 20, 20)
@@ -162,7 +176,7 @@ def char_ground(x, y):
     vein = math.sin(x * 0.8 + y * 0.55 + 2.0 * math.sin(y * 0.3))
     if abs(vein) < 0.05 and hash01(x, y, 9) > 0.3:
         col = SCORCH_INK
-    if col in (SOOT, SCORCH_INK) and hash01(x, y, 3) > 0.955:
+    if col in (SOOT, SCORCH_INK) and hash01(x, y, 3) > 0.978:
         col = EMBER_HOT if hash01(x, y, 4) > 0.5 else EMBER
     return col
 
@@ -199,6 +213,106 @@ def render_bands(px, gp, depth_fn):
                     px[x, y] = (*SOOT, 255)
 
 
+class Brush:
+    """Paints only where the cell is actually burnt, judged by the SAME depth field
+    the bands were drawn from. That is what lets a standing trunk be drawn into both a
+    base frame and an inner-corner overlay: each clips itself to its own char, so the
+    quadrant the renderer copies over the base always agrees with what was under it."""
+
+    def __init__(self, img, depth_fn, floor):
+        self.px = img.load()
+        self.depth = depth_fn
+        self.floor = floor
+
+    def put(self, x, y, c):
+        if not (0 <= x < CELL and 0 <= y < CELL):
+            return
+        if self.depth(x, y) < self.floor:
+            return
+        self.px[x, y] = (c[0], c[1], c[2], 255)
+
+
+def standing_tree(brush, cx, cy, h, lean, seed):
+    """A tree the fire killed but could not bring down: a tall charred trunk, snapped
+    off at the top, with the stubs of its lower limbs still on it and embers banked in
+    the ash at its foot. Bigger and darker than the edge stumps, because it is meant to
+    be the thing your eye lands on in the middle of a scar."""
+    def offset(i):
+        return int(lean * i * i / (h * 3.4))
+
+    # ash banked around the root, and the shadow the trunk throws down-right
+    for dx in range(-5, 6):
+        brush.put(cx + dx, cy, ASH_MID if abs(dx) < 3 else ASH_LO)
+        brush.put(cx + dx, cy + 1, ASH_LO if abs(dx) < 4 else SOOT)
+    for i in range(int(h * 0.75)):
+        brush.put(cx + 4 + int(i * 0.25), cy - i, SOOT)
+
+    for i in range(h):
+        y = cy - 1 - i
+        x = cx + offset(i)
+        w = 4 if i < h * 0.3 else 3 if i < h * 0.72 else 2
+        brush.put(x - 1, y, CHAR_RIM)  # top-left key light catches the near edge
+        for dx in range(w):
+            brush.put(x + dx, y, CHAR)
+        brush.put(x + w, y, CHAR_SHADOW)
+    # snapped crown: a splintered, uneven break rather than a clean tip
+    top = cy - 1 - h
+    brush.put(cx + offset(h), top, CHAR_RIM)
+    brush.put(cx + offset(h) + 1, top + 1, CHAR_RIM)
+
+    # broken limbs, alternating sides and angling up before they stop short
+    for start, run, dirx in ((0.34, 7, -lean), (0.58, 6, lean), (0.80, 4, -lean)):
+        by = cy - 1 - int(h * start)
+        bx = cx + offset(int(h * start)) + (0 if dirx < 0 else 3)
+        for i in range(1, run + 1):
+            x = bx + dirx * i
+            y = by - int(i * 0.85)
+            brush.put(x, y, CHAR)
+            if i <= run - 2:
+                brush.put(x, y - 1, CHAR)
+        brush.put(bx + dirx * run, by - int(run * 0.85) - 1, CHAR_RIM)
+
+    # embers still alive in the root ash
+    for i in range(3):
+        ex = cx - 3 + int(hash01(i, seed, 4) * 7)
+        if hash01(i, seed, 5) > 0.35:
+            brush.put(ex, cy, EMBER_HOT if hash01(i, seed, 6) > 0.5 else EMBER)
+
+
+def fallen_log(brush, x0, y0, x1, y1, seed):
+    """A trunk the fire did bring down: lying at an angle across the ash, thickest at
+    the torn-up root end and splintered where it snapped. Drawn tapered and off the
+    horizontal on purpose — a straight even bar reads as a fence rail, not a tree."""
+    steps = int(max(abs(x1 - x0), abs(y1 - y0))) + 1
+    for i in range(steps):
+        t = i / max(1, steps - 1)
+        x = int(x0 + (x1 - x0) * t)
+        y = int(y0 + (y1 - y0) * t + 1.2 * math.sin(t * 3 + seed))
+        w = 4 - int(t * 2.4)  # tapers from the root end to the break
+        brush.put(x, y - w, CHAR_RIM)
+        for dy in range(-w + 1, w):
+            brush.put(x, y + dy, CHAR)
+        brush.put(x, y + w, CHAR_SHADOW)
+        brush.put(x, y + w + 1, SOOT)
+        if hash01(x, y, seed) > 0.90:
+            brush.put(x, y, EMBER if hash01(x, y, seed + 1) > 0.5 else CHAR_RIM)
+    # root plate torn out of the ground, still attached at the thick end
+    for dy in range(-5, 6):
+        for dx in range(-3, 2):
+            if dx * dx * 2 + dy * dy <= 22 and hash01(dx, dy, seed + 2) > 0.35:
+                brush.put(x0 + dx, y0 + dy, CHAR if abs(dy) < 4 else CHAR_SHADOW)
+
+
+# Per-variant decoration. Deliberately thin: two rows carry a standing trunk, one a
+# fallen log, one nothing, so a scar shows a few survivors rather than a forest of them.
+VARIANT_TREES = {
+    0: lambda b: standing_tree(b, 26, 44, h=23, lean=-1, seed=7),
+    1: lambda b: None,
+    2: lambda b: standing_tree(b, 35, 46, h=19, lean=1, seed=19),
+    3: lambda b: fallen_log(b, 17, 24, 44, 42, seed=31),
+}
+
+
 def stump(px, cx, cy, seed):
     def put(x, y, c):
         if 0 <= x < CELL and 0 <= y < CELL:
@@ -229,34 +343,53 @@ def stump(px, cx, cy, seed):
 
 
 def edge_stumps(px, L, U, R, D):
+    """The tree line where the fire stopped: a few stumps just inside each open edge.
+
+    Gated to roughly half the candidate positions, and skipped entirely on a tile whose
+    char has pulled back from several sides at once. Drawing every position ringed a
+    small scar in black stumps, which buried the ash and read as a fence rather than as
+    the edge of a burnt wood — the standing trees in the middle are meant to be what
+    the eye lands on.
+    """
+    open_edges = (0 if L else 1) + (0 if U else 1) + (0 if R else 1) + (0 if D else 1)
+    if open_edges >= 3:
+        return
     if not U:
-        for x in range(9, CELL - 6, 15):
-            xx = x + int(hash01(x, 11) * 6)
+        for x in range(11, CELL - 8, 23):
+            if hash01(x, 21) < 0.5:
+                continue
+            xx = x + int(hash01(x, 11) * 8)
             stump(px, xx, int(margin_top(xx)) + 2, seed=xx * 3 + 1)
     if not D:
-        for x in range(9, CELL - 6, 15):
-            xx = x + int(hash01(x, 12) * 6)
+        for x in range(11, CELL - 8, 23):
+            if hash01(x, 22) < 0.5:
+                continue
+            xx = x + int(hash01(x, 12) * 8)
             stump(px, xx, CELL - 1 - int(margin_bottom(xx)) + 1, seed=xx * 3 + 2)
     if not L:
-        for y in range(11, CELL - 8, 16):
-            yy = y + int(hash01(y, 13) * 6)
+        for y in range(13, CELL - 10, 24):
+            if hash01(y, 23) < 0.5:
+                continue
+            yy = y + int(hash01(y, 13) * 8)
             stump(px, int(margin_left(yy)) + 2, yy, seed=yy * 3 + 3)
     if not R:
-        for y in range(11, CELL - 8, 16):
-            yy = y + int(hash01(y, 14) * 6)
+        for y in range(13, CELL - 10, 24):
+            if hash01(y, 24) < 0.5:
+                continue
+            yy = y + int(hash01(y, 14) * 8)
             stump(px, CELL - 1 - int(margin_right(yy)), yy, seed=yy * 3 + 4)
 
 
-def build_base(grass, L, U, R, D):
-    cell = grass.copy()
-    render_bands(cell.load(), grass.load(), lambda x, y: edge_depth(x, y, L, U, R, D))
-    edge_stumps(cell.load(), L, U, R, D)
-    return cell
+# The trees clip to char at least this deep, so a trunk never leans out onto grass.
+TREE_FLOOR = 5.0
 
 
-def build_corner(grass, edge_a, edge_b):
+def build_cell(grass, depth_fn, variant, base_edges=None):
     cell = grass.copy()
-    render_bands(cell.load(), grass.load(), lambda x, y: corner_depth(x, y, edge_a, edge_b))
+    render_bands(cell.load(), grass.load(), depth_fn)
+    if base_edges is not None:
+        edge_stumps(cell.load(), *base_edges)
+    VARIANT_TREES[variant](Brush(cell, depth_fn, TREE_FLOOR))
     return cell
 
 
@@ -264,13 +397,18 @@ def main():
     plains = Image.open(SRC_PLAINS).convert("RGBA")
     grass = plains.crop((0, 0, CELL, CELL))
 
-    sheet = Image.new("RGBA", (CELL * FRAMES, CELL), (0, 0, 0, 0))
-    for idx in range(FRAMES):
-        if idx in INDEX_TO_LURD:
-            cell = build_base(grass, *INDEX_TO_LURD[idx])
-        else:
-            cell = build_corner(grass, *CORNER_EDGES[idx])
-        sheet.paste(cell, (idx * CELL, 0))
+    sheet = Image.new("RGBA", (CELL * FRAMES, CELL * VARIANTS), (0, 0, 0, 0))
+    for variant in range(VARIANTS):
+        for idx in range(FRAMES):
+            if idx in INDEX_TO_LURD:
+                L, U, R, D = INDEX_TO_LURD[idx]
+                depth_fn = lambda x, y, a=L, b=U, c=R, e=D: edge_depth(x, y, a, b, c, e)
+                cell = build_cell(grass, depth_fn, variant, base_edges=(L, U, R, D))
+            else:
+                ea, eb = CORNER_EDGES[idx]
+                depth_fn = lambda x, y, a=ea, b=eb: corner_depth(x, y, a, b)
+                cell = build_cell(grass, depth_fn, variant)
+            sheet.paste(cell, (idx * CELL, variant * CELL))
     sheet.save(OUT)
     print("wrote", OUT, sheet.size)
 
