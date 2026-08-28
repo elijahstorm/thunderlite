@@ -1,15 +1,11 @@
 name: Unit Tests
 
-# Temporarily disabled: CI test runs are paused. To resume, restore the
-# push/pull_request triggers below and remove the workflow_dispatch stub.
-# on:
-#   push:
-#     branches: [main, develop]
-#   pull_request:
-#     branches: [main, develop]
 on:
-    workflow_dispatch:
-    
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
