@@ -116,6 +116,13 @@
 		 * quietly grown or shrunk. `reflow` no-ops when nothing actually moved.
 		 */
 		reflowSignal?: number
+		/**
+		 * Editor drag-to-paint: while the left mouse button is held, every tile the
+		 * cursor crosses gets a `handleClick` instead of the drag panning the board.
+		 * Panning stays on wheel / arrow keys / touch drag / right- or middle-button
+		 * drag, so the board is still navigable with the brush active.
+		 */
+		dragPaint?: boolean
 		handleClick: (x: number, y: number) => void
 		handleHover: (x: number, y: number) => void
 		handleOffset: (x: number, y: number, zoom: number) => void
@@ -132,6 +139,7 @@
 		contentHeight,
 		requestRedraw = 0,
 		reflowSignal = 0,
+		dragPaint = false,
 		handleClick,
 		handleHover,
 		handleOffset,
@@ -179,6 +187,40 @@
 		const rect = container.getBoundingClientRect()
 		const [cx, cy] = centerOffset(scroller?.__zoomLevel ?? 1)
 		return { ...rect.toJSON(), left: rect.left + cx, top: rect.top + cy } as DOMRect
+	}
+
+	// Drag-to-paint (dragPaint boards): true from a left-button press until release.
+	// Plain lets, not $state — nothing rendered reads them.
+	let painting = false
+	let lastPaintedTile = ''
+	let lastPaintPoint: { x: number; y: number } | null = null
+	const paintPoint = (x: number, y: number) => {
+		// A drag can sweep past the board's edge, where the flat tile index
+		// (y * cols + x) would wrap onto another row's tile — never paint there.
+		if (x < 0 || y < 0 || x >= contentWidth || y >= contentHeight) return
+		const tile = `${Math.floor(x / tileWidth)},${Math.floor(y / tileHeight)}`
+		if (tile === lastPaintedTile) return
+		lastPaintedTile = tile
+		handleClick(x, y)
+	}
+	const paintAt = (e: MouseEvent) => {
+		if (!scroller) return
+		const rect = boardRect()
+		const x = e.clientX - rect.left + scroller.__scrollLeft
+		const y = e.clientY - rect.top + scroller.__scrollTop
+		// Mouse events are sampled, so a fast flick can jump several tiles between
+		// two mousemoves — walk the segment in half-tile steps so no gaps are left.
+		if (lastPaintPoint) {
+			const dx = x - lastPaintPoint.x
+			const dy = y - lastPaintPoint.y
+			const dist = Math.hypot(dx, dy)
+			const step = Math.min(tileWidth, tileHeight) / 2
+			for (let d = step; d < dist; d += step) {
+				paintPoint(lastPaintPoint.x + dx * (d / dist), lastPaintPoint.y + dy * (d / dist))
+			}
+		}
+		paintPoint(x, y)
+		lastPaintPoint = { x, y }
 	}
 
 	onMount(() => {
@@ -311,7 +353,12 @@
 	way to scroll it back into view. The closure reads the current `reflow` at
 	event time instead.
 -->
-<svelte:window onresize={() => reflow?.()} />
+<!--
+	The paint stroke must end wherever the button is released — dragging off the
+	board and letting go there never delivers a mouseup to the section, and a
+	stroke that survives its release would resume painting on the next hover.
+-->
+<svelte:window onresize={() => reflow?.()} onmouseup={() => (painting = false)} />
 
 <section
 	role="grid"
@@ -322,6 +369,10 @@
 		if (!scroller) return
 		e.stopPropagation()
 		e.preventDefault()
+		// A dragPaint board already painted this tile on mousedown; letting the
+		// click through would double-fire (and its stale minimal-movement check
+		// misjudges drags, since painting never arms the scroller's touch state).
+		if (dragPaint) return
 		click(boardRect, scroller)(handleClick)(e)
 	}}
 	onkeypress={(e) => {
@@ -360,12 +411,25 @@
 		if (!scroller) return
 		e.stopPropagation()
 		e.preventDefault()
+		// Left button paints on a dragPaint board (and never arms the pan tracker,
+		// so the board can't creep while brushing). Middle/right drags still pan.
+		if (dragPaint && e.button === 0) {
+			painting = true
+			lastPaintedTile = ''
+			lastPaintPoint = null
+			paintAt(e)
+			return
+		}
 		mousedown(scroller)(e)
 	}}
 	onmouseup={(e) => {
 		if (!scroller) return
 		e.stopPropagation()
 		e.preventDefault()
+		if (painting) {
+			painting = false
+			return
+		}
 		mouseup(scroller)(e)
 	}}
 	oncontextmenu={(e) => {
@@ -378,6 +442,10 @@
 		if (!scroller) return
 		e.stopPropagation()
 		e.preventDefault()
+		if (painting) {
+			paintAt(e)
+			return
+		}
 		mousemove(boardRect, scroller)(handleHover)(e)
 	}}
 	class="h-full outline-none"

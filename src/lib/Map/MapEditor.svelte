@@ -628,7 +628,7 @@
 			class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-sm text-destructive"
 		>
 			<Icon icon="mdi:eraser" width="15" height="15" />
-			Eraser active. Click tiles to {editType === 'units'
+			Eraser active. Click or drag across tiles to {editType === 'units'
 				? 'remove units'
 				: editType === 'buildings'
 					? 'remove buildings'
@@ -1145,7 +1145,7 @@
 				<div>
 					<div class="font-semibold">Eraser</div>
 					<div class="text-xs text-muted-foreground">
-						Click tiles to {editType === 'units'
+						Click or drag across tiles to {editType === 'units'
 							? 'remove units'
 							: editType === 'buildings'
 								? 'remove buildings'

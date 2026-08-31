@@ -572,6 +572,7 @@
 									afterPaint={flushDeferredOverlays}
 									{requestRedraw}
 									reflowSignal={gutter}
+									dragPaint={editor}
 									{handleClick}
 									{handleHover}
 									{handleKeypress}
