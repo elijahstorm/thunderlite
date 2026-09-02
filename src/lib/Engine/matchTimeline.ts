@@ -124,70 +124,87 @@ export const turnPosition = (state: GameState): number => {
 	return state.turnNumber + seat / seats
 }
 
-/** Live timeline for the current match. Reset between matches (see GameStateManager). */
-export const matchTimeline = writable<TimelinePoint[]>([])
-
-/**
- * Append a point, keeping the axis strictly increasing: a sample that lands on
- * (or behind) the last one replaces it, so a match that ends exactly on a
- * handover never gets two points at the same x.
- */
-const push = (point: TimelinePoint): void => {
-	matchTimeline.update((points) => {
-		const last = points[points.length - 1]
-		if (last && point.x <= last.x) return [...points.slice(0, -1), point]
-		return [...points, point]
-	})
-}
+// --- Building points --------------------------------------------------------
+// Pure constructors, shared by the live tracker below and by the replay viewer,
+// which walks a finished match's log on the client and builds the same series
+// without anything having been stored.
 
 /** The match-start sample: the board before anyone has moved. */
-export const recordTimelineStart = (map: MapObject | MapProcesser): void => {
-	const state = get(gameState)
-	matchTimeline.set([
-		{
-			x: turnPosition(state),
-			turn: state.turnNumber,
-			afterTeam: null,
-			final: state.phase === 'gameOver',
-			teams: sampleTeams(map, state),
-		},
-	])
-}
+export const startPoint = (map: MapObject | MapProcesser, state: GameState): TimelinePoint => ({
+	x: turnPosition(state),
+	turn: state.turnNumber,
+	afterTeam: null,
+	final: state.phase === 'gameOver',
+	teams: sampleTeams(map, state),
+})
 
 /**
- * Sample after a turn handover. Called by `applyAction` for live end-turns only,
- * once `endTurn` has advanced the state. If that handover also ended the match
- * (a Start_Turn hazard finishing off the last unit, say) the point is final.
+ * The sample after a turn handover, once `endTurn` has advanced the state. If
+ * that handover also ended the match (a Start_Turn hazard finishing off the last
+ * unit, say) the point is final and sits at the end of the match, not at the
+ * start of a turn nobody will play.
  */
-export const recordTimelineHandover = (map: MapObject | MapProcesser, afterTeam: number): void => {
-	const state = get(gameState)
+export const handoverPoint = (
+	map: MapObject | MapProcesser,
+	state: GameState,
+	afterTeam: number
+): TimelinePoint => {
 	const ended = state.phase === 'gameOver'
-	push({
-		// A handover that ended the match is the end of the match, not the start of
-		// a turn nobody will play.
+	return {
 		x: ended ? turnPosition(state) + 1 / (state.players.length || 1) : turnPosition(state),
 		turn: state.turnNumber,
 		afterTeam,
 		final: ended,
 		teams: sampleTeams(map, state),
-	})
+	}
 }
 
+/** The board as the match ends mid-turn, placed at the end of the turn in progress. */
+export const endPoint = (map: MapObject | MapProcesser, state: GameState): TimelinePoint => ({
+	x: turnPosition(state) + 1 / (state.players.length || 1),
+	turn: state.turnNumber,
+	afterTeam: state.currentTeam,
+	final: true,
+	teams: sampleTeams(map, state),
+})
+
 /**
- * Sample the board as the match ends mid-turn. Placed at the end of the turn in
- * progress. No-op if the last point is already final (the handover recorded it).
+ * Append a point, keeping the axis strictly increasing: a sample that lands on
+ * (or behind) the last one replaces it, so a match that ends exactly on a
+ * handover never gets two points at the same x. Returns a fresh array.
  */
+export const appendPoint = (
+	points: readonly TimelinePoint[],
+	point: TimelinePoint
+): TimelinePoint[] => {
+	const last = points[points.length - 1]
+	if (last && point.x <= last.x) return [...points.slice(0, -1), point]
+	return [...points, point]
+}
+
+// --- The live tracker -------------------------------------------------------
+
+/** Live timeline for the current match. Reset between matches (see GameStateManager). */
+export const matchTimeline = writable<TimelinePoint[]>([])
+
+const push = (point: TimelinePoint): void => {
+	matchTimeline.update((points) => appendPoint(points, point))
+}
+
+export const recordTimelineStart = (map: MapObject | MapProcesser): void => {
+	matchTimeline.set([startPoint(map, get(gameState))])
+}
+
+/** Called by `applyAction` for live end-turns only, once `endTurn` has advanced. */
+export const recordTimelineHandover = (map: MapObject | MapProcesser, afterTeam: number): void => {
+	push(handoverPoint(map, get(gameState), afterTeam))
+}
+
+/** No-op if the last point is already final (the handover recorded it). */
 export const recordTimelineEnd = (map: MapObject | MapProcesser): void => {
 	const points = get(matchTimeline)
 	if (points[points.length - 1]?.final) return
-	const state = get(gameState)
-	push({
-		x: turnPosition(state) + 1 / (state.players.length || 1),
-		turn: state.turnNumber,
-		afterTeam: state.currentTeam,
-		final: true,
-		teams: sampleTeams(map, state),
-	})
+	push(endPoint(map, get(gameState)))
 }
 
 export const resetMatchTimeline = (): void => {

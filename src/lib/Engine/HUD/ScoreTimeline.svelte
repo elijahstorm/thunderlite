@@ -14,11 +14,13 @@
 	} from '../matchTimeline'
 
 	/**
-	 * ScoreTimeline — the shape of the match, one line per side, on the results
-	 * screen. Reads the handover samples `matchTimeline` recorded and plots the
-	 * chosen metric over the rounds axis. Hovering finds the nearest sample and
-	 * reads every side out; clicking (a line, or a legend chip) fills the area
-	 * under one side so its rise and fall stands apart from the rest.
+	 * ScoreTimeline — the shape of the match, one line per side. Plots the chosen
+	 * metric from a set of timeline points (recorded live on the results screen,
+	 * or rebuilt from the log in the replay viewer) over the rounds axis. Hovering
+	 * finds the nearest sample and reads every side out; clicking (a line, or a
+	 * legend chip) fills the area under one side so its rise and fall stands apart
+	 * from the rest. A host that passes `onPick` turns the click into a seek
+	 * instead, with `playhead` marking where it currently stands.
 	 */
 
 	interface Props {
@@ -28,9 +30,21 @@
 		labelFor: (team: number) => string
 		localTeam?: number
 		winner?: number | null
+		/** A position on the rounds axis to mark as "now" (the replay playhead). */
+		playhead?: number | null
+		/** When set, clicking the plot picks that sample instead of toggling a side. */
+		onPick?: ((index: number) => void) | undefined
 	}
 
-	let { points, teams, labelFor, localTeam = 0, winner = null }: Props = $props()
+	let {
+		points,
+		teams,
+		labelFor,
+		localTeam = 0,
+		winner = null,
+		playhead = null,
+		onPick = undefined,
+	}: Props = $props()
 
 	// Layout. The SVG is sized in CSS pixels (no viewBox scaling) so stroke widths
 	// and text stay crisp at any width and pointer maths is a straight subtraction.
@@ -127,10 +141,15 @@
 	}
 
 	// A click picks the side whose line is nearest the pointer at that sample and
-	// toggles its fill, so the area can be chosen straight off the chart.
+	// toggles its fill, so the area can be chosen straight off the chart. With a
+	// host seeking off the chart, the click is theirs instead.
 	const onClick = (event: MouseEvent) => {
 		const rect = (event.currentTarget as SVGElement).getBoundingClientRect()
 		const idx = nearestIndex(event.clientX - rect.left)
+		if (onPick) {
+			onPick(idx)
+			return
+		}
 		const py = event.clientY - rect.top
 		let pick: number | null = null
 		let bestDist = Infinity
@@ -261,7 +280,7 @@
 			<svg
 				{width}
 				height={HEIGHT}
-				class="block cursor-crosshair select-none overflow-visible"
+				class="block select-none overflow-visible {onPick ? 'cursor-pointer' : 'cursor-crosshair'}"
 				role="img"
 				aria-label={ariaLabel}
 				onpointermove={onPointerMove}
@@ -307,7 +326,7 @@
 					</text>
 				{/each}
 				<text
-					x={PAD.left + plotW}
+					x={PAD.left - 8}
 					y={HEIGHT - 8}
 					text-anchor="end"
 					class="fill-muted-foreground/70 text-[10px] uppercase tracking-wide"
@@ -371,6 +390,25 @@
 						/>
 					{/if}
 				{/each}
+
+				<!-- Where the host's playback currently stands. -->
+				{#if playhead != null}
+					<line
+						x1={sx(playhead)}
+						x2={sx(playhead)}
+						y1={PAD.top - 4}
+						y2={sy(0)}
+						class="stroke-foreground/70"
+						stroke-width="1.5"
+						data-testid="score-timeline-playhead"
+					/>
+					<polygon
+						points="{sx(playhead) - 4},{PAD.top - 8} {sx(playhead) + 4},{PAD.top - 8} {sx(
+							playhead
+						)},{PAD.top - 2}"
+						class="fill-foreground/70"
+					/>
+				{/if}
 
 				<!-- Crosshair + markers at the hovered sample. -->
 				{#if hovered}

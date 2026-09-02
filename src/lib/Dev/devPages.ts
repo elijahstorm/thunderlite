@@ -14,6 +14,14 @@ export type DevPage = {
 
 export const devPages: DevPage[] = [
 	{
+		href: '/dev/timeline',
+		title: 'Results Chart',
+		blurb:
+			'The end-of-match momentum chart over synthetic matches — comebacks, blowouts, a three-way, a draw — in both themes.',
+		tag: 'visuals',
+		ready: true,
+	},
+	{
 		href: '/dev/lag',
 		title: 'Runtime Lag',
 		blurb:
