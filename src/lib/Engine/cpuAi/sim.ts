@@ -5,6 +5,7 @@ import { applyAction } from '../applyAction'
 import { bestPlanFor } from './candidates'
 import { pickBuildOnce } from './production'
 import { beginCpuPlanning, endCpuPlanning, planningUnits } from './planningContext'
+import { concealedEnemyTiles } from '../visibility'
 import type { SerializedAction } from '../Interactor/serializedAction'
 
 /**
@@ -45,6 +46,27 @@ export const snapshot = (map: MapObject, state: GameState = get(gameState)): Sim
 	state: structuredClone(state),
 	smoke: new Map(get(smokeTiles)),
 })
+
+/**
+ * The board as `observer` BELIEVES it: a snapshot with every enemy unit the observer
+ * cannot perceive (fog, stealth, sky cover) removed. This is what the search plans
+ * on — it never cheats fog. The observer's own units are always all present, and its
+ * fog hunch (`fogBelief`) rides along in the cloned state so the evaluator can charge
+ * for the enemies it suspects but can't see.
+ */
+export const believedSnapshot = (
+	map: MapObject,
+	observer: number,
+	state: GameState = get(gameState)
+): SimBoard => {
+	const board = snapshot(map, state)
+	const concealed = concealedEnemyTiles(map, observer)
+	for (const tile of concealed) {
+		const unit = board.map.layers.units[tile]
+		if (unit && unit.team !== observer) board.map.layers.units[tile] = null
+	}
+	return board
+}
 
 /** Copy an existing snapshot (a child node of the search). */
 export const cloneBoard = (board: SimBoard): SimBoard => ({
@@ -104,6 +126,12 @@ export type GreedyTurnHooks = {
 	onAction?: (action: SerializedAction, before: (UnitObject | null)[]) => void
 	/** Safety valve on the tick loop; the default is far above any real turn. */
 	maxTicks?: number
+	/**
+	 * The search branching on production: the FIRST factory build of the turn is this
+	 * action instead of `pickBuildOnce`'s choice (later builds stay greedy). Ignored if
+	 * it can no longer be placed by the time the units are done.
+	 */
+	buildOverride?: SerializedAction | null
 }
 
 /**
@@ -128,6 +156,7 @@ export const runGreedyTurn = (
 		log.push(action)
 		if (hooks.onAction && before) hooks.onAction(action, before)
 	}
+	let buildOverride = hooks.buildOverride ?? null
 	for (let guard = 0; guard < max; guard++) {
 		let best: { score: number; actions: SerializedAction[] } | null = null
 		beginCpuPlanning(map)
@@ -143,6 +172,16 @@ export const runGreedyTurn = (
 		}
 		const actions = best?.actions ?? []
 		if (actions.length === 0) {
+			if (buildOverride) {
+				const forced = buildOverride
+				buildOverride = null
+				if (forced.kind === 'build' && map.layers.units[forced.building] == null) {
+					apply(forced)
+					// A build that could not be placed leaves the tile empty; fall through to
+					// the greedy choice next tick rather than looping on it.
+					if (map.layers.units[forced.building]) continue
+				}
+			}
 			const build = pickBuildOnce(map, team)
 			if (!build) return log
 			apply(build)

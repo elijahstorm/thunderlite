@@ -48,6 +48,12 @@ import { cpuRandom, setCpuSeed } from './cpuAi/rng'
 export const SeedStream = {
 	/** `random unit` reinforcement waves in a level script. */
 	ScriptSpawn: 'script:spawn',
+	/**
+	 * The CPU's lookahead search (cpuAi/search.ts): which alternative turn plans get
+	 * assembled at a node. Separate from the planner's un-namespaced `cpuRandom`
+	 * draws, whose regression suite is pinned to that exact sequence.
+	 */
+	CpuSearch: 'cpu:search',
 } as const
 
 export type SeedStreamName = (typeof SeedStream)[keyof typeof SeedStream] | (string & {})
