@@ -1,4 +1,5 @@
-import { writable, get } from 'svelte/store'
+import { get } from 'svelte/store'
+import { shadowable } from './shadowStore'
 
 // Tiles currently blanketed by a Shroud's smoke screen, mapped to the number of
 // turns of cover remaining. Smoke conceals exactly like Forest — distant viewers
@@ -6,7 +7,8 @@ import { writable, get } from 'svelte/store'
 // — and decays one step per turn transition (see turnLoop.endTurn). It lives in
 // its own store, outside gameState, so the visibility layer can read it without a
 // circular import.
-export const smokeTiles = writable<Map<number, number>>(new Map())
+// Shadowable like `gameState`: a simulated end-turn ages a COPY of the smoke.
+export const smokeTiles = shadowable<Map<number, number>>(new Map())
 
 /** Lay (or refresh) smoke on `tiles` for `ttl` turns, keeping the longer of any
  * existing and the new duration so overlapping screens don't cut each other short. */

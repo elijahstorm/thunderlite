@@ -138,9 +138,11 @@ export const applySkyEndOfTurnDamage = (
 
 export type EndTurnOptions = {
 	map?: MapObject | MapProcesser
+	/** No explosion animations: the turn is ending on a simulated board (cpuAi/sim.ts). */
+	silent?: boolean
 }
 
-export const endTurn = ({ map }: EndTurnOptions = {}): void => {
+export const endTurn = ({ map, silent = false }: EndTurnOptions = {}): void => {
 	const before = get(gameState)
 	if (before.phase !== 'playing') return
 
@@ -148,14 +150,16 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 		runPhaseForTeam(map, before.currentTeam, 'End_Turn', ['unit'], before)
 		const damageEvents = applyTerrainEndOfTurnDamage(map, before.currentTeam)
 		const skyEvents = applySkyEndOfTurnDamage(map, before.currentTeam)
-		for (const event of damageEvents) {
-			if (event.died) {
-				void animateExplosion(map as MapObject, event.tile)
+		if (!silent) {
+			for (const event of damageEvents) {
+				if (event.died) {
+					void animateExplosion(map as MapObject, event.tile)
+				}
 			}
-		}
-		for (const event of skyEvents) {
-			if (event.died) {
-				void animateExplosion(map as MapObject, event.tile)
+			for (const event of skyEvents) {
+				if (event.died) {
+					void animateExplosion(map as MapObject, event.tile)
+				}
 			}
 		}
 		applySkyHiding(map, before.currentTeam)

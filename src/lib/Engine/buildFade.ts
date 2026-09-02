@@ -8,6 +8,8 @@
 // deferral, no input gating. The unit is on the board immediately; it just fades
 // up over a couple of frames.
 
+import { simulationActive } from './shadowStore'
+
 const FADE_MS = 240
 
 const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n)
@@ -18,8 +20,11 @@ const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : 0)
 
 // Start a fade-in for the unit on `tile`. No-op without a real clock (headless/
 // test) so the unit simply shows at full opacity.
+// Also a no-op while the CPU is simulating: a build on a hypothetical board must not
+// fade the unit standing on that tile of the REAL one.
 export const beginBuildFade = (tile: number): void => {
 	if (typeof performance === 'undefined') return
+	if (simulationActive()) return
 	active.set(tile, performance.now())
 }
 

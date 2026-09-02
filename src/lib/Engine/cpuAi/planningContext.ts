@@ -38,12 +38,20 @@ type PlanningContext = {
 	memo: Map<string, unknown>
 }
 
+// A STACK, not a slot: the search (cpuAi/search.ts) plans whole turns on cloned
+// boards from inside a live planning tick, and each clone opens its own window.
+// With a single slot the nested `beginCpuPlanning` would have replaced the parent's
+// memo — and its `endCpuPlanning` would have torn the parent's down mid-tick.
+// `active(map)` only ever answers for the innermost window whose map matches, so a
+// parent's stale memo is never served for a child's board and vice versa.
+const stack: PlanningContext[] = []
 let ctx: PlanningContext | null = null
 
 export const beginCpuPlanning = (map: MapObject): void => {
 	// Units/buildings/reach are all rebuilt lazily on first access this tick — a CPU
 	// action committed last tick may have moved or killed a unit, so nothing carries
 	// over. Only the reset happens here; the O(map) scans run at most once per tick.
+	if (ctx) stack.push(ctx)
 	ctx = {
 		map,
 		units: null,
@@ -59,8 +67,11 @@ export const beginCpuPlanning = (map: MapObject): void => {
 }
 
 export const endCpuPlanning = (): void => {
-	ctx = null
+	ctx = stack.pop() ?? null
 }
+
+/** How many planning windows are open (tests; the search asserts it never leaks one). */
+export const planningDepth = (): number => (ctx ? stack.length + 1 : 0)
 
 const scanUnits = (map: MapObject): UnitEntry[] => {
 	const out: UnitEntry[] = []

@@ -1,4 +1,5 @@
-import { writable, get } from 'svelte/store'
+import { get } from 'svelte/store'
+import { shadowable } from './shadowStore'
 import { buildingData } from '$lib/GameData/building'
 import { unitData } from '$lib/GameData/unit'
 import { resetSmoke } from './smokeState'
@@ -114,7 +115,10 @@ const makeInitialState = (): GameState => ({
 	phase: 'playing',
 })
 
-export const gameState = writable<GameState>(makeInitialState())
+// Shadowable (see shadowStore.ts) so the CPU's lookahead can apply whole turns to a
+// hypothetical copy of this state without the live match, its HUD or its relay ever
+// seeing them. Outside a simulation it behaves exactly like a `writable`.
+export const gameState = shadowable<GameState>(makeInitialState())
 
 export const derivePlayersFromMap = (map: MapProcesser | MapObject): Player[] => {
 	const teams = new Set<number>()

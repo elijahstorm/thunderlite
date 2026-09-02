@@ -49,7 +49,6 @@ const HEAVY = T('Heavy Commando')
 const FLAK = T('Flak Tank')
 const SCORPION = T('Scorpion Tank')
 const STEALTH = T('Stealth Tank')
-const STRIKE = T('Strike Commando')
 
 const COLS = 10
 const ROWS = 8

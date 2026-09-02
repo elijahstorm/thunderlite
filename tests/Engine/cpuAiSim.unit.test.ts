@@ -11,20 +11,12 @@ vi.mock('../../src/lib/Engine/Animator/animator', () => ({
 }))
 vi.mock('../../src/lib/Audio/audioEngine', () => ({ audioEngine: { playSfx: () => {} } }))
 
-import { applyAction } from '../../src/lib/Engine/applyAction'
 import { endTurn } from '../../src/lib/Engine/turnLoop'
 import { gameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
-import { bestPlanFor } from '../../src/lib/Engine/cpuAi/candidates'
-import { pickBuildOnce } from '../../src/lib/Engine/cpuAi/production'
-import {
-	beginCpuPlanning,
-	endCpuPlanning,
-	planningUnits,
-} from '../../src/lib/Engine/cpuAi/planningContext'
+import { runGreedyTurn } from '../../src/lib/Engine/cpuAi/sim'
 import { unitData } from '../../src/lib/GameData/unit'
 import { buildingData } from '../../src/lib/GameData/building'
 import { terrainData } from '../../src/lib/GameData/terrain'
-import type { SerializedAction } from '../../src/lib/Engine/Interactor/serializedAction'
 
 /**
  * Headless CPU-vs-CPU simulation.
@@ -119,42 +111,6 @@ const buildBoard = (): MapObject => {
 	return map
 }
 
-/** Headless equivalent of `runCpuTurn`'s tick loop: no animation, no relay. */
-const runCpuTurnSync = (
-	map: MapObject,
-	team: number,
-	onAction: (action: SerializedAction, before: (UnitObject | null)[]) => void
-): void => {
-	for (let guard = 0; guard < 400; guard++) {
-		let best: { score: number; actions: SerializedAction[] } | null = null
-		beginCpuPlanning(map)
-		try {
-			const acted = get(gameState).actedTiles
-			for (const { tile, unit } of planningUnits(map)) {
-				if (unit.team !== team || acted.has(tile)) continue
-				const plan = bestPlanFor(map, tile, unit, team)
-				if (plan && (!best || plan.score > best.score)) best = plan
-			}
-		} finally {
-			endCpuPlanning()
-		}
-		const actions = best?.actions ?? []
-		if (actions.length === 0) {
-			const build = pickBuildOnce(map, team)
-			if (!build) return
-			const before = map.layers.units.slice()
-			applyAction(map, build)
-			onAction(build, before)
-			continue
-		}
-		for (const action of actions) {
-			const before = map.layers.units.slice()
-			applyAction(map, action)
-			onAction(action, before)
-		}
-	}
-}
-
 type Metrics = {
 	builds: number
 	spend: number
@@ -231,33 +187,35 @@ const runSim = (rounds: number) => {
 		const team = state.currentTeam
 		const round = state.turnNumber
 		noteTurnStart(team)
-		runCpuTurnSync(map, team, (action, before) => {
-			const m = metrics[team]
-			if (action.kind === 'build') {
-				m.builds++
-				m.spend += unitData[action.unitType]?.cost ?? 0
-				const name = unitData[action.unitType]?.name ?? String(action.unitType)
-				m.types[name] = (m.types[name] ?? 0) + 1
-			}
-			if (action.kind === 'attack') {
-				m.attacks++
-				if (!map.layers.units[action.to]) m.kills++
-				if (!map.layers.units[action.from]) m.tradedSelf++
-			}
-			const moveFrom = action.kind === 'move' ? action.from : -1
-			for (let t = 0; t < before.length; t++) {
-				const was = before[t]
-				if (!was || map.layers.units[t] || t === moveFrom) continue
-				if (metrics[was.team]) metrics[was.team].losses++
-			}
-			if (process.env.AI_SIM_DUMP) {
-				log.push({
-					round,
-					team,
-					action,
-					unit: action.kind === 'build' ? unitData[action.unitType]?.name : undefined,
-				})
-			}
+		runGreedyTurn(map, team, {
+			onAction: (action, before) => {
+				const m = metrics[team]
+				if (action.kind === 'build') {
+					m.builds++
+					m.spend += unitData[action.unitType]?.cost ?? 0
+					const name = unitData[action.unitType]?.name ?? String(action.unitType)
+					m.types[name] = (m.types[name] ?? 0) + 1
+				}
+				if (action.kind === 'attack') {
+					m.attacks++
+					if (!map.layers.units[action.to]) m.kills++
+					if (!map.layers.units[action.from]) m.tradedSelf++
+				}
+				const moveFrom = action.kind === 'move' ? action.from : -1
+				for (let t = 0; t < before.length; t++) {
+					const was = before[t]
+					if (!was || map.layers.units[t] || t === moveFrom) continue
+					if (metrics[was.team]) metrics[was.team].losses++
+				}
+				if (process.env.AI_SIM_DUMP) {
+					log.push({
+						round,
+						team,
+						action,
+						unit: action.kind === 'build' ? unitData[action.unitType]?.name : undefined,
+					})
+				}
+			},
 		})
 		noteTurnEnd(team)
 		endTurn({ map })

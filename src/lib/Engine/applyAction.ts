@@ -69,6 +69,13 @@ export interface ApplyActionOptions {
 	 * `animateAttackSequence`.
 	 */
 	deferBurn?: boolean
+	/**
+	 * The action is being applied to a SIMULATED board (the CPU's lookahead, see
+	 * cpuAi/sim.ts): skip everything that reaches the DOM, the dev log or the
+	 * outgoing relay. `live` already gates SFX, stats and the timeline; this covers
+	 * the rest (the dev action log, the end-turn explosion animation, build fades).
+	 */
+	simulated?: boolean
 }
 
 /**
@@ -287,8 +294,9 @@ export const applyAction = (
 	action: SerializedAction,
 	opts: ApplyActionOptions = {}
 ): void => {
-	// Dev-only: log the action + the board it acted on (no-op in prod / tests).
-	recordAction(map, action)
+	// Dev-only: log the action + the board it acted on (no-op in prod / tests, and
+	// never for a simulated board — the log is the story of the REAL match).
+	if (!opts.simulated) recordAction(map, action)
 	const fx = makeSfxEmit(opts)
 	const stat = makeStatEmit(opts)
 	switch (action.kind) {
@@ -435,7 +443,7 @@ export const applyAction = (
 			// diffing building ownership across the turn flip. Goes through the same
 			// live-gated `stat` sink, so replay/reconnect stays silent.
 			const ownersBefore = map.layers.buildings.map((b) => b?.team ?? null)
-			endTurn({ map })
+			endTurn({ map, silent: opts.simulated })
 			// Only buildings that flipped *to the team that just started its turn* are
 			// auto-captures. This excludes ownership changes from a player defeat
 			// (those neutralize to NEUTRAL_TEAM, not the active team).
