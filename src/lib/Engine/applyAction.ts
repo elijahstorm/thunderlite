@@ -20,6 +20,7 @@ import { applyWinConditions } from './winConditions'
 import { audioEngine } from '$lib/Audio/audioEngine'
 import { sfxForAction, type SfxAction, type SfxUnitRef } from '$lib/Audio/sfxMap'
 import { recordMatchStat, type StatEvent } from './matchStats'
+import { recordTimelineHandover } from './matchTimeline'
 import { concealsSelfAt, isStealthUnit } from './visibility'
 import {
 	recordStealthBuild,
@@ -427,7 +428,8 @@ export const applyAction = (
 		}
 		case 'end-turn': {
 			// Credit the turn to whoever is ending it, before `endTurn` advances.
-			stat({ kind: 'turn', team: get(gameState).currentTeam })
+			const endingTeam = get(gameState).currentTeam
+			stat({ kind: 'turn', team: endingTeam })
 			// Capture now resolves inside `endTurn` (the next team's Start_Turn phase)
 			// rather than via a menu action, so the capture stat is credited here by
 			// diffing building ownership across the turn flip. Goes through the same
@@ -443,6 +445,10 @@ export const applyAction = (
 					stat({ kind: 'capture', team: activeTeam })
 				}
 			})
+			// Sample the board for the results chart, after the incoming side's
+			// Start_Turn income and captures have landed. Live only, like the stats
+			// above, so a replayed log doesn't re-plot points this client never saw.
+			if (opts.live) recordTimelineHandover(map, endingTeam)
 			return
 		}
 		case 'surrender': {

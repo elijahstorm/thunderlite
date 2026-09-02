@@ -10,8 +10,10 @@
 	import type { PlayerMatchStats } from '../matchStats'
 	import { isDevMode, downloadDevLog, devLogSize } from '../devLog'
 	import { matchRating } from '$lib/Game/matchRating'
+	import { recordedMatchId } from '$lib/Game/matchRecord'
 	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
+	import ScoreTimeline from './ScoreTimeline.svelte'
 
 	interface Props {
 		/** The team controlled on this machine — used to frame the banner as Victory/Defeat. */
@@ -153,6 +155,17 @@
 	})
 	let showRatingSection = $derived(
 		ratingRows.length > 0 || (couldBeRated && !settleGaveUp && result != null)
+	)
+
+	// Two samples make a line; anything less (a match that never reached a
+	// handover, a reconnect that saw none of it) has no story to chart.
+	let timeline = $derived(result?.timeline ?? [])
+	let showTimeline = $derived(timeline.length >= 2)
+
+	// Only online matches leave an event log to replay, and the link needs the row
+	// id the result endpoint hands back, so this fills in a beat after the board.
+	let replayHref = $derived(
+		result?.mode === 'online' && $recordedMatchId ? `/replays/${$recordedMatchId}` : null
 	)
 
 	// Campaign win → Continue (auto-advance to the next level, decided by the host
@@ -322,9 +335,29 @@
 				</div>
 			</section>
 
+			{#if showTimeline}
+				<!-- The shape of the match: who was ahead when, and where it turned. -->
+				<section class="border-t border-border px-6 py-5 sm:px-8" data-testid="stats-timeline">
+					<p class="section-eyebrow mb-3">Momentum</p>
+					<ScoreTimeline
+						points={timeline}
+						teams={result.players.map((p) => p.team)}
+						{labelFor}
+						{localTeam}
+						winner={result.winner}
+					/>
+				</section>
+			{/if}
+
 			<footer
 				class="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface-2 px-6 py-4 sm:px-8"
 			>
+				{#if replayHref}
+					<a href={replayHref} class="btn btn-outline mr-auto" data-testid="stats-replay">
+						<Icon icon="lucide:film" width={15} />
+						Watch replay
+					</a>
+				{/if}
 				{#if isCampaign}
 					<a href={campaignHref} class="btn btn-outline" data-testid="stats-exit-campaign">
 						Exit to campaign

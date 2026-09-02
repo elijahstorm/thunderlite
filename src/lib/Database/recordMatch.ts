@@ -6,6 +6,7 @@ import {
 	type MatchRating,
 	type RatingMove,
 } from '$lib/Game/matchRating'
+import { clearRecordedMatch, recordedMatchId } from '$lib/Game/matchRecord'
 
 /**
  * recordMatch — a J1 `onMatchEnd` subscriber that persists match results. It is
@@ -27,6 +28,8 @@ import {
 
 type RawMove = { before?: unknown; delta?: unknown }
 type ResultResponse = {
+	/** The `matches` row this result landed on. */
+	matchId?: unknown
 	/** The caller's own movement. */
 	elo?: RawMove | null
 	/** Every settled seat, so the report can show both sides of a rated 1v1. */
@@ -86,10 +89,17 @@ const publishRating = (data: ResultResponse, localTeam: number): void => {
 	if (rating) matchRating.set(rating)
 }
 
+/** Publish the recorded match id, so the results screen can link to the replay. */
+const publishMatchId = (data: ResultResponse): void => {
+	const id = Number(data?.matchId)
+	if (Number.isInteger(id) && id > 0) recordedMatchId.set(id)
+}
+
 export const recordMatch = (result: MatchResult): void => {
 	// Whatever this match turns out to be, it is not the previous one — drop any
 	// rating still on screen from an earlier game before the new one resolves.
 	clearMatchRating()
+	clearRecordedMatch()
 
 	if (result.mode === 'online') {
 		if (!result.sessionId) return
@@ -104,7 +114,10 @@ export const recordMatch = (result: MatchResult): void => {
 				turns: result.turns,
 				mapSha: result.mapSha ?? null,
 			},
-			(data) => publishRating(data, local.team)
+			(data) => {
+				publishRating(data, local.team)
+				publishMatchId(data)
+			}
 		)
 		return
 	}

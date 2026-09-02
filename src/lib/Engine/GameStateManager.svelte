@@ -5,6 +5,7 @@
 	import { gameState, initGameStateFromMap } from './gameState'
 	import { emitMatchEnd, resetMatchEnd, buildMatchResult, type MatchMode } from './matchEnd'
 	import { resetMatchStats, matchStatsList } from './matchStats'
+	import { recordTimelineStart, recordTimelineEnd, matchTimelineList } from './matchTimeline'
 	import { resetDevLog } from './devLog'
 	import { registerRecordMatch } from '$lib/Database/recordMatch'
 	import { registerCampaignProgress } from '$lib/Campaign/progress'
@@ -138,6 +139,7 @@
 			// can fire its own match-end event (J1), and zero the stat tracker (J2).
 			resetMatchEnd()
 			resetMatchStats()
+			recordTimelineStart(map)
 			resetDevLog(localTeam)
 			// Install this match's seed before anything can draw from it — the CPU's
 			// first plan, the first scripted spawn telegraph. Online this is the room's
@@ -160,6 +162,9 @@
 	// winner is read straight from the engine state, never from any UI claim.
 	$effect(() => {
 		if (map && $gameState.phase === 'gameOver') {
+			// Close the timeline on the final board so the chart's last point is the
+			// position the match actually ended on. Idempotent, like emitMatchEnd.
+			recordTimelineEnd(map)
 			emitMatchEnd(
 				buildMatchResult({
 					state: $gameState,
@@ -172,6 +177,7 @@
 					// J2 — carry the live per-player stat tracker into the result so the
 					// stats screen (and J3 persistence) read it off `MatchResult.stats`.
 					stats: matchStatsList(),
+					timeline: matchTimelineList(),
 				})
 			)
 		}
@@ -352,6 +358,7 @@
 		initGameStateFromMap(map)
 		resetMatchEnd()
 		resetMatchStats()
+		recordTimelineStart(map)
 		resetDevLog(localTeam)
 	}
 

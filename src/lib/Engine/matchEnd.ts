@@ -1,4 +1,5 @@
 import type { GameState } from './gameState'
+import type { TimelinePoint } from './matchTimeline'
 
 /**
  * matchEnd — the single "this match ended" moment.
@@ -43,6 +44,8 @@ export type MatchResult = {
 	turns: number
 	endedAt: number
 	stats?: PerPlayerStats[] // populated by J2's tracker if present
+	/** Per-handover board samples for the results chart (see matchTimeline). */
+	timeline?: TimelinePoint[]
 }
 
 type Handler = (result: MatchResult) => void
@@ -112,6 +115,8 @@ export type BuildMatchResultArgs = {
 	campaignLevelId?: string
 	/** Carried through from J2's tracker, if present. */
 	stats?: PerPlayerStats[]
+	/** Carried through from the timeline sampler, if present. */
+	timeline?: TimelinePoint[]
 	/** Injectable clock for deterministic tests. Defaults to `Date.now`. */
 	now?: () => number
 }
@@ -144,5 +149,6 @@ export const buildMatchResult = (args: BuildMatchResultArgs): MatchResult => {
 		turns: state.turnNumber,
 		endedAt: (args.now ?? Date.now)(),
 		...(args.stats ? { stats: args.stats } : {}),
+		...(args.timeline ? { timeline: args.timeline } : {}),
 	}
 }
