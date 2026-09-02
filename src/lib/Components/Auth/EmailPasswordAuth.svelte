@@ -2,7 +2,7 @@
 	import { page } from '$app/state'
 	import { redirectAfterLogin, refreshSession } from '$lib/dontcode/client'
 
-	type Mode = 'login' | 'signup' | 'verify-email' | 'mfa'
+	type Mode = 'login' | 'signup' | 'verify-email' | 'mfa' | 'forgot-password' | 'reset-password'
 
 	let mode = $state<Mode>('login')
 	let email = $state('')
@@ -29,6 +29,12 @@
 	/** Move to a new step, clearing per-step input and messages. */
 	const goTo = (next: Mode) => {
 		mode = next
+		// The reset steps ask for a NEW password; don't prefill it with whatever
+		// was typed into the sign-in form.
+		if (next === 'forgot-password' || next === 'reset-password') {
+			password = ''
+			confirmPassword = ''
+		}
 		code = ''
 		recoveryCode = ''
 		useRecoveryCode = false
@@ -119,6 +125,42 @@
 		await loginAfterVerify()
 	}
 
+	const submitForgotPassword = async () => {
+		const data = await postJson('/api/auth/forgot-password', { email })
+		if (!data.success) {
+			errorMessage = data.error ?? 'Something went wrong. Please try again.'
+			return
+		}
+		goTo('reset-password')
+		noticeMessage = 'If an account exists for that email, a reset code is on its way.'
+	}
+
+	const submitResetPassword = async () => {
+		if (password !== confirmPassword) {
+			errorMessage = 'Passwords do not match'
+			return
+		}
+		const data = await postJson('/api/auth/reset-password', { code, password, email })
+		if (!data.success) {
+			errorMessage = data.error ?? 'That code is invalid or has expired.'
+			return
+		}
+		// The new password is still in memory; sign in with it so the user
+		// lands straight in the app instead of retyping it.
+		const login = await postJson('/api/auth/login', { email, password })
+		if (login.success && login.mfaRequired) {
+			goTo('mfa')
+			noticeMessage = 'Enter the code from your authenticator app.'
+			return
+		}
+		if (!login.success) {
+			goTo('login')
+			noticeMessage = 'Password updated. Please sign in.'
+			return
+		}
+		await finishLogin()
+	}
+
 	const submitMfa = async () => {
 		const payload = useRecoveryCode ? { recoveryCode } : { code }
 		const data = await postJson('/api/auth/mfa', payload)
@@ -143,6 +185,8 @@
 			else if (mode === 'login') await submitLogin()
 			else if (mode === 'verify-email') await submitVerifyEmail()
 			else if (mode === 'mfa') await submitMfa()
+			else if (mode === 'forgot-password') await submitForgotPassword()
+			else if (mode === 'reset-password') await submitResetPassword()
 		} catch {
 			errorMessage = NETWORK_ERROR
 		} finally {
@@ -150,7 +194,7 @@
 		}
 	}
 
-	let isCodeStep = $derived(mode === 'verify-email' || mode === 'mfa')
+	let isCodeStep = $derived(mode !== 'login' && mode !== 'signup')
 	let heading = $derived(
 		mode === 'login'
 			? 'Sign in'
@@ -158,16 +202,26 @@
 				? 'Create your account'
 				: mode === 'verify-email'
 					? 'Verify your email'
-					: 'Two-factor authentication'
+					: mode === 'forgot-password'
+						? 'Reset your password'
+						: mode === 'reset-password'
+							? 'Choose a new password'
+							: 'Two-factor authentication'
 	)
 	let subheading = $derived(
 		mode === 'verify-email'
 			? 'Enter the 6-digit code we emailed you.'
-			: mode === 'mfa'
-				? useRecoveryCode
-					? 'Enter one of your recovery codes.'
-					: 'Enter the code from your authenticator app.'
-				: ''
+			: mode === 'forgot-password'
+				? 'Enter your email and we will send you a code.'
+				: mode === 'reset-password'
+					? email
+						? `Enter the code we emailed to ${email}.`
+						: 'Enter the code we emailed you.'
+					: mode === 'mfa'
+						? useRecoveryCode
+							? 'Enter one of your recovery codes.'
+							: 'Enter the code from your authenticator app.'
+						: ''
 	)
 	let submitLabel = $derived(
 		mode === 'login'
@@ -176,7 +230,11 @@
 				? 'Create account'
 				: mode === 'verify-email'
 					? 'Verify email'
-					: 'Verify code'
+					: mode === 'forgot-password'
+						? 'Send code'
+						: mode === 'reset-password'
+							? 'Reset password'
+							: 'Verify code'
 	)
 </script>
 
@@ -222,7 +280,7 @@
 			submit()
 		}}
 	>
-		{#if mode === 'login' || mode === 'signup'}
+		{#if mode === 'login' || mode === 'signup' || mode === 'forgot-password'}
 			<div class="space-y-1.5">
 				<label for="email" class="field-label">Email</label>
 				<input
@@ -237,19 +295,28 @@
 				/>
 			</div>
 
-			<div class="space-y-1.5">
-				<label for="password" class="field-label">Password</label>
-				<input
-					id="password"
-					name="password"
-					type="password"
-					class="input"
-					placeholder="••••••••"
-					autocomplete={mode === 'login' ? 'current-password' : 'new-password'}
-					required
-					bind:value={password}
-				/>
-			</div>
+			{#if mode !== 'forgot-password'}
+				<div class="space-y-1.5">
+					<div class="flex items-baseline justify-between">
+						<label for="password" class="field-label">Password</label>
+						{#if mode === 'login'}
+							<button type="button" class="link text-xs" onclick={() => goTo('forgot-password')}>
+								Forgot password?
+							</button>
+						{/if}
+					</div>
+					<input
+						id="password"
+						name="password"
+						type="password"
+						class="input"
+						placeholder="••••••••"
+						autocomplete={mode === 'login' ? 'current-password' : 'new-password'}
+						required
+						bind:value={password}
+					/>
+				</div>
+			{/if}
 
 			{#if mode === 'signup'}
 				<div class="space-y-1.5">
@@ -266,6 +333,49 @@
 					/>
 				</div>
 			{/if}
+		{:else if mode === 'reset-password'}
+			<div class="space-y-1.5">
+				<label for="reset-code" class="field-label">Reset code</label>
+				<input
+					id="reset-code"
+					name="reset-code"
+					type="text"
+					inputmode="numeric"
+					autocomplete="one-time-code"
+					class="input tracking-[0.5em] text-center text-lg"
+					placeholder="123456"
+					required
+					bind:value={code}
+				/>
+			</div>
+
+			<div class="space-y-1.5">
+				<label for="new-password" class="field-label">New password</label>
+				<input
+					id="new-password"
+					name="new-password"
+					type="password"
+					class="input"
+					placeholder="••••••••"
+					autocomplete="new-password"
+					required
+					bind:value={password}
+				/>
+			</div>
+
+			<div class="space-y-1.5">
+				<label for="confirm-new-password" class="field-label">Confirm new password</label>
+				<input
+					id="confirm-new-password"
+					name="confirm-new-password"
+					type="password"
+					class="input"
+					placeholder="••••••••"
+					autocomplete="new-password"
+					required
+					bind:value={confirmPassword}
+				/>
+			</div>
 		{:else if mode === 'verify-email' || (mode === 'mfa' && !useRecoveryCode)}
 			<div class="space-y-1.5">
 				<label for="code" class="field-label">Verification code</label>
@@ -321,6 +431,16 @@
 			{useRecoveryCode
 				? 'Use your authenticator code instead'
 				: "Can't access your authenticator? Use a recovery code"}
+		</button>
+	{/if}
+
+	{#if mode === 'forgot-password'}
+		<button type="button" class="link text-sm" onclick={() => goTo('reset-password')}>
+			Already have a code?
+		</button>
+	{:else if mode === 'reset-password'}
+		<button type="button" class="link text-sm" onclick={() => goTo('forgot-password')}>
+			Send a new code
 		</button>
 	{/if}
 
