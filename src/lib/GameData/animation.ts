@@ -72,6 +72,52 @@ export const animationData: AnimationData[] = [
 		name: 'Pierce',
 		type: 'tile',
 	},
+	// Payload impacts: the round a ranged unit fires landing on the tile it aimed
+	// at. A melee swing plays right beside its victim, but a ranged attacker's
+	// swing is tiles away, so without one of these the only sign of *what* got hit
+	// is a bar draining somewhere. Each reads as the ammunition that unit throws
+	// (see `PAYLOAD_IMPACT_ANIMATION` and `UnitData.payload`). Same 56x96 cell
+	// geometry as the effects above; deliberately smaller than the death blast.
+	{
+		url: '/game/play/animation/tile-impact-shell.png',
+		frames: 10,
+		xOffset: -2,
+		yOffset: 36,
+		width: 56,
+		height: 96,
+		name: 'Shell Impact',
+		type: 'tile',
+	},
+	{
+		url: '/game/play/animation/tile-impact-rocket.png',
+		frames: 10,
+		xOffset: -2,
+		yOffset: 36,
+		width: 56,
+		height: 96,
+		name: 'Rocket Impact',
+		type: 'tile',
+	},
+	{
+		url: '/game/play/animation/tile-impact-missile.png',
+		frames: 10,
+		xOffset: -2,
+		yOffset: 36,
+		width: 56,
+		height: 96,
+		name: 'Missile Impact',
+		type: 'tile',
+	},
+	{
+		url: '/game/play/animation/tile-impact-slug.png',
+		frames: 8,
+		xOffset: -2,
+		yOffset: 36,
+		width: 56,
+		height: 96,
+		name: 'Slug Impact',
+		type: 'tile',
+	},
 ]
 
 export const animationRenderer = imageLazyLoader('animation' as keyof MapLayers, animationData)
@@ -84,6 +130,10 @@ export const ANIMATION_SELECT = 2
 export const ANIMATION_FLAME = 3
 export const ANIMATION_SHRAPNEL = 4
 export const ANIMATION_PIERCE = 5
+export const ANIMATION_IMPACT_SHELL = 6
+export const ANIMATION_IMPACT_ROCKET = 7
+export const ANIMATION_IMPACT_MISSILE = 8
+export const ANIMATION_IMPACT_SLUG = 9
 
 // Maps a secondary-hit flavor to its tile-effect sheet. Keyed by the same union
 // the combat side chooses (see `SecondaryEffectKind`), kept here so the animator
@@ -92,4 +142,16 @@ export const SECONDARY_EFFECT_ANIMATION: Record<'flame' | 'shrapnel' | 'pierce',
 	flame: ANIMATION_FLAME,
 	shrapnel: ANIMATION_SHRAPNEL,
 	pierce: ANIMATION_PIERCE,
+}
+
+// The ammunition a ranged unit sends downrange. Each kind owns the impact sheet
+// that blooms on the struck tile when the round lands, so a shell, a rocket
+// salvo, a guided missile and a sniper slug each look like themselves on arrival.
+export type PayloadKind = 'shell' | 'rocket' | 'missile' | 'slug'
+
+export const PAYLOAD_IMPACT_ANIMATION: Record<PayloadKind, number> = {
+	shell: ANIMATION_IMPACT_SHELL,
+	rocket: ANIMATION_IMPACT_ROCKET,
+	missile: ANIMATION_IMPACT_MISSILE,
+	slug: ANIMATION_IMPACT_SLUG,
 }

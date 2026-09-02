@@ -1,5 +1,6 @@
-"""Shared helpers for the tile secondary-hit effect sheets (flame / shrapnel /
-pierce).
+"""Shared helpers for the tile hit-effect sheets: the secondary-hit effects
+(flame / shrapnel / pierce) and the ranged payload impacts (shell / rocket /
+missile / slug).
 
 These are single-column sprite strips: `FRAMES` cells stacked vertically, each
 CELL_W x CELL_H, drawn on its own transparent tile so nothing bleeds between
@@ -58,6 +59,22 @@ def blob(img: Image.Image, cx: float, cy: float, rad: float, color, alpha: int, 
     if h != d:
         stamp = stamp.resize((d, h))
     img.alpha_composite(stamp, (int(cx - d / 2), int(cy - h / 2)))
+
+
+def streak(img: Image.Image, p0, p1, color, alpha: int, width: float = 1.5):
+    """Composite one soft straight streak from p0 to p1 — an incoming round's
+    tracer or exhaust trail. Drawn as a chain of small glow discs so it stays
+    anti-aliased and blends like the blobs around it; `alpha` fades toward p0
+    (the tail) so the streak reads as travelling into p1."""
+    (x0, y0), (x1, y1) = p0, p1
+    length = math.hypot(x1 - x0, y1 - y0)
+    steps = max(2, int(length / max(0.75, width * 0.6)))
+    for i in range(steps + 1):
+        t = i / steps
+        a = int(alpha * (0.25 + 0.75 * t))
+        if a <= 0:
+            continue
+        blob(img, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, width, color, a)
 
 
 def new_cell() -> Image.Image:
