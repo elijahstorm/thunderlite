@@ -20,8 +20,6 @@ export interface EmailContent {
 	markdownText: string
 }
 
-const signoff = '\n\nSee you on the battlefield,\nThe ThunderLite team'
-
 /**
  * Absolute base for links in an email body. Mail clients render outside the app,
  * so a root-relative href would resolve against the client's own domain and
@@ -68,42 +66,38 @@ export const proActivated = (planLabel: string, periodEnd: string | null): Email
 	subject: 'Thank you for supporting ThunderLite',
 	markdownText: `# You are a supporter now
 
-Thank you for backing **ThunderLite** (${planLabel} support). The game is built by one person, and recurring support is what keeps the servers running and new content coming. It means a lot.
+Thank you for backing **ThunderLite** (${planLabel} support).
 
-Your support renews on **${formatDate(periodEnd)}**. You can [manage or cancel it any time](${proUrl}).${signoff}${prefsFooter}`,
+Your support renews on **${formatDate(periodEnd)}**. You can [manage or cancel it any time](${proUrl}).${prefsFooter}`,
 })
 
 export const proCanceled = (periodEnd: string | null): EmailContent => ({
 	subject: 'Your ThunderLite support is set to end',
 	markdownText: `# Cancellation confirmed
 
-Your recurring support will not renew after **${formatDate(
-		periodEnd
-	)}**. Nothing about your account changes: ThunderLite has no paywalled content, so everything stays exactly as it is.
+Your recurring support will not renew after **${formatDate(periodEnd)}**.
 
-Thank you for having supported the project. If you change your mind, you can [resume any time](${proUrl}).${signoff}${prefsFooter}`,
+Thank you for having supported the project. If you change your mind, you can [resume any time](${proUrl}).${prefsFooter}`,
 })
 
 export const proResumed = (periodEnd: string | null): EmailContent => ({
 	subject: 'Your ThunderLite support is active again',
 	markdownText: `# Welcome back
 
-Good to have you back. Your recurring support is active again and will renew on **${formatDate(
+Your recurring support is active again and will renew on **${formatDate(
 		periodEnd
 	)}**. Thank you for keeping the project going.
 
-[View your supporter status](${proUrl})${signoff}${prefsFooter}`,
+[View your supporter status](${proUrl})${prefsFooter}`,
 })
 
 export const donationThanks = (amountLabel: string): EmailContent => ({
 	subject: 'Thank you for your donation',
 	markdownText: `# Thank you
 
-Your **${amountLabel}** donation to ThunderLite went through. The game is a one-person project with no paywalled content, so donations like yours are what keep the servers running and new maps, units, and campaign chapters coming.
+Your **${amountLabel}** donation to ThunderLite went through.
 
-Genuinely: thank you.
-
-[View your supporter page](${proUrl})${signoff}${prefsFooter}`,
+[View your supporter page](${proUrl})${prefsFooter}`,
 })
 
 // ── Social / inbox ───────────────────────────────────────────────────────────
@@ -121,7 +115,7 @@ export const friendAccepted = (fromName: string, fromAuth: string): EmailContent
 	subject: `${fromName} accepted your friend request`,
 	markdownText: `# You are friends now
 
-**[${fromName}](${profileUrl(fromAuth)})** accepted your friend request on ThunderLite. You will find each other in your friends list, and you can start a game or send a message any time.
+**[${fromName}](${profileUrl(fromAuth)})** accepted your friend request on ThunderLite.
 
 [Send them a message](${chatUrl(fromAuth)}) or [open your friends list](${friendsUrl})${prefsFooter}`,
 })
@@ -132,7 +126,7 @@ export const newMessage = (fromName: string, preview: string, fromAuth: string):
 
 > ${preview}
 
-[Open the conversation](${chatUrl(fromAuth)}) to read it and reply.${prefsFooter}`,
+[Open the conversation](${chatUrl(fromAuth)})${prefsFooter}`,
 })
 
 // ── Game events ───────────────────────────────────────────────────────────────
@@ -149,7 +143,7 @@ export const matchResult = (
 		outcome === 'win'
 			? `You won your match${vs}. Well played.`
 			: outcome === 'loss'
-				? `Your match${vs} did not go your way this time. Rematch?`
+				? `Your match${vs} did not go your way. Rematch?`
 				: `Your match${vs} ended in a draw.`
 	return {
 		subject: `Match result: ${headline}`,
@@ -172,11 +166,9 @@ export const asyncYourTurn = (
 	subject: 'Your move in your async ThunderLite match',
 	markdownText: `# Your move
 
-${opponentName ? `**${opponentName}** finished their turn. ` : ''}It is your turn in your async ThunderLite match.
+${opponentName ? `**${opponentName}** finished their turn. ` : ''}You have **${timeLabel}** on the clock.
 
-You have **${timeLabel}** to finish your turn. If the clock runs out, the match is resigned automatically.
-
-[Take your turn](${roomUrl(session)})${signoff}${prefsFooter}`,
+[Take your turn](${roomUrl(session)})${prefsFooter}`,
 })
 
 /** Sent to the player whose turn clock ran out. */
@@ -189,7 +181,7 @@ export const asyncAutoResigned = (
 
 Your turn clock of **${timeLabel}** ran out, so your async ThunderLite match${opponentName ? ` against **${opponentName}**` : ''} was resigned automatically.
 
-Up for another? [Start a fresh game](${roomsUrl}) any time, or [look back at your match history](${gamesUrl}).${signoff}${prefsFooter}`,
+[Look back at your match history](${gamesUrl})${prefsFooter}`,
 })
 
 /** Sent to the opponent when a player resigned an async match by hand. */
@@ -202,7 +194,7 @@ export const asyncOpponentResigned = (
 
 ${opponentName ? `**${opponentName}**` : 'Your opponent'} resigned your async ThunderLite match, so the win is yours.
 
-[See the final board](${roomUrl(session)}) or [start a rematch](${roomsUrl}).${signoff}${prefsFooter}`,
+[See the final board](${roomUrl(session)}) or [start a rematch](${roomsUrl}).${prefsFooter}`,
 })
 
 /** Sent to the opponent when the current player's clock ran out. */
@@ -215,5 +207,5 @@ export const asyncOpponentTimedOut = (
 
 ${opponentName ? `**${opponentName}**` : 'Your opponent'} ran out of time in your async ThunderLite match, so the win is yours.
 
-[See the final board](${roomUrl(session)}) or [start a rematch](${roomsUrl}).${signoff}${prefsFooter}`,
+[See the final board](${roomUrl(session)}) or [start a rematch](${roomsUrl}).${prefsFooter}`,
 })
