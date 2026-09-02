@@ -45,6 +45,12 @@
 	})
 	let seats = $state<Record<number, Seat>>({ 0: 'greedy', 1: 'search', 2: 'greedy', 3: 'greedy' })
 
+	// Declared ahead of `rebuild`, which the scene effect below calls during init.
+	let telemetry = $state<Record<number, SearchTelemetry>>({})
+	/** What the search expected of the position after its turn, per CPU turn. */
+	let predictions = $state<{ turn: number; team: number; value: number; greedy: number }[]>([])
+	let selectedUnit = $state<number | null>(null)
+
 	// The engine mutates the board in place; keep it out of deep reactivity.
 	let map = $state.raw<MapObject | undefined>(undefined)
 	let rebuildKey = $state(0)
@@ -100,9 +106,6 @@
 	})
 
 	// ── Telemetry & predictions ─────────────────────────────────────────────────
-	let telemetry = $state<Record<number, SearchTelemetry>>({})
-	/** What the search expected of the position after its turn, per CPU turn. */
-	let predictions = $state<{ turn: number; team: number; value: number; greedy: number }[]>([])
 	const onCpuSearch = (team: number, t: SearchTelemetry) => {
 		telemetry = { ...telemetry, [team]: t }
 		if (t.chosenValue !== null && t.greedyValue !== null) {
@@ -150,7 +153,6 @@
 	// ── Eval overlay ────────────────────────────────────────────────────────────
 	// Paint the selected CPU unit's position score over its reachable tiles (the same
 	// hook /dev/ai uses), normalised 0..1 for the dev HUD's amber tint. Q toggles the HUD.
-	let selectedUnit = $state<number | null>(null)
 	let cpuUnits = $derived.by(() => {
 		void $gameState
 		if (!map) return []
@@ -264,8 +266,11 @@
 <svelte:head><title>ThunderLite — AI Playtest</title></svelte:head>
 
 <div class="flex h-screen w-screen overflow-hidden bg-slate-900 text-slate-100">
-	<!-- Controls -->
-	<aside class="flex w-80 shrink-0 flex-col gap-5 overflow-y-auto border-r border-slate-700 p-4">
+	<!-- Controls. The match HUD pins a gear to the top-left corner of the viewport, so
+	     the column starts below it. -->
+	<aside
+		class="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r border-slate-700 p-4 pt-16"
+	>
 		<div>
 			<a href="/dev" class="text-xs text-slate-400 hover:text-slate-200">← dev</a>
 			<h1 class="mt-1 text-lg font-bold">AI Playtest</h1>
@@ -416,8 +421,16 @@
 		</section>
 	</aside>
 
+	<!-- Readouts, as a second left column: the match HUD owns the right edge of the
+	     viewport (its player panel and turn pill are position: fixed). -->
+	<aside
+		class="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-r border-slate-700 p-4 text-sm"
+	>
+		{@render readouts()}
+	</aside>
+
 	<!-- Board -->
-	<main class="relative flex min-w-0 flex-1 flex-col">
+	<main class="relative flex min-w-0 flex-1 flex-col pr-72">
 		<div class="relative flex-1 overflow-hidden">
 			{#if map}
 				<DevMatch
@@ -440,193 +453,185 @@
 			{/if}
 		</div>
 	</main>
+</div>
 
-	<!-- Readouts -->
-	<aside
-		class="flex w-96 shrink-0 flex-col gap-4 overflow-y-auto border-l border-slate-700 p-4 text-sm"
-	>
-		<section>
-			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Match</h2>
-			<div class="flex items-center gap-2">
-				<span
-					class="inline-block h-3 w-3 rounded-full"
-					style="background:{teamColor($gameState.currentTeam)}"
-				></span>
-				<span>Turn {$gameState.turnNumber} · team {$gameState.currentTeam}</span>
-				<span class="ml-auto text-xs uppercase text-slate-500">{$gameState.phase}</span>
-			</div>
-			<div class="mt-1 flex flex-wrap gap-x-4 text-xs text-slate-400">
-				{#each teams as team (team)}
-					<span><span style="color:{teamColor(team)}">●</span> {fmt(strengthNow(team))}</span>
-				{/each}
-			</div>
-		</section>
-
-		<section>
-			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-				Search telemetry
-			</h2>
-			{#if Object.keys(telemetry).length === 0}
-				<p class="text-xs text-slate-500">No search has run yet. Give a seat the Search policy.</p>
-			{/if}
-			{#each Object.entries(telemetry) as [team, t] (team)}
-				<div
-					class="mb-2 rounded border-l-4 bg-slate-800 p-2"
-					style="border-color:{teamColor(Number(team))}"
-				>
-					<div class="flex flex-wrap gap-x-3 text-xs tabular-nums">
-						<span>d{t.depthCompleted}{t.truncated ? '·cut' : ''}</span>
-						<span>{t.nodes} nodes</span>
-						<span>{fmt(t.ms)} ms</span>
-						<span>{t.rootPlans} plans</span>
-						{#if t.skipped}<span class="text-amber-300">skipped (army too large)</span>{/if}
-					</div>
-					<div class="mt-1 text-xs">
-						<span class="text-slate-400">chose</span>
-						<span class="font-mono">{t.chosen}</span>
-						<span class="text-slate-400">at</span>
-						{fmt(t.chosenValue)}
-						<span class="text-slate-400">· greedy</span>
-						{fmt(t.greedyValue)}
-					</div>
-					<ul class="mt-1 max-h-32 overflow-y-auto text-[11px] text-slate-400">
-						{#each t.plans as p (p.label)}
-							<li class="flex justify-between gap-2 font-mono">
-								<span class="truncate {p.label === t.chosen ? 'text-emerald-300' : ''}"
-									>{p.label}</span
-								>
-								<span class="tabular-nums"
-									>{fmt(p.value)} <span class="text-slate-600">d{p.depth}</span></span
-								>
-							</li>
-						{/each}
-					</ul>
-				</div>
+{#snippet readouts()}
+	<section>
+		<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Match</h2>
+		<div class="flex items-center gap-2">
+			<span
+				class="inline-block h-3 w-3 rounded-full"
+				style="background:{teamColor($gameState.currentTeam)}"
+			></span>
+			<span>Turn {$gameState.turnNumber} · team {$gameState.currentTeam}</span>
+			<span class="ml-auto text-xs uppercase text-slate-500">{$gameState.phase}</span>
+		</div>
+		<div class="mt-1 flex flex-wrap gap-x-4 text-xs text-slate-400">
+			{#each teams as team (team)}
+				<span><span style="color:{teamColor(team)}">●</span> {fmt(strengthNow(team))}</span>
 			{/each}
-		</section>
+		</div>
+	</section>
 
-		<section>
-			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-				Eval vs actual
-			</h2>
-			{#if evalVsActual.length === 0}
-				<p class="text-xs text-slate-500">
-					Each searched turn's expected value against the strength gap the chart recorded after it.
-				</p>
-			{:else}
-				{@const rows = evalVsActual.slice(-12)}
-				{@const span = Math.max(
-					1,
-					...rows.flatMap((r) => [Math.abs(r.value), Math.abs(r.actual ?? 0)])
-				)}
-				<svg viewBox="0 0 320 90" class="w-full">
-					<line x1="0" y1="45" x2="320" y2="45" stroke="#334155" />
-					{#each rows as r, i (i)}
-						{@const x = (i + 0.5) * (320 / rows.length)}
-						<circle cx={x} cy={45 - (r.value / span) * 40} r="3" fill={teamColor(r.team)} />
-						{#if r.actual !== null}
-							<rect
-								x={x - 3}
-								y={45 - (r.actual / span) * 40 - 3}
-								width="6"
-								height="6"
-								fill="none"
-								stroke="#e2e8f0"
-							/>
-						{/if}
-					{/each}
-				</svg>
-				<p class="text-[11px] text-slate-500">
-					Dots: the search's expectation. Squares: what happened.
-				</p>
-			{/if}
-		</section>
-
-		<section>
-			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-				Eval overlay
-			</h2>
-			<select bind:value={selectedUnit} class="w-full rounded bg-slate-800 px-2 py-1 text-sm">
-				<option value={null}>Off</option>
-				{#each cpuUnits as { u, tile } (tile)}
-					<option value={tile}>
-						T{u.team}
-						{unitData[u.type]?.name} @ {tile % (map?.cols ?? 1)},{Math.floor(
-							tile / (map?.cols ?? 1)
-						)}
-					</option>
-				{/each}
-			</select>
-			<p class="mt-1 text-[11px] text-slate-500">
-				Tints the unit's reachable tiles by position score and rings its favourite. Q toggles the
-				HUD.
-			</p>
-		</section>
-
-		<section>
-			<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Batch</h2>
-			<div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
-				<label class="flex items-center justify-between gap-2">
-					Games <input type="number" min="1" max="200" bind:value={batchGames} class="knob" />
-				</label>
-				<label class="flex items-center justify-between gap-2">
-					Rounds <input type="number" min="2" max="80" bind:value={batchRounds} class="knob" />
-				</label>
-				<label class="flex items-center justify-between gap-2">
-					A
-					<select bind:value={batchA} class="knob"
-						><option value="greedy">Greedy</option><option value="search">Search</option></select
-					>
-				</label>
-				<label class="flex items-center justify-between gap-2">
-					B
-					<select bind:value={batchB} class="knob"
-						><option value="greedy">Greedy</option><option value="search">Search</option></select
-					>
-				</label>
-				<label class="flex items-center justify-between gap-2">
-					Nodes <input type="number" min="10" step="10" bind:value={batchNodes} class="knob" />
-				</label>
-				<label class="flex items-center gap-2">
-					<input type="checkbox" bind:checked={batchAlternate} />
-					Swap seats
-				</label>
-			</div>
-			<div class="mt-2 flex gap-2">
-				<button
-					class="flex-1 rounded bg-emerald-600 px-2 py-1.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
-					disabled={batchRunning}
-					onclick={runTheBatch}
-				>
-					{batchRunning ? `Running ${batch?.games.length ?? 0}/${batchGames}` : 'Run headless'}
-				</button>
-				{#if batchRunning}
-					<button class="chip" onclick={() => (batchStop = true)}>Stop</button>
-				{/if}
-			</div>
-			{#if batch}
-				<div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums">
-					<span class="text-slate-400">A wins</span><span>{batch.wins[0] ?? 0}</span>
-					<span class="text-slate-400">B wins</span><span>{batch.wins[1] ?? 0}</span>
-					<span class="text-slate-400">Draw / unfinished</span><span>{batch.draws}</span>
-					<span class="text-slate-400">Avg rounds</span><span>{fmt(batch.avgRounds, 1)}</span>
-					<span class="text-slate-400">Avg gap (A − B)</span><span>{fmt(batch.avgGap)}</span>
-					<span class="text-slate-400">Nodes / s</span><span>{fmt(batch.nodesPerSecond)}</span>
-					<span class="text-slate-400">Avg depth</span><span>{fmt(batch.avgDepth, 2)}</span>
+	<section>
+		<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+			Search telemetry
+		</h2>
+		{#if Object.keys(telemetry).length === 0}
+			<p class="text-xs text-slate-500">No search has run yet. Give a seat the Search policy.</p>
+		{/if}
+		{#each Object.entries(telemetry) as [team, t] (team)}
+			<div
+				class="mb-2 rounded border-l-4 bg-slate-800 p-2"
+				style="border-color:{teamColor(Number(team))}"
+			>
+				<div class="flex flex-wrap gap-x-3 text-xs tabular-nums">
+					<span>d{t.depthCompleted}{t.truncated ? '·cut' : ''}</span>
+					<span>{t.nodes} nodes</span>
+					<span>{fmt(t.ms)} ms</span>
+					<span>{t.rootPlans} plans</span>
+					{#if t.skipped}<span class="text-amber-300">skipped (army too large)</span>{/if}
 				</div>
-				<ul class="mt-2 max-h-40 overflow-y-auto text-[11px] text-slate-400">
-					{#each batch.games as g (g.seed)}
-						<li class="flex justify-between font-mono">
-							<span>#{g.seed}</span>
-							<span>{g.winner === null ? '–' : g.winner === 0 ? 'A' : 'B'} · r{g.rounds}</span>
-							<span class="tabular-nums">{fmt((g.strength[0] ?? 0) - (g.strength[1] ?? 0))}</span>
+				<div class="mt-1 text-xs">
+					<span class="text-slate-400">chose</span>
+					<span class="font-mono">{t.chosen}</span>
+					<span class="text-slate-400">at</span>
+					{fmt(t.chosenValue)}
+					<span class="text-slate-400">· greedy</span>
+					{fmt(t.greedyValue)}
+				</div>
+				<ul class="mt-1 max-h-32 overflow-y-auto text-[11px] text-slate-400">
+					{#each t.plans as p (p.label)}
+						<li class="flex justify-between gap-2 font-mono">
+							<span class="truncate {p.label === t.chosen ? 'text-emerald-300' : ''}"
+								>{p.label}</span
+							>
+							<span class="tabular-nums"
+								>{fmt(p.value)} <span class="text-slate-600">d{p.depth}</span></span
+							>
 						</li>
 					{/each}
 				</ul>
+			</div>
+		{/each}
+	</section>
+
+	<section>
+		<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+			Eval vs actual
+		</h2>
+		{#if evalVsActual.length === 0}
+			<p class="text-xs text-slate-500">
+				Each searched turn's expected value against the strength gap the chart recorded after it.
+			</p>
+		{:else}
+			{@const rows = evalVsActual.slice(-12)}
+			{@const span = Math.max(
+				1,
+				...rows.flatMap((r) => [Math.abs(r.value), Math.abs(r.actual ?? 0)])
+			)}
+			<svg viewBox="0 0 320 90" class="w-full">
+				<line x1="0" y1="45" x2="320" y2="45" stroke="#334155" />
+				{#each rows as r, i (i)}
+					{@const x = (i + 0.5) * (320 / rows.length)}
+					<circle cx={x} cy={45 - (r.value / span) * 40} r="3" fill={teamColor(r.team)} />
+					{#if r.actual !== null}
+						<rect
+							x={x - 3}
+							y={45 - (r.actual / span) * 40 - 3}
+							width="6"
+							height="6"
+							fill="none"
+							stroke="#e2e8f0"
+						/>
+					{/if}
+				{/each}
+			</svg>
+			<p class="text-[11px] text-slate-500">
+				Dots: the search's expectation. Squares: what happened.
+			</p>
+		{/if}
+	</section>
+
+	<section>
+		<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Eval overlay</h2>
+		<select bind:value={selectedUnit} class="w-full rounded bg-slate-800 px-2 py-1 text-sm">
+			<option value={null}>Off</option>
+			{#each cpuUnits as { u, tile } (tile)}
+				<option value={tile}>
+					T{u.team}
+					{unitData[u.type]?.name} @ {tile % (map?.cols ?? 1)},{Math.floor(tile / (map?.cols ?? 1))}
+				</option>
+			{/each}
+		</select>
+		<p class="mt-1 text-[11px] text-slate-500">
+			Tints the unit's reachable tiles by position score and rings its favourite. Q toggles the HUD.
+		</p>
+	</section>
+
+	<section>
+		<h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Batch</h2>
+		<div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+			<label class="flex items-center justify-between gap-2">
+				Games <input type="number" min="1" max="200" bind:value={batchGames} class="knob" />
+			</label>
+			<label class="flex items-center justify-between gap-2">
+				Rounds <input type="number" min="2" max="80" bind:value={batchRounds} class="knob" />
+			</label>
+			<label class="flex items-center justify-between gap-2">
+				A
+				<select bind:value={batchA} class="knob"
+					><option value="greedy">Greedy</option><option value="search">Search</option></select
+				>
+			</label>
+			<label class="flex items-center justify-between gap-2">
+				B
+				<select bind:value={batchB} class="knob"
+					><option value="greedy">Greedy</option><option value="search">Search</option></select
+				>
+			</label>
+			<label class="flex items-center justify-between gap-2">
+				Nodes <input type="number" min="10" step="10" bind:value={batchNodes} class="knob" />
+			</label>
+			<label class="flex items-center gap-2">
+				<input type="checkbox" bind:checked={batchAlternate} />
+				Swap seats
+			</label>
+		</div>
+		<div class="mt-2 flex gap-2">
+			<button
+				class="flex-1 rounded bg-emerald-600 px-2 py-1.5 font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+				disabled={batchRunning}
+				onclick={runTheBatch}
+			>
+				{batchRunning ? `Running ${batch?.games.length ?? 0}/${batchGames}` : 'Run headless'}
+			</button>
+			{#if batchRunning}
+				<button class="chip" onclick={() => (batchStop = true)}>Stop</button>
 			{/if}
-		</section>
-	</aside>
-</div>
+		</div>
+		{#if batch}
+			<div class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums">
+				<span class="text-slate-400">A wins</span><span>{batch.wins[0] ?? 0}</span>
+				<span class="text-slate-400">B wins</span><span>{batch.wins[1] ?? 0}</span>
+				<span class="text-slate-400">Draw / unfinished</span><span>{batch.draws}</span>
+				<span class="text-slate-400">Avg rounds</span><span>{fmt(batch.avgRounds, 1)}</span>
+				<span class="text-slate-400">Avg gap (A − B)</span><span>{fmt(batch.avgGap)}</span>
+				<span class="text-slate-400">Nodes / s</span><span>{fmt(batch.nodesPerSecond)}</span>
+				<span class="text-slate-400">Avg depth</span><span>{fmt(batch.avgDepth, 2)}</span>
+			</div>
+			<ul class="mt-2 max-h-40 overflow-y-auto text-[11px] text-slate-400">
+				{#each batch.games as g (g.seed)}
+					<li class="flex justify-between font-mono">
+						<span>#{g.seed}</span>
+						<span>{g.winner === null ? '–' : g.winner === 0 ? 'A' : 'B'} · r{g.rounds}</span>
+						<span class="tabular-nums">{fmt((g.strength[0] ?? 0) - (g.strength[1] ?? 0))}</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+{/snippet}
 
 <style>
 	.knob {
