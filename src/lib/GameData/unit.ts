@@ -1,5 +1,6 @@
 import { imageLazyLoader } from '$lib/Sprites/imageLazyLoader'
 import type { modifierData } from './modifier'
+import type { PayloadKind } from './animation'
 
 type UnitData = ObjectAssetMeta & {
 	attackSprite: ObjectAssetMeta | null
@@ -36,6 +37,11 @@ type UnitData = ObjectAssetMeta & {
 	// unit stands adjacent. Drives movement-path ghosting + collision (see
 	// `concealedEnemyTiles`). Absent/false for ordinary units.
 	stealth?: boolean
+	// What a ranged unit fires. Drives the impact effect that lands on the struck
+	// tile so a distant hit is visible where it arrives, not just where it left.
+	// Required for every unit that shoots from range (min range >= 2, power > 0);
+	// melee units leave it unset since their swing already plays beside the target.
+	payload?: PayloadKind
 	modifiers: (keyof typeof modifierData)[]
 }
 
@@ -285,6 +291,7 @@ export const unitData: UnitData[] = [
 		cost: 285,
 		range: [2, 3],
 		actable: true,
+		payload: 'shell',
 		modifiers: ['Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	{
@@ -311,6 +318,7 @@ export const unitData: UnitData[] = [
 		cost: 470,
 		range: [3, 5],
 		actable: true,
+		payload: 'rocket',
 		modifiers: ['Can_Attack.Air_Raid', 'Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	{
@@ -358,6 +366,7 @@ export const unitData: UnitData[] = [
 		cost: 525,
 		range: [2, 3],
 		actable: true,
+		payload: 'shell',
 		modifiers: [
 			'Self_Action.Miner',
 			'Self_Action.Builder',
@@ -572,6 +581,7 @@ export const unitData: UnitData[] = [
 		cost: 0,
 		range: [2, 5],
 		actable: true,
+		payload: 'shell',
 		modifiers: ['Can_Attack.Air_Raid', 'Self_Action.Repairable'],
 	},
 	{
@@ -619,6 +629,7 @@ export const unitData: UnitData[] = [
 		cost: 800,
 		range: [2, 6],
 		actable: true,
+		payload: 'shell',
 		modifiers: ['Self_Action.Repairable'],
 	},
 	{
@@ -715,6 +726,7 @@ export const unitData: UnitData[] = [
 		cost: 320,
 		range: [2, 3],
 		actable: true,
+		payload: 'slug',
 		modifiers: ['Damage.Highground', 'Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	{
@@ -845,7 +857,7 @@ export const unitData: UnitData[] = [
 	{
 		url: '/game/play/unit/idle/albatross-gunship.png',
 		frames: 4,
-		xOffset: 0, 
+		xOffset: 0,
 		yOffset: 60,
 		attackSprite: {
 			url: '/game/play/unit/attack/albatross-gunship.png',
@@ -916,6 +928,7 @@ export const unitData: UnitData[] = [
 		cost: 500,
 		range: [2, 4],
 		actable: true,
+		payload: 'missile',
 		modifiers: ['Can_Attack.Air_Raid', 'Can_Attack.Counter_Range', 'Self_Action.Repairable'],
 	},
 	// Appended at the end on purpose: unit types are serialized by array index in
@@ -946,6 +959,7 @@ export const unitData: UnitData[] = [
 		cost: 400,
 		range: [2, 3],
 		actable: true,
+		payload: 'shell',
 		modifiers: [
 			'Damage.Siege',
 			'Attack.Splash',
@@ -979,7 +993,12 @@ export const unitData: UnitData[] = [
 		range: COMMON_RANGE,
 		actable: true,
 		stealth: true,
-		modifiers: ['End_Turn.Cloak', 'Damage.Stealth_Strike', 'Can_Attack.Air_Raid', 'Self_Action.Repairable'],
+		modifiers: [
+			'End_Turn.Cloak',
+			'Damage.Stealth_Strike',
+			'Can_Attack.Air_Raid',
+			'Self_Action.Repairable',
+		],
 	},
 ]
 

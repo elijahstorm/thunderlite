@@ -1,9 +1,10 @@
 import { buildScene, type DevSceneSpec } from './devScenes'
 
-// Hand-built scenes for the splash / lance / burn playground. Each one lines a
-// secondary-hit attacker (team 0, the one you control) up against a cluster so a
-// single click fires the whole area-of-effect: the flame/shrapnel/pierce overlays,
-// the lockstep health-bar drains, friendly fire, and the air-overfly type filter.
+// Hand-built scenes for the splash / lance / burn / payload playground. Each one
+// lines a secondary-hit or ranged attacker (team 0, the one you control) up against
+// a cluster so a single click fires the whole effect: the flame/shrapnel/pierce
+// overlays, the payload impacts a ranged round leaves where it lands, the lockstep
+// health-bar drains, friendly fire, and the air-overfly type filter.
 // Built through the same buildScene path as the shared dev scenes, so every board
 // is a genuine MapObject the real interactor and combat stack drive.
 //
@@ -179,6 +180,43 @@ const SPECS: SplashSceneSpec[] = [
 			{ x: 3, y: 4, unit: 'Scorpion Tank', team: 1 },
 			{ x: 4, y: 3, unit: 'Scorpion Tank', team: 1 },
 			{ x: 8, y: 6, unit: 'Strike Commando', team: 0 }, // spare
+		],
+	},
+	{
+		id: 'payload-impacts',
+		name: 'Ranged payloads — impact on arrival',
+		blurb: 'Four ranged shooters, one per ammunition, each lined up on its own target.',
+		tips: [
+			'Each lane is a different round: the Mortar Truck lobs a shell, the Rocket Truck a salvo, the Shrike a guided missile, the Strider a sniper slug.',
+			'Fire any of them — the impact blooms on the TARGET tile in step with its bar draining, so you can tell what got hit without watching health numbers.',
+			'The Mortar and Strider targets are ranged too, so they answer with their own round: watch the counter land back on the shooter.',
+			'Kills skip the small impact and play the full death blast instead.',
+		],
+		rows: [
+			'..........',
+			'..........',
+			'..........',
+			'..........',
+			'..........',
+			'..........',
+			'..........',
+			'..........',
+			'..........',
+		],
+		units: [
+			// shell: mortar on a mortar (ranged counter lands back on the shooter)
+			{ x: 1, y: 1, unit: 'Mortar Truck', team: 0 },
+			{ x: 4, y: 1, unit: 'Mortar Truck', team: 1 },
+			// rocket: long-range salvo on a tank that can't answer
+			{ x: 1, y: 3, unit: 'Rocket Truck', team: 0 },
+			{ x: 5, y: 3, unit: 'Scorpion Tank', team: 1 },
+			// missile: standoff air platform on a fighter
+			{ x: 1, y: 5, unit: 'Shrike Interdictor', team: 0 },
+			{ x: 4, y: 5, unit: 'Raptor Fighter', team: 1 },
+			// slug: sniper on a sniper (ranged counter)
+			{ x: 1, y: 7, unit: 'Strider', team: 0 },
+			{ x: 4, y: 7, unit: 'Strider', team: 1 },
+			{ x: 9, y: 8, unit: 'Strike Commando', team: 0 }, // spare — keeps the turn alive
 		],
 	},
 ]

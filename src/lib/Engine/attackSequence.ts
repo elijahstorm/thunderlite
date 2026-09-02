@@ -9,6 +9,7 @@ import {
 	endAnimationBeat,
 	repaintSignal,
 } from './Animator/animator'
+import { PAYLOAD_IMPACT_ANIMATION } from '$lib/GameData/animation'
 import { SECONDARY_EFFECT_ANIMATION } from '$lib/GameData/animation'
 import { canAttackTarget, hasModifier } from './modifiers/canAttack'
 import { computeBehindTile } from './modifiers/lance'
@@ -19,6 +20,16 @@ import { invalidateThreatOverlay } from './threatOverlay'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
 import type { CommitOptions } from './applyAction'
 import type { SerializedAction } from './Interactor/serializedAction'
+
+// The impact sheet a ranged shooter's round leaves on the tile it strikes, or null
+// for a melee unit. A melee swing plays right beside its victim, so the hit is
+// obvious; a ranged swing plays tiles away, and in a fast game the only clue to
+// *what* it hit was a bar quietly draining somewhere. Keyed off the unit's
+// declared `payload` (see unit.ts) so each ammunition lands looking like itself.
+const impactEffectFor = (shooter: UnitObject): number | null => {
+	const payload = unitData[shooter.type]?.payload
+	return payload ? PAYLOAD_IMPACT_ANIMATION[payload] : null
+}
 
 /**
  * Drives the visual choreography of one attack and commits its result. The beat:
@@ -192,6 +203,15 @@ export const animateAttackSequence = async (
 		//    play together) rather than one waiting on the other to finish.
 		const hits: Promise<void>[] = []
 
+		// A ranged attacker's round lands on the target tile as the bar drains, so
+		// the eye is drawn to where the hit arrived and not just the distant swing.
+		// Skipped on a kill: the death blast already marks the tile unmistakably,
+		// and a small burst under a big one just muddies it.
+		const impact = impactEffectFor(attacker)
+		if (impact !== null && !targetWillDie) {
+			hits.push(animateTileEffect(map, targetTile, impact))
+		}
+
 		if (targetWillDie) {
 			target.displayHealth = undefined
 			// Hide the doomed unit's idle sprite under the blast; the commit below
@@ -253,7 +273,13 @@ export const animateAttackSequence = async (
 				playActionSfx('death', attacker)
 				await animateExplosion(map, attackerTile)
 			} else {
-				await animateHealthBar(attacker, attackerHealthBefore, attackerHealthAfter, true)
+				// A ranged defender returning fire (Counter_Range) lobs its own round
+				// back, so its payload lands on the attacker's tile the same way.
+				const counterImpact = impactEffectFor(target)
+				await Promise.all([
+					...(counterImpact !== null ? [animateTileEffect(map, attackerTile, counterImpact)] : []),
+					animateHealthBar(attacker, attackerHealthBefore, attackerHealthAfter, true),
+				])
 			}
 		} else {
 			attacker.displayHealth = undefined

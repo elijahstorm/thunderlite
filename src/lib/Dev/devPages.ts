@@ -65,7 +65,7 @@ export const devPages: DevPage[] = [
 		href: '/dev/splash',
 		title: 'Splash / AoE Lab',
 		blurb:
-			'Line up splash, lance and burn attackers on hand-built clusters: hover to preview the red blast footprint, then fire and watch the flame/shrapnel/pierce effects, lockstep bar drains, friendly fire and the air-overfly filter.',
+			'Line up splash, lance, burn and ranged attackers on hand-built clusters: hover to preview the red blast footprint, then fire and watch the flame/shrapnel/pierce effects, the payload impact landing on a ranged target, lockstep bar drains, friendly fire and the air-overfly filter.',
 		tag: 'combat',
 		ready: true,
 	},
