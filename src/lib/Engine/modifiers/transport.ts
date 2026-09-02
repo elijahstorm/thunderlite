@@ -72,7 +72,11 @@ export type TransportLoadResult =
 	| { ok: true; transportTile: number }
 	| { ok: false; reason: 'no-commando' | 'no-transport' | 'cannot-transport' | 'occupied' }
 
-const carryHPRatio = (carrier: UnitObject, passengerMaxHP: number, passengerHP: number): number => {
+export const carryHPRatio = (
+	carrier: UnitObject,
+	passengerMaxHP: number,
+	passengerHP: number
+): number => {
 	const carrierMax = unitData[carrier.type].health
 	const ratio = passengerHP / passengerMaxHP
 	return Math.max(1, Math.round(carrierMax * ratio))
@@ -112,7 +116,7 @@ export const transportLoad = (
 const teamHasControl = (
 	map: MapObject | MapProcesser,
 	team: number,
-	modifier: ModifierKey,
+	modifier: ModifierKey
 ): boolean => {
 	for (const building of map.layers.buildings) {
 		if (!building || building.team !== team) continue
@@ -184,8 +188,7 @@ export const canAirLift = (map: MapObject | MapProcesser, unitTile: number): boo
 }
 
 export type AirLiftResult =
-	| { ok: true; transportTile: number }
-	| { ok: false; reason: 'no-unit' | 'cannot-air-lift' }
+	{ ok: true; transportTile: number } | { ok: false; reason: 'no-unit' | 'cannot-air-lift' }
 
 export const airLift = (map: MapObject | MapProcesser, unitTile: number): AirLiftResult => {
 	const unit = map.layers.units[unitTile]
@@ -218,16 +221,23 @@ export const hasRescuedUnit = (unit: UnitObject | null | undefined): boolean =>
 export const landTiles = (map: MapObject | MapProcesser, transportTile: number): number[] => {
 	const transport = map.layers.units[transportTile]
 	if (!transport || !transport.rescuedUnit) return []
-	const rescued = transport.rescuedUnit
-	const mapWithSky = map as MapObject
+	return canLandPassengerAt(map, transportTile, transport.rescuedUnit) ? [transportTile] : []
+}
 
-	const ground = map.layers.ground[transportTile]
-	if (!ground) return []
-	if (!validTerrain(ground, rescued)) return []
-	const sky = mapWithSky.layers.sky ? mapWithSky.layers.sky[transportTile] : null
-	const cost = drag(rescued, ground, sky ?? undefined)
-	if (cost >= 100) return []
-	return [transportTile]
+// The single-tile rule behind `landTiles`, for a passenger that is not (yet) standing
+// there: could `passenger` stand on `tile`'s ground under its sky? The CPU planner
+// asks this for every tile a carrier could fly to, and for a commando's hypothetical
+// lift before the lift exists, so it is exposed separately from the board lookup.
+export const canLandPassengerAt = (
+	map: MapObject | MapProcesser,
+	tile: number,
+	passenger: UnitObject
+): boolean => {
+	const ground = map.layers.ground[tile]
+	if (!ground) return false
+	if (!validTerrain(ground, passenger)) return false
+	const sky = (map as MapObject).layers.sky ? (map as MapObject).layers.sky[tile] : null
+	return drag(passenger, ground, sky ?? undefined) < 100
 }
 
 export type LandUnloadResult =

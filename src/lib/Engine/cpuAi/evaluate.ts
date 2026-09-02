@@ -2,22 +2,29 @@ import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { coverProtection, previewDamage } from '../combat'
 import { isMineableTerrainType } from '../modifiers/miner'
+import { canAttackTarget } from '../modifiers/canAttack'
 import {
 	planningUnits,
 	planningBuildings,
 	planningConcealed,
-	planningAttackReach,
+	planningStationaryReach,
 	planningThreatTiles,
 } from './planningContext'
 import { weights as W } from './weights'
 
+// A loaded carrier (Transporter / Leviathan) is worth its own hull PLUS the unit
+// inside it: the same accounting `matchTimeline.sampleTeams` shows the player, so the
+// heuristics and the search's evaluator agree about what a carrier is. Without this
+// every threat / cover / phantom term priced a Heavy Commando in the air at the
+// Transporter's `cost: 0` → 50 fallback and happily flew it into fire.
 export const unitValue = (unit: UnitObject): number => {
 	const data = unitData[unit.type]
 	if (!data) return 0
 	const max = data.health || 1
 	const hp = unit.health ?? max
 	const cost = data.cost > 0 ? data.cost : 50
-	return cost * (hp / max)
+	const own = cost * (hp / max)
+	return unit.rescuedUnit ? own + unitValue(unit.rescuedUnit) : own
 }
 
 // Cover as combat prices it (see coverProtection): ground/sea units read the
@@ -68,15 +75,20 @@ export const threatToTile = (
 	ignoreTile?: number
 ): number => {
 	let totalIncomingHP = 0
-	// Compact unit list + per-tick-cached enemy reach: this used to scan all map
-	// tiles and rebuild each enemy's attack list (and its own concealed set) for
-	// every candidate tile scored.
+	const domain = unitData[defender.type]?.type ?? 'any'
+	// Compact unit list + per-tick-cached enemy reach. The reach is stationary
+	// GEOMETRY (the diamond from where the enemy stands), not its attack list: the
+	// attack list only ever names tiles a target already occupies, so reading it here
+	// made every empty destination look perfectly safe and the threat term only ever
+	// bit on the tile a unit was already standing on.
 	for (const { tile: i, unit: enemy } of planningUnits(map)) {
 		if (i === ignoreTile) continue
 		if (enemy.team === cpuTeam) continue
 		if (concealed.has(i)) continue
-		const reach = planningAttackReach(map, i, enemy)
-		if (!reach.includes(tile)) continue
+		// A gun that can't be aimed at this kind of unit (no Air_Raid vs a plane, a
+		// ship's deck gun vs infantry) is no threat to it however close it is.
+		if (!canAttackTarget(enemy, defender)) continue
+		if (!planningStationaryReach(map, i, enemy, domain).has(tile)) continue
 		const dmg = previewDamage(enemy, defender, {
 			map,
 			defenderTile: tile,
@@ -109,6 +121,7 @@ export const incomingThreatMoveAware = (
 	for (const { tile: i, unit: enemy } of planningUnits(map)) {
 		if (enemy.team === cpuTeam) continue
 		if (concealed.has(i)) continue
+		if (!canAttackTarget(enemy, unit)) continue
 		// Reach measured against THIS unit's domain — an air unit isn't sheltered by
 		// the Trench/ridge geometry that would hide a ground unit on the same tile.
 		if (!planningThreatTiles(map, i, enemy, domain).has(tile)) continue

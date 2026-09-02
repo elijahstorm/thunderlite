@@ -69,13 +69,49 @@ export const unitThreatTiles = (
 	if (min > 1) {
 		// Indirect / long-range: can't move-and-fire, and can't reach Trench tiles.
 		// High ground extends its reach by one tile (mirrors generateAttackList).
-		addAttackDiamond(map, tile, min, max + extraRangeBonus(map, tile, unit), out, true, targetDomain)
+		addAttackDiamond(
+			map,
+			tile,
+			min,
+			max + extraRangeBonus(map, tile, unit),
+			out,
+			true,
+			targetDomain
+		)
 	} else {
 		// Direct: closes to point-blank, so move first then strike — Trenches included.
 		for (const from of generateMovementList(map, tile, unit)) {
 			addAttackDiamond(map, from, min, max, out, false, targetDomain)
 		}
 	}
+	return out
+}
+
+// Every tile the unit on `tile` could strike WITHOUT moving first: the attack
+// diamond from where it already stands (high ground included for indirect fire).
+// This is the "who can shoot a unit parked here from where they are now" question
+// the CPU's cheap threat term asks; `unitThreatTiles` above is the move-aware
+// superset. Pure geometry — it doesn't care whether a target is on the tile yet,
+// which is the whole point: the planner asks about tiles it is *considering*.
+export const stationaryThreatTiles = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	targetDomain: 'any' | 'ground' | 'air' | 'sea' = 'any'
+): Set<number> => {
+	const out = new Set<number>()
+	const stats = unitData[unit.type]
+	if (!stats || stats.power <= 0) return out
+	const [min, max] = stats.range
+	addAttackDiamond(
+		map,
+		tile,
+		min,
+		max + extraRangeBonus(map, tile, unit),
+		out,
+		min > 1,
+		targetDomain
+	)
 	return out
 }
 

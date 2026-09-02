@@ -6,6 +6,8 @@ import { hasAdjacentEnemy, adjacentTiles } from '../modifiers/cloak'
 import { canAttackTarget, hasModifier } from '../modifiers/canAttack'
 import { computeBehindTile } from '../modifiers/lance'
 import { tilesInRange } from '../modifiers/radar'
+import { canLandPassengerAt } from '../modifiers/transport'
+import { generateMovementList } from '../Interactor/Pathing/movement'
 import { strongestSuspicion } from './stealthMemory'
 import { phantomThreatAt, exploreValue } from './fogMemory'
 import { NEUTRAL_TEAM } from '../gameState'
@@ -45,8 +47,10 @@ const damageValue = (victim: UnitObject, damage: number): number => {
 	const hp = victim.health ?? max
 	const cost = data.cost > 0 ? data.cost : 50
 	// A lethal hit is worth the target's remaining value — which is `unitValue`, so
-	// the two branches meet continuously at `damage === hp`.
-	if (damage >= hp) return cost * (hp / max)
+	// the two branches meet continuously at `damage === hp` (and, for a loaded
+	// carrier, takes the passenger down with it; a sub-lethal hit never touches the
+	// passenger, whose HP rides inside untouched).
+	if (damage >= hp) return unitValue(victim)
 	return cost * (damage / max)
 }
 
@@ -363,7 +367,8 @@ export const expectedLossAt = (
 	const max = data.health || 1
 	const hp = unit.health ?? max
 	const cost = data.cost > 0 ? data.cost : 50
-	if (incoming >= hp) return cost * (hp / max) * W.LETHAL_PENALTY
+	// Certain death costs everything on board, passenger included (see `unitValue`).
+	if (incoming >= hp) return unitValue(unit) * W.LETHAL_PENALTY
 	return cost * (incoming / max)
 }
 
@@ -767,6 +772,35 @@ const scoreReinforcementTile = (map: MapObject, tile: number, cpuTeam: number): 
 	return penalty
 }
 
+// ── Carriers: a loaded Transporter / Leviathan is a delivery, not a unit ──────
+//
+// A carrier has no gun and exists only to put its passenger somewhere. Left to the
+// ordinary position terms it would happily hover forever: nothing told it that
+// ending a turn still loaded is a turn the passenger did nothing, and nothing told a
+// Leviathan drifting away from every shore that it had just marooned a tank. Two
+// penalties fix both, priced above the positional noise between one hover tile and
+// the next so that any decent landing (see the `land` plan kind in candidates.ts)
+// beats every hover, and a hover with a shore in reach beats one without.
+//
+// Zero for anything that isn't carrying a passenger, so no other unit is touched.
+const carrierHoldCost = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	concealed?: ReadonlySet<number>
+): number => {
+	const passenger = unit.rescuedUnit
+	if (!passenger) return 0
+	let cost = W.HOVER_PENALTY
+	// Stranded: nowhere the passenger could be set down inside the carrier's NEXT move
+	// from here. Checked with the carrier's own reach (an air Transporter flies over
+	// anything; a Leviathan is bound to the water) against the passenger's footing.
+	const reach = generateMovementList(map, tile, unit, concealed)
+	const landable = reach.some((t) => canLandPassengerAt(map, t, passenger))
+	if (!landable) cost += W.STRANDED_PENALTY
+	return cost
+}
+
 // `concealed` (enemies the CPU can't perceive) is threaded into the threat and
 // closest-enemy terms so the AI scores positions blind to fogged/stealthed foes.
 // `lurking` is the count of enemy stealth units the CPU *remembers but can't see*
@@ -789,7 +823,10 @@ export const scorePositionBonus = (
 	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
 	// Capture-capable units feel the objective pull harder — they're the only ones who
 	// can actually take a building — so they press in instead of milling at the front.
-	const objWeight = hasModifier(unit, 'Start_Turn.Capture') ? W.OBJ_WEIGHT_CAPTOR : W.OBJ_WEIGHT
+	// A carrier borrows its passenger's intent: a Transporter can't capture, but the
+	// commando it is delivering can, and the delivery should fly like the commando walks.
+	const intent = unit.rescuedUnit ?? unit
+	const objWeight = hasModifier(intent, 'Start_Turn.Capture') ? W.OBJ_WEIGHT_CAPTOR : W.OBJ_WEIGHT
 	// Ranged units (min range ≥ 2, and never capture-capable here) seek standoff instead
 	// of charging: hold the enemy at firing distance rather than closing onto the front.
 	const [minRange, maxRange] = unitData[unit.type]?.range ?? [0, 0]
@@ -835,6 +872,9 @@ export const scorePositionBonus = (
 	// Vacate a tile our own reinforcement is about to land on (a blocked drop is lost),
 	// unless the positive terms above make holding worth the sacrifice.
 	const reinforcement = scoreReinforcementTile(map, tile, cpuTeam)
+	// A loaded carrier pays for every turn it ends still loaded, and dearly for ending
+	// somewhere its passenger can never get off (see carrierHoldCost).
+	const hold = carrierHoldCost(map, tile, unit, concealed)
 	return (
 		cover -
 		threat +
@@ -850,7 +890,8 @@ export const scorePositionBonus = (
 		overextend +
 		cohesion -
 		separation -
-		reinforcement
+		reinforcement -
+		hold
 	)
 }
 

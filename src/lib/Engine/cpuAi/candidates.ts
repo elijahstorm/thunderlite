@@ -4,6 +4,7 @@ import { buildingData } from '$lib/GameData/building'
 import { hasModifier, isRanged } from '../modifiers/canAttack'
 import { canMineAt } from '../modifiers/miner'
 import { buildableAdjacentTiles } from '../modifiers/builder'
+import { canLandPassengerAt } from '../modifiers/transport'
 import { isWalletUnit, walletOf } from '../wallet'
 import { generateMovementList } from '../Interactor/Pathing/movement'
 import { generateAttackList } from '../Interactor/Pathing/attack'
@@ -75,6 +76,13 @@ export const generatePlansFor = (
 		return generateBuilderPlans(map, unitTile, unit, cpuTeam, reachable, concealed)
 	}
 
+	// A loaded Transporter / Leviathan is a delivery in progress: it flies (or sails)
+	// somewhere its passenger can stand and sets it down, or it keeps going. It has no
+	// gun and can't capture, so none of the combat plans below apply to it.
+	if (unit.rescuedUnit) {
+		return generateCarrierPlans(map, unitTile, unit, cpuTeam, reachable, concealed, lurking)
+	}
+
 	// Ranged units may either move or attack in a turn, not both, so they can only
 	// fire from their current tile. Direct units may move-then-attack from any destination.
 	const ranged = isRanged(unit)
@@ -140,6 +148,88 @@ export const generatePlansFor = (
 					unitTile,
 					kind: 'repair',
 					score: repairValue + position,
+					actions: [{ kind: 'repair', tile: dest }],
+				})
+			}
+		}
+
+		plans.push({
+			unitTile,
+			kind: 'wait',
+			score: scoreWait(map, dest, unit, cpuTeam, concealed, lurking),
+			actions: [...moveActions(unitTile, dest), { kind: 'wait', tile: dest }],
+		})
+	}
+
+	return plans
+}
+
+/** The single best score among a unit's plans (what it would actually pick, modulo sampling). */
+const bestScore = (plans: readonly ActionPlan[]): number => {
+	let best = -Infinity
+	for (const plan of plans) if (plan.score > best) best = plan.score
+	return best
+}
+
+// Plans for a carrier holding a passenger (a Transporter in the air, a Leviathan at
+// sea). For every tile in the carrier's reach where the passenger could stand, a
+// `land` plan: fly there and unload. It is scored as THE PASSENGER'S plan at that
+// tile — the capture it would start, or the position it would hold — because that is
+// who ends the turn standing there; the carrier itself ceases to exist on landing.
+//
+// Two shapes fall out of the acted-state rules (applyAction: unload keeps the tile's
+// flag, move sets it):
+//   • move → unload: the passenger lands spent, exactly as if it had walked there.
+//   • unload in place (dest === unitTile): the passenger lands FREE and the tick loop
+//     plans it as an ordinary unit next tick, so this plan is worth whatever the
+//     passenger's best ordinary plan from here is — a land-then-attack needs no extra
+//     machinery, just the bare unload emitted first.
+// The carrier's own move-and-wait plans stay, priced by the hover / stranded
+// penalties in scorePositionBonus, so it only keeps flying when nothing landable is
+// in reach (or every landing is worse than another turn aloft).
+const generateCarrierPlans = (
+	map: MapObject,
+	unitTile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	reachable: number[],
+	concealed: ReadonlySet<number>,
+	lurking: number
+): ActionPlan[] => {
+	const plans: ActionPlan[] = []
+	const passenger = unit.rescuedUnit
+	if (!passenger) return plans
+
+	for (const dest of reachable) {
+		if (canLandPassengerAt(map, dest, passenger)) {
+			let score: number
+			if (dest === unitTile) {
+				score = bestScore(generatePlansFor(map, dest, passenger, cpuTeam))
+				if (!Number.isFinite(score)) score = 0
+			} else {
+				const position = scorePositionBonus(map, dest, passenger, cpuTeam, concealed, lurking)
+				score = canCapture(map, dest, passenger)
+					? scoreCapture(map, dest, cpuTeam) + position * 0.5
+					: scoreWait(map, dest, passenger, cpuTeam, concealed, lurking)
+			}
+			plans.push({
+				unitTile,
+				kind: 'land',
+				score: score + W.LAND_BONUS,
+				actions: [
+					...moveActions(unitTile, dest),
+					{ kind: 'transport-unload', transport: dest, tile: dest },
+				],
+			})
+		}
+
+		if (dest === unitTile && canRepairUnit(unit)) {
+			const repairValue = scoreRepair(unit)
+			if (repairValue > 0) {
+				plans.push({
+					unitTile,
+					kind: 'repair',
+					score: repairValue + scorePositionBonus(map, dest, unit, cpuTeam, concealed, lurking),
 					actions: [{ kind: 'repair', tile: dest }],
 				})
 			}

@@ -1,6 +1,6 @@
 import { concealedEnemyTiles } from '../visibility'
 import { generateAttackList } from '../Interactor/Pathing/attack'
-import { unitThreatTiles } from '../Interactor/Pathing/threat'
+import { stationaryThreatTiles, unitThreatTiles } from '../Interactor/Pathing/threat'
 
 // Per-tick memo cache for the CPU planner.
 //
@@ -31,6 +31,7 @@ type PlanningContext = {
 	buildings: BuildingEntry[] | null
 	concealed: Map<number, ReadonlySet<number>>
 	attackReach: Map<number, number[]>
+	stationaryReach: Map<string, Set<number>>
 	threatTiles: Map<string, Set<number>>
 	growth: Map<number, number>
 	flock: Map<UnitObject, unknown>
@@ -48,6 +49,7 @@ export const beginCpuPlanning = (map: MapObject): void => {
 		buildings: null,
 		concealed: new Map(),
 		attackReach: new Map(),
+		stationaryReach: new Map(),
 		threatTiles: new Map(),
 		growth: new Map(),
 		flock: new Map(),
@@ -120,6 +122,29 @@ export const planningAttackReach = (map: MapObject, tile: number, unit: UnitObje
 		c.attackReach.set(tile, reach)
 	}
 	return reach
+}
+
+/**
+ * `stationaryThreatTiles` for an enemy on `tile`, memoised by tile + target domain:
+ * the tiles it can hit next turn without moving. Geometry only, so it is valid for
+ * empty tiles the planner is merely considering (the attack list above is not — it
+ * only ever lists tiles a target already stands on).
+ */
+export const planningStationaryReach = (
+	map: MapObject,
+	tile: number,
+	unit: UnitObject,
+	targetDomain: 'any' | 'ground' | 'air' | 'sea' = 'any'
+): Set<number> => {
+	const c = active(map)
+	if (!c) return stationaryThreatTiles(map, tile, unit, targetDomain)
+	const key = `${tile}:${targetDomain}`
+	let set = c.stationaryReach.get(key)
+	if (!set) {
+		set = stationaryThreatTiles(map, tile, unit, targetDomain)
+		c.stationaryReach.set(key, set)
+	}
+	return set
 }
 
 /** `unitThreatTiles` for an enemy on `tile`, memoised by tile + target domain. */

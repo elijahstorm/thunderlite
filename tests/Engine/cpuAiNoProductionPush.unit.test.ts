@@ -177,7 +177,12 @@ describe('CPU with no way to reinforce', () => {
 
 	it('keeps pushing forward round on round rather than milling', () => {
 		// Ground gained every round up to contact, not a shuffle around the same tiles.
-		expect(snapshots[2].cpuFront).toBeGreaterThan(snapshots[1].cpuFront)
+		// Once the line is met the front legitimately holds while the fight is won, so a
+		// round that kills instead of walking counts as progress too (the threat term
+		// pricing empty tiles made the CPU stop over-walking into the enemy line).
+		const gained = snapshots[2].cpuFront > snapshots[1].cpuFront
+		const killed = snapshots[2].foeAlive < snapshots[1].foeAlive
+		expect(gained || killed).toBe(true)
 	})
 
 	it('trades as an army instead of being picked off one at a time', () => {
