@@ -1,4 +1,4 @@
-import { get } from 'svelte/store'
+import { get, writable } from 'svelte/store'
 import { unitData } from '$lib/GameData/unit'
 import { buildingData } from '$lib/GameData/building'
 import { gameState } from '../gameState'
@@ -131,6 +131,9 @@ export type SearchResult = {
 }
 
 const GREEDY: TurnPlan = { overrides: [], build: null, label: 'greedy' }
+
+/** The last live search's telemetry, for the dev pages. Null until a search has run. */
+export const searchTelemetry = writable<SearchTelemetry | null>(null)
 
 const now = (): number =>
 	typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -313,8 +316,13 @@ const alternativeBuild = (map: MapObject, team: number): SerializedAction | null
 
 // ── Applying a turn plan to a node ──────────────────────────────────────────────
 
-/** Whether a per-unit plan can still be applied verbatim to this board. */
-const planStillValid = (map: MapObject, plan: ActionPlan, team: number): boolean => {
+/**
+ * Whether a per-unit plan can still be applied verbatim to this board (the unit is
+ * where the plan left it, unacted; its destination is free; its target is alive).
+ * Read live by `runCpuTurn` before dispatching a searched override, and by the
+ * search when stacking two overrides in one turn plan.
+ */
+export const planStillValid = (map: MapObject, plan: ActionPlan, team: number): boolean => {
 	const acted = get(gameState).actedTiles
 	const mover = map.layers.units[plan.unitTile]
 	if (!mover || mover.team !== team || acted.has(plan.unitTile)) return false

@@ -24,6 +24,17 @@ import { isWalletUnit } from './wallet'
 import type { SerializedAction } from './Interactor/serializedAction'
 import type { ActionPlan } from './cpuAi/types'
 import { weights as W } from './cpuAi/weights'
+import { believedSnapshot } from './cpuAi/sim'
+import {
+	DEFAULT_SEARCH,
+	planStillValid,
+	searchTelemetry,
+	searchTurnAsync,
+	type SearchConfig,
+	type SearchTelemetry,
+} from './cpuAi/search'
+import { canDeployFromFactory, discountedUnitCost } from './build'
+import { unitData } from '$lib/GameData/unit'
 
 // Gap inserted *between* consecutive CPU actions. Each move/attack now plays its
 // own animation (same helpers a human's actions use), so the bulk of the pacing
@@ -72,11 +83,42 @@ export type CpuAiHandle = {
 	cancel: () => void
 }
 
+/**
+ * How the CPU decides its turn. `greedy` is the depth-1 planner (the default, and
+ * always the floor); `search` runs the time-boxed lookahead first (cpuAi/search.ts)
+ * and dispatches its chosen root plan, then plays greedy for whatever it left open.
+ */
+export type CpuPolicy = 'greedy' | 'search'
+
 export type CpuAiOptions = {
 	humanTeam: number
 	endTurn: () => void
 	map: MapObject
 	delayMs?: number
+	policy?: CpuPolicy
+	/** Search settings (depth, beams, budget). Merged over `DEFAULT_SEARCH`. */
+	search?: Partial<SearchConfig>
+	/** Fires with every search's telemetry (the dev playtest readout). */
+	onSearch?: (telemetry: SearchTelemetry) => void
+}
+
+/** Default wall-clock thinking time per CPU turn when the policy is `search`. */
+export const LIVE_SEARCH_BUDGET_MS = 1500
+/** Never let one turn's search approach the 45 s online stall watchdog. */
+export const MAX_SEARCH_BUDGET_MS = 10_000
+/** A hidden tab gets a tiny, timer-free node budget instead of a clock. */
+export const HIDDEN_SEARCH_NODES = 200
+/** Re-search after a diverged dispatch only while this share of the budget remains. */
+export const RESEARCH_MIN_FRACTION = 0.3
+
+/**
+ * The time a live search may take: the requested budget, scaled down as the army
+ * grows (a big board already strains depth 1; past the lazy threshold the search is
+ * skipped outright) and hard-capped well under the stall watchdog.
+ */
+export const liveSearchBudget = (requestedMs: number, actableUnits: number): number => {
+	const scale = Math.max(0.3, 1 - actableUnits / W.LAZY_PLAN_THRESHOLD)
+	return Math.min(MAX_SEARCH_BUDGET_MS, Math.max(0, requestedMs * scale))
 }
 
 export const isCpuTurn = (humanTeam: number): boolean => {
@@ -211,6 +253,9 @@ export const runCpuTurn = ({
 	endTurn,
 	map,
 	delayMs = CPU_AI_TURN_DELAY_MS,
+	policy = 'greedy',
+	search = {},
+	onSearch,
 }: CpuAiOptions): CpuAiHandle => {
 	const startTurn = get(gameState).turnNumber
 	const startTeam = get(gameState).currentTeam
@@ -267,6 +312,97 @@ export const runCpuTurn = ({
 			return
 		}
 		timer = setTimeout(fn, delayMs)
+	}
+
+	// ── The search policy ─────────────────────────────────────────────────────────
+	// The lookahead runs once at the start of the turn (yielding to the event loop so
+	// the banner and board keep painting) and hands back a root TurnPlan: a few
+	// per-unit overrides to play first, an optional first build, greedy for the rest.
+	// Each tick then dispatches ONE override through the same funnel a greedy plan
+	// uses, so relay, collision truncation, sync-lock and animation are untouched. If
+	// a dispatched action lands differently than the plan assumed (a route truncated by
+	// a hidden unit, an override the board no longer allows) the rest of the plan is
+	// dropped and the turn is re-searched with whatever budget remains — or finished
+	// greedy when there is not enough left to be worth it.
+	const searchConfig: SearchConfig = { ...DEFAULT_SEARCH, ...search }
+	const requestedMs = search.budget?.ms ?? LIVE_SEARCH_BUDGET_MS
+	let overrideQueue: ActionPlan[] = []
+	let buildOverride: SerializedAction | null = null
+	let searched = policy !== 'search'
+	let budgetLeftMs = Infinity
+
+	const countActable = (): number => {
+		const acted = get(gameState).actedTiles
+		let n = 0
+		map.layers.units.forEach((u, tile) => {
+			if (u && u.team === startTeam && !acted.has(tile)) n++
+		})
+		return n
+	}
+
+	const runSearch = async (): Promise<void> => {
+		searched = true
+		const actable = countActable()
+		const isHidden = hidden()
+		if (budgetLeftMs === Infinity) budgetLeftMs = liveSearchBudget(requestedMs, actable)
+		const config: SearchConfig = {
+			...searchConfig,
+			budget: isHidden
+				? { nodes: Math.min(HIDDEN_SEARCH_NODES, search.budget?.nodes ?? HIDDEN_SEARCH_NODES) }
+				: search.budget?.nodes !== undefined
+					? { nodes: search.budget.nodes, ms: budgetLeftMs }
+					: { ms: budgetLeftMs },
+		}
+		const startedAt = Date.now()
+		// The search only ever touches its own snapshot; `commit` is unreachable from it.
+		const board = believedSnapshot(map, startTeam)
+		const result = await searchTurnAsync(board, startTeam, config, {
+			stop: () => !stillOurTurn(),
+			noYield: isHidden,
+		})
+		budgetLeftMs = Math.max(0, budgetLeftMs - (Date.now() - startedAt))
+		if (!stillOurTurn()) return
+		overrideQueue = result.plan.overrides.slice()
+		buildOverride = result.plan.build
+		searchTelemetry.set(result.telemetry)
+		onSearch?.(result.telemetry)
+	}
+
+	// The plan assumed a board that has since changed: forget the rest of it, and think
+	// again if there is still meaningful time to do so.
+	const diverged = (): void => {
+		overrideQueue = []
+		buildOverride = null
+		const initial = liveSearchBudget(requestedMs, countActable())
+		if (policy === 'search' && !hidden() && budgetLeftMs >= RESEARCH_MIN_FRACTION * initial) {
+			searched = false
+		}
+	}
+
+	/** The next searched override the live board still allows, dropping stale ones. */
+	const nextOverride = (): ActionPlan | null => {
+		while (overrideQueue.length > 0) {
+			const candidate = overrideQueue.shift() as ActionPlan
+			if (planStillValid(map, candidate, startTeam)) return candidate
+			diverged()
+		}
+		return null
+	}
+
+	/** The search's first build, if the factory, the money and the tile still allow it. */
+	const takeBuildOverride = (): SerializedAction | null => {
+		const forced = buildOverride
+		buildOverride = null
+		if (!forced || forced.kind !== 'build') return null
+		const state = get(gameState)
+		const building = map.layers.buildings[forced.building]
+		const player = state.players.find((p) => p.team === startTeam)
+		const data = unitData[forced.unitType]
+		if (!building || building.team !== startTeam || !player || !data) return null
+		if (state.actedTiles.has(forced.building) || map.layers.units[forced.building]) return null
+		if (player.money < discountedUnitCost(player, data)) return null
+		if (!canDeployFromFactory(map, forced.building, forced.unitType)) return null
+		return forced
 	}
 
 	const finish = () => {
@@ -403,10 +539,17 @@ export const runCpuTurn = ({
 		// back to the player. Without this net a single throw leaves the turn
 		// hung, since nothing else schedules the next tick.
 		try {
-			const plan = pickBestPlan(map, startTeam, planCache, startTurn)
+			if (!searched) {
+				await runSearch()
+				if (!stillOurTurn()) return
+			}
+			// A searched override goes first; once the queue is empty (or was never
+			// filled) every remaining unit is planned greedily, exactly as before.
+			const override = nextOverride()
+			const plan = override ?? pickBestPlan(map, startTeam, planCache, startTurn)
 			const actions = plan?.actions ?? []
 			if (actions.length === 0) {
-				const build = pickBuildOnce(map, startTeam)
+				const build = takeBuildOverride() ?? pickBuildOnce(map, startTeam)
 				if (!build) {
 					finish()
 					return
@@ -426,7 +569,11 @@ export const runCpuTurn = ({
 				const result = await dispatch(action)
 				changed.push(...result.changed)
 				// A blind move that collided ends this unit's plan; other units still act.
-				if (!result.proceed) break
+				if (!result.proceed) {
+					// The board no longer matches what the search assumed.
+					if (override) diverged()
+					break
+				}
 			}
 			invalidatePlans(planCache, changed, map)
 			if (!stillOurTurn()) return
