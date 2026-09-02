@@ -6,6 +6,7 @@ import { animateExplosion } from './Animator/animator'
 import { gameState, type GameState, type Player } from './gameState'
 import { runModifiers, type ModifierContext, type ModifierPhase } from './modifiers'
 import { applySkyHiding } from './visibility'
+import { releaseSight } from './fogState'
 import { resetCaptureProgress } from './modifiers/capture'
 import { applyWinConditions } from './winConditions'
 import { decaySmoke } from './smokeState'
@@ -163,6 +164,9 @@ export const endTurn = ({ map }: EndTurnOptions = {}): void => {
 	const advance = nextActiveTeam(before.players, before.currentTeam)
 	if (!advance) return
 
+	// Nothing is mid-decision across a turn handover: drop any pre-move sight
+	// freeze so the outgoing side's fog settles on the live board.
+	releaseSight()
 	gameState.update((state) => ({
 		...state,
 		currentTeam: advance.team,

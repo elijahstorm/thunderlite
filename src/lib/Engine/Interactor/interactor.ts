@@ -247,6 +247,10 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 		return
 	}
 
+	// Hold our side's sight as it stands right now, before the unit leaves. Until
+	// the post-move menu resolves, fog and the attack list are judged from here, so
+	// stepping up beside an enemy in the dark can't unveil and shoot it in one go.
+	freezeSight(map, unit.team)
 	map.layers.units[tile] = null
 	// Footsteps roll *with* the walk, not after it: voice the movement sfx as the
 	// slide starts.
@@ -278,7 +282,9 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 		applyAction(map, moveAction, { live: true, suppressSfxActions: ['move'] })
 		// Walked into a concealed enemy mid-route: turn over, skip menu / callback.
 		// The unit bumps the tile it hit so the halt reads as an ambush, not a stroll.
+		// No decision left to make, so the held pre-move sight lifts here.
 		if (collided) {
+			releaseSight()
 			if (blocked !== undefined) void animateBlocked(map, unit, finalTile, blocked)
 			return
 		}
@@ -360,7 +366,10 @@ const attack: Interactor = ({ map, tile, choice }) => {
 const performAttack = (map: MapObject, attackerTile: number, targetTile: number) => {
 	const attacker = map.layers.units[attackerTile]
 	const target = map.layers.units[targetTile]
-	if (!attacker || !target) return
+	if (!attacker || !target) {
+		releaseSight()
+		return
+	}
 	// Relay the attack to opponents at the START of our choreography so they animate
 	// their copy concurrently, rather than waiting out our full swing + counter and
 	// only then starting theirs. State is applied locally at the end of the sequence;
@@ -368,9 +377,11 @@ const performAttack = (map: MapObject, attackerTile: number, targetTile: number)
 	emitOutgoingAction({ kind: 'attack', from: attackerTile, to: targetTile })
 	// The sequencer plays attack → (target bar / explosion) → counter → (attacker
 	// bar / explosion), applying the authoritative result at the end.
+	// The strike settles the unit's post-move decision: once the result is applied,
+	// let the fog catch up to where it now stands (see `frozenSight`).
 	void animateAttackSequence(map, attackerTile, targetTile, (action, opts) =>
 		applyAction(map, action, { live: true, ...opts })
-	)
+	).then(releaseSight, releaseSight)
 }
 
 const selectAttackTarget: Interactor = ({ map, tile }) => {
@@ -392,7 +403,13 @@ const selectAttackTarget: Interactor = ({ map, tile }) => {
 	highlightActionsList(map, [])
 	map.pathHistory = []
 
-	if (!valid) return
+	// Backing out of the attack prompt after a move idles the unit where it stands
+	// (its tile was marked acted by the move), so its decision is over: drop any
+	// pre-move sight freeze and let the fog update.
+	if (!valid) {
+		releaseSight()
+		return
+	}
 
 	performAttack(map, source, tile)
 }

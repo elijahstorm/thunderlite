@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store'
 import { buildingData } from '$lib/GameData/building'
 import { unitData } from '$lib/GameData/unit'
 import { resetSmoke } from './smokeState'
+import { releaseSight } from './fogState'
 
 /**
  * The owner value for an unclaimed (neutral) building. Players are teams 0–3;
@@ -169,6 +170,7 @@ export const refreshControlsFromMap = (map: MapProcesser | MapObject): void => {
 export const resetGameState = (): void => {
 	gameState.set(makeInitialState())
 	resetSmoke()
+	releaseSight()
 }
 
 export const markTileActed = (tile: number): void => {

@@ -7,7 +7,7 @@ import { tilesInRange } from './modifiers/radar'
 import { extraSightBonus } from './modifiers/extraSight'
 import { hasLineOfSight, type OcclusionMode } from './lineOfSight'
 import { occlusionMode } from './occlusionState'
-import { fogOfWarEnabled } from './fogState'
+import { fogOfWarEnabled, frozenSight, heldSight } from './fogState'
 import { isSmokeConcealed } from './smokeState'
 
 export const isUnitVisibleTo = (unit: UnitObject, team: number): boolean => {
@@ -18,8 +18,7 @@ export const isUnitVisibleTo = (unit: UnitObject, team: number): boolean => {
 // Whether `unit`'s type can conceal itself (Stealth Tank, U-Boat). Stealth units
 // behave as if hidden in fog even when fog is off; an observer only sees them once
 // one of their own units stands adjacent.
-export const isStealthUnit = (unit: UnitObject): boolean =>
-	unitData[unit.type]?.stealth === true
+export const isStealthUnit = (unit: UnitObject): boolean => unitData[unit.type]?.stealth === true
 
 // Whether `unit`'s type radiates a radar field (the Jammer Truck). A radar field
 // is a *ring* from `range[0]`..`range[1]` tiles out — the same band the Move.Radar
@@ -129,12 +128,19 @@ export const isUnitStealthed = (map: VisibilityMap, tile: number, unit: UnitObje
 // attack list, the AI, and the renderer all consult it so every system agrees on
 // what's perceivable. With fog off and no stealth units on the board this set is
 // empty, so ordinary play is unaffected.
+//
+// Fog reach honors a pending-move freeze (see `frozenSight`): while `team`'s unit
+// is deciding what to do after a move, the fog half of this set is judged from the
+// sight it had *before* stepping, so the move can't unveil and shoot an enemy in one
+// go. Stealth concealment stays live: flushing a cloaked unit by closing to
+// point-blank is the intended counterplay to stealth, not a fog exploit.
 export const concealedEnemyTiles = (map: VisibilityMap, team: number): Set<number> => {
 	const out = new Set<number>()
 	const fog = get(fogOfWarEnabled)
-	const visible = fog ? computeTeamVisibility(map, team) : null
+	const held = fog ? heldSight(team) : null
+	const visible = fog ? (held?.visible ?? computeTeamVisibility(map, team)) : null
 	// Built lazily, only the first time an air enemy sits on a fog-dark tile.
-	let airVisible: Set<number> | null = null
+	let airVisible: Set<number> | null = held?.airVisible ?? null
 	const units = map.layers.units
 	for (let tile = 0; tile < units.length; tile++) {
 		const unit = units[tile]
@@ -243,8 +249,7 @@ const addDiamond = (
 			// Forest and other concealing terrain hide their occupants from any viewer
 			// not standing on or directly beside the tile (radar reveal is layered on
 			// separately, in computeTeamVisibility).
-			if (canopyHides && Math.abs(dx) + Math.abs(dy) > 1 && isConcealingTerrain(map, tile))
-				continue
+			if (canopyHides && Math.abs(dx) + Math.abs(dy) > 1 && isConcealingTerrain(map, tile)) continue
 			out.add(tile)
 		}
 	}
@@ -288,6 +293,22 @@ export const computeTeamAirVisibility = (map: VisibilityMap, team: number): Set<
 // widens the reach for airborne occupants only (see computeTeamAirVisibility);
 // when omitted it falls back to `visible`, so a caller that doesn't distinguish
 // domains gets the conservative ground reach for everyone.
+// Snapshot `team`'s current sight and hold it (see `frozenSight` in fogState) until
+// `releaseSight` is called. Call this BEFORE the moving unit leaves its tile, so the
+// snapshot carries the reach it had from where it stood. A no-op with fog off: there
+// is no fog to hold, and the attack list ignores sight entirely.
+export const freezeSight = (map: VisibilityMap, team: number): void => {
+	if (!get(fogOfWarEnabled)) {
+		frozenSight.set(null)
+		return
+	}
+	frozenSight.set({
+		team,
+		visible: computeTeamVisibility(map, team),
+		airVisible: computeTeamAirVisibility(map, team),
+	})
+}
+
 export type ViewerFog = { visible: Set<number>; airVisible?: Set<number>; team: number }
 
 // Whether the viewer holding `fog` perceives `unit` standing on `tile`, honoring
@@ -295,7 +316,11 @@ export type ViewerFog = { visible: Set<number>; airVisible?: Set<number>; team: 
 // ridge occlusion apply), air units by either set (treetops can't hide a plane).
 // The single predicate the painter, animator and threat overlays share, so
 // "can I see it" never disagrees between systems. Fog `null` means fog is off.
-export const unitSeenByViewer = (fog: ViewerFog | null, tile: number, unit: UnitObject): boolean => {
+export const unitSeenByViewer = (
+	fog: ViewerFog | null,
+	tile: number,
+	unit: UnitObject
+): boolean => {
 	if (!fog) return true
 	if (fog.visible.has(tile)) return true
 	if (unitData[unit.type]?.type === 'air') return (fog.airVisible ?? fog.visible).has(tile)
