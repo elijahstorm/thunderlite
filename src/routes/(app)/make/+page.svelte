@@ -152,9 +152,7 @@
 						<h1 class="mt-1 text-3xl font-semibold tracking-tight text-foreground">
 							Browse community maps
 						</h1>
-						<p class="text-sm text-muted-foreground mt-1">
-							Pick a map to start a new game with, or build your own.
-						</p>
+						<p class="text-sm text-muted-foreground mt-1">Pick a map to start a game.</p>
 					</div>
 					<a href="/editor?new" class="btn btn-outline">
 						<Icon icon="lucide:hammer" width={14} />
@@ -188,11 +186,11 @@
 
 					{#if !maps?.length}
 						<div class="card p-10 text-center text-sm text-muted-foreground">
-							No maps matched your search. Try broadening your filters.
+							No maps matched your search.
 						</div>
 					{:else if !hasMore}
 						<div class="card p-6 text-center text-sm text-muted-foreground border-dashed">
-							You've reached the end of the list. Pick a map and get into a game.
+							End of the list.
 						</div>
 					{/if}
 				{/if}

@@ -63,15 +63,11 @@
 	<div class="card p-6 sm:p-8 space-y-6">
 		<div>
 			<h2 class="text-lg font-semibold tracking-tight text-foreground">Email notifications</h2>
-			<p class="text-sm text-muted-foreground mt-0.5">Choose which emails you want to receive.</p>
 		</div>
 
 		<label class="flex items-center justify-between gap-4 border-b border-border pb-4">
 			<span>
 				<span class="block text-sm font-medium text-foreground">All email notifications</span>
-				<span class="block text-xs text-muted-foreground mt-0.5">
-					The master switch. Turn off to stop every email below.
-				</span>
 			</span>
 			<input
 				type="checkbox"

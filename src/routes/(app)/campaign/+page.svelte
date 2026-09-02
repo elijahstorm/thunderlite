@@ -37,8 +37,7 @@
 			</a>
 			<h1 class="text-3xl font-semibold tracking-tight text-foreground">Single Player Campaign</h1>
 			<p class="text-muted-foreground max-w-xl">
-				Fight through the Reyes / Vance / Kael story one level at a time. Beat a level to unlock the
-				next.
+				Fight through the Reyes / Vance / Kael story one level at a time.
 			</p>
 		</header>
 
@@ -50,9 +49,6 @@
 				<Icon icon="lucide:trophy" width={22} class="text-primary" />
 				<div>
 					<div class="font-semibold text-foreground">Campaign complete</div>
-					<p class="text-sm text-muted-foreground">
-						You've cleared every level. Replay any of them below.
-					</p>
 				</div>
 			</div>
 		{/if}

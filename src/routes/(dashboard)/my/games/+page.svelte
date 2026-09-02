@@ -20,19 +20,12 @@
 	<header class="mb-6">
 		<p class="section-eyebrow">Battle log</p>
 		<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">My Games</h1>
-		<p class="text-sm text-muted-foreground mt-1">
-			Every finished match, newest first. Online games keep their full move log, so you can watch
-			them back at any time.
-		</p>
 	</header>
 
 	{#if entries.length === 0}
 		<div class="card p-8 text-center">
 			<Icon icon="lucide:swords" width={28} class="mx-auto text-muted-foreground" />
 			<p class="mt-3 font-medium text-foreground">No matches yet</p>
-			<p class="mt-1 text-sm text-muted-foreground">
-				Finish a game and it will show up here, win or lose.
-			</p>
 			<a class="btn btn-primary mt-4" href="/rooms">Find a game</a>
 		</div>
 	{:else}

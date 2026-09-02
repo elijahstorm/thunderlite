@@ -87,9 +87,6 @@
 	<header>
 		<p class="section-eyebrow">Community</p>
 		<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">Friends</h1>
-		<p class="text-sm text-muted-foreground mt-1">
-			Players you've added, and anyone waiting on an answer from you.
-		</p>
 	</header>
 
 	{#if incoming.length}
@@ -145,8 +142,7 @@
 				<Icon icon="lucide:users" width={28} class="mx-auto text-muted-foreground" />
 				<p class="mt-3 font-medium text-foreground">No friends yet</p>
 				<p class="mt-1 text-sm text-muted-foreground">
-					Open a player's profile and pick Add friend. They will get an email, and their answer
-					shows up here.
+					Open a player's profile and pick Add friend.
 				</p>
 				<a class="btn btn-primary mt-4" href="/rooms">Find a game</a>
 			</div>

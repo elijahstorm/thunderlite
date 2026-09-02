@@ -57,9 +57,6 @@
 	<header class="mb-6">
 		<p class="section-eyebrow">Account</p>
 		<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">My Profile</h1>
-		<p class="text-sm text-muted-foreground mt-1">
-			Manage how you appear to other players in the community.
-		</p>
 	</header>
 
 	<form

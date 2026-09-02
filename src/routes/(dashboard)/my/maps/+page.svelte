@@ -55,7 +55,6 @@
 			<p class="section-eyebrow">Library</p>
 			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">My Maps</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				Maps you've created and saved.
 				<span class="text-foreground font-medium">{maps.length}/{data.limit}</span> used.
 			</p>
 		</div>
