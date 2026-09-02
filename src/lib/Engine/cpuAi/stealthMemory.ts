@@ -11,6 +11,7 @@ import {
 	isStealthUnit,
 	radarTeamsCovering,
 } from '../visibility'
+import { weights as W } from './weights'
 
 // ── CPU "memory" of enemy stealth strength ────────────────────────────────────
 // The AI keeps a fuzzy, per-enemy running estimate of how many cloakable units it
@@ -73,16 +74,12 @@ const setFloor = (observer: number, target: number, floor: number): void => {
 // cloaked enemy probably is. A fresh sighting plants SEED heat; each of the
 // observer's turns the cloud decays and bleeds a slice into its neighbours, so a
 // stale pin widens into a vague blob (a stealth unit moves several tiles a turn).
-const SUSPICION_SEED = 1
 // Diffusion is mass-CONSERVING-then-decayed: each turn a tile keeps SUSPICION_KEEP of
 // its heat and hands SUSPICION_BLEED of *that* out to its neighbours (split between
 // them). Total heat therefore strictly shrinks by SUSPICION_KEEP per turn and no tile
 // can ever climb above the seed value — the cloud widens and fades, it never blows up.
 // KEEP is high so a fresh sighting survives long enough for the CPU to build a radar
 // AND drive it over — at ~0.9 a pin stays above the floor for ~9-10 of its turns.
-const SUSPICION_KEEP = 0.9 // total heat retained per turn (the decay)
-const SUSPICION_BLEED = 0.28 // share of retained heat that spreads to neighbours
-const SUSPICION_FLOOR = 0.04 // below this a tile is forgotten
 
 // Plant/refresh heat at concrete tiles in `observer`'s hunch. Takes the max with any
 // existing heat so a fresh sighting never dims a hotter one already there.
@@ -94,8 +91,8 @@ const seedSuspicion = (observer: number, tiles: Iterable<number>): void => {
 			const heat = { ...(p.stealthSuspicion ?? {}) }
 			let touched = false
 			for (const tile of tiles) {
-				if ((heat[tile] ?? 0) < SUSPICION_SEED) {
-					heat[tile] = SUSPICION_SEED
+				if ((heat[tile] ?? 0) < W.SUSPICION_SEED) {
+					heat[tile] = W.SUSPICION_SEED
 					touched = true
 				}
 			}
@@ -123,16 +120,16 @@ export const decayStealthSuspicion = (
 			}
 			for (const [key, value] of Object.entries(old)) {
 				const tile = Number(key)
-				const retained = value * SUSPICION_KEEP
+				const retained = value * W.SUSPICION_KEEP
 				const nbs = adjacentTiles(map, tile)
-				const toSpread = nbs.length > 0 ? retained * SUSPICION_BLEED : 0
+				const toSpread = nbs.length > 0 ? retained * W.SUSPICION_BLEED : 0
 				add(tile, retained - toSpread)
 				const share = nbs.length > 0 ? toSpread / nbs.length : 0
 				for (const nb of nbs) add(nb, share)
 			}
 			const cleaned: Record<number, number> = {}
 			for (const [key, value] of Object.entries(next)) {
-				if (value >= SUSPICION_FLOOR) cleaned[Number(key)] = value
+				if (value >= W.SUSPICION_FLOOR) cleaned[Number(key)] = value
 			}
 			return { ...p, stealthSuspicion: cleaned }
 		}),

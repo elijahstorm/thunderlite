@@ -9,6 +9,7 @@ import {
 	planningAttackReach,
 	planningThreatTiles,
 } from './planningContext'
+import { weights as W } from './weights'
 
 export const unitValue = (unit: UnitObject): number => {
 	const data = unitData[unit.type]
@@ -34,15 +35,15 @@ export const buildingValue = (map: MapObject, tile: number, cpuTeam: number): nu
 	if (building.team === cpuTeam) return 0
 
 	let v = 0
-	if (data.modifiers.includes('Capture.Insta_Lose')) v += 4000
-	if (data.modifiers.includes('Capture.Allow_Ground')) v += 600
-	if (data.modifiers.includes('Capture.Allow_Air')) v += 700
-	if (data.modifiers.includes('Capture.Allow_Sea')) v += 700
-	if (data.actable) v += 500
-	v += data.income * 2
+	if (data.modifiers.includes('Capture.Insta_Lose')) v += W.INSTA_LOSE_VALUE
+	if (data.modifiers.includes('Capture.Allow_Ground')) v += W.GROUND_CONTROL_VALUE
+	if (data.modifiers.includes('Capture.Allow_Air')) v += W.AIR_CONTROL_VALUE
+	if (data.modifiers.includes('Capture.Allow_Sea')) v += W.SEA_CONTROL_VALUE
+	if (data.actable) v += W.FACTORY_VALUE
+	v += data.income * W.INCOME_VALUE
 
 	if (building.team === -1 || building.team === undefined || !isOwnedByLivingTeam(building)) {
-		v *= 0.85
+		v *= W.NEUTRAL_BUILDING_FACTOR
 	}
 	return v
 }

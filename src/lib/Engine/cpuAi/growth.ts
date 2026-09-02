@@ -7,6 +7,7 @@ import { DEPLETED_INCOME_FACTOR } from '../modifiers/supplyIncome'
 import { isWalletUnit, walletOf } from '../wallet'
 import { hasModifier } from '../modifiers/canAttack'
 import { planningBuildings, planningUnits, planningGrowth } from './planningContext'
+import { weights as W } from './weights'
 
 // ── Is waiting actually worth anything? ─────────────────────────────────────
 //
@@ -39,7 +40,6 @@ import { planningBuildings, planningUnits, planningGrowth } from './planningCont
  * not a rate, so spreading it over a few turns keeps a single fat reserve from
  * reading as a permanent factory. Short, because the CPU spends aggressively.
  */
-const BANK_HORIZON = 4
 
 /**
  * Prospective rate credited for "we have infantry and there is a factory on the
@@ -47,7 +47,6 @@ const BANK_HORIZON = 4
  * turns for, but it is a plan rather than an income, so it is priced well under a
  * factory that is already running.
  */
-const CAPTURE_PROSPECT_RATE = 30
 
 /** Cheapest unit `team` is actually allowed to produce from a factory, or Infinity. */
 const cheapestBuildable = (player: {
@@ -121,7 +120,7 @@ export const reinforcementRate = (map: MapObject, team: number): number => {
 			// Income only counts as growth if it is being spent on something. With no
 			// income at all, a standing reserve still buys a few more units.
 			rate += income
-			if (player.money >= cheapest) rate += player.money / BANK_HORIZON
+			if (player.money >= cheapest) rate += player.money / W.BANK_HORIZON
 		}
 	}
 
@@ -129,15 +128,15 @@ export const reinforcementRate = (map: MapObject, team: number): number => {
 	// mining), so it is a production line the building scan never sees.
 	for (const { unit } of planningUnits(map)) {
 		if (unit.team !== team || !isWalletUnit(unit)) continue
-		rate += walletOf(unit) / BANK_HORIZON
-		if (hasModifier(unit, 'Self_Action.Miner')) rate += CAPTURE_PROSPECT_RATE
+		rate += walletOf(unit) / W.BANK_HORIZON
+		if (hasModifier(unit, 'Self_Action.Miner')) rate += W.CAPTURE_PROSPECT_RATE
 	}
 
 	if (!ownsFactory && capturableFactory) {
 		const canCapture = planningUnits(map).some(
 			({ unit }) => unit.team === team && hasModifier(unit, 'Start_Turn.Capture')
 		)
-		if (canCapture) rate += CAPTURE_PROSPECT_RATE
+		if (canCapture) rate += W.CAPTURE_PROSPECT_RATE
 	}
 
 	return rate

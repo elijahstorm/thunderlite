@@ -9,6 +9,7 @@ import { lurkingStealthCount } from './stealthMemory'
 import { factoryCount } from './evaluate'
 import { sampleByScore } from './rng'
 import type { SerializedAction } from '../Interactor/serializedAction'
+import { weights as W } from './weights'
 
 /**
  * How much of an enemy's return fire a candidate that OUTRANGES it still expects to
@@ -16,7 +17,6 @@ import type { SerializedAction } from '../Interactor/serializedAction'
  * enemy spends a turn walking. Pricing standoff as untouchable makes the CPU field
  * nothing but glass cannons with no line to hide behind. See `counterEffectiveness`.
  */
-const COUNTER_STANDOFF_EXPOSURE = 0.35
 
 type ArmyMix = {
 	ground: number
@@ -101,7 +101,6 @@ type StealthHunt = {
 }
 
 /** Overall authority of the matchup term relative to the flat stat prior. */
-const COUNTER_WEIGHT = 150
 
 /**
  * How close a unit has to rank to the best buy to be worth buying instead of it. In
@@ -110,7 +109,6 @@ const COUNTER_WEIGHT = 150
  * Variety in production matters more than variety anywhere else: an army assembled over
  * twenty turns is the most legible pattern a player can read off the CPU.
  */
-const BUILD_TEMPERATURE = 22
 
 /**
  * How well a freshly-built `unitType` matches up against the enemy army the CPU can
@@ -165,12 +163,12 @@ const counterEffectiveness = (
 		// first and the enemy has to spend a turn closing. Discounted rather than
 		// zeroed — artillery does get caught, and pricing it as untouchable makes the
 		// CPU field nothing but glass cannons with no line to hide behind.
-		const exposure = wouldBeCountered(unitType, unit) ? 1 : COUNTER_STANDOFF_EXPOSURE
+		const exposure = wouldBeCountered(unitType, unit) ? 1 : W.COUNTER_STANDOFF_EXPOSURE
 		defenseValue += (Math.min(inc, freshMax) / freshMax) * cost * exposure
 	}
 	const net = (offenseValue - defenseValue) / enemies.length
 	const denominator = cost + (Math.max(topCost, cost) - cost) * richness
-	return (net / Math.max(1, denominator)) * COUNTER_WEIGHT
+	return (net / Math.max(1, denominator)) * W.COUNTER_WEIGHT
 }
 
 /**
@@ -182,7 +180,6 @@ const counterEffectiveness = (
  * limit. Three turns is roughly how long a unit takes to walk to a front on these
  * maps, so it is also the horizon over which a purchase has to pay off.
  */
-const SPENDING_SLACK_TURNS = 3
 
 /**
  * How far the treasury outruns what the CPU's factories can sustainably spend, 0..1.
@@ -191,7 +188,7 @@ const SPENDING_SLACK_TURNS = 3
  * slot). See `counterEffectiveness`, which slides between those two readings.
  */
 const spendingSlack = (money: number, factories: number, topCost: number): number => {
-	const capacity = Math.max(1, factories) * Math.max(1, topCost) * SPENDING_SLACK_TURNS
+	const capacity = Math.max(1, factories) * Math.max(1, topCost) * W.SPENDING_SLACK_TURNS
 	return Math.max(0, Math.min(1, money / capacity))
 }
 
@@ -210,14 +207,14 @@ const scoreBuildChoice = (
 	if (!data) return -Infinity
 	const cost = effectiveCost > 0 ? effectiveCost : 1
 
-	let score = 100 + (data.power + data.health) * 0.4
+	let score = W.BUILD_BASE + (data.power + data.health) * W.BUILD_STAT_WEIGHT
 
 	// Reward building a real counter to what the enemy currently fields.
 	score += counter
 
-	if (enemyAirThreat && isAntiAir(unitType)) score += 250
-	if (ownCaptureCount < 2 && isCaptureCapable(unitType)) score += 200
-	if (data.movement >= 4) score += 30
+	if (enemyAirThreat && isAntiAir(unitType)) score += W.ANTI_AIR_BONUS
+	if (ownCaptureCount < 2 && isCaptureCapable(unitType)) score += W.CAPTURE_CAPABLE_BONUS
+	if (data.movement >= 4) score += W.MOBILITY_BONUS
 
 	// Cloak hunters: when the CPU believes ambushers lurk, it wants eyes. A first
 	// Jammer Truck (mobile radar that flushes them and screens our line) is a high
@@ -225,13 +222,13 @@ const scoreBuildChoice = (
 	if (hunt.lurking > 0) {
 		if (unitTypeHasRadar(unitType)) {
 			// One mobile radar is plenty to sweep a hunch — don't stockpile jammers.
-			score += hunt.ownRadar === 0 ? 220 : 0
+			score += hunt.ownRadar === 0 ? W.RADAR_HUNT_BONUS : 0
 		} else if (data.movement >= 5 && cost <= 300 && data.sight > 0) {
-			score += 60
+			score += W.SCOUT_HUNT_BONUS
 		}
 	}
 
-	return score - cost * 0.1
+	return score - cost * W.BUILD_COST_WEIGHT
 }
 
 /**
@@ -328,7 +325,7 @@ export const pickBuildOnce = (map: MapObject, cpuTeam: number): SerializedAction
 	// so a two-factory turn can pick differently for each.
 	const choice = sampleByScore(
 		deployable,
-		BUILD_TEMPERATURE,
+		W.BUILD_TEMPERATURE,
 		state.turnNumber,
 		cpuTeam,
 		producers.length

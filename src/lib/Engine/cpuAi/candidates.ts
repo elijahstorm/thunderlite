@@ -26,6 +26,7 @@ import {
 	scoreBuilderAttack,
 } from './score'
 import type { ActionPlan } from './types'
+import { weights as W } from './weights'
 
 const canCapture = (map: MapObject, tile: number, unit: UnitObject): boolean => {
 	if (!hasModifier(unit, 'Start_Turn.Capture')) return false
@@ -249,7 +250,6 @@ const generateBuilderPlans = (
  * difference is worth tens, so this only ever shuffles genuinely comparable options —
  * a good shot is never passed up for a bad one. See `sampleByScore`.
  */
-const PLAN_TEMPERATURE = 18
 
 /**
  * ...but only when the decision is actually that wide. A unit crossing open ground has
@@ -265,10 +265,8 @@ const PLAN_TEMPERATURE = 18
  * it; a narrow one narrows with it, so the CPU still varies freely between tiles it
  * genuinely rates as equal and stops wandering off the one it rates best.
  */
-const PLAN_SPREAD_FRACTION = 0.25
 /** Floor, so a set of exactly-equal plans still samples uniformly instead of collapsing
  * to whichever one happens to be generated first. */
-const MIN_PLAN_TEMPERATURE = 1
 
 /**
  * ...and how much of a gap inside that band actually decides the draw. Separate from
@@ -286,7 +284,6 @@ const MIN_PLAN_TEMPERATURE = 1
  * plans the scorer genuinely can't separate still share the roll (which is the whole
  * point of sampling), and anything it CAN separate loses.
  */
-const PLAN_SOFTMAX_SCALE = 3
 
 const planTemperature = (plans: readonly ActionPlan[]): number => {
 	if (plans.length < 2) return 0
@@ -297,7 +294,10 @@ const planTemperature = (plans: readonly ActionPlan[]): number => {
 		if (plan.score < worst) worst = plan.score
 	}
 	const spread = best - worst
-	return Math.max(MIN_PLAN_TEMPERATURE, Math.min(PLAN_TEMPERATURE, spread * PLAN_SPREAD_FRACTION))
+	return Math.max(
+		W.MIN_PLAN_TEMPERATURE,
+		Math.min(W.PLAN_TEMPERATURE, spread * W.PLAN_SPREAD_FRACTION)
+	)
 }
 
 export const bestPlanFor = (
@@ -312,7 +312,7 @@ export const bestPlanFor = (
 	const state = get(gameState)
 	return sampleByScore(
 		plans,
-		{ band: planTemperature(plans), scale: PLAN_SOFTMAX_SCALE },
+		{ band: planTemperature(plans), scale: W.PLAN_SOFTMAX_SCALE },
 		state.turnNumber,
 		cpuTeam,
 		unitTile

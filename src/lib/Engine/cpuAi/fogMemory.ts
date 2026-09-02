@@ -3,6 +3,7 @@ import { gameState } from '../gameState'
 import { fogOfWarEnabled } from '../fogState'
 import { adjacentTiles } from '../modifiers/cloak'
 import { computeTeamVisibility, computeUnitSight, isConcealingTerrain } from '../visibility'
+import { weights as W } from './weights'
 
 // Flip this on (e.g. from a dev page) to dump fog-belief activity to the console as
 // JSON — every seed, the resulting hunch, and why. Off by default; never logs in
@@ -27,15 +28,6 @@ const dbg = (label: string, payload: unknown) => {
 // happen (a contact it had eyes on, a unit of its own that died) — never by reading
 // the true board through fog — so it stays a believable hunch, not an oracle.
 
-const FOG_SEED = 1
-const FOG_KEEP = 0.85 // heat retained per turn (mass-conserving, then decayed)
-const FOG_BLEED = 0.3 // share of retained heat spread to neighbours
-const FOG_FLOOR = 0.05 // below this a tile is forgotten
-const FOG_REACH = 3 // tiles out to which a believed contact projects danger
-const CLEARED_KEEP = 0.65 // rule-out confidence retained per turn (re-checkable in ~5)
-const CLEARED_FLOOR = 0.08 // below this a cleared tile is worth re-checking again
-const CONCEAL_PROBE_BONUS = 2 // a Forest tile is worth this much more to actually peek into
-
 const tileXY = (map: Pick<MapObject, 'cols'>, tile: number): [number, number] => [
 	tile % map.cols,
 	Math.floor(tile / map.cols),
@@ -59,16 +51,16 @@ const ageField = (
 	}
 	for (const [key, value] of Object.entries(old)) {
 		const tile = Number(key)
-		const retained = value * FOG_KEEP
+		const retained = value * W.FOG_KEEP
 		const nbs = adjacentTiles(map, tile)
-		const toSpread = nbs.length > 0 ? retained * FOG_BLEED : 0
+		const toSpread = nbs.length > 0 ? retained * W.FOG_BLEED : 0
 		add(tile, retained - toSpread)
 		const share = nbs.length > 0 ? toSpread / nbs.length : 0
 		for (const nb of nbs) add(nb, share)
 	}
 	const cleaned: Record<number, number> = {}
 	for (const [key, value] of Object.entries(next)) {
-		if (value >= FOG_FLOOR) cleaned[Number(key)] = value
+		if (value >= W.FOG_FLOOR) cleaned[Number(key)] = value
 	}
 	return cleaned
 }
@@ -116,7 +108,7 @@ export const updateFogBelief = (map: MapObject | MapProcesser, observerTeam: num
 			const seedFogged = (tile: number) => {
 				for (const c of [tile, ...adjacentTiles(map, tile)]) {
 					if (!vis.has(c)) {
-						belief[c] = Math.max(belief[c] ?? 0, FOG_SEED)
+						belief[c] = Math.max(belief[c] ?? 0, W.FOG_SEED)
 						seeded.push(c)
 					}
 				}
@@ -149,8 +141,8 @@ export const updateFogBelief = (map: MapObject | MapProcesser, observerTeam: num
 			//    clear. Keeps the scout drive from re-treading ground it just swept.
 			const cleared: Record<number, number> = {}
 			for (const [key, value] of Object.entries(p.fogCleared ?? {})) {
-				const aged = value * CLEARED_KEEP
-				if (aged >= CLEARED_FLOOR) cleared[Number(key)] = aged
+				const aged = value * W.CLEARED_KEEP
+				if (aged >= W.CLEARED_FLOOR) cleared[Number(key)] = aged
 			}
 			for (const tile of vis) {
 				const u = units[tile]
@@ -184,8 +176,8 @@ const seedBelief = (observer: number, tiles: number[]): void => {
 			const heat = { ...(p.fogBelief ?? {}) }
 			let touched = false
 			for (const t of tiles) {
-				if ((heat[t] ?? 0) < FOG_SEED) {
-					heat[t] = FOG_SEED
+				if ((heat[t] ?? 0) < W.FOG_SEED) {
+					heat[t] = W.FOG_SEED
 					touched = true
 				}
 			}
@@ -224,7 +216,7 @@ export const phantomThreatAt = (map: MapObject, observerTeam: number, tile: numb
 	let danger = 0
 	for (const [key, heat] of Object.entries(belief)) {
 		const d = manhattan(map, tile, Number(key))
-		if (d <= FOG_REACH) danger += heat * ((FOG_REACH - d + 1) / (FOG_REACH + 1))
+		if (d <= W.FOG_REACH) danger += heat * ((W.FOG_REACH - d + 1) / (W.FOG_REACH + 1))
 	}
 	return danger
 }
@@ -301,7 +293,7 @@ export const exploreValue = (
 			const freshness = 1 - (cleared[t] ?? 0) // recently swept → little to gain
 			if (isConcealingTerrain(map, t)) {
 				if (Math.abs(dx) + Math.abs(dy) > 1) continue // can't see in unless beside it
-				gained += freshness * CONCEAL_PROBE_BONUS
+				gained += freshness * W.CONCEAL_PROBE_BONUS
 			} else {
 				gained += freshness
 			}

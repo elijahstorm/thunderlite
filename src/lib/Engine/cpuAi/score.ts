@@ -22,8 +22,7 @@ import {
 	closestObjectiveDistance,
 	closestOreDistance,
 } from './evaluate'
-
-const VALUE_PER_HP = 1 / 40
+import { weights as W, DEFAULT_WEIGHTS } from './weights'
 
 /**
  * Value destroyed by landing `damage` on `victim`: a killing blow takes everything
@@ -61,7 +60,6 @@ export type AttackScore = {
 // Bonus added when an attack secures a kill on the tile *behind* the primary
 // target (or, negated, the penalty for catching a friendly unit there). Mirrors
 // the kill bonus in scoreAttack so a lance kill is valued like any other kill.
-const LANCE_KILL_BONUS = 25
 
 // A Lance Tank's shot also strikes the unit directly behind its target (see
 // applyLancePassthrough). The CPU should hunt for shots that line a *second*
@@ -95,7 +93,7 @@ const scoreLancePassthrough = (
 		role: 'attack',
 	})
 	const kills = damage >= current
-	const value = damageValue(victim, damage) + (kills ? LANCE_KILL_BONUS : 0)
+	const value = damageValue(victim, damage) + (kills ? W.LANCE_KILL_BONUS : 0)
 
 	// Same team behind the target → friendly fire: dock the score by the same
 	// amount the hit would have been worth against an enemy.
@@ -110,7 +108,6 @@ const scoreLancePassthrough = (
 // attacker's own modifiers, so a Breaker's siege shells ignore the splashed units'
 // cover here as they will in combat. Returns the net value: positive for enemies
 // caught, negative for friendlies caught; 0 when the unit can't splash or stands alone.
-const SPLASH_KILL_BONUS = 15
 const SPLASH_MULTIPLIER = 0.5
 
 const scoreSplashDamage = (
@@ -138,7 +135,7 @@ const scoreSplashDamage = (
 				attackerTile,
 				role: 'attack',
 			}) * SPLASH_MULTIPLIER
-		const value = damageValue(splashed, damage) + (damage >= current ? SPLASH_KILL_BONUS : 0)
+		const value = damageValue(splashed, damage) + (damage >= current ? W.SPLASH_KILL_BONUS : 0)
 		// Same team caught in the wash → friendly fire: dock the score by what the
 		// hit would have been worth against an enemy (mirrors scoreLancePassthrough).
 		total += splashed.team === attacker.team ? -value : value
@@ -150,12 +147,11 @@ const scoreSplashDamage = (
 // (End_Turn.Vulture). A guaranteed kill is therefore worth more to it than to
 // any other unit — it refunds the entire action. Reward securing the kill so the
 // CPU lines up lethal shots over mere chip damage with its Vultures.
-const VULTURE_KILL_BONUS = 30
 
 const scoreVultureKill = (attacker: UnitObject, killsTarget: boolean): number => {
 	if (!killsTarget) return 0
 	if (!hasModifier(attacker, 'End_Turn.Vulture')) return 0
-	return VULTURE_KILL_BONUS
+	return W.VULTURE_KILL_BONUS
 }
 
 export const scoreAttack = (
@@ -210,10 +206,10 @@ export const scoreAttack = (
 	// same way `expectedLossAt` weights certain death so it always ranks below living.
 	const attackerDies = returnDamage >= atkCurrent
 	const damageValueOut = damageValue(defender, damage)
-	const damageValueIn = attackerDies ? av * LETHAL_PENALTY : damageValue(attacker, returnDamage)
+	const damageValueIn = attackerDies ? av * W.LETHAL_PENALTY : damageValue(attacker, returnDamage)
 
 	let score = damageValueOut - damageValueIn
-	if (killsTarget) score += 25
+	if (killsTarget) score += W.KILL_BONUS
 	if (killsTarget && !defStats) score = 0
 
 	// Fold in unit-specific attack quirks: a Lance Tank's passthrough hit on the
@@ -227,10 +223,10 @@ export const scoreAttack = (
 }
 
 export const scoreCapture = (map: MapObject, tile: number, cpuTeam: number): number => {
-	return buildingValue(map, tile, cpuTeam) * 0.5
+	return buildingValue(map, tile, cpuTeam) * W.CAPTURE_WEIGHT
 }
 
-export const scoreMine = (): number => 35
+export const scoreMine = (): number => W.MINE_VALUE
 
 export const scoreRepair = (unit: UnitObject): number => {
 	const data = unitData[unit.type]
@@ -238,9 +234,9 @@ export const scoreRepair = (unit: UnitObject): number => {
 	const max = data.health || 1
 	const hp = unit.health ?? max
 	const ratio = hp / max
-	if (ratio >= 0.8) return 0
+	if (ratio >= W.REPAIR_THRESHOLD) return 0
 	const cost = data.cost > 0 ? data.cost : 50
-	return (1 - ratio) * cost * 0.15
+	return (1 - ratio) * cost * W.REPAIR_WEIGHT
 }
 
 // Stealth units earn their keep cloaked, as invisible area-denial: an enemy can't
@@ -257,9 +253,9 @@ const scoreStealthPositioning = (
 	enemyDist: number
 ): number => {
 	if (!isStealthUnit(unit)) return 0
-	if (hasAdjacentEnemy(map, tile, cpuTeam)) return -unitValue(unit) * 0.05
+	if (hasAdjacentEnemy(map, tile, cpuTeam)) return -unitValue(unit) * W.STEALTH_FLUSH_PENALTY
 	const forward = enemyDist > 0 ? Math.max(0, 8 - enemyDist) : 0
-	return forward * 1.2
+	return forward * W.STEALTH_FORWARD_WEIGHT
 }
 
 const manhattan = (map: MapObject, a: number, b: number): number =>
@@ -277,15 +273,6 @@ const proberWeight = (unit: UnitObject): number => {
 	const eyes = (d.sight ?? 0) > 0 ? 1 : 0.5
 	return Math.max(0, cheap * 0.5 + mobile * 0.5) * eyes
 }
-
-const HUNT_REACH = 9 // tiles within which closing on the hunch starts to pay
-const HUNT_STEP = 0.5 // prober pull per tile closer to the hunch
-const HUNT_FLUSH = 24 // ending adjacent to the hunch breaks the cloak — the whole point
-const HUNT_RADAR_COVER = 14 // a jammer whose ring lands on the hunch — flush it out
-const HUNT_RADAR_STEP = 0.7 // jammer pull per tile while not yet covering it
-const HUNT_GUARD = 0.015 // jammer reward per point of friendly value its ring screens
-const PHANTOM_WEIGHT = 0.02 // fog-belief caution per point of unit value, per believed-danger
-const EXPLORE_WEIGHT = 0.5 // scout pull per fresh fog tile a move would uncover
 
 // Steer the hunt for a remembered-but-unseen cloaked enemy. With `lurking > 0` and a
 // live hunch (see stealthMemory.ts):
@@ -315,14 +302,14 @@ export const scoreStealthHunt = (
 	if (hasRadarField(unit)) {
 		const [min, max] = unitData[unit.type]?.range ?? [0, 0]
 		const covers = dist >= min && dist <= max
-		const sweep = covers ? HUNT_RADAR_COVER : Math.max(0, HUNT_REACH - dist) * HUNT_RADAR_STEP
+		const sweep = covers ? W.HUNT_RADAR_COVER : Math.max(0, W.HUNT_REACH - dist) * W.HUNT_RADAR_STEP
 		// Screen value: friendly units the ring would shelter from ambush.
 		let screened = 0
 		for (const ringTile of tilesInRange(map, tile, min, max)) {
 			const ally = map.layers.units[ringTile]
 			if (ally && ally.team === cpuTeam) screened += unitValue(ally)
 		}
-		return weight * sweep + screened * HUNT_GUARD * Math.min(lurking, 3)
+		return weight * sweep + screened * W.HUNT_GUARD * Math.min(lurking, 3)
 	}
 
 	// Anti-bunching: the more units already sitting on/around the best guess, the less
@@ -335,18 +322,20 @@ export const scoreStealthHunt = (
 	const crowd = 1 / (1 + nearby)
 
 	// Don't chase into a death trap: damp the pull by how much fire this tile takes.
-	const danger = threatToTile(map, tile, unit, cpuTeam, concealed) * VALUE_PER_HP
+	const danger = threatToTile(map, tile, unit, cpuTeam, concealed) * W.VALUE_PER_HP
 	const safety = 1 / (1 + danger)
 
 	if (dist === 1) {
 		// Ending adjacent flushes the cloak THIS move — open to any unit, not just cheap
 		// probes, since revealing it is worth a real unit's action when it's safe to do.
-		return weight * HUNT_FLUSH * safety * crowd
+		return weight * W.HUNT_FLUSH * safety * crowd
 	}
 
 	// Further out: close the gap so we can flush next turn; cheap units lead the long
 	// approach (a heavyweight shouldn't wander off-objective chasing a rumour).
-	return weight * proberWeight(unit) * Math.max(0, HUNT_REACH - dist) * HUNT_STEP * safety * crowd
+	return (
+		weight * proberWeight(unit) * Math.max(0, W.HUNT_REACH - dist) * W.HUNT_STEP * safety * crowd
+	)
 }
 
 // Value the unit expects to LOSE by ending its turn on `tile`, given everything that
@@ -358,7 +347,6 @@ export const scoreStealthHunt = (
 // certain death always ranks below barely surviving); sub-lethal damage costs the value
 // of the HP actually lost — both scaled by the unit's own max HP, not a global constant.
 // `ignoreTile` drops one attacker (the target of a killing blow, which won't shoot back).
-const LETHAL_PENALTY = 1.2
 
 export const expectedLossAt = (
 	map: MapObject,
@@ -375,7 +363,7 @@ export const expectedLossAt = (
 	const max = data.health || 1
 	const hp = unit.health ?? max
 	const cost = data.cost > 0 ? data.cost : 50
-	if (incoming >= hp) return cost * (hp / max) * LETHAL_PENALTY
+	if (incoming >= hp) return cost * (hp / max) * W.LETHAL_PENALTY
 	return cost * (incoming / max)
 }
 
@@ -388,14 +376,12 @@ export const expectedLossAt = (
 // unit in from beyond it, and penalizes creeping inside min range (both exposed and
 // unable to shoot). `enemyDist` is the blind closest-enemy distance; 0 means no known
 // enemy, so there's nothing to stand off from.
-const RANGED_APPROACH_PULL = 0.5 // per tile, closing the gap from beyond firing range
-const RANGED_CLOSE_PENALTY = 2 // per tile, for creeping inside the standoff distance
 
 const rangedStandoff = (enemyDist: number, minRange: number, maxRange: number): number => {
 	if (enemyDist <= 0) return 0
-	if (enemyDist > maxRange) return -(enemyDist - maxRange) * RANGED_APPROACH_PULL
+	if (enemyDist > maxRange) return -(enemyDist - maxRange) * W.RANGED_APPROACH_PULL
 	if (enemyDist >= minRange) return 0
-	return -(minRange - enemyDist) * RANGED_CLOSE_PENALTY
+	return -(minRange - enemyDist) * W.RANGED_CLOSE_PENALTY
 }
 
 // ── Massing: commit as an army, not as a queue ──────────────────────────────
@@ -427,14 +413,10 @@ const rangedStandoff = (enemyDist: number, minRange: number, maxRange: number): 
 // doesn't — a factory-less or broke side that will never be stronger than it is right
 // now — the whole term is switched off by `massingPatience` (growth.ts), or the CPU
 // would talk itself into a corner and be dismantled a unit at a time.
-const SUPPORT_RADIUS = 4
 // Local value share at or below which the CPU is outmatched and should gather.
-const HOLD_SHARE = 0.35
 // Share at or above which it commits at full strength.
-const COMMIT_SHARE = 0.6
 // Floor, so a badly outnumbered unit still drifts toward the fight rather than
 // freezing forever — the advance never switches off, it only loses priority.
-const MIN_COMMITMENT = 0.15
 // Value at which a unit stops being expendable pressure and becomes an investment worth
 // protecting.
 //
@@ -456,11 +438,10 @@ const MIN_COMMITMENT = 0.15
 // without needing a carve-out. And because `unitValue` scales with current health, a
 // badly wounded heavy becomes expendable again, which is the right instinct for
 // something about to die regardless.
-const SKIRMISHER_VALUE = 350
 
 /** 0 = an investment that should wait for support, 1 = expendable pressure. */
 const expendability = (unit: UnitObject): number =>
-	1 - Math.min(1, unitValue(unit) / SKIRMISHER_VALUE)
+	1 - Math.min(1, unitValue(unit) / W.SKIRMISHER_VALUE)
 
 // ── Flocking: an army that travels as a group ───────────────────────────────
 //
@@ -491,23 +472,19 @@ const expendability = (unit: UnitObject): number =>
 // centre is itself dragged forward every turn by the objective pull acting on all of
 // its members. So the flock advances rather than pooling: whoever steps forward this
 // tick moves the anchor, and the rest follow it next tick.
-const COHESION_RADIUS = 6
 // Per tile of distance to the flock anchor, for a unit that fully wants the escort.
 // Deliberately the same order as `objWeight` (1.5–3 per tile of objective distance):
 // enough to keep the group together on the way in, never enough to out-argue the
 // objective and freeze it in place.
-const COHESION_WEIGHT = 2
 // Distance past which extra separation from the flock stops adding pull. Keeps a unit
 // that got cut off from carrying a huge constant into cross-unit plan comparison; the
 // gradient near the group, which is what actually steers, is untouched.
-const COHESION_CAP = 10
 // How far from the anchor still counts as "with the group". Inside this the term is
 // silent, and that matters more than the weight does: a cohesion pull that bites at
 // zero distance fights the objective pull head-on, and since it is the stronger of the
 // two for a heavy the whole formation would assemble and then refuse to leave. Slack
 // makes it a catch-up term instead — free movement within the pack, a rope on anyone
 // drifting out of it — so the leading edge advances uncontested and tows the rest.
-const FLOCK_SLACK = 2
 
 type FlockAnchor = { x: number; y: number } | null
 
@@ -543,7 +520,7 @@ const flockAnchor = (map: MapObject, unit: UnitObject, cpuTeam: number): FlockAn
 			nearestDist = distance
 			nearest = tile
 		}
-		if (distance > COHESION_RADIUS) continue
+		if (distance > W.COHESION_RADIUS) continue
 		const value = unitValue(other)
 		if (value <= 0) continue
 		wx += (tile % cols) * value
@@ -565,9 +542,9 @@ const cohesionPull = (map: MapObject, tile: number, unit: UnitObject, cpuTeam: n
 	if (!anchor) return 0
 	const cols = map.cols
 	const distance = Math.abs((tile % cols) - anchor.x) + Math.abs(Math.floor(tile / cols) - anchor.y)
-	const strayed = Math.min(distance, COHESION_CAP) - FLOCK_SLACK
+	const strayed = Math.min(distance, W.COHESION_CAP) - W.FLOCK_SLACK
 	if (strayed <= 0) return 0
-	return -strayed * COHESION_WEIGHT * need
+	return -strayed * W.COHESION_WEIGHT * need
 }
 
 // The other half of the rule. Cohesion alone builds a blob, and a blob is what splash
@@ -576,8 +553,6 @@ const cohesionPull = (map: MapObject, tile: number, unit: UnitObject, cpuTeam: n
 // line; past that it is a target. Priced off the unit's own value, like every other
 // risk term here, and small enough to shuffle a unit one tile sideways rather than
 // break the formation up.
-const CROWD_TOLERANCE = 2
-const SEPARATION_WEIGHT = 0.012
 
 const separationCost = (
 	map: MapObject,
@@ -590,9 +565,9 @@ const separationCost = (
 		const other = map.layers.units[adjacent]
 		if (other && other !== unit && other.team === cpuTeam) neighbours++
 	}
-	const crowd = neighbours - CROWD_TOLERANCE
+	const crowd = neighbours - W.CROWD_TOLERANCE
 	if (crowd <= 0) return 0
-	return crowd * unitValue(unit) * SEPARATION_WEIGHT
+	return crowd * unitValue(unit) * W.SEPARATION_WEIGHT
 }
 
 const localCommitment = (
@@ -610,8 +585,8 @@ const localCommitment = (
 		// as well as in the seed would inflate its own support.
 		if (other === unit) continue
 		const distance = manhattan(map, i, tile)
-		if (distance > SUPPORT_RADIUS) continue
-		const weight = 1 - distance / (SUPPORT_RADIUS + 1)
+		if (distance > W.SUPPORT_RADIUS) continue
+		const weight = 1 - distance / (W.SUPPORT_RADIUS + 1)
 		if (other.team === cpuTeam) {
 			friendly += unitValue(other) * weight
 		} else {
@@ -622,8 +597,8 @@ const localCommitment = (
 	}
 	if (hostile <= 0) return 1
 	const share = friendly / (friendly + hostile)
-	const ramp = (share - HOLD_SHARE) / (COMMIT_SHARE - HOLD_SHARE)
-	const commitment = Math.max(MIN_COMMITMENT, Math.min(1, ramp))
+	const ramp = (share - W.HOLD_SHARE) / (W.COMMIT_SHARE - W.HOLD_SHARE)
+	const commitment = Math.max(W.MIN_COMMITMENT, Math.min(1, ramp))
 	// Lerp back toward "commit anyway" by how expendable the unit is, so the caution
 	// lands on the units that are worth being cautious with and cheap pressure keeps
 	// flowing while the heavies gather behind it.
@@ -651,18 +626,16 @@ const localCommitment = (
 // a unit pushing into a fight its side is losing. It is a positional cost, so a unit
 // that IS already there and has a good shot still takes it — attacks are scored
 // separately and outweigh this.
-const OVEREXTEND_WEIGHT = 0.35
 
 const overextensionCost = (unit: UnitObject, enemyDist: number, commitment: number): number => {
 	if (commitment >= 1) return 0
-	if (enemyDist <= 0 || enemyDist > SUPPORT_RADIUS) return 0
-	const frontProximity = 1 - (enemyDist - 1) / SUPPORT_RADIUS
-	return (1 - commitment) * frontProximity * unitValue(unit) * OVEREXTEND_WEIGHT
+	if (enemyDist <= 0 || enemyDist > W.SUPPORT_RADIUS) return 0
+	const frontProximity = 1 - (enemyDist - 1) / W.SUPPORT_RADIUS
+	return (1 - commitment) * frontProximity * unitValue(unit) * W.OVEREXTEND_WEIGHT
 }
 
 // How close (Manhattan) an enemy may sit to a building before the CPU treats it as
 // under threat and pulls a defender back.
-const DEFEND_RANGE = 4
 
 // The old scorer only pulled units TOWARD enemy/neutral objectives — it had no notion
 // of guarding its own, so the player could march a captor onto a CPU building (or the
@@ -684,7 +657,9 @@ const homeDefenseBonus = (map: MapObject, tile: number, cpuTeam: number): number
 		const data = buildingData[b.type]
 		if (!data) continue
 		const insta = data.modifiers.includes('Capture.Insta_Lose')
-		const importance = insta ? 4000 : (data.actable ? 500 : 0) + data.income * 2
+		const importance = insta
+			? W.INSTA_LOSE_VALUE
+			: (data.actable ? W.FACTORY_VALUE : 0) + data.income * W.INCOME_VALUE
 		if (importance <= 0) continue
 		// Nearest enemy that can actually capture this building.
 		let de = Infinity
@@ -692,10 +667,10 @@ const homeDefenseBonus = (map: MapObject, tile: number, cpuTeam: number): number
 			const d = manhattan(map, j, i)
 			if (d < de) de = d
 		}
-		if (de > DEFEND_RANGE) continue
-		const urgency = DEFEND_RANGE - de + 1
+		if (de > W.DEFEND_RANGE) continue
+		const urgency = W.DEFEND_RANGE - de + 1
 		const dt = manhattan(map, tile, i)
-		const pull = (importance * 0.01 * urgency) / (1 + dt)
+		const pull = (importance * W.DEFEND_WEIGHT * urgency) / (1 + dt)
 		if (pull > best) best = pull
 	}
 	return best
@@ -711,7 +686,6 @@ const homeDefenseBonus = (map: MapObject, tile: number, cpuTeam: number): number
 // which is exactly "they can't kill the unit placed there in the same turn". The reward
 // is split across the owner's factories: blocking their sole factory is devastating, one
 // of several far less so. Returns 0 for our own / neutral buildings and non-factories.
-const FACTORY_BLOCK_BONUS = 320
 
 // Only Start_Turn.Capture units (the commandos, the Intrepid) can actually take a
 // building, but the `advance` term pulls EVERY unit toward the nearest objective. A
@@ -721,7 +695,6 @@ const FACTORY_BLOCK_BONUS = 320
 // repairing. Dock a non-captor for ending on the prize itself. Deliberately small: it
 // nudges the tank one tile off the building without unwinding the approach, and it is
 // an order of magnitude below FACTORY_BLOCK_BONUS so a chosen factory block still wins.
-const OBJECTIVE_SQUAT_PENALTY = 40
 
 const scoreObjectiveSquat = (map: MapObject, tile: number, unit: UnitObject, cpuTeam: number) => {
 	if (hasModifier(unit, 'Start_Turn.Capture')) return 0
@@ -729,7 +702,7 @@ const scoreObjectiveSquat = (map: MapObject, tile: number, unit: UnitObject, cpu
 	if (!building) return 0
 	if (building.team === cpuTeam) return 0
 	if ((buildingData[building.type]?.stature ?? 0) <= 0) return 0
-	return OBJECTIVE_SQUAT_PENALTY
+	return W.OBJECTIVE_SQUAT_PENALTY
 }
 
 // A factory can't deploy while ANY unit stands on its tile (see the `select`
@@ -744,12 +717,11 @@ const scoreObjectiveSquat = (map: MapObject, tile: number, unit: UnitObject, cpu
 // guard shifts one square off the building and defends from there — still able to shoot
 // a captor, no longer costing a unit of production every turn. It stays a penalty rather
 // than a veto: a strong attack from that tile can still be worth the slot.
-const SELF_FACTORY_BLOCK_PENALTY = 60
 
 const scoreSelfFactoryBlock = (map: MapObject, tile: number, cpuTeam: number): number => {
 	const building = map.layers.buildings[tile]
 	if (!building || building.team !== cpuTeam) return 0
-	return buildingData[building.type]?.actable ? SELF_FACTORY_BLOCK_PENALTY : 0
+	return buildingData[building.type]?.actable ? W.SELF_FACTORY_BLOCK_PENALTY : 0
 }
 
 const scoreFactoryBlock = (
@@ -770,7 +742,7 @@ const scoreFactoryBlock = (
 	const max = unitData[unit.type]?.health ?? 1
 	const hp = unit.health ?? max
 	if (incomingThreatMoveAware(map, tile, unit, cpuTeam, concealed) >= hp) return 0
-	return FACTORY_BLOCK_BONUS / Math.max(1, factoryCount(map, building.team))
+	return W.FACTORY_BLOCK_BONUS / Math.max(1, factoryCount(map, building.team))
 }
 
 // One of the CPU's own scripted reinforcements is telegraphed onto this tile next
@@ -781,7 +753,6 @@ const scoreFactoryBlock = (
 // can still outweigh it, in which case the CPU holds and sacrifices the drop. That
 // "hold vs. vacate" trade is the whole point. `REINFORCEMENT_WEIGHT` tunes how
 // hard the CPU protects the landing zone.
-const REINFORCEMENT_WEIGHT = 0.5
 const scoreReinforcementTile = (map: MapObject, tile: number, cpuTeam: number): number => {
 	const scheduled = map.scheduledSpawns
 	if (!scheduled || scheduled.length === 0) return 0
@@ -791,7 +762,7 @@ const scoreReinforcementTile = (map: MapObject, tile: number, cpuTeam: number): 
 		// A fresh reinforcement lands at full HP, so its value is just its cost
 		// (mirrors unitValue for a full-health unit); fall back like unitValue does.
 		const cost = unitData[s.unitType]?.cost ?? 0
-		penalty += (cost > 0 ? cost : 50) * REINFORCEMENT_WEIGHT
+		penalty += (cost > 0 ? cost : 50) * W.REINFORCEMENT_WEIGHT
 	}
 	return penalty
 }
@@ -812,13 +783,13 @@ export const scorePositionBonus = (
 	lurking: number = 0,
 	ignoreThreatTile?: number
 ): number => {
-	const cover = terrainProtection(map, tile, unit) * unitValue(unit) * 0.05
+	const cover = terrainProtection(map, tile, unit) * unitValue(unit) * W.COVER_WEIGHT
 	const threat = expectedLossAt(map, tile, unit, cpuTeam, concealed, ignoreThreatTile)
 	const objectiveDist = closestObjectiveDistance(map, tile, cpuTeam)
 	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
 	// Capture-capable units feel the objective pull harder — they're the only ones who
 	// can actually take a building — so they press in instead of milling at the front.
-	const objWeight = hasModifier(unit, 'Start_Turn.Capture') ? 3 : 1.5
+	const objWeight = hasModifier(unit, 'Start_Turn.Capture') ? W.OBJ_WEIGHT_CAPTOR : W.OBJ_WEIGHT
 	// Ranged units (min range ≥ 2, and never capture-capable here) seek standoff instead
 	// of charging: hold the enemy at firing distance rather than closing onto the front.
 	const [minRange, maxRange] = unitData[unit.type]?.range ?? [0, 0]
@@ -832,7 +803,7 @@ export const scorePositionBonus = (
 			? rangedStandoff(enemyDist, minRange, maxRange)
 			: objectiveDist > 0
 				? -objectiveDist * objWeight
-				: -enemyDist * 0.5)
+				: -enemyDist * W.ENEMY_PULL)
 	// Cost of holding a forward tile while the local force ratio is against us.
 	const overextend = overextensionCost(unit, enemyDist, commitment)
 	// Travel as an army: stay with the group (hard for a heavy, loosely for a
@@ -841,19 +812,19 @@ export const scorePositionBonus = (
 	const separation = separationCost(map, tile, unit, cpuTeam)
 	const defense = homeDefenseBonus(map, tile, cpuTeam)
 	const stealth = scoreStealthPositioning(map, tile, unit, cpuTeam, enemyDist)
-	const caution = lurking * Math.max(0, 6 - enemyDist) * 0.4
+	const caution = lurking * Math.max(0, 6 - enemyDist) * W.CAUTION_WEIGHT
 	const hunt = scoreStealthHunt(map, tile, unit, cpuTeam, lurking, concealed)
 	// Fog caution: shy away from regions a contact recently vanished into. Scaled by
 	// unit value (like the visible-threat term) so the CPU won't shove a costly unit
 	// blindly into the dark, while cheap scouts stay willing to go look.
-	const phantom = phantomThreatAt(map, cpuTeam, tile) * unitValue(unit) * PHANTOM_WEIGHT
+	const phantom = phantomThreatAt(map, cpuTeam, tile) * unitValue(unit) * W.PHANTOM_WEIGHT
 	// Exploration: with fog on and nothing in sight, reward peeling back the unknown so
 	// the CPU goes looking instead of turtling. Cheap units lead the scouting; costly
 	// ones (1 − value/600, floored) stay home rather than blunder into the dark.
 	const explore =
 		exploreValue(map, tile, unit, cpuTeam) *
-		Math.max(0.2, 1 - unitValue(unit) / 600) *
-		EXPLORE_WEIGHT
+		Math.max(W.EXPLORE_FLOOR, 1 - unitValue(unit) / W.EXPLORE_VALUE_CAP) *
+		W.EXPLORE_WEIGHT
 	// Choke enemy production by ending on (and thus occupying) their factory — only
 	// counted when the blocker can't be killed off it next turn (see scoreFactoryBlock).
 	const block = scoreFactoryBlock(map, tile, unit, cpuTeam, concealed)
@@ -889,7 +860,7 @@ export const scorePositionBonus = (
 // from the front, and when funds run low drift toward the nearest ore to refill.
 // `wallet` is the unit's current holdings; `LOW_WALLET` is the threshold below
 // which refuelling becomes a priority.
-export const LOW_WALLET = 1000
+export const LOW_WALLET = DEFAULT_WEIGHTS.LOW_WALLET
 
 export const scoreBuilderPosition = (
 	map: MapObject,
@@ -899,22 +870,25 @@ export const scoreBuilderPosition = (
 	wallet: number,
 	concealed?: ReadonlySet<number>
 ): number => {
-	const cover = terrainProtection(map, tile, unit) * unitValue(unit) * 0.05
+	const cover = terrainProtection(map, tile, unit) * unitValue(unit) * W.COVER_WEIGHT
 	// Losing this unit loses the game, so weight incoming damage far above a normal
 	// unit's threat term (×5) — a threatened tile is all but disqualifying.
 	const danger =
-		threatToTile(map, tile, unit, cpuTeam, concealed) * VALUE_PER_HP * unitValue(unit) * 5
+		threatToTile(map, tile, unit, cpuTeam, concealed) *
+		W.VALUE_PER_HP *
+		unitValue(unit) *
+		W.BUILDER_DANGER_WEIGHT
 	const enemyDist = closestEnemyDistance(map, tile, cpuTeam, concealed)
 	// Inverse of a combat unit's "advance": reward keeping distance from the enemy.
-	const safety = enemyDist > 0 ? Math.min(enemyDist, 8) * 2 : 0
+	const safety = enemyDist > 0 ? Math.min(enemyDist, 8) * W.BUILDER_SAFETY_WEIGHT : 0
 	// Low on funds: pull toward the closest ore so it can mine and keep building.
 	// The emptier the wallet the harder the pull, so a nearly broke Warmachine will
 	// commit to closing on ore over hugging cover or padding its distance from the
 	// enemy. It still never overrides `danger` (×5) — it won't walk onto a tile an
 	// enemy can actually hit just to reach ore.
 	const ore = closestOreDistance(map, tile)
-	const urgency = wallet < LOW_WALLET ? (LOW_WALLET - wallet) / LOW_WALLET : 0
-	const refuel = wallet < LOW_WALLET && ore > 0 ? -ore * (5 + urgency * 9) : 0
+	const urgency = wallet < W.LOW_WALLET ? (W.LOW_WALLET - wallet) / W.LOW_WALLET : 0
+	const refuel = wallet < W.LOW_WALLET && ore > 0 ? -ore * (5 + urgency * 9) : 0
 	return cover - danger + safety + refuel
 }
 
@@ -922,20 +896,20 @@ export const scoreBuilderPosition = (
 // scale the reward from a baseline up as holdings fall below LOW_WALLET so a broke
 // Warmachine prefers refilling over building the cheapest thing it can afford.
 export const scoreBuilderMine = (wallet: number): number => {
-	const urgency = wallet < LOW_WALLET ? (LOW_WALLET - wallet) / LOW_WALLET : 0
-	return 80 + urgency * 180
+	const urgency = wallet < W.LOW_WALLET ? (W.LOW_WALLET - wallet) / W.LOW_WALLET : 0
+	return W.BUILDER_MINE_BASE + urgency * W.BUILDER_MINE_URGENCY
 }
 
 // Value of a Warmachine spending its wallet to build a unit, from a given tile.
 // `buildScore` is the chosen unit's production score (see bestBuildableType);
 // `position` folds in how safe the tile it builds from is.
 export const scoreBuilderBuild = (buildScore: number, position: number): number =>
-	buildScore * 0.6 + position
+	buildScore * W.BUILDER_BUILD_WEIGHT + position
 
 // Below this many enemies on the board the Warmachine is willing to pick a fight —
 // few foes means a lost trade can't snowball, and it hits hard enough to likely
 // one-shot its target.
-export const FEW_ENEMIES = 3
+export const FEW_ENEMIES = DEFAULT_WEIGHTS.FEW_ENEMIES
 
 // A Warmachine attacking is the exception, not the rule: its life is the game, so
 // escaping and building come first. But it's a heavy hitter, so when there are few
@@ -949,11 +923,11 @@ export const scoreBuilderAttack = (
 	position: number
 ): number => {
 	const cleanKill = attack.killsTarget && attack.returnDamage <= 0
-	const favorable = cleanKill && enemies <= FEW_ENEMIES
+	const favorable = cleanKill && enemies <= W.FEW_ENEMIES
 	if (favorable) return attack.score + position * 0.5
 	// Last resort: a fraction of the tactical value, anchored to how exposed the
 	// firing tile is, so it only surfaces when build/escape are worse.
-	return attack.score * 0.15 + position
+	return attack.score * W.BUILDER_ATTACK_DAMP + position
 }
 
 export const scoreWait = (
@@ -964,5 +938,5 @@ export const scoreWait = (
 	concealed?: ReadonlySet<number>,
 	lurking: number = 0
 ): number => {
-	return scorePositionBonus(map, tile, unit, cpuTeam, concealed, lurking) - 5
+	return scorePositionBonus(map, tile, unit, cpuTeam, concealed, lurking) - W.WAIT_PENALTY
 }
