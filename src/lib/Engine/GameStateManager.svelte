@@ -13,7 +13,9 @@
 	import { applyAction } from './applyAction'
 	import { outgoingActions } from './outgoingActions'
 	import { setSelectedTile } from './uiState'
-	import { runCpuTurn, type CpuAiHandle } from './cpuAi'
+	import { runCpuTurn, type CpuAiHandle, type CpuPolicy } from './cpuAi'
+	import { cpuPresetOverride, resolveCpuPreset, type CpuPresetName } from './cpuAi/presets'
+	import type { SearchConfig, SearchTelemetry } from './cpuAi/search'
 	import { beginMatchWithSeed, randomMatchSeed, setMatchSeed } from './matchSeed'
 	import { teamHasPendingActions } from './pendingActions'
 	import { controlsTeam } from './turnOwnership'
@@ -65,6 +67,19 @@
 		onContinue?: (() => void) | undefined
 		onRetry?: (() => void) | undefined
 		campaignHref?: string
+		/**
+		 * How hard the CPU seats think (cpuAi/presets.ts). Unset falls back to the
+		 * process-wide `cpuPresetOverride`, then to the default (greedy Recruit).
+		 */
+		cpuPreset?: CpuPresetName | undefined
+		/** Per-seat policy override for the dev playtest (wins over the preset). */
+		cpuPolicyFor?: ((team: number) => CpuPolicy) | undefined
+		/** Search settings merged over the preset's (dev playtest sliders). */
+		cpuSearch?: Partial<SearchConfig> | undefined
+		/** Skip CPU animation and pacing so a match runs in seconds (dev playtest). */
+		cpuFast?: boolean
+		/** Every CPU search's telemetry, by team (dev playtest readout). */
+		onCpuSearch?: ((team: number, telemetry: SearchTelemetry) => void) | undefined
 		children?: import('svelte').Snippet<[{ select: (x: number, y: number) => void }]>
 	}
 
@@ -84,6 +99,11 @@
 		onContinue = undefined,
 		onRetry = undefined,
 		campaignHref = '/campaign',
+		cpuPreset = undefined,
+		cpuPolicyFor = undefined,
+		cpuSearch = undefined,
+		cpuFast = false,
+		onCpuSearch = undefined,
 		children,
 	}: Props = $props()
 
@@ -388,10 +408,16 @@
 				cpuHandle = null
 			}
 			if (isCpu && !blocked && map) {
+				const team = s.currentTeam
+				const preset = resolveCpuPreset(cpuPreset, $cpuPresetOverride)
 				cpuHandle = runCpuTurn({
 					humanTeam: localTeam,
 					endTurn: handleEndTurn,
 					map,
+					policy: cpuPolicyFor ? cpuPolicyFor(team) : preset.policy,
+					search: { ...preset.search, ...cpuSearch },
+					fast: cpuFast,
+					onSearch: onCpuSearch ? (telemetry) => onCpuSearch(team, telemetry) : undefined,
 				})
 			}
 		}

@@ -100,6 +100,12 @@ export type CpuAiOptions = {
 	search?: Partial<SearchConfig>
 	/** Fires with every search's telemetry (the dev playtest readout). */
 	onSearch?: (telemetry: SearchTelemetry) => void
+	/**
+	 * Skip every animation and pacing delay, exactly as a hidden tab does, so a whole
+	 * match plays out in seconds (the dev playtest's speed toggle). The search then
+	 * runs on a node budget without yielding.
+	 */
+	fast?: boolean
 }
 
 /** Default wall-clock thinking time per CPU turn when the policy is `search`. */
@@ -256,6 +262,7 @@ export const runCpuTurn = ({
 	policy = 'greedy',
 	search = {},
 	onSearch,
+	fast = false,
 }: CpuAiOptions): CpuAiHandle => {
 	const startTurn = get(gameState).turnNumber
 	const startTeam = get(gameState).currentTeam
@@ -300,7 +307,7 @@ export const runCpuTurn = ({
 	// online room this client is relaying the AI's moves for everyone else: the
 	// other players sit and wait on a tab they can't see. So when hidden the turn
 	// skips the choreography and commits straight through.
-	const hidden = (): boolean => typeof document !== 'undefined' && document.hidden
+	const hidden = (): boolean => fast || (typeof document !== 'undefined' && document.hidden)
 
 	const schedule = (fn: () => void) => {
 		if (hidden()) {
@@ -345,10 +352,16 @@ export const runCpuTurn = ({
 		const actable = countActable()
 		const isHidden = hidden()
 		if (budgetLeftMs === Infinity) budgetLeftMs = liveSearchBudget(requestedMs, actable)
+		// A hidden tab gets the tiny fixed node budget; the dev page's fast mode keeps
+		// the configured node budget (or the search default) but never yields either.
 		const config: SearchConfig = {
 			...searchConfig,
 			budget: isHidden
-				? { nodes: Math.min(HIDDEN_SEARCH_NODES, search.budget?.nodes ?? HIDDEN_SEARCH_NODES) }
+				? {
+						nodes: fast
+							? (search.budget?.nodes ?? DEFAULT_SEARCH.budget.nodes ?? HIDDEN_SEARCH_NODES)
+							: Math.min(HIDDEN_SEARCH_NODES, search.budget?.nodes ?? HIDDEN_SEARCH_NODES),
+					}
 				: search.budget?.nodes !== undefined
 					? { nodes: search.budget.nodes, ms: budgetLeftMs }
 					: { ms: budgetLeftMs },

@@ -4,6 +4,8 @@
 	import GameBoard from '$lib/Map/GameBoard.svelte'
 	import { socketEndTurn, socketSelect } from '$lib/Components/Socket/socket'
 	import { clearAnimations } from '$lib/Engine/Animator/animator'
+	import type { CpuPolicy } from '$lib/Engine/cpuAi'
+	import type { SearchConfig, SearchTelemetry } from '$lib/Engine/cpuAi/search'
 
 	// A real, fully client-side match — the exact stack /dev/los uses. An
 	// 'ephemeral' session makes GameSocket fall back to its LocalInteracter so the
@@ -17,9 +19,27 @@
 		menuHref?: string
 		/** Bumped by the parent to force a fresh board (scene / weather change). */
 		rebuildKey?: string | number
+		/** Fix the match seed (reproduce a run). Null rolls a fresh one. */
+		seed?: number | null
+		/** Per-seat CPU policy (the playtest's Greedy / Search seats). */
+		cpuPolicyFor?: ((team: number) => CpuPolicy) | undefined
+		cpuSearch?: Partial<SearchConfig> | undefined
+		cpuFast?: boolean
+		onCpuSearch?: ((team: number, telemetry: SearchTelemetry) => void) | undefined
 	}
 
-	let { map, localTeam = 0, fogOfWar = false, menuHref = '/dev', rebuildKey = 0 }: Props = $props()
+	let {
+		map,
+		localTeam = 0,
+		fogOfWar = false,
+		menuHref = '/dev',
+		rebuildKey = 0,
+		seed = null,
+		cpuPolicyFor = undefined,
+		cpuSearch = undefined,
+		cpuFast = false,
+		onCpuSearch = undefined,
+	}: Props = $props()
 
 	const gameSession = 'ephemeral'
 
@@ -44,7 +64,12 @@
 				{map}
 				{gameSession}
 				{localTeam}
+				{seed}
 				mode="hotseat"
+				{cpuPolicyFor}
+				{cpuSearch}
+				{cpuFast}
+				{onCpuSearch}
 				interactor={socket ? socketSelect(socket, () => map) : undefined}
 				endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 			>
