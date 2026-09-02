@@ -119,6 +119,8 @@ const actionTiles = (action: SerializedAction): number[] => {
 		case 'wait':
 		case 'mine':
 		case 'repair':
+		case 'ship-out':
+		case 'air-lift':
 			return [action.tile]
 		case 'transport-load':
 			return [action.transport, action.passenger]

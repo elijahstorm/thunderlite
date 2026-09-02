@@ -12,7 +12,7 @@ import { mine } from './modifiers/miner'
 import { hasModifier } from './modifiers/canAttack'
 import { resetCaptureProgress } from './modifiers/capture'
 import { repair } from './modifiers/repair'
-import { landUnload, transportLoad } from './modifiers/transport'
+import { airLift, landUnload, shipOut, transportLoad } from './modifiers/transport'
 import { buildAdjacent } from './modifiers/builder'
 import { spawnBuiltUnit } from './build'
 import { endTurn } from './turnLoop'
@@ -396,6 +396,25 @@ export const applyAction = (
 			// Nothing to mark — landUnload removes the transport and drops the unit in
 			// the same cell, keeping whatever acted flag the cell already had.
 			const result = landUnload(map, action.transport, action.tile)
+			if (result.ok) {
+				applyWinConditions(map as MapObject)
+			}
+			return
+		}
+		case 'ship-out': {
+			// The unit transforms in place, so the carrier inherits the tile's acted
+			// state: spent if the unit moved onto the Port this turn, still free to sail
+			// if it embarked without moving. Nothing to mark either way.
+			const result = shipOut(map, action.tile)
+			if (result.ok) {
+				applyWinConditions(map as MapObject)
+			}
+			return
+		}
+		case 'air-lift': {
+			// Same in-place rule as ship-out: a commando that paraglides without moving
+			// may still fly the new Transporter this turn.
+			const result = airLift(map, action.tile)
 			if (result.ok) {
 				applyWinConditions(map as MapObject)
 			}

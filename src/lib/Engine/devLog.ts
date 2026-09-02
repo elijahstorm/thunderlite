@@ -82,6 +82,10 @@ const describe = (map: MapObject | MapProcesser, a: SerializedAction): string =>
 			return `transport-load ${xy(c, a.passenger)} -> ${xy(c, a.transport)}`
 		case 'transport-unload':
 			return `transport-unload ${xy(c, a.transport)} -> ${xy(c, a.tile)}`
+		case 'ship-out':
+			return `ship-out ${occupant(map, a.tile)} ${xy(c, a.tile)}`
+		case 'air-lift':
+			return `air-lift ${occupant(map, a.tile)} ${xy(c, a.tile)}`
 		case 'wait':
 			return `wait ${occupant(map, a.tile)} ${xy(c, a.tile)}`
 		case 'end-turn':

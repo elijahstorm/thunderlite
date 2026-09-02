@@ -22,11 +22,10 @@ import { openBuildMenu, closeBuildMenu } from '../HUD/buildMenuStore'
 import { applyAction, type CommitOptions } from '../applyAction'
 import { emitOutgoingAction } from '../outgoingActions'
 import { isSyncLocked } from '../desync'
-import { airLift, findFriendlyTransporters, shipOut } from '../modifiers/transport'
+import { findFriendlyTransporters } from '../modifiers/transport'
 import { buildableAdjacentTiles, resolveAdjacentBuild } from '../modifiers/builder'
 import { canDeployFromFactory } from '../build'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
-import { applyWinConditions } from '../winConditions'
 import { computeAvailableActions, type ActionMenuItemId } from '../actions'
 import {
 	openActionMenu,
@@ -613,10 +612,10 @@ export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): v
 			// can still sail this turn, so we don't end it. The transform happens in
 			// place, so the new unit inherits the tile's acted state — already set if the
 			// unit reached here by moving (post-move menu), still clear if it didn't.
-			const result = shipOut(map, tile)
-			if (result.ok) {
-				applyWinConditions(map)
-			}
+			// Goes through `commit` like every other action so the transform is relayed:
+			// applied directly, an online opponent never saw the Leviathan and their
+			// board kept the tank until the next resync.
+			commit(map, { kind: 'ship-out', tile })
 			return
 		}
 		case 'air_lift': {
@@ -624,10 +623,7 @@ export const performMenuAction = (map: MapObject, actionId: ActionMenuItemId): v
 			// Same rule as ship_out: a commando that paraglides without moving may still
 			// fly the new Transporter this turn. In-place transform inherits the tile's
 			// acted state, so there's nothing to mark.
-			const result = airLift(map, tile)
-			if (result.ok) {
-				applyWinConditions(map)
-			}
+			commit(map, { kind: 'air-lift', tile })
 			return
 		}
 		case 'land': {

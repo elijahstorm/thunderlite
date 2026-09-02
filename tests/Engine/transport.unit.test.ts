@@ -17,6 +17,8 @@ import {
 	hasRescuedUnit,
 } from '../../src/lib/Engine/modifiers/transport'
 import { buildingData } from '../../src/lib/GameData/building'
+import { applyAction } from '../../src/lib/Engine/applyAction'
+import { initGameStateFromMap } from '../../src/lib/Engine/gameState'
 
 const AIR_CONTROL = buildingData.findIndex((b) => b.name === 'Air Control')
 const SEA_CONTROL = buildingData.findIndex((b) => b.name === 'Sea Control')
@@ -397,5 +399,69 @@ describe('transport — load and unload', () => {
 		const landed = map.layers.units[transTile]
 		expect(landed).toBe(commando)
 		expect(landed?.health).toBe(commandoMax) // full HP round-trip
+	})
+})
+
+// Ship Out and Air Lift used to mutate the board straight from the action menu,
+// never reaching the relay, so an online opponent kept the untransformed unit on
+// their board. They are now serialized actions applied through `applyAction`, the
+// same entry point a remote peer (and the replay log) uses.
+describe('transport — ship-out / air-lift as relayed actions', () => {
+	const building = (type: number, team = 0) => ({ type, state: 0, team })
+
+	it('ship-out: applyAction turns a Port-bound ground unit into a Leviathan', () => {
+		const map = makeMap(5, 5, SHORE)
+		const tile = tileXY(5, 2, 2)
+		const tank = unit(SCORPION_TANK, 0, 35)
+		map.layers.units[tile] = tank
+		map.layers.buildings[tileXY(5, 0, 0)] = building(SEA_CONTROL, 0)
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'ship-out', tile })
+
+		const lev = map.layers.units[tile]
+		expect(lev?.type).toBe(LEVIATHAN_TYPE)
+		expect(lev?.rescuedUnit).toBe(tank)
+		expect(lev?.team).toBe(0)
+	})
+
+	it('ship-out: applyAction leaves the board alone when the unit cannot embark', () => {
+		const map = makeMap(5, 5, PLAINS)
+		const tile = tileXY(5, 2, 2)
+		const tank = unit(SCORPION_TANK, 0)
+		map.layers.units[tile] = tank
+		map.layers.buildings[tileXY(5, 0, 0)] = building(SEA_CONTROL, 0)
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'ship-out', tile })
+
+		expect(map.layers.units[tile]).toBe(tank)
+	})
+
+	it('air-lift: applyAction turns a commando into a Transporter carrying itself', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		const commando = unit(HEAVY_COMMANDO, 0)
+		map.layers.units[tile] = commando
+		map.layers.buildings[tileXY(5, 0, 0)] = building(AIR_CONTROL, 0)
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'air-lift', tile })
+
+		const transport = map.layers.units[tile]
+		expect(transport?.type).toBe(TRANSPORTER_TYPE)
+		expect(transport?.rescuedUnit).toBe(commando)
+	})
+
+	it('air-lift: applyAction leaves the board alone without an Air Control', () => {
+		const map = makeMap(5, 5)
+		const tile = tileXY(5, 2, 2)
+		const commando = unit(STRIKE_COMMANDO, 0)
+		map.layers.units[tile] = commando
+		initGameStateFromMap(map)
+
+		applyAction(map, { kind: 'air-lift', tile })
+
+		expect(map.layers.units[tile]).toBe(commando)
 	})
 })

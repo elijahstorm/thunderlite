@@ -23,6 +23,8 @@ describe('isValidSerializedAction', () => {
 			true
 		)
 		expect(isValidSerializedAction({ kind: 'transport-unload', transport: 1, tile: 3 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'ship-out', tile: 4 })).toBe(true)
+		expect(isValidSerializedAction({ kind: 'air-lift', tile: 4 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'wait', tile: 7 })).toBe(true)
 		expect(isValidSerializedAction({ kind: 'end-turn' })).toBe(true)
 	})
@@ -39,6 +41,8 @@ describe('isValidSerializedAction', () => {
 		expect(isValidSerializedAction({ kind: 'wait', tile: '5' })).toBe(false)
 		expect(isValidSerializedAction({ kind: 'wait', tile: Number.NaN })).toBe(false)
 		expect(isValidSerializedAction({ kind: 'tile', tile: 12 })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'ship-out' })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'air-lift', tile: -1 })).toBe(false)
 		expect(isValidSerializedAction({ kind: 'endTurn' })).toBe(false)
 	})
 

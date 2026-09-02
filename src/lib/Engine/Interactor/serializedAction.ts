@@ -21,6 +21,13 @@ export type SerializedAction =
 	| { kind: 'repair'; tile: number }
 	| { kind: 'transport-load'; transport: number; passenger: number }
 	| { kind: 'transport-unload'; transport: number; tile: number }
+	// In-place transforms: a ground unit on a Port embarks into a Leviathan
+	// (`ship-out`), a commando paraglides into a Transporter (`air-lift`). Both
+	// replace the unit on `tile` with a carrier holding it as `rescuedUnit`. They
+	// used to be applied straight from the action menu, bypassing the relay, so an
+	// online opponent kept seeing the original unit until the next full resync.
+	| { kind: 'ship-out'; tile: number }
+	| { kind: 'air-lift'; tile: number }
 	| { kind: 'wait'; tile: number }
 	// `next` is the team this client's engine advanced to (see socketEndTurn). It
 	// is advisory metadata for the SERVER's turn pointer, not something the engine
@@ -76,6 +83,8 @@ export const isValidSerializedAction = (value: unknown): value is SerializedActi
 		case 'capture':
 		case 'mine':
 		case 'repair':
+		case 'ship-out':
+		case 'air-lift':
 		case 'wait':
 			return isTile(v.tile)
 		case 'build':
