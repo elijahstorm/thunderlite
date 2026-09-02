@@ -104,9 +104,6 @@
 			<section class="card p-6 sm:p-8 space-y-5">
 				<div class="space-y-1">
 					<h2 class="text-lg font-semibold tracking-tight text-foreground">Your active session</h2>
-					<p class="text-sm text-muted-foreground">
-						Share this code with a friend so they can join your game.
-					</p>
 				</div>
 
 				<div class="flex flex-wrap items-center gap-2">
@@ -147,7 +144,6 @@
 			<section class="card p-6 sm:p-8 flex items-center justify-between gap-4 flex-wrap">
 				<div>
 					<h2 class="font-medium text-foreground">No active session</h2>
-					<p class="text-sm text-muted-foreground mt-1">You don't have a game in progress yet.</p>
 				</div>
 				<div class="flex flex-wrap items-center gap-2">
 					<a href="/editor" class="btn btn-outline">
@@ -166,9 +162,6 @@
 			<section class="card p-6 sm:p-8 space-y-5" data-testid="async-games">
 				<div class="space-y-1">
 					<h2 class="text-lg font-semibold tracking-tight text-foreground">Your async games</h2>
-					<p class="text-sm text-muted-foreground">
-						Games played over days. You get an email whenever it is your move.
-					</p>
 				</div>
 
 				<ul class="divide-y divide-border">
@@ -210,7 +203,6 @@
 		<section class="card p-6 sm:p-8 space-y-5">
 			<div class="space-y-1">
 				<h2 class="text-lg font-semibold tracking-tight text-foreground">Join a game</h2>
-				<p class="text-sm text-muted-foreground">Paste a session code shared by another player.</p>
 			</div>
 
 			<form
@@ -246,9 +238,7 @@
 		<section class="card p-6 sm:p-8 space-y-5">
 			<div class="space-y-1">
 				<h2 class="text-lg font-semibold tracking-tight text-foreground">Open games</h2>
-				<p class="text-sm text-muted-foreground">
-					Public lobbies waiting for a player. Jump into one to fill it.
-				</p>
+				<p class="text-sm text-muted-foreground">Public lobbies waiting for a player.</p>
 			</div>
 
 			{#if data.openRooms?.length}
@@ -286,9 +276,7 @@
 					{/each}
 				</ul>
 			{:else}
-				<p class="text-sm text-muted-foreground">
-					No open games right now. Make one to get started.
-				</p>
+				<p class="text-sm text-muted-foreground">No open games right now.</p>
 			{/if}
 
 			{#if data.page > 0 || data.hasMore}

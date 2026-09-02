@@ -276,8 +276,7 @@
 						Async game{turnClockLabel ? ` · ${turnClockLabel} per turn` : ''}
 					</span>
 					<span class="text-xs text-muted-foreground">
-						Play at your own pace. You get an email when it is your move, and a turn left unfinished
-						past the clock is resigned automatically.
+						Turns left past the clock are auto-resigned.
 					</span>
 				{:else}
 					<span
@@ -293,9 +292,6 @@
 		<section class="card p-6 sm:p-8 space-y-5">
 			<div class="space-y-1">
 				<h2 class="text-lg font-semibold tracking-tight text-foreground">Invite a player</h2>
-				<p class="text-sm text-muted-foreground">
-					Share this code so a friend can join before the match begins.
-				</p>
 			</div>
 
 			<div class="flex flex-wrap items-center gap-2">
@@ -506,12 +502,6 @@
 				<p class="flex items-center gap-2 text-sm text-muted-foreground">
 					<Icon icon="lucide:loader" width={16} class="animate-spin" />
 					Waiting for {emptySeats === 1 ? 'another player' : `${emptySeats} more players`} to join…
-					{#if data.canFillWithAi && isHost}
-						<span class="text-foreground">
-							Or start now and the {emptySeats === 1 ? 'open side' : 'open sides'} will be played by the
-							CPU.
-						</span>
-					{/if}
 				</p>
 			{/if}
 
