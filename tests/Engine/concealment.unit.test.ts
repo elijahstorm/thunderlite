@@ -289,6 +289,7 @@ describe('truncateRouteAtCollision', () => {
 		expect(truncateRouteAtCollision(map, [0, 1, 2, 3], 0)).toEqual({
 			route: [0, 1],
 			collided: true,
+			blocked: 2,
 		})
 	})
 
@@ -298,6 +299,7 @@ describe('truncateRouteAtCollision', () => {
 		expect(truncateRouteAtCollision(map, [0, 1, 2], 0)).toEqual({
 			route: [0],
 			collided: true,
+			blocked: 1,
 		})
 	})
 

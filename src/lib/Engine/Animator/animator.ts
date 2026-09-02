@@ -8,6 +8,7 @@ import { clearBuildFade } from '$lib/Engine/buildFade'
 import { generateKey } from '$lib/Security/keys'
 import {
 	ANIMATION_TIME,
+	BLOCKED_ANIMATION_TIME,
 	HEALTH_BAR_ANIMATION_TIME,
 	HEALTH_BAR_BACKSTOP_SLACK,
 	OVERLAY_ANIMATION_TIME,
@@ -19,6 +20,7 @@ import {
 // Re-exported here so every existing import site is unchanged.
 export {
 	ANIMATION_TIME,
+	BLOCKED_ANIMATION_TIME,
 	HEALTH_BAR_ANIMATION_TIME,
 	HEALTH_BAR_BACKSTOP_SLACK,
 	OVERLAY_ANIMATION_TIME,
@@ -88,14 +90,31 @@ export const animations = writable<
 	}[]
 >([])
 
+// A halted mover's "blocked" beat (see `animateBlocked`). One at a time: moves are
+// sequenced, so a second collision can't start before the first has played out.
+export const blockedAnimation = writable<{
+	map: MapObject
+	unit: UnitObject
+	// Where the unit came to rest.
+	tile: number
+	// The tile it ran into — orthogonally adjacent to `tile`.
+	blocked: number
+	// Which way the lunge goes: an index into `directions`, i.e. the same value the
+	// unit's `state` (sprite facing) takes, so the sprite faces what it hit.
+	direction: number
+} | null>(null)
+
 // True whenever the board is mid-animation: a unit walking its route, combat
 // overlays on screen, or a multi-beat attack/health-bar ease in flight. Player
 // input gating (clicks, hover marker, route preview) reads this so nothing can
 // select or move a unit until the previous action's animations have settled.
 export const boardBusy = derived(
-	[routeAnimation, animations, animationBusy],
-	([$routeAnimation, $animations, $animationBusy]) =>
-		$routeAnimation !== null || $animations.length > 0 || $animationBusy > 0
+	[routeAnimation, animations, animationBusy, blockedAnimation],
+	([$routeAnimation, $animations, $animationBusy, $blockedAnimation]) =>
+		$routeAnimation !== null ||
+		$animations.length > 0 ||
+		$animationBusy > 0 ||
+		$blockedAnimation !== null
 )
 
 // Cancel any in-flight animation timers and reset both overlay stores to idle.
@@ -113,6 +132,11 @@ export const clearAnimations = () => {
 	animationBusy.set(0)
 	routeAnimation.set(null)
 	animations.set([])
+	// The blocked beat hides the unit's idle sprite under its overlay; give the
+	// sprite back before the overlay goes, or the unit stays invisible on the board.
+	const blocked = get(blockedAnimation)
+	if (blocked) blocked.unit.animating = false
+	blockedAnimation.set(null)
 	clearMaterialize()
 	clearBuildFade()
 }
@@ -348,6 +372,47 @@ export const facingToward = (map: MapObject, from: number, to: number): number =
 	if (dx !== 0) return dx > 0 ? 0 : 2
 	return to > from ? 1 : 3
 }
+
+// Are `a` and `b` orthogonal neighbours on this board? `directions` alone would
+// accept a +1 step that wraps from the end of one row to the start of the next.
+export const isOrthogonalStep = (map: MapObject, a: number, b: number): boolean => {
+	const dx = Math.abs((a % map.cols) - (b % map.cols))
+	const dy = Math.abs(Math.floor(a / map.cols) - Math.floor(b / map.cols))
+	return dx + dy === 1
+}
+
+/**
+ * The "blocked" beat for a move cut short by an enemy the mover couldn't see: the
+ * unit on `tile` wheels to face `blocked`, lunges at it and recoils, and a callout
+ * pops over it (see Animator.svelte for the choreography itself). Without this
+ * the halt is unreadable from the other side of the board — the ambusher just
+ * sees an enemy walk up to their hidden unit and stop, and wonders why it never
+ * attacked. Played by every client (local, CPU, remote, replay) off the `blocked`
+ * field the move/wait action carries.
+ *
+ * The unit keeps its board tile (fog sight, win conditions) but has its idle sprite
+ * suppressed under the overlay, the same way an attacker does while it swings.
+ * `blocked` arrives over the network, so it's re-checked here: anything that isn't
+ * an orthogonal neighbour of `tile` plays nothing and resolves at once.
+ */
+export const animateBlocked = (map: MapObject, unit: UnitObject, tile: number, blocked: number) =>
+	new Promise<void>((resolve) => {
+		if (!isOrthogonalStep(map, tile, blocked)) {
+			resolve()
+			return
+		}
+		const direction = directions.findIndex((validator) => validator(map, tile, blocked))
+		unit.state = direction
+		unit.animating = true
+		beginAnimationBeat()
+		blockedAnimation.set({ map, unit, tile, blocked, direction })
+		schedule(() => {
+			unit.animating = false
+			blockedAnimation.set(null)
+			endAnimationBeat()
+			resolve()
+		}, BLOCKED_ANIMATION_TIME)
+	})
 
 export const animateAttack = (
 	map: MapObject,

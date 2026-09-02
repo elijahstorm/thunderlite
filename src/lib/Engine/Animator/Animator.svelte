@@ -1,8 +1,10 @@
 <script lang="ts">
 	import {
 		ANIMATION_TIME,
+		BLOCKED_ANIMATION_TIME,
 		routeAnimation,
 		animations,
+		blockedAnimation,
 		getDirection,
 		startIncrementer,
 	} from './animator'
@@ -80,31 +82,126 @@
 		)
 	}
 
-	const parseRoute = (route: typeof $routeAnimation) => {
-		if (route === null) return null
-		// The renderer may be missing (a unit type's sprite hasn't decoded yet, or
-		// a headless/test context) — never index into it blindly. A throw here lands
-		// inside the render effect and corrupts the whole reactive tree, which reads
-		// as "animations freeze and the board snaps to its final state". Bail to null
-		// (render() treats that as no overlay) instead.
-		const source = $rendererStore.units[route.unit.type]?.sprite?.[route.unit.team ?? 0]?.src
+	// A unit's idle sheet as an overlay sprite seated on cell (x, y), facing `state`.
+	// The renderer may be missing (a unit type's sprite hasn't decoded yet, or a
+	// headless/test context) — never index into it blindly. A throw here lands
+	// inside the render effect and corrupts the whole reactive tree, which reads as
+	// "animations freeze and the board snaps to its final state". Bail to null
+	// (render() treats that as no overlay) instead.
+	const parseUnitSprite = (unit: UnitObject, x: number, y: number, state: number) => {
+		const source = $rendererStore.units[unit.type]?.sprite?.[unit.team ?? 0]?.src
 		if (!source) return null
-		const { x, y } = tileToXY(route.map, route.route[index])
-		const unit = unitData[route.unit.type]
+		const data = unitData[unit.type]
 		return {
 			x,
 			y,
 			source,
-			xOffset: unit.xOffset,
-			yOffset: unit.yOffset,
-			frames: unit.frames,
-			// Face the step the sprite is *currently sliding along* (route[index-1] →
-			// route[index]), which is the same direction as its in:fly. Facing the
-			// *next* step here would turn the unit the instant it enters a corner tile,
-			// so it crabs sideways into the bend before setting off the new way. The
-			// turn belongs to the next beat, when the following element slides out.
-			state: getDirection(route.map, route.route, Math.max(0, index - 1)),
+			xOffset: data.xOffset,
+			yOffset: data.yOffset,
+			frames: data.frames,
+			state,
 		}
+	}
+
+	const parseRoute = (route: typeof $routeAnimation) => {
+		if (route === null) return null
+		const { x, y } = tileToXY(route.map, route.route[index])
+		// Face the step the sprite is *currently sliding along* (route[index-1] →
+		// route[index]), which is the same direction as its in:fly. Facing the
+		// *next* step here would turn the unit the instant it enters a corner tile,
+		// so it crabs sideways into the bend before setting off the new way. The
+		// turn belongs to the next beat, when the following element slides out.
+		const state = getDirection(route.map, route.route, Math.max(0, index - 1))
+		return parseUnitSprite(route.unit, x, y, state)
+	}
+
+	// --- Blocked lunge ---------------------------------------------------------
+	// A move cut short by an enemy the mover couldn't see ends on this beat: the
+	// halted unit lunges at the tile it ran into, recoils, an impact flash licks the
+	// shared edge, and a "!" callout pops over it. The pieces sit inside one wrapper
+	// pinned to the unit's cell — the sprite (and its health bar) lunges, the flash
+	// and callout stay put — so nothing is clipped by the sprite's own box.
+
+	// Same vantage rule as a moving unit at one step (`routeVisible`): our own unit
+	// always shows, an enemy only where fog and cloak let us see it standing.
+	const blockedVisible = (
+		bump: typeof $blockedAnimation,
+		fog: typeof $viewerVisibility,
+		team: number
+	) => {
+		if (bump === null) return false
+		if (bump.unit.team === team) return true
+		if (!unitSeenByViewer(fog, bump.tile, bump.unit)) return false
+		return !isUnitStealthed(bump.map, bump.tile, bump.unit)
+	}
+
+	// Mirrors `routeOpacity`: our own cloaked unit reads at half strength.
+	const blockedOpacity = (bump: NonNullable<typeof $blockedAnimation>, team: number) =>
+		bump.unit.team === team && isUnitStealthed(bump.map, bump.tile, bump.unit) ? 0.5 : 1
+
+	// Unit vector per facing (right, down, left, up) — the way the lunge goes.
+	const LUNGE_VECTORS = [
+		[1, 0],
+		[0, 1],
+		[-1, 0],
+		[0, -1],
+	] as const
+	// How far the lunge carries, as a share of a cell: enough to visibly cross the
+	// tile line, short of looking like a step onto the blocked tile.
+	const LUNGE_REACH = 0.34
+
+	const blockedWrapperStyle = (bump: NonNullable<typeof $blockedAnimation>, alpha: number) => {
+		const { x, y } = tileToXY(bump.map, bump.tile)
+		return `
+			left: ${x * cellWidth}px;
+			top: ${y * cellHeight}px;
+			width: ${cellWidth}px;
+			height: ${cellHeight}px;
+			opacity: ${alpha};
+			--beat: ${BLOCKED_ANIMATION_TIME}ms;
+		`
+	}
+
+	// The sprite is a child of the cell wrapper, so render() is asked for cell
+	// (0, 0): that yields exactly the -xOffset/-yOffset seat the sprite needs.
+	const blockedSpriteStyle = (bump: NonNullable<typeof $blockedAnimation>, frame: number) => {
+		const [dx, dy] = LUNGE_VECTORS[bump.direction] ?? [0, 0]
+		return `
+			${render(parseUnitSprite(bump.unit, 0, 0, bump.direction), frame)}
+			--lunge-x: ${dx * cellWidth * LUNGE_REACH}px;
+			--lunge-y: ${dy * cellHeight * LUNGE_REACH}px;
+		`
+	}
+
+	// A flash on the edge shared with the blocked tile: long along the edge, thin
+	// across it, centred on the edge's midpoint.
+	const blockedImpactStyle = (bump: NonNullable<typeof $blockedAnimation>) => {
+		const [dx, dy] = LUNGE_VECTORS[bump.direction] ?? [0, 0]
+		const horizontal = dx !== 0
+		const along = (horizontal ? cellHeight : cellWidth) * 0.72
+		const across = (horizontal ? cellWidth : cellHeight) * 0.24
+		return `
+			left: ${cellWidth / 2 + (dx * cellWidth) / 2}px;
+			top: ${cellHeight / 2 + (dy * cellHeight) / 2}px;
+			width: ${horizontal ? across : along}px;
+			height: ${horizontal ? along : across}px;
+			margin-left: ${-(horizontal ? across : along) / 2}px;
+			margin-top: ${-(horizontal ? along : across) / 2}px;
+		`
+	}
+
+	const blockedCalloutStyle = () => {
+		const size = cellHeight * 0.44
+		return `
+			left: 50%;
+			top: ${-cellHeight * 0.36}px;
+			min-width: ${size}px;
+			height: ${size}px;
+			padding: 0 ${size * 0.22}px;
+			border-radius: ${size / 2}px;
+			border-width: ${Math.max(1.5, cellHeight * 0.035)}px;
+			font-size: ${size * 0.72}px;
+		`
 	}
 
 	const render = (
@@ -162,9 +259,10 @@
 	const healthBands = (p: number): [string, string] =>
 		p > 0.65 ? ['#86efac', '#22c55e'] : p > 0.35 ? ['#fde047', '#eab308'] : ['#fca5a5', '#ef4444']
 
-	const parseRouteHealth = (route: typeof $routeAnimation) => {
-		if (route === null) return null
-		const unit = route.unit
+	const parseRouteHealth = (route: typeof $routeAnimation) =>
+		route === null ? null : parseUnitHealth(route.unit)
+
+	const parseUnitHealth = (unit: UnitObject) => {
 		const data = unitData[unit.type]
 		const max = data?.health ?? 0
 		if (max <= 0) return null
@@ -179,7 +277,7 @@
 		}
 	}
 
-	type RouteBar = NonNullable<ReturnType<typeof parseRouteHealth>>
+	type RouteBar = NonNullable<ReturnType<typeof parseUnitHealth>>
 
 	const routeBarTrackStyle = (bar: RouteBar) => {
 		const o = (5 * cellHeight) / 60
@@ -257,6 +355,24 @@
 	{/key}
 {/if}
 
+{#if $blockedAnimation && blockedVisible($blockedAnimation, $viewerVisibility, $viewerTeam)}
+	{@const bump = $blockedAnimation}
+	{@const bar = parseUnitHealth(bump.unit)}
+	<div class="absolute" style={blockedWrapperStyle(bump, blockedOpacity(bump, $viewerTeam))}>
+		<div
+			class="blocked-sprite absolute overflow-clip"
+			style={blockedSpriteStyle(bump, $animationFrame)}
+		>
+			{#if bar}
+				<div class="absolute" style={routeBarTrackStyle(bar)}></div>
+				<div class="absolute" style={routeBarFillStyle(bar)}></div>
+			{/if}
+		</div>
+		<div class="blocked-impact absolute" style={blockedImpactStyle(bump)}></div>
+		<div class="blocked-callout absolute" style={blockedCalloutStyle()}>!</div>
+	</div>
+{/if}
+
 {#each $animations as animation (animation.key)}
 	{#if tileVisible(animation.tile, $viewerVisibility)}
 		<div
@@ -265,3 +381,108 @@
 		></div>
 	{/if}
 {/each}
+
+<style>
+	/* The halted unit: a sharp lunge at the tile it ran into, a springy recoil
+	   past centre, then it settles. Timing functions ride the keyframe they start
+	   from — accelerate into the impact, ease out of it. */
+	.blocked-sprite {
+		animation: blocked-lunge var(--beat) both;
+		will-change: transform;
+	}
+	@keyframes blocked-lunge {
+		0% {
+			transform: translate(0, 0);
+			animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+		}
+		14% {
+			transform: translate(var(--lunge-x), var(--lunge-y));
+			animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1);
+		}
+		36% {
+			transform: translate(calc(var(--lunge-x) * -0.12), calc(var(--lunge-y) * -0.12));
+			animation-timing-function: ease-in-out;
+		}
+		50%,
+		100% {
+			transform: translate(0, 0);
+		}
+	}
+
+	/* A pale flash where the sprite meets the tile line, on the impact beat. */
+	.blocked-impact {
+		border-radius: 50%;
+		background: radial-gradient(
+			closest-side,
+			rgba(255, 255, 255, 0.95),
+			rgba(255, 255, 255, 0.55) 45%,
+			rgba(255, 255, 255, 0) 100%
+		);
+		opacity: 0;
+		pointer-events: none;
+		animation: blocked-impact calc(var(--beat) * 0.3) calc(var(--beat) * 0.14) both;
+	}
+	@keyframes blocked-impact {
+		0% {
+			opacity: 0;
+			transform: scale(0.5);
+		}
+		25% {
+			opacity: 0.95;
+			transform: scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: scale(1.35);
+		}
+	}
+
+	/* The callout pops in on the impact beat, holds, and lifts away as the beat
+	   ends. Dark pill, white glyph — the same slate the health-bar track uses, so
+	   it reads as part of the board rather than a UI toast. */
+	.blocked-callout {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+		color: #fff;
+		background: rgba(15, 23, 42, 0.9);
+		border-style: solid;
+		border-color: rgba(255, 255, 255, 0.92);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+		font-family:
+			ui-sans-serif,
+			system-ui,
+			-apple-system,
+			sans-serif;
+		font-weight: 900;
+		line-height: 1;
+		white-space: nowrap;
+		pointer-events: none;
+		user-select: none;
+		opacity: 0;
+		transform-origin: 50% 100%;
+		animation: blocked-callout calc(var(--beat) * 0.86) calc(var(--beat) * 0.14) both;
+	}
+	@keyframes blocked-callout {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, 30%) scale(0.5);
+		}
+		14% {
+			opacity: 1;
+			transform: translate(-50%, 0) scale(1.15);
+		}
+		24% {
+			transform: translate(-50%, 0) scale(1);
+		}
+		78% {
+			opacity: 1;
+			transform: translate(-50%, 0) scale(1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -30%) scale(0.9);
+		}
+	}
+</style>

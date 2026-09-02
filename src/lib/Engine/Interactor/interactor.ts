@@ -8,14 +8,15 @@ import {
 import { computeThreatSeverity } from './Pathing/threat'
 import { toggleThreatUnit, viewerTeam } from '../threatOverlay'
 import { get } from 'svelte/store'
-import { animateRoute, animateHealthBar } from '../Animator/animator'
+import { animateRoute, animateHealthBar, animateBlocked } from '../Animator/animator'
 import { animateAttackSequence } from '../attackSequence'
 import { interactionSource, interactionState } from './interactionState'
 import { buildingData } from '$lib/GameData/building'
 import { unitData } from '$lib/GameData/unit'
 import { pathFinder } from './Pathing/pathFinder'
 import { truncateRouteAtCollision } from './Pathing/movement'
-import { concealedEnemyTiles, isUnitStealthed } from '../visibility'
+import { concealedEnemyTiles, freezeSight, isUnitStealthed } from '../visibility'
+import { releaseSight } from '../fogState'
 import { recordStealthPassthrough } from '../cpuAi/stealthMemory'
 import { canSelectUnit, gameState } from '../gameState'
 import { openBuildMenu, closeBuildMenu } from '../HUD/buildMenuStore'
@@ -69,6 +70,11 @@ const commit = (map: MapObject, action: SerializedAction, opts?: CommitOptions):
 	// is exempt — quitting must always be possible, and the server attributes it to
 	// the sender's own team rather than trusting the board it came from.
 	if (action.kind !== 'surrender' && isSyncLocked()) return
+	// Every non-move local action settles whatever unit was mid-decision, so any
+	// pre-move sight freeze is over (see `frozenSight`). The move itself never
+	// lands here (it applies + relays inline once its walk finishes), which is what
+	// lets the freeze it took survive until the post-move choice.
+	releaseSight()
 	// `live: true` — locally-initiated action, so fire its SFX. Replayed and
 	// relayed actions go through `applyAction` directly and stay silent. Animated
 	// actions (move / attack) voice their sound at the animation beat and pass
@@ -226,13 +232,18 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	// In fog / against stealth the planned route can run through an enemy the player
 	// couldn't see. Stop on the last clear tile: the unit walks into the ambush,
 	// halts, and its turn ends — no post-move menu, and any queued attack is aborted.
-	const { route, collided } = truncateRouteAtCollision(map, plannedRoute, unit.team)
+	const { route, collided, blocked } = truncateRouteAtCollision(map, plannedRoute, unit.team)
 	const finalTile = route.length > 0 ? route[route.length - 1] : destination
 
 	// Collided before taking a single step (a concealed enemy sits adjacent): the
-	// unit forfeits its move in place.
+	// unit forfeits its move in place. The wait carries the tile it ran into so
+	// every board — this one included — plays the blocked lunge; otherwise the
+	// player clicks a destination and simply nothing happens.
 	if (collided && finalTile === tile) {
-		commit(map, { kind: 'wait', tile })
+		const waitAction: SerializedAction = { kind: 'wait', tile }
+		if (blocked !== undefined) waitAction.blocked = blocked
+		commit(map, waitAction)
+		if (blocked !== undefined) void animateBlocked(map, unit, tile, blocked)
 		return
 	}
 
@@ -249,10 +260,15 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 	// tile — and every other client used to re-derive its own route from from/to,
 	// landing on whichever equal-cost line `pathFinder` settled first. Two boards
 	// then showed the same tank taking two different roads.
-	const moveAction: SerializedAction =
-		route.length > 1
-			? { kind: 'move', from: tile, to: finalTile, path: route.slice() }
-			: { kind: 'move', from: tile, to: finalTile }
+	// A collision also relays the tile the unit ran into (`blocked`), so the other
+	// boards play the same lunge this one does — see `animateBlocked`.
+	const moveAction: Extract<SerializedAction, { kind: 'move' }> = {
+		kind: 'move',
+		from: tile,
+		to: finalTile,
+	}
+	if (route.length > 1) moveAction.path = route.slice()
+	if (blocked !== undefined) moveAction.blocked = blocked
 	emitOutgoingAction(moveAction)
 	animateRoute(map, unit, tile, finalTile, route).then(() => {
 		map.layers.units[tile] = unit
@@ -261,7 +277,11 @@ const move: Interactor = ({ map, tile, choice, callback }) => {
 		recordStealthPassthrough(map, route, unit)
 		applyAction(map, moveAction, { live: true, suppressSfxActions: ['move'] })
 		// Walked into a concealed enemy mid-route: turn over, skip menu / callback.
-		if (collided) return
+		// The unit bumps the tile it hit so the halt reads as an ambush, not a stroll.
+		if (collided) {
+			if (blocked !== undefined) void animateBlocked(map, unit, finalTile, blocked)
+			return
+		}
 		if (callback) {
 			callback()
 		} else {

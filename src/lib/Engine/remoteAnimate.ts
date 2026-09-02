@@ -1,5 +1,5 @@
 import { get } from 'svelte/store'
-import { animateRoute, animateHealthBar } from './Animator/animator'
+import { animateRoute, animateHealthBar, animateBlocked } from './Animator/animator'
 import { animateAttackSequence } from './attackSequence'
 import { applyAction } from './applyAction'
 import { dispatchSerializedAction, type SerializedAction } from './Interactor/serializedAction'
@@ -95,6 +95,25 @@ export const animateRemoteAction = async (
 		// "remember" a stealth threat is about, same as the local/CPU paths.
 		recordStealthPassthrough(map, route, unit)
 		applyAction(map, action, { live: true, suppressSfxActions: ['move'] })
+		// The walk was cut short by a unit the mover couldn't see — very often OURS.
+		// Play the lunge at the tile it hit, or from this side the enemy just walked
+		// up to our hidden unit and inexplicably stopped. Awaited so the queue can't
+		// start the opponent's next action while the callout is still up.
+		if (action.blocked !== undefined) {
+			await animateBlocked(map, unit, action.to, action.blocked)
+		}
+		return
+	}
+
+	// A move that never got off its tile: the first step ran into a concealed
+	// enemy, so the unit forfeited in place. Same lunge as a cut-short move, from
+	// where it stands — but only if we can see it there; otherwise apply silently.
+	if (action.kind === 'wait' && action.blocked !== undefined) {
+		const unit = map.layers.units[action.tile]
+		applyAction(map, action, { live: true })
+		if (unit && unitSeenByViewer(get(viewerVisibility), action.tile, unit)) {
+			await animateBlocked(map, unit, action.tile, action.blocked)
+		}
 		return
 	}
 

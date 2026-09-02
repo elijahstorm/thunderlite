@@ -29,6 +29,28 @@ describe('isValidSerializedAction', () => {
 		expect(isValidSerializedAction({ kind: 'end-turn' })).toBe(true)
 	})
 
+	/**
+	 * `blocked` is the tile a cut-short move ran into — choreography for the lunge
+	 * every client plays. Like the route, adjacency can't be checked without a board
+	 * (the animator does that); what can be is that it's a tile and not the tile the
+	 * unit came to rest on. A wait carries it too, for a move that never got off
+	 * its start tile.
+	 */
+	it('accepts a blocked tile on a cut-short move or a forfeited wait', () => {
+		expect(isValidSerializedAction({ kind: 'move', from: 0, to: 1, blocked: 2 })).toBe(true)
+		expect(
+			isValidSerializedAction({ kind: 'move', from: 0, to: 2, path: [0, 1, 2], blocked: 3 })
+		).toBe(true)
+		expect(isValidSerializedAction({ kind: 'wait', tile: 7, blocked: 8 })).toBe(true)
+		// Not a tile.
+		expect(isValidSerializedAction({ kind: 'move', from: 0, to: 1, blocked: -1 })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'move', from: 0, to: 1, blocked: '2' })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'wait', tile: 7, blocked: 1.5 })).toBe(false)
+		// Can't have run into the tile it's standing on.
+		expect(isValidSerializedAction({ kind: 'move', from: 0, to: 1, blocked: 1 })).toBe(false)
+		expect(isValidSerializedAction({ kind: 'wait', tile: 7, blocked: 7 })).toBe(false)
+	})
+
 	it('rejects malformed payloads', () => {
 		expect(isValidSerializedAction(null)).toBe(false)
 		expect(isValidSerializedAction(undefined)).toBe(false)

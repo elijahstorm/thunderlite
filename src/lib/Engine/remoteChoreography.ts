@@ -1,6 +1,7 @@
 import type { SerializedAction } from './Interactor/serializedAction'
 import {
 	ANIMATION_TIME,
+	BLOCKED_ANIMATION_TIME,
 	HEALTH_BAR_ANIMATION_TIME,
 	OVERLAY_ANIMATION_TIME,
 } from './Animator/timings'
@@ -18,7 +19,12 @@ import {
  * `animateRemoteAction` together; nowhere else.
  */
 export const hasRemoteChoreography = (action: SerializedAction): boolean =>
-	action.kind === 'move' || action.kind === 'attack' || action.kind === 'repair'
+	action.kind === 'move' ||
+	action.kind === 'attack' ||
+	action.kind === 'repair' ||
+	// A wait only has something to show when it stands for a move that ran into a
+	// concealed enemy on its first step (the blocked lunge); a plain wait is silent.
+	(action.kind === 'wait' && action.blocked !== undefined)
 
 /**
  * Frames in a combat overlay sheet, for estimating an attack's length. The real
@@ -45,8 +51,12 @@ export const remoteChoreographyMs = (action: SerializedAction): number => {
 	switch (action.kind) {
 		case 'move': {
 			const tiles = Array.isArray(action.path) ? action.path.length - 1 : 2
-			return Math.max(1, tiles) * ANIMATION_TIME
+			// A cut-short walk ends on the blocked lunge + callout.
+			const blocked = action.blocked !== undefined ? BLOCKED_ANIMATION_TIME : 0
+			return Math.max(1, tiles) * ANIMATION_TIME + blocked
 		}
+		case 'wait':
+			return action.blocked !== undefined ? BLOCKED_ANIMATION_TIME : 0
 		case 'attack':
 			// Swing, then the health-bar ease, then — often — the target's return fire
 			// and its own ease. Counted as one exchange plus most of a second.

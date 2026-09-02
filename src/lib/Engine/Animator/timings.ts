@@ -30,3 +30,11 @@ export const HEALTH_BAR_BACKSTOP_SLACK = 600
 // 1.6-2.8s and read as unnaturally slow. ~55ms (~18fps) keeps them punchy while
 // still showing every frame. Tuned independently of movement/idle pacing.
 export const OVERLAY_ANIMATION_TIME = 55
+
+// A unit that walks into an enemy it couldn't see (fog, cloak, stealth) halts a
+// tile short. Left at that, the halt is unreadable — to the ambusher it looks like
+// the enemy strolled up and declined to attack. So the mover plays a "blocked"
+// beat: it lunges at the tile it ran into, recoils, and a callout pops over it.
+// This is the whole beat, lunge through the callout fading out; the sequencers
+// await it so the next action doesn't start while the callout is still up.
+export const BLOCKED_ANIMATION_TIME = 850

@@ -36,7 +36,7 @@
 	import { updateRoute } from '$lib/Layers/tileHighlighter'
 	import { splashPreviewForHover } from '$lib/Engine/aoePreview'
 	import { interactionSource, interactionState } from '$lib/Engine/Interactor/interactionState'
-	import { fogOfWarEnabled, viewerVisibility } from '$lib/Engine/fogState'
+	import { fogOfWarEnabled, frozenSight, heldSight, viewerVisibility } from '$lib/Engine/fogState'
 	import { fogBusy, unitFadeBusy, createFadeScope } from '$lib/Engine/fogRender'
 	import { materializeBusy, materializeSignal } from '$lib/Engine/materialize'
 	import { buildFadeBusy } from '$lib/Engine/buildFade'
@@ -56,6 +56,7 @@
 		OVERLAY_ANIMATION_TIME,
 		routeAnimation,
 		animations,
+		blockedAnimation,
 		repaintSignal,
 		boardBusy,
 		setRouteCamera,
@@ -186,6 +187,11 @@
 		// cache still keys on turn + actedTiles so our view refreshes as their
 		// units move in and out of our sight.
 		const team = localTeam
+		// A unit of ours is mid-decision after a move: keep showing the fog as it
+		// stood before the step, so what's revealed lines up with what the attack
+		// list offers (see `frozenSight`). The reveal lands once they choose.
+		const held = heldSight(team)
+		if (held) return { visible: held.visible, airVisible: held.airVisible, team }
 		if (
 			!cachedVisibility ||
 			cachedVisibility.team !== team ||
@@ -210,8 +216,10 @@
 
 	$effect.pre(() => {
 		if ($fogOfWarEnabled) {
-			// invalidate cache when units move or turn changes
+			// invalidate cache when units move, the turn changes, or a pre-move sight
+			// freeze is taken / released
 			$gameState
+			$frozenSight
 			cachedVisibility = null
 		}
 	})
@@ -223,6 +231,7 @@
 	$effect(() => {
 		$gameState
 		$fogOfWarEnabled
+		$frozenSight
 		// A scripted spawn/terrain change bumps this when it begins its pixel
 		// assemble; kick the same pump so those effects animate too.
 		$materializeSignal
@@ -252,6 +261,7 @@
 	// write here published *its* viewer's reach and leaked enemy animations.
 	$effect.pre(() => {
 		$gameState
+		$frozenSight
 		if (mini) return
 		viewerVisibility.set($fogOfWarEnabled ? visibilityProvider() : null)
 	})
@@ -272,6 +282,7 @@
 			$shownThreatUnits
 			$gameState
 			$fogOfWarEnabled
+			$frozenSight
 			$threatOverlayRevision
 			// Drop units that have left the board before painting, so the settings
 			// panel's "on" state matches what's actually drawn. Re-read the store
@@ -293,6 +304,7 @@
 		if (!mini && !editor) {
 			$gameState
 			$fogOfWarEnabled
+			$frozenSight
 			map.radarTiles = computeRadarTiles(
 				map,
 				localTeam,
@@ -401,6 +413,9 @@
 	$effect.pre(() => {
 		$animations
 		$routeAnimation
+		// The blocked lunge hides the halted unit's idle sprite under its overlay
+		// (`unit.animating`) and gives it back when the beat ends; repaint on both.
+		$blockedAnimation
 		// Bumped per frame by health-bar eases (animateHealthBar) so each step of the
 		// slide repaints, not just the coarse 200ms idle tick.
 		$repaintSignal

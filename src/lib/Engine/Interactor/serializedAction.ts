@@ -9,7 +9,13 @@ export type SerializedAction =
 	// events logged before this field existed, and moves minted without a walked
 	// route, still fall back to pathfinding. Purely choreography — `applyAction`
 	// reads only `from`/`to`, so a move replays to the same board with or without it.
-	| { kind: 'move'; from: number; to: number; path?: number[] }
+	//
+	// `blocked` is set when the walk was cut short by an enemy the mover couldn't
+	// see: the tile it ran into, adjacent to `to`. Also choreography only — every
+	// client plays the "blocked" lunge + callout on `to` so the halt reads as a
+	// collision to the ambusher too, instead of an enemy that walked up and did
+	// nothing. Ignored by `applyAction`.
+	| { kind: 'move'; from: number; to: number; path?: number[]; blocked?: number }
 	| { kind: 'attack'; from: number; to: number }
 	| { kind: 'capture'; tile: number }
 	| { kind: 'build'; building: number; unitType: number; direction?: number }
@@ -28,7 +34,10 @@ export type SerializedAction =
 	// online opponent kept seeing the original unit until the next full resync.
 	| { kind: 'ship-out'; tile: number }
 	| { kind: 'air-lift'; tile: number }
-	| { kind: 'wait'; tile: number }
+	// A wait's `blocked` marks a move that never got off its tile: the very first
+	// step ran into a concealed enemy on `blocked`, so the unit forfeited in place.
+	// Same choreography hint as the move's field; `applyAction` ignores it.
+	| { kind: 'wait'; tile: number; blocked?: number }
 	// `next` is the team this client's engine advanced to (see socketEndTurn). It
 	// is advisory metadata for the SERVER's turn pointer, not something the engine
 	// reads back — `applyAction` ignores it and re-derives the rotation itself, so
@@ -69,23 +78,34 @@ const isRoute = (value: unknown, from: number, to: number): boolean =>
 	value[value.length - 1] === to &&
 	value.every(isTile)
 
+/**
+ * The tile a halted mover ran into. Adjacency to the resting tile can't be checked
+ * here (no board, no column count — same as the route); the animator re-checks it
+ * and simply plays nothing if it doesn't hold up. What can be checked is: it's a
+ * tile, and it isn't the tile the unit is standing on.
+ */
+const isBlockedTile = (value: unknown, restingTile: number): boolean =>
+	value === undefined || (isTile(value) && value !== restingTile)
+
 export const isValidSerializedAction = (value: unknown): value is SerializedAction => {
 	if (!value || typeof value !== 'object') return false
 	const v = value as Record<string, unknown>
 	switch (v.kind) {
 		case 'move': {
-			const { from, to, path } = v
+			const { from, to, path, blocked } = v
 			if (!isTile(from) || !isTile(to)) return false
+			if (!isBlockedTile(blocked, to)) return false
 			return path === undefined || isRoute(path, from, to)
 		}
 		case 'attack':
 			return isTile(v.from) && isTile(v.to)
+		case 'wait':
+			return isTile(v.tile) && isBlockedTile(v.blocked, v.tile)
 		case 'capture':
 		case 'mine':
 		case 'repair':
 		case 'ship-out':
 		case 'air-lift':
-		case 'wait':
 			return isTile(v.tile)
 		case 'build':
 			return (

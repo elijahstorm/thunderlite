@@ -3,7 +3,7 @@ import { gameState } from './gameState'
 import { applyAction, type CommitOptions } from './applyAction'
 import { emitOutgoingAction } from './outgoingActions'
 import { isSyncLocked } from './desync'
-import { animateRoute } from './Animator/animator'
+import { animateRoute, animateBlocked } from './Animator/animator'
 import { animateAttackSequence } from './attackSequence'
 import { playActionSfx } from '$lib/Audio/playActionSfx'
 import { pathFinder } from './Interactor/Pathing/pathFinder'
@@ -311,21 +311,31 @@ export const runCpuTurn = ({
 			// destination so an online opponent stays in sync.
 			const concealed = concealedEnemyTiles(map, unit.team)
 			const planned = pathFinder(map, unit, action.from, action.to, concealed)
-			const { route: walked, collided } = truncateRouteAtCollision(map, planned, unit.team)
+			const { route: walked, collided, blocked } = truncateRouteAtCollision(map, planned, unit.team)
 			const finalTile =
 				walked.length > 1 ? walked[walked.length - 1] : collided ? action.from : action.to
 			if (collided && finalTile === action.from) {
-				// Ambushed before taking a step: forfeit the move in place.
-				commit(map, { kind: 'wait', tile: action.from })
+				// Ambushed before taking a step: forfeit the move in place. The wait
+				// carries the tile it ran into so every board plays the blocked lunge.
+				const waitAction: SerializedAction = { kind: 'wait', tile: action.from }
+				if (blocked !== undefined) waitAction.blocked = blocked
+				commit(map, waitAction)
+				if (blocked !== undefined && !hidden()) {
+					await safeAnimate(() => animateBlocked(map, unit, action.from, blocked))
+				}
 				return { proceed: false, changed: [action.from] }
 			}
 			// Relay the walked route alongside the endpoints so every other client
 			// animates the road this unit really took rather than re-deriving one of
-			// its own (see the `path` field on the move action).
-			const moveAction: SerializedAction =
-				walked.length > 1
-					? { kind: 'move', from: action.from, to: finalTile, path: walked.slice() }
-					: { kind: 'move', from: action.from, to: finalTile }
+			// its own (see the `path` field on the move action) — and, on a collision,
+			// the tile it ran into, so they play the same blocked lunge.
+			const moveAction: Extract<SerializedAction, { kind: 'move' }> = {
+				kind: 'move',
+				from: action.from,
+				to: finalTile,
+			}
+			if (walked.length > 1) moveAction.path = walked.slice()
+			if (blocked !== undefined) moveAction.blocked = blocked
 			if (hidden()) {
 				// No slide to roll the footsteps under, so let the commit voice the move.
 				recordStealthPassthrough(map, walked, unit)
@@ -343,6 +353,11 @@ export const runCpuTurn = ({
 			// the watching player "remembers" a stealth threat is about.
 			recordStealthPassthrough(map, walked, unit)
 			commit(map, moveAction, { suppressSfxActions: ['move'] })
+			// Walked into a concealed enemy: bump the tile it hit so the watching
+			// player reads the halt as an ambush rather than a unit that gave up.
+			if (blocked !== undefined) {
+				await safeAnimate(() => animateBlocked(map, unit, finalTile, blocked))
+			}
 			// The unit vacated `from` and now sits on `finalTile`; both flip the board for
 			// nearby planners. Intermediate path tiles hold no unit, so they don't count.
 			return { proceed: !collided, changed: [action.from, finalTile] }

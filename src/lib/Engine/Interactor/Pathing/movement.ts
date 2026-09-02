@@ -209,17 +209,19 @@ const notBlocked = (
 // route up to (but not including) that tile and flagging the collision. Pathing
 // only ever routes a unit through enemies it couldn't see (concealed by fog or
 // stealth), so any enemy met mid-route is one the player walked into blind: the
-// unit halts on the last clear tile and its turn ends. A clean route comes back
-// unchanged with `collided: false`.
+// unit halts on the last clear tile and its turn ends. `blocked` is the tile it ran
+// into (always the next step after the truncated route, so orthogonally adjacent
+// to its final tile) — the animator lunges the halted unit at it so the stop reads
+// as a collision. A clean route comes back unchanged with `collided: false`.
 export const truncateRouteAtCollision = (
 	map: MapObject,
 	route: number[],
 	team: number
-): { route: number[]; collided: boolean } => {
+): { route: number[]; collided: boolean; blocked?: number } => {
 	for (let i = 1; i < route.length; i++) {
 		const occupant = map.layers.units[route[i]]
 		if (occupant && occupant.team !== team) {
-			return { route: route.slice(0, i), collided: true }
+			return { route: route.slice(0, i), collided: true, blocked: route[i] }
 		}
 	}
 	return { route, collided: false }
