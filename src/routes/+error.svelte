@@ -18,9 +18,6 @@
 				<h1 class="text-3xl font-semibold tracking-tight text-foreground">
 					{$page.error?.message ?? 'Something went wrong'}
 				</h1>
-				<p class="text-muted-foreground">
-					We hit a snag loading this page. Head back home and try again.
-				</p>
 			</div>
 			<div class="flex items-center gap-3 pt-2">
 				<a class="btn btn-primary" href="/">

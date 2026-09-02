@@ -46,9 +46,7 @@
 		>
 			<h2 class="text-base font-bold">Resume this level?</h2>
 			<p class="mt-2 text-sm leading-relaxed opacity-80">
-				You have an unfinished game on this level, saved from turn {turnNumber}{ago
-					? ` (${ago})`
-					: ''}.
+				Saved at turn {turnNumber}{ago ? ` · ${ago}` : ''}
 			</p>
 			<div class="mt-5 flex flex-col gap-2">
 				<button

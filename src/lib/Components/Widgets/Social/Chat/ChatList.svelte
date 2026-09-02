@@ -207,7 +207,7 @@
 				{/each}
 			{:else if degraded}
 				<p class="px-2 py-2 text-sm text-muted-foreground">
-					Online status is unavailable right now. Your friends are still listed below.
+					Online status is unavailable right now.
 				</p>
 			{:else}
 				<p class="px-2 py-2 text-sm text-muted-foreground">No one else is online right now.</p>
@@ -246,9 +246,7 @@
 					</button>
 				{/each}
 			{:else}
-				<p class="px-2 py-2 text-sm text-muted-foreground">
-					Add friends from a player's profile to see them here.
-				</p>
+				<p class="px-2 py-2 text-sm text-muted-foreground">No friends yet.</p>
 			{/if}
 		</div>
 	</div>

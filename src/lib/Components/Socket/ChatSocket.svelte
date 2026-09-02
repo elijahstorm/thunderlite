@@ -138,8 +138,8 @@
 					/>
 				</svg>
 				<div class="flex flex-col sm:space-x-1 sm:contents translate-y-2 sm:translate-y-0">
-					<p class="relative text-xs">You're offline. Your messages</p>
-					<p class="relative text-xs">will be synched when you are online again.</p>
+					<p class="relative text-xs">You're offline.</p>
+					<p class="relative text-xs">Messages send when you reconnect.</p>
 				</div>
 			</div>
 		</div>

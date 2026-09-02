@@ -21,8 +21,7 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 16,
 		name: 'Command Center',
-		description:
-			'This is your base of operations. Do not allow the enemy to capture any command center.',
+		description: 'Headquarters. If the enemy captures it, you lose.',
 		protection: 0.5,
 		stature: 30,
 		income: 0,
@@ -37,8 +36,7 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 0,
 		name: 'Ground Control',
-		description:
-			'It enables you to build ground units. Each extra one you hold cuts ground unit prices by 10%.',
+		description: 'Builds ground units. Each extra one you hold cuts ground unit prices by 10%.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,
@@ -53,8 +51,7 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 17,
 		name: 'Air Control',
-		description:
-			'It enables you to build air units. Each extra one you hold cuts air unit prices by 10%.',
+		description: 'Builds air units. Each extra one you hold cuts air unit prices by 10%.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,
@@ -69,8 +66,7 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 15,
 		name: 'Sea Control',
-		description:
-			'It enables you to build sea units. Each extra one you hold cuts sea unit prices by 10%.',
+		description: 'Builds sea units. Each extra one you hold cuts sea unit prices by 10%.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,
@@ -85,7 +81,7 @@ export const buildingData: BuildingData[] = [
 		xOffset: -2,
 		yOffset: 10,
 		name: 'Warfactory',
-		description: 'Allow you to build new units.',
+		description: 'Builds new units.',
 		protection: 0.1,
 		stature: 20,
 		income: 0,

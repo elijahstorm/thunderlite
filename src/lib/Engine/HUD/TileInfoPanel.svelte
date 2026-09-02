@@ -58,9 +58,7 @@
 	</div>
 
 	{#if tile == null}
-		<p class="text-[11px] leading-relaxed text-white/40">
-			Hover a tile to inspect it, or tap one to pin it here.
-		</p>
+		<p class="text-[11px] leading-relaxed text-white/40">No tile selected</p>
 	{:else}
 		<div class="flex flex-col gap-2">
 			{#if terrain}

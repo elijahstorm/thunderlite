@@ -6,14 +6,7 @@ export type ModifierKey = keyof typeof modifierData
 // categories so the at-a-glance HUD reads as a small, color-coded set rather
 // than a wall of identical chips.
 export type ModifierCategory =
-	| 'trait'
-	| 'turn'
-	| 'capture'
-	| 'move'
-	| 'aura'
-	| 'utility'
-	| 'combat'
-	| 'death'
+	'trait' | 'turn' | 'capture' | 'move' | 'aura' | 'utility' | 'combat' | 'death'
 
 type CategoryStyle = {
 	label: string
@@ -129,11 +122,11 @@ const descriptions: Partial<Record<ModifierKey, string>> = {
 		'At the owner’s turn start, repairs a friendly unit on this building by 10 HP, or deals 10 damage to an enemy camping it.',
 	'Capture.Insta_Lose': 'If this property is captured, its former owner is instantly defeated.',
 	'Capture.Allow_Ground':
-		'Capturing this property grants the owner the ability to build ground units. Each additional one held discounts ground units bought with main funds by 10%, up to 50%.',
+		'Lets the owner build ground units. Each extra one held cuts ground unit prices by 10%, up to 50%.',
 	'Capture.Allow_Air':
-		'Capturing this property grants the owner the ability to build air units. Each additional one held discounts air units bought with main funds by 10%, up to 50%.',
+		'Lets the owner build air units. Each extra one held cuts air unit prices by 10%, up to 50%.',
 	'Capture.Allow_Sea':
-		'Capturing this property grants the owner the ability to build naval units. Each additional one held discounts naval units bought with main funds by 10%, up to 50%.',
+		'Lets the owner build naval units. Each extra one held cuts naval unit prices by 10%, up to 50%.',
 	'Each_Turn.Supply_Income':
 		'Pays out income each turn, drawing from its reserves and trickling a reduced amount once drained.',
 	'Start_Turn.Capture':
@@ -153,7 +146,8 @@ const descriptions: Partial<Record<ModifierKey, string>> = {
 	'Can_Attack.Counter_Range': 'Can return fire even against attackers striking from range.',
 	'Move.Radar':
 		'Sweeps the surrounding area as it moves, revealing hidden enemies within its range.',
-	'Idle.Jamming': 'While stationary, its jamming field walls off the surrounding airspace, blocking enemy aircraft from flying through it.',
+	'Idle.Jamming':
+		'While stationary, its jamming field walls off the surrounding airspace, blocking enemy aircraft from flying through it.',
 	'Self_Action.Miner': 'Can mine resources from the terrain.',
 	'Self_Action.Builder': 'Can construct structures or fortifications.',
 	'Death.Insta_Lose':
