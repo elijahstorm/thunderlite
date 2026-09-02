@@ -65,8 +65,7 @@
 						<Logo height={32} />
 					</a>
 					<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
-						A free browser rebuild of Battalion: Arena. Turn-based tactics in the Advance Wars
-						tradition, with an adaptive CPU, weather, and maps up to 500×500.
+						A free browser rebuild of Battalion: Arena.
 					</p>
 					<div class="flex items-center gap-3 pt-1">
 						{#each socialLinks as link (link.href)}

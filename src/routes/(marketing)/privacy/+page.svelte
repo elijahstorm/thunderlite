@@ -61,10 +61,9 @@
 				<Icon icon="lucide:heart-handshake" width={20} />
 			</div>
 			<p class="text-sm leading-relaxed">
-				ThunderLite is a free, browser-based tactics game built by
-				<a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>. It is supported and
-				sponsored in full by <a href={DONTCODE_PRIVACY} class="link">DontCode</a>, which also powers
-				its accounts, database, and multiplayer. Because DontCode runs the backend, its
+				ThunderLite is built by
+				<a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a> on DontCode, which
+				runs its accounts, database, and multiplayer. Because DontCode runs the backend, its
 				<a href={DONTCODE_PRIVACY} target="_blank" rel="noopener noreferrer" class="link"
 					>privacy policy</a
 				> governs the underlying data handling, and this notice explains it in the context of the game.
@@ -72,10 +71,10 @@
 		</div>
 
 		<p>
-			This notice describes what we collect when you play ThunderLite at
-			<a href="https://thunderlite.vercel.app/" class="link">thunderlite.vercel.app</a>, how we use
-			it, and the choices you have. If you do not agree with it, please do not use the game.
-			Questions? Email <a href="mailto:{CONTACT}" class="link">{CONTACT}</a>.
+			This notice applies to ThunderLite at
+			<a href="https://thunderlite.vercel.app/" class="link">thunderlite.vercel.app</a>. If you do
+			not agree with it, please do not use the game. Questions? Email
+			<a href="mailto:{CONTACT}" class="link">{CONTACT}</a>.
 		</p>
 
 		<section class="space-y-3 pt-4">
@@ -109,13 +108,12 @@
 			<p>We only collect information you give us or that the game needs to function:</p>
 			<ul class="space-y-2 list-disc pl-5">
 				<li>
-					<span class="text-foreground font-medium">Account information</span> — your email address,
-					username, and a securely hashed password when you register, or the details provided by your
-					sign-in provider.
+					<span class="text-foreground font-medium">Account information</span> — your email address, username,
+					and a securely hashed password when you register, or the details provided by your sign-in provider.
 				</li>
 				<li>
-					<span class="text-foreground font-medium">Profile information</span> — an optional display
-					name and avatar shown to other players.
+					<span class="text-foreground font-medium">Profile information</span> — an optional display name
+					and avatar shown to other players.
 				</li>
 				<li>
 					<span class="text-foreground font-medium">Gameplay data</span> — the maps you create, match
@@ -126,8 +124,8 @@
 					chat you send to other players.
 				</li>
 				<li>
-					<span class="text-foreground font-medium">Technical data</span> — a session identifier and
-					basic logs needed to keep you signed in and to protect the game from abuse.
+					<span class="text-foreground font-medium">Technical data</span> — a session identifier and basic
+					logs needed to keep you signed in and to protect the game from abuse.
 				</li>
 			</ul>
 			<p>
@@ -199,8 +197,8 @@
 				{/each}
 			</div>
 			<p>
-				To exercise any of these, email <a href="mailto:{CONTACT}" class="link">{CONTACT}</a> and we
-				will respond within a reasonable time.
+				To exercise any of these, email <a href="mailto:{CONTACT}" class="link">{CONTACT}</a> and we will
+				respond within a reasonable time.
 			</p>
 		</section>
 
