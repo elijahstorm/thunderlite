@@ -161,15 +161,13 @@
 					: 'Two-factor authentication'
 	)
 	let subheading = $derived(
-		mode === 'login'
-			? 'Welcome back. Pick up where you left off.'
-			: mode === 'signup'
-				? 'Join ThunderLite to play, build, and share maps.'
-				: mode === 'verify-email'
-					? 'Enter the 6-digit code we emailed you.'
-					: useRecoveryCode
-						? 'Enter one of your recovery codes.'
-						: 'Enter the code from your authenticator app.'
+		mode === 'verify-email'
+			? 'Enter the 6-digit code we emailed you.'
+			: mode === 'mfa'
+				? useRecoveryCode
+					? 'Enter one of your recovery codes.'
+					: 'Enter the code from your authenticator app.'
+				: ''
 	)
 	let submitLabel = $derived(
 		mode === 'login'
@@ -185,7 +183,9 @@
 <div class="space-y-6">
 	<div class="space-y-1">
 		<h1 class="text-2xl font-semibold tracking-tight">{heading}</h1>
-		<p class="text-sm text-muted-foreground">{subheading}</p>
+		{#if subheading}
+			<p class="text-sm text-muted-foreground">{subheading}</p>
+		{/if}
 	</div>
 
 	{#if !isCodeStep}
@@ -330,8 +330,7 @@
 		</button>
 	{:else}
 		<p class="text-xs text-muted-foreground">
-			We will never share your details. Read our
-			<a href="/privacy" class="link">Privacy Policy</a>.
+			<a href="/privacy" class="link">Privacy Policy</a>
 		</p>
 	{/if}
 </div>

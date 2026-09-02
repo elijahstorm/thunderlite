@@ -48,10 +48,6 @@
 					<h2 class="text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
 						Welcome, commander.
 					</h2>
-					<p class="text-base text-primary-foreground/80 leading-relaxed">
-						Sign in to save your progress, queue up multiplayer sessions, and publish maps to the
-						community.
-					</p>
 				</div>
 
 				<ul class="space-y-3">
@@ -79,7 +75,7 @@
 						class="underline underline-offset-2 hover:text-primary-foreground"
 					>
 						DontCode
-					</a>, who supports and sponsors this free service in full.
+					</a>
 				</p>
 			</div>
 		</div>

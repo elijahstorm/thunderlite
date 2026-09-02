@@ -18,9 +18,7 @@
 	<div class="flex items-center gap-2 text-xs text-muted-foreground {className}">
 		<Icon icon="lucide:heart-handshake" width={14} class="text-primary" />
 		<span>
-			Made with
-			<a href={HREF} target="_blank" rel="noopener noreferrer" class="link">DontCode</a>. This free
-			service is proudly supported and sponsored in full by
+			Made with and sponsored in full by
 			<a href={HREF} target="_blank" rel="noopener noreferrer" class="link">DontCode</a>.
 		</span>
 	</div>
@@ -38,7 +36,6 @@
 {:else}
 	<p class="text-xs text-muted-foreground {className}">
 		Made with
-		<a href={HREF} target="_blank" rel="noopener noreferrer" class="link">DontCode</a>, who supports
-		and sponsors this free service in full.
+		<a href={HREF} target="_blank" rel="noopener noreferrer" class="link">DontCode</a>
 	</p>
 {/if}

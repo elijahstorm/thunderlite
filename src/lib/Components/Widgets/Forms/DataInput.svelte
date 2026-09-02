@@ -101,8 +101,7 @@
 
 	{#if showPrivacy}
 		<p class="text-xs text-muted-foreground">
-			We will never share your details. Read our
-			<a href="/privacy" class="link">Privacy Policy</a>.
+			<a href="/privacy" class="link">Privacy Policy</a>
 		</p>
 	{/if}
 </div>
