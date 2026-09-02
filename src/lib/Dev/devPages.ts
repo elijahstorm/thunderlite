@@ -78,6 +78,14 @@ export const devPages: DevPage[] = [
 		ready: true,
 	},
 	{
+		href: '/dev/playtest',
+		title: 'AI Playtest',
+		blurb:
+			'Greedy vs lookahead, live or headless. Per-seat policy, depth and time budgets, every AI weight on a slider, search telemetry, an eval overlay, the momentum chart, and a batch runner that tallies wins across seeded matches.',
+		tag: 'ai',
+		ready: true,
+	},
+	{
 		href: '/dev/ai',
 		title: 'AI Inspector',
 		blurb:
