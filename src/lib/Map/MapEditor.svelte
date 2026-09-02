@@ -628,13 +628,7 @@
 			class="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-sm text-destructive"
 		>
 			<Icon icon="mdi:eraser" width="15" height="15" />
-			Eraser active. Click or drag across tiles to {editType === 'units'
-				? 'remove units'
-				: editType === 'buildings'
-					? 'remove buildings'
-					: editType === 'sky'
-						? 'clear weather'
-						: 'reset to plains'}.
+			Eraser active
 		</div>
 	{/if}
 
@@ -702,8 +696,7 @@
 <Modal title="Load a map" bind:open={openLoadModal} outsideclose size="xl">
 	<section class="flex flex-col gap-3">
 		<p class="text-sm text-muted-foreground">
-			Open one of your saved maps in the editor. Unsaved changes to the current map are kept as a
-			local draft.
+			Unsaved changes to the current map are kept as a local draft.
 		</p>
 
 		{#if loadingMaps}
@@ -720,7 +713,7 @@
 			</div>
 		{:else if myMaps.length === 0}
 			<div class="py-10 text-center text-sm text-muted-foreground">
-				You haven't saved any maps yet. Save this one to start your library.
+				You haven't saved any maps yet.
 			</div>
 		{:else}
 			<div class="grid max-h-[60vh] gap-3 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
@@ -781,9 +774,8 @@
 			<Icon icon="lucide:trash-2" width="18" height="18" />
 		</span>
 		<p class="text-sm text-muted-foreground">
-			This will permanently remove
 			<span class="font-semibold text-foreground">{deleteTarget?.name ?? 'Untitled map'}</span>
-			from your library. Its share link will stop working. This can't be undone.
+			will be removed from your library and its share link will stop working.
 		</p>
 	</div>
 
@@ -816,9 +808,9 @@
 			<Icon icon="mdi:content-save-alert" width="20" height="20" />
 		</span>
 		<p class="text-sm text-muted-foreground">
-			This will update your map
+			The saved copy of
 			<span class="font-semibold text-foreground">{map?.title?.trim() || 'Untitled map'}</span>
-			in the database, replacing what's currently saved. This can't be undone.
+			will be replaced.
 		</p>
 	</div>
 
@@ -837,11 +829,8 @@
 <Modal title="Map script" bind:open={openScriptModal} outsideclose size="xl">
 	<section class="flex flex-col gap-3">
 		<p class="text-sm text-muted-foreground">
-			Author cutscene-style logic that runs while this map is played: dialogue, camera moves,
-			spawns, weather, funds, victory/defeat, and more. Blocks fire on level load (<code
-				>&lt;start&gt;</code
-			>), each side-turn (<code>&lt;turn N,T&gt;</code>), and match end (<code>&lt;win&gt;</code> /
-			<code>&lt;lose&gt;</code>).
+			Blocks fire on load (<code>&lt;start&gt;</code>), each side-turn (<code>&lt;turn N,T&gt;</code
+			>), and match end (<code>&lt;win&gt;</code> / <code>&lt;lose&gt;</code>).
 		</p>
 
 		<textarea

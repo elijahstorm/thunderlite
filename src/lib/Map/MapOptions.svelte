@@ -159,9 +159,6 @@
 						</button>
 					{/each}
 				</div>
-				<p class="max-w-40 text-center text-xs text-muted-foreground">
-					Choose which edge stays fixed while resizing
-				</p>
 			</div>
 
 			<div class="flex flex-col items-center gap-2">
