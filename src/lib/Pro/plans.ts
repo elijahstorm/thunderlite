@@ -95,10 +95,10 @@ export const formatPrice = (cents: number): string => {
 
 /** What donations actually pay for. Honest copy: nothing here is a paywall. */
 export const SUPPORT_POINTS = [
-	{ icon: 'lucide:server', label: 'Keeps the servers and multiplayer running' },
-	{ icon: 'lucide:map', label: 'Funds new units, maps, and campaign chapters' },
-	{ icon: 'lucide:lock-open', label: 'No paywalls. Every feature stays free for everyone' },
-	{ icon: 'lucide:heart', label: 'Made by one person; every donation genuinely helps' },
+	{ icon: 'lucide:server', label: 'Servers and multiplayer' },
+	{ icon: 'lucide:map', label: 'New units, maps, and campaigns' },
+	{ icon: 'lucide:lock-open', label: 'Everything stays free' },
+	{ icon: 'lucide:heart', label: 'Built by one person' },
 ]
 
 // ── One-time donations ───────────────────────────────────────────────────────

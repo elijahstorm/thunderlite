@@ -210,10 +210,7 @@
 			<h1 class="mt-1 text-2xl font-semibold tracking-tight text-foreground">
 				Support ThunderLite
 			</h1>
-			<p class="text-sm text-muted-foreground mt-1">
-				ThunderLite is free, with no paywalled content. If you want to help cover servers and
-				development, this is the place. Patreon style: give once, or back the project monthly.
-			</p>
+			<p class="text-sm text-muted-foreground mt-1">Help cover servers and development.</p>
 		</div>
 		{#if isSupporter}
 			<span
@@ -248,9 +245,6 @@
 				<div class="card p-6 sm:p-8 space-y-5">
 					<div>
 						<h2 class="text-lg font-semibold tracking-tight text-foreground">One-time donation</h2>
-						<p class="text-sm text-muted-foreground mt-0.5">
-							Give whatever feels right. No account changes, no strings.
-						</p>
 					</div>
 
 					<div class="flex flex-wrap gap-2">
@@ -294,11 +288,7 @@
 						</p>
 					{/if}
 
-					<div class="flex flex-wrap items-center justify-between gap-3">
-						<p class="text-xs text-muted-foreground flex items-center gap-1.5">
-							<Icon icon="lucide:shield-check" width={13} />
-							Secure one-time checkout.
-						</p>
+					<div class="flex flex-wrap items-center justify-end gap-3">
 						<button
 							class="btn btn-primary"
 							onclick={() => openCheckout('donate')}
@@ -338,7 +328,7 @@
 						{#if subscription.cancelAtPeriodEnd}
 							Your support ends on <span class="text-foreground font-medium"
 								>{formatDate(subscription.currentPeriodEnd)}</span
-							>. You can resume any time before then. Nothing about your account changes either way.
+							>.
 						{:else}
 							Renews on <span class="text-foreground font-medium"
 								>{formatDate(subscription.currentPeriodEnd)}</span
@@ -357,19 +347,11 @@
 							</button>
 						{/if}
 					</div>
-
-					<p class="text-xs text-muted-foreground flex items-center gap-1.5">
-						<Icon icon="lucide:shield-check" width={13} />
-						Billing is handled securely by our payment provider. Manage or cancel any time.
-					</p>
 				</div>
 			{:else}
 				<div class="card p-6 sm:p-8 space-y-5">
 					<div>
 						<h2 class="text-lg font-semibold tracking-tight text-foreground">Monthly support</h2>
-						<p class="text-sm text-muted-foreground mt-0.5">
-							Steady support is what makes planning new content possible. Cancel any time.
-						</p>
 					</div>
 
 					<div class="grid sm:grid-cols-2 gap-3">
@@ -405,7 +387,7 @@
 					<div class="flex flex-wrap items-center justify-between gap-3">
 						<p class="text-xs text-muted-foreground flex items-center gap-1.5">
 							<Icon icon="lucide:shield-check" width={13} />
-							Secure checkout. Cancel any time.
+							Cancel any time.
 						</p>
 						<button class="btn btn-primary" onclick={() => openCheckout('subscribe')}>
 							Become a supporter · {formatPrice(plan.priceCents)}/{plan.interval}
@@ -462,7 +444,7 @@
 				class="flex items-center gap-2 rounded-md bg-secondary/10 px-3 py-2 text-xs text-secondary"
 			>
 				<Icon icon="lucide:lock" width={14} />
-				Secure checkout. You'll authorize payment with your provider in the next step.
+				You'll authorize payment with your provider in the next step.
 			</div>
 
 			<div class="space-y-2">

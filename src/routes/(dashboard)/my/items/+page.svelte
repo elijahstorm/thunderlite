@@ -21,11 +21,7 @@
 			<Icon icon="lucide:package" width={22} />
 		</div>
 		<div class="space-y-1">
-			<p class="font-medium text-foreground">Items are still being built</p>
-			<p class="text-sm text-muted-foreground">
-				Collectibles and cosmetics will show up here in a future update. Like everything else in
-				ThunderLite, they will be free.
-			</p>
+			<p class="font-medium text-foreground">Collectibles and cosmetics</p>
 		</div>
 	</div>
 </section>
