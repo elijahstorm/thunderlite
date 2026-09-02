@@ -4,14 +4,24 @@ import { buildingData } from '$lib/GameData/building'
 import { hasModifier, isRanged } from '../modifiers/canAttack'
 import { canMineAt } from '../modifiers/miner'
 import { buildableAdjacentTiles } from '../modifiers/builder'
-import { canLandPassengerAt } from '../modifiers/transport'
+import {
+	canAirLift,
+	canLandPassengerAt,
+	canShipOut,
+	carryHPRatio,
+	findFriendlyTransporters,
+	LEVIATHAN_TYPE,
+	TRANSPORTER_TYPE,
+	teamHasSeaControl,
+} from '../modifiers/transport'
+import { tileHasModifier } from '../modifiers/terrainModifier'
 import { isWalletUnit, walletOf } from '../wallet'
 import { generateMovementList } from '../Interactor/Pathing/movement'
 import { generateAttackList } from '../Interactor/Pathing/attack'
 import { planningConcealed } from './planningContext'
 import { lurkingStealthCount } from './stealthMemory'
 import { rankBuildableTypes } from './production'
-import { enemyCount } from './evaluate'
+import { enemyCount, ferryGain, ferryGainTo } from './evaluate'
 import { sampleByScore } from './rng'
 import { gameState } from '../gameState'
 import {
@@ -156,12 +166,205 @@ export const generatePlansFor = (
 		plans.push({
 			unitTile,
 			kind: 'wait',
-			score: scoreWait(map, dest, unit, cpuTeam, concealed, lurking),
+			score:
+				scoreWait(map, dest, unit, cpuTeam, concealed, lurking) +
+				portStagingBonus(map, unitTile, dest, unit, cpuTeam, reachable, concealed),
 			actions: [...moveActions(unitTile, dest), { kind: 'wait', tile: dest }],
 		})
 	}
 
+	// Air Lift / Ship Out / Load: the carrier plans a unit can start itself.
+	plans.push(...generateTransportPlans(map, unitTile, unit, cpuTeam, reachable, concealed, lurking))
+
 	return plans
+}
+
+// ── Transport plans a unit starts for itself (section 8.3 / 8.4 of the plan) ──
+//
+// A commando with Air Control can paraglide: `air-lift` transforms it in place into
+// a Transporter WITHOUT spending the tile, the carrier then flies up to six low-air
+// tiles (over water, cliffs, enemy lines) and lands, ending exactly as if the
+// commando had walked there. Net: a 6-tile air move instead of a 3-tile foot move,
+// with zero carrier exposure. Ship Out is the sea cousin from a Port tile. Neither
+// was ever proposed by the planner, which is why the CPU never left an island.
+//
+// The synthetic carrier is built without touching the board — the same
+// `carryHPRatio` the real transform uses — and its reach is flooded from the unit's
+// tile. Every air/sea destination the passenger could stand on becomes a
+// lift → move → unload plan scored as the PASSENGER's plan at that tile (it is who
+// ends the turn there) minus a flat tax, so flying is chosen when it buys ground the
+// feet cannot, not as a coin-flip alternative to walking. Destinations the feet reach
+// anyway are skipped: walking is equivalent and cheaper, and generating both would
+// just duplicate plans.
+//
+// The multi-turn ferry (lift and stay airborne, or embark and sit on the Port) is the
+// one plan whose payoff is a turn away. At depth 1 the ferry-gain bonus stands in for
+// the lookahead: it is only generated when the sea/air route beats every foot tile by
+// FERRY_GAIN_MIN, and the search (Phase D) rewards it properly.
+const syntheticCarrier = (carrierType: number, passenger: UnitObject, team: number): UnitObject => {
+	const max = unitData[passenger.type].health
+	const hp = passenger.health ?? max
+	const carrier: UnitObject = { type: carrierType, state: 0, team, rescuedUnit: passenger }
+	carrier.health = carryHPRatio(carrier, max, hp)
+	return carrier
+}
+
+const ferryBonus = (gain: number): number => Math.min(gain, W.FERRY_GAIN_CAP) * W.FERRY_GAIN_WEIGHT
+
+const generateTransportPlans = (
+	map: MapObject,
+	unitTile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	footReach: number[],
+	concealed: ReadonlySet<number>,
+	lurking: number
+): ActionPlan[] => {
+	const plans: ActionPlan[] = []
+	if (canAirLift(map, unitTile)) {
+		plans.push(
+			...liftPlans(map, unitTile, unit, cpuTeam, footReach, concealed, lurking, 'air-lift')
+		)
+	}
+	if (canShipOut(map, unitTile)) {
+		plans.push(
+			...liftPlans(map, unitTile, unit, cpuTeam, footReach, concealed, lurking, 'ship-out')
+		)
+	}
+	if (hasModifier(unit, 'Self_Action.Transport') && !unit.rescuedUnit) {
+		plans.push(...loadPlans(map, unitTile, unit, cpuTeam, footReach, concealed, lurking))
+	}
+	return plans
+}
+
+const liftPlans = (
+	map: MapObject,
+	unitTile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	footReach: number[],
+	concealed: ReadonlySet<number>,
+	lurking: number,
+	kind: 'air-lift' | 'ship-out'
+): ActionPlan[] => {
+	const plans: ActionPlan[] = []
+	const carrier = syntheticCarrier(
+		kind === 'air-lift' ? TRANSPORTER_TYPE : LEVIATHAN_TYPE,
+		unit,
+		cpuTeam
+	)
+	const reach = generateMovementList(map, unitTile, carrier, concealed)
+	const footSet = new Set(footReach)
+	// Lift and unload on the same tile is a no-op; a landing means going somewhere.
+	const landings = reach.filter((t) => t !== unitTile && canLandPassengerAt(map, t, unit))
+	const gain = ferryGain(map, unit, footReach, landings, cpuTeam, concealed)
+
+	for (const dest of landings) {
+		if (footSet.has(dest)) continue
+		const position = scorePositionBonus(map, dest, unit, cpuTeam, concealed, lurking)
+		const base = canCapture(map, dest, unit)
+			? scoreCapture(map, dest, cpuTeam) + position * 0.5
+			: scoreWait(map, dest, unit, cpuTeam, concealed, lurking)
+		// The objective pull inside `position` is Manhattan and can't see the strait;
+		// the ferry gain is what says this landing bought ground the feet never could.
+		const gain = ferryGainTo(map, unit, footReach, dest, cpuTeam, concealed)
+		plans.push({
+			unitTile,
+			kind,
+			score: base + ferryBonus(gain) - W.AIR_LIFT_TAX,
+			actions: [
+				{ kind, tile: unitTile },
+				{ kind: 'move', from: unitTile, to: dest },
+				{ kind: 'transport-unload', transport: dest, tile: dest },
+			],
+		})
+	}
+
+	// The ferry: stay aboard, land next turn. Only when the route is worth a turn.
+	if (gain >= W.FERRY_GAIN_MIN) {
+		const landingSet = new Set(landings)
+		for (const dest of reach) {
+			if (landingSet.has(dest)) continue
+			const position = scorePositionBonus(map, dest, carrier, cpuTeam, concealed, lurking)
+			plans.push({
+				unitTile,
+				kind,
+				score: position + ferryBonus(gain) - W.AIR_LIFT_TAX,
+				actions: [
+					{ kind, tile: unitTile },
+					...moveActions(unitTile, dest),
+					{ kind: 'wait', tile: dest },
+				],
+			})
+		}
+	}
+	return plans
+}
+
+// Board an existing empty friendly Transporter standing next to a tile the commando
+// can reach. Transporters have `cost: 0` and can't be built, and a landed carrier
+// ceases to exist, so an empty one only ever comes from a map author — rare, hence
+// low priority — but a Transporter left idle next to a stranded commando is exactly
+// the case a designer authored it for. Loading marks the TRANSPORT acted, so the
+// payoff is next turn's flight: gated on ferry gain like the other ferries.
+const loadPlans = (
+	map: MapObject,
+	unitTile: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	footReach: number[],
+	concealed: ReadonlySet<number>,
+	lurking: number
+): ActionPlan[] => {
+	const plans: ActionPlan[] = []
+	for (const dest of footReach) {
+		for (const transportTile of findFriendlyTransporters(map, dest, cpuTeam)) {
+			const empty = map.layers.units[transportTile]
+			if (!empty) continue
+			const loaded: UnitObject = { ...empty, rescuedUnit: unit }
+			const reach = generateMovementList(map, transportTile, loaded, concealed)
+			const landings = reach.filter((t) => t !== transportTile && canLandPassengerAt(map, t, unit))
+			const gain = ferryGain(map, unit, footReach, landings, cpuTeam, concealed)
+			if (gain < W.FERRY_GAIN_MIN) continue
+			plans.push({
+				unitTile,
+				kind: 'load',
+				score:
+					scorePositionBonus(map, transportTile, loaded, cpuTeam, concealed, lurking) +
+					ferryBonus(gain),
+				actions: [
+					...moveActions(unitTile, dest),
+					{ kind: 'transport-load', transport: transportTile, passenger: dest },
+				],
+			})
+		}
+	}
+	return plans
+}
+
+// Walking onto a Port and embarking in the same turn is legal but pointless (the move
+// spends the tile, so the Leviathan can't sail), so no such plan is generated. The
+// walk-to-Port is just the ordinary wait at that tile — with this small bonus when the
+// sea route from that Port beats every foot tile, so the CPU stages the two-turn trip.
+const portStagingBonus = (
+	map: MapObject,
+	unitTile: number,
+	dest: number,
+	unit: UnitObject,
+	cpuTeam: number,
+	footReach: number[],
+	concealed: ReadonlySet<number>
+): number => {
+	if (dest === unitTile) return 0
+	if (unitData[unit.type]?.type !== 'ground') return 0
+	if (!tileHasModifier(map, dest, 'Port')) return 0
+	if (!teamHasSeaControl(map, cpuTeam)) return 0
+	const carrier = syntheticCarrier(LEVIATHAN_TYPE, unit, cpuTeam)
+	const reach = generateMovementList(map, dest, carrier, concealed)
+	const landings = reach.filter((t) => t !== dest && canLandPassengerAt(map, t, unit))
+	return ferryGain(map, unit, footReach, landings, cpuTeam, concealed) >= W.FERRY_GAIN_MIN
+		? W.PORT_STAGING
+		: 0
 }
 
 /** The single best score among a unit's plans (what it would actually pick, modulo sampling). */

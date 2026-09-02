@@ -109,6 +109,8 @@ export const DEFAULT_WEIGHTS = {
 	FERRY_GAIN_MIN: 3,
 	/** Per tile of ferry gain, the bonus for staging on a Port / staying airborne. */
 	FERRY_GAIN_WEIGHT: 2,
+	/** Ferry gain is capped here before it is priced (an island reads as infinite). */
+	FERRY_GAIN_CAP: 12,
 	/** Bonus for parking a ground unit on a Port whose sea route beats the land one. */
 	PORT_STAGING: 8,
 
@@ -328,6 +330,7 @@ export const WEIGHT_GROUPS: { title: string; keys: CpuWeightKey[] }[] = [
 			'STRANDED_PENALTY',
 			'FERRY_GAIN_MIN',
 			'FERRY_GAIN_WEIGHT',
+			'FERRY_GAIN_CAP',
 			'PORT_STAGING',
 		],
 	},

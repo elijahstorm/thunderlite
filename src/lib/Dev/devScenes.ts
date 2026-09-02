@@ -34,16 +34,18 @@ const GLYPH: Record<string, number> = {
 	c: terrain('Canyon'),
 	w: terrain('Wasteland'),
 	'~': terrain('Sea'),
+	s: terrain('Shore'),
 }
 
-type Placement = { x: number; y: number; type: number; team: number }
+type Placement = { x: number; y: number; type: number; team: number; cargo?: number }
 
 export type DevSceneSpec = {
 	id: string
 	name: string
 	blurb: string
 	rows: string[]
-	units?: { x: number; y: number; unit: string; team: number }[]
+	/** `cargo` names a passenger riding inside a Transporter / Leviathan placed here. */
+	units?: { x: number; y: number; unit: string; team: number; cargo?: string }[]
 	buildings?: { x: number; y: number; building: string; team: number }[]
 	funds?: number
 }
@@ -71,6 +73,7 @@ export const buildScene = (spec: DevSceneSpec): MapObject => {
 		y: p.y,
 		type: unitType(p.unit),
 		team: p.team,
+		...(p.cargo ? { cargo: unitType(p.cargo) } : {}),
 	}))
 	const buildings: Placement[] = (spec.buildings ?? []).map((p) => ({
 		x: p.x,
@@ -87,7 +90,12 @@ export const buildScene = (spec: DevSceneSpec): MapObject => {
 		layers: {
 			ground,
 			sky: [],
-			units: units.map((p) => ({ type: p.type, team: p.team, l: p.y * cols + p.x })),
+			units: units.map((p) => ({
+				type: p.type,
+				team: p.team,
+				l: p.y * cols + p.x,
+				...(p.cargo !== undefined ? { cargo: p.cargo } : {}),
+			})),
 			buildings: buildings.map((p) => ({ type: p.type, team: p.team, l: p.y * cols + p.x })),
 		},
 	} as unknown as MapData)
@@ -201,6 +209,40 @@ const SPECS: DevSceneSpec[] = [
 			{ x: 9, y: 4, building: 'Command Center', team: 1 },
 		],
 		funds: 500,
+	},
+	{
+		id: 'islands',
+		name: 'Islands',
+		blurb:
+			'Two land masses across a strait, Air Control and a Port on each side, commandos and a loaded Transporter mid-flight. The scene for the lift / land loop: nothing here can be captured on foot.',
+		// Shores at x=4 and x=8 with a three-tile strait between: a commando two tiles
+		// behind its own shore reaches the far shore in one lift (2 + 3 + 1 = 6 air
+		// tiles) and lands two tiles short of the defenders, out of point-blank reach.
+		rows: [
+			'....s~~~s.....',
+			'....s~~~s.....',
+			'....s~~~s.....',
+			'....s~~~s.....',
+			'....s~~~s.....',
+			'....s~~~s.....',
+			'....s~~~s.....',
+		],
+		units: [
+			{ x: 2, y: 2, unit: 'Strike Commando', team: 0 },
+			{ x: 2, y: 4, unit: 'Heavy Commando', team: 0 },
+			{ x: 6, y: 3, unit: 'Transporter', team: 0, cargo: 'Heavy Commando' },
+			{ x: 11, y: 2, unit: 'Strike Commando', team: 1 },
+			{ x: 11, y: 4, unit: 'Heavy Commando', team: 1 },
+		],
+		buildings: [
+			{ x: 0, y: 3, building: 'Command Center', team: 0 },
+			{ x: 1, y: 1, building: 'Air Control', team: 0 },
+			{ x: 1, y: 5, building: 'Sea Control', team: 0 },
+			{ x: 13, y: 3, building: 'Command Center', team: 1 },
+			{ x: 12, y: 1, building: 'Air Control', team: 1 },
+			{ x: 12, y: 5, building: 'Sea Control', team: 1 },
+		],
+		funds: 0,
 	},
 	{
 		id: 'airfield',

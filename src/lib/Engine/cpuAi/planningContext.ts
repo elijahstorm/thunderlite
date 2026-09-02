@@ -35,6 +35,7 @@ type PlanningContext = {
 	threatTiles: Map<string, Set<number>>
 	growth: Map<number, number>
 	flock: Map<UnitObject, unknown>
+	memo: Map<string, unknown>
 }
 
 let ctx: PlanningContext | null = null
@@ -53,6 +54,7 @@ export const beginCpuPlanning = (map: MapObject): void => {
 		threatTiles: new Map(),
 		growth: new Map(),
 		flock: new Map(),
+		memo: new Map(),
 	}
 }
 
@@ -179,6 +181,20 @@ export const planningGrowth = (map: MapObject, team: number, compute: () => numb
 		value = compute()
 		c.growth.set(team, value)
 	}
+	return value
+}
+
+/**
+ * Any other pure read of the frozen board, memoised by a caller-chosen string key
+ * for the tick (the ferry-gain distance floods, for instance). Computes fresh with
+ * no active context, like everything else here.
+ */
+export const planningMemo = <T>(map: MapObject, key: string, compute: () => T): T => {
+	const c = active(map)
+	if (!c) return compute()
+	if (c.memo.has(key)) return c.memo.get(key) as T
+	const value = compute()
+	c.memo.set(key, value)
 	return value
 }
 

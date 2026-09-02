@@ -3,12 +3,14 @@ import { buildingData } from '$lib/GameData/building'
 import { coverProtection, previewDamage } from '../combat'
 import { isMineableTerrainType } from '../modifiers/miner'
 import { canAttackTarget } from '../modifiers/canAttack'
+import { floodMoveCosts } from '../Interactor/Pathing/movement'
 import {
 	planningUnits,
 	planningBuildings,
 	planningConcealed,
 	planningStationaryReach,
 	planningThreatTiles,
+	planningMemo,
 } from './planningContext'
 import { weights as W } from './weights'
 
@@ -196,6 +198,92 @@ export const closestOreDistance = (map: MapObject, tile: number): number => {
 		if (d < best) best = d
 	}
 	return best === Infinity ? 0 : best
+}
+
+// ── Ferry gain: why Air Lift and Ship Out exist ───────────────────────────────
+//
+// `closestObjectiveDistance` is Manhattan, and Manhattan is exactly the metric that
+// hides a strait: a commando three tiles from an HQ across water reads as "nearly
+// there" and never sees the river. These measure the objective in FOOT distance —
+// the passenger's own move costs, flooded from every objective at once — so the
+// planner can ask how much ground a carrier would actually buy.
+
+/**
+ * Cheapest drag from every tile to the nearest enemy / neutral objective, walking as
+ * `unit` would (multi-source Dijkstra from the objectives, unbounded). Tiles with no
+ * foot path at all are absent, which callers read as +∞: an island commando always
+ * sees a gain from flying. Memoised for the tick per team and movement type.
+ */
+export const objectiveFootDistances = (
+	map: MapObject,
+	unit: UnitObject,
+	cpuTeam: number,
+	concealed: ReadonlySet<number> = planningConcealed(map, cpuTeam)
+): Map<number, number> => {
+	const data = unitData[unit.type]
+	const key = `objdist:${cpuTeam}:${data?.type}:${data?.movementType}`
+	return planningMemo(map, key, () => {
+		const objectives: number[] = []
+		for (const { tile, building } of planningBuildings(map)) {
+			const b = buildingData[building.type]
+			if (!b || b.stature <= 0) continue
+			if (building.team === cpuTeam) continue
+			objectives.push(tile)
+		}
+		if (objectives.length === 0) return new Map<number, number>()
+		return floodMoveCosts(map, objectives, unit, concealed, Infinity)
+	})
+}
+
+/** Foot distance from `tile` to the nearest objective for `unit`, or +∞ if unreachable. */
+export const footDistanceTo = (
+	map: MapObject,
+	unit: UnitObject,
+	tile: number,
+	cpuTeam: number,
+	concealed?: ReadonlySet<number>
+): number => objectiveFootDistances(map, unit, cpuTeam, concealed).get(tile) ?? Infinity
+
+/**
+ * How many tiles of foot distance to the nearest objective a carrier saves `unit`:
+ * the best it can do on its own feet this turn minus the best landing the carrier
+ * offers. Positive means the ferry buys ground; +∞ means the feet can't get there
+ * at all (island). 0 when there is no objective, or the carrier lands nowhere better.
+ * Use it for the lift / embark DECISION; the landing tile itself is still scored by
+ * the ordinary position terms so the drop point respects threat, cover and capture.
+ */
+export const ferryGain = (
+	map: MapObject,
+	unit: UnitObject,
+	footReach: readonly number[],
+	carrierLandings: readonly number[],
+	cpuTeam: number,
+	concealed?: ReadonlySet<number>
+): number => {
+	let best = 0
+	for (const t of carrierLandings) {
+		best = Math.max(best, ferryGainTo(map, unit, footReach, t, cpuTeam, concealed))
+	}
+	return best
+}
+
+/** {@link ferryGain} for ONE landing tile: what setting the unit down on `dest` saves. */
+export const ferryGainTo = (
+	map: MapObject,
+	unit: UnitObject,
+	footReach: readonly number[],
+	dest: number,
+	cpuTeam: number,
+	concealed?: ReadonlySet<number>
+): number => {
+	const distances = objectiveFootDistances(map, unit, cpuTeam, concealed)
+	if (distances.size === 0) return 0
+	const byCarrier = distances.get(dest) ?? Infinity
+	if (byCarrier === Infinity) return 0
+	let byFoot = Infinity
+	for (const t of footReach) byFoot = Math.min(byFoot, distances.get(t) ?? Infinity)
+	if (byFoot === Infinity) return Infinity
+	return byFoot - byCarrier
 }
 
 export const closestObjectiveDistance = (map: MapObject, tile: number, cpuTeam: number): number => {

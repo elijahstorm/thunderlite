@@ -26,9 +26,32 @@ export const generateMovementList = (
 	unit: UnitObject,
 	concealed: ReadonlySet<number> = NO_CONCEALED
 ) => {
+	const best = floodMoveCosts(map, [tile], unit, concealed, unitData[unit.type].movement)
+
+	// The start tile is always included (the unit stands there). Every other
+	// reachable tile passes through removeOccupied: you can path THROUGH a friendly
+	// or concealed tile but can't stop on one a visible unit occupies. Sorted
+	// ascending to preserve the old array-scan ordering, so any downstream tie-break
+	// (e.g. the CPU picking the first of several equal-score destinations) is
+	// unchanged.
+	const reachable = [...best.keys()].sort((a, b) => a - b)
+	return [...new Set([tile, ...removeOccupied(map, reachable, concealed)])]
+}
+
+// The Dijkstra core behind `generateMovementList`, exposed for callers that want
+// the COSTS rather than the reachable set — the CPU's ferry-gain primitive floods
+// from every objective at once with no budget to learn how far each tile is on
+// foot (see cpuAi/evaluate.ts). Returns the cheapest drag to reach every settled
+// tile from any of `starts`; `budget` bounds the flood (Infinity = the whole map).
+export const floodMoveCosts = (
+	map: MapObject,
+	starts: readonly number[],
+	unit: UnitObject,
+	concealed: ReadonlySet<number> = NO_CONCEALED,
+	budget: number = unitData[unit.type].movement
+): Map<number, number> => {
 	const cols = map.cols
 	const rows = map.rows
-	const budget = unitData[unit.type].movement
 
 	// `best` is a sparse Map, not a full-board array: a Dijkstra flood only ever
 	// touches tiles within `budget` drag of the start, so its footprint is the
@@ -39,9 +62,11 @@ export const generateMovementList = (
 	// CPU's per-unit cost. Settled tiles are collected as they're first reached, so
 	// we never scan unreached ground.
 	const best = new Map<number, number>()
-	best.set(tile, 0)
 	const heap = new MinHeap()
-	heap.push(tile, 0)
+	for (const start of starts) {
+		best.set(start, 0)
+		heap.push(start, 0)
+	}
 
 	while (heap.size > 0) {
 		const { node: cur, cost } = heap.pop()
@@ -81,15 +106,7 @@ export const generateMovementList = (
 			}
 		}
 	}
-
-	// The start tile is always included (the unit stands there). Every other
-	// reachable tile passes through removeOccupied: you can path THROUGH a friendly
-	// or concealed tile but can't stop on one a visible unit occupies. Sorted
-	// ascending to preserve the old array-scan ordering, so any downstream tie-break
-	// (e.g. the CPU picking the first of several equal-score destinations) is
-	// unchanged.
-	const reachable = [...best.keys()].sort((a, b) => a - b)
-	return [...new Set([tile, ...removeOccupied(map, reachable, concealed)])]
+	return best
 }
 
 const removeOccupied = (map: MapObject, tiles: number[], concealed: ReadonlySet<number>) =>

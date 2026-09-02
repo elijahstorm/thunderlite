@@ -11,6 +11,9 @@ vi.mock('../../src/lib/Engine/Animator/animator', () => ({
 vi.mock('../../src/lib/Audio/audioEngine', () => ({ audioEngine: { playSfx: () => {} } }))
 
 import { applyAction } from '../../src/lib/Engine/applyAction'
+import { endTurn } from '../../src/lib/Engine/turnLoop'
+import { runCpuTurn } from '../../src/lib/Engine/cpuAi'
+import { devScenes } from '../../src/lib/Dev/devScenes'
 import { gameState, initGameStateFromMap } from '../../src/lib/Engine/gameState'
 import { bestPlanFor, generatePlansFor } from '../../src/lib/Engine/cpuAi/candidates'
 import { pickBuildOnce } from '../../src/lib/Engine/cpuAi/production'
@@ -45,6 +48,8 @@ const SEA = terrainData.findIndex((t) => t.name === 'Sea')
 const HEAVY = T('Heavy Commando')
 const FLAK = T('Flak Tank')
 const SCORPION = T('Scorpion Tank')
+const STEALTH = T('Stealth Tank')
+const STRIKE = T('Strike Commando')
 
 const COLS = 10
 const ROWS = 8
@@ -240,5 +245,203 @@ describe('T1: land', () => {
 		// It did not fly onto the strip beside the flak to die with its passenger.
 		expect(endTile).not.toBe(at(6, 3))
 		expect(plan.kind).not.toBe('land')
+	})
+})
+
+// An island board: land on the left (x 0..2), a strait (x 3..6), land on the right
+// (x 7..9). Nothing can walk across. Team 1 is the CPU and starts on the left.
+const islandBoard = (airControl: boolean) => {
+	const map = makeMap()
+	startTurn(map, 1)
+	for (let y = 0; y < ROWS; y++) for (let x = 3; x <= 6; x++) sea(map, [at(x, y)])
+	if (airControl) building(map, at(0, 1), B('Air Control'), 1)
+	building(map, at(8, 3), B('Command Center'), 0)
+	place(map, at(1, 3), HEAVY, 1)
+	// Controls are derived from buildings at init; re-derive now that they exist.
+	initGameStateFromMap(map)
+	gameState.update((s) => ({ ...s, currentTeam: 1 }))
+	return map
+}
+
+describe('T2: air lift', () => {
+	it('an island commando with Air Control lifts, flies and lands toward the enemy HQ', () => {
+		const map = islandBoard(true)
+		const plan = planFor(map, at(1, 3), 1)!
+		expect(plan.kind).toBe('air-lift')
+		expect(plan.actions.map((a) => a.kind)).toEqual(['air-lift', 'move', 'transport-unload'])
+		const move = plan.actions[1] as Extract<SerializedAction, { kind: 'move' }>
+		// Landed on the far island, not back on its own.
+		expect(move.to % COLS).toBeGreaterThanOrEqual(7)
+		const unload = plan.actions[2] as Extract<SerializedAction, { kind: 'transport-unload' }>
+		expect(unload.transport).toBe(move.to)
+		expect(unload.tile).toBe(move.to)
+	})
+
+	it('the same board without Air Control generates no lift plan at all', () => {
+		const map = islandBoard(false)
+		const plans = plansFor(map, at(1, 3), 1)
+		expect(plans.some((p) => p.kind === 'air-lift')).toBe(false)
+	})
+
+	it('never lifts to a tile it could walk to (walking is preferred, no duplicates)', () => {
+		const map = makeMap()
+		startTurn(map, 1)
+		building(map, at(0, 1), B('Air Control'), 1)
+		building(map, at(3, 3), B('Command Center'), 0)
+		place(map, at(1, 3), HEAVY, 1)
+		initGameStateFromMap(map)
+		gameState.update((s) => ({ ...s, currentTeam: 1 }))
+		const plans = plansFor(map, at(1, 3), 1)
+		// The objective is two tiles away on open plains: the feet get there, so no lift
+		// plan targets any tile the feet reach, and the chosen plan is the plain walk-on.
+		const footTiles = new Set(
+			plans
+				.filter((p) => p.kind !== 'air-lift')
+				.flatMap((p) =>
+					p.actions.filter((a) => a.kind === 'move').map((a) => (a as { to: number }).to)
+				)
+		)
+		for (const lift of plans.filter((p) => p.kind === 'air-lift')) {
+			const move = lift.actions.find((a) => a.kind === 'move') as { to: number } | undefined
+			if (move) expect(footTiles.has(move.to)).toBe(false)
+		}
+		const plan = planFor(map, at(1, 3), 1)!
+		expect(plan.kind).toBe('capture')
+	})
+
+	it('a flight cut short by a concealed enemy drops the unload and keeps the passenger aboard', async () => {
+		// A single-row strip so the only route runs through the hidden tank.
+		const cols = 12
+		const strip = {
+			cols,
+			rows: 1,
+			layers: {
+				ground: new Array(cols).fill(0).map(() => ({ type: PLAINS, state: 0 })),
+				sky: new Array(cols).fill(null),
+				units: new Array(cols).fill(null),
+				buildings: new Array(cols).fill(null),
+			},
+			highlights: new Array(cols),
+			route: [],
+			pathHistory: [],
+		} as unknown as MapObject
+		for (let x = 3; x <= 6; x++) strip.layers.ground[x] = { type: SEA, state: 0 }
+		strip.layers.buildings[0] = {
+			type: B('Air Control'),
+			state: 0,
+			team: 1,
+			stature: buildingData[B('Air Control')].stature,
+		} as BuildingObject
+		strip.layers.buildings[7] = {
+			type: B('Command Center'),
+			state: 0,
+			team: 0,
+			stature: buildingData[B('Command Center')].stature,
+		} as BuildingObject
+		place(strip, 1, HEAVY, 1)
+		// A cloaked enemy in the strait the CPU can't perceive: pathing ghosts through it.
+		const lurker = place(strip, 5, STEALTH, 0)
+		lurker.hidden = true
+		initGameStateFromMap(strip)
+		gameState.update((s) => ({ ...s, currentTeam: 1 }))
+
+		const before = planFor(strip, 1, 1)!
+		expect(before.kind).toBe('air-lift')
+		expect((before.actions[1] as { to: number }).to).toBe(7)
+
+		vi.useFakeTimers()
+		let ended = false
+		const handle = runCpuTurn({
+			humanTeam: 0,
+			endTurn: () => {
+				ended = true
+			},
+			map: strip,
+			delayMs: 1,
+		})
+		await vi.runAllTimersAsync()
+		handle.cancel()
+		vi.useRealTimers()
+		expect(ended).toBe(true)
+		// Collided at x=5, so it stopped on x=4 still holding the commando; the HQ tile
+		// is untouched and no unload happened.
+		const carrier = strip.layers.units[4]
+		expect(carrier?.type).toBe(TRANSPORTER_TYPE)
+		expect(carrier?.rescuedUnit?.type).toBe(HEAVY)
+		expect(strip.layers.units[7]).toBeNull()
+		// Next turn the T1 land plan picks the stranded carrier up.
+		gameState.update((s) => ({ ...s, actedTiles: new Set(), currentTeam: 1 }))
+		const next = planFor(strip, 4, 1)!
+		expect(['land', 'wait']).toContain(next.kind)
+	})
+})
+
+describe('T3: ship out and load', () => {
+	it('a unit on a Port with Sea Control embarks and sails when the shore route beats the feet', () => {
+		const map = makeMap()
+		// Left island x 0..2, shore column at x=3 (Port), sea x 4..6, shore at x=7,
+		// land x 8..9 with the enemy HQ.
+		const SHORE = terrainData.findIndex((t) => t.name === 'Shore')
+		for (let y = 0; y < ROWS; y++) {
+			map.layers.ground[at(3, y)] = { type: SHORE, state: 0 }
+			map.layers.ground[at(7, y)] = { type: SHORE, state: 0 }
+			for (let x = 4; x <= 6; x++) sea(map, [at(x, y)])
+		}
+		building(map, at(0, 1), B('Sea Control'), 1)
+		building(map, at(9, 3), B('Command Center'), 0)
+		place(map, at(3, 3), SCORPION, 1)
+		initGameStateFromMap(map)
+		gameState.update((s) => ({ ...s, currentTeam: 1 }))
+		const plans = plansFor(map, at(3, 3), 1)
+		const ships = plans.filter((p) => p.kind === 'ship-out')
+		expect(ships.length).toBeGreaterThan(0)
+		// A Leviathan moves 4: from x=3 it reaches the far shore at x=7 and lands there.
+		const landing = ships.find((p) => p.actions.some((a) => a.kind === 'transport-unload'))
+		expect(landing).toBeDefined()
+		const plan = planFor(map, at(3, 3), 1)!
+		expect(plan.kind).toBe('ship-out')
+		expect(plan.actions[0]).toEqual({ kind: 'ship-out', tile: at(3, 3) })
+	})
+
+	it('a commando boards an idle empty Transporter when it opens a route the feet lack', () => {
+		const map = islandBoard(false)
+		// No Air Control this time, but a map-authored empty Transporter idles next door.
+		place(map, at(2, 3), TRANSPORTER_TYPE, 1)
+		initGameStateFromMap(map)
+		gameState.update((s) => ({ ...s, currentTeam: 1 }))
+		const plans = plansFor(map, at(1, 3), 1)
+		const load = plans.find((p) => p.kind === 'load')
+		expect(load).toBeDefined()
+		const last = load!.actions[load!.actions.length - 1]
+		expect(last.kind).toBe('transport-load')
+		expect((last as { transport: number }).transport).toBe(at(2, 3))
+	})
+})
+
+describe('T2/T3: the islands scene', () => {
+	it('CPU vs CPU crosses the strait by air instead of stalemating', () => {
+		const scene = devScenes.find((s) => s.id === 'islands')!
+		const map = scene.build()
+		initGameStateFromMap(map)
+		const log: SerializedAction[] = []
+		for (let i = 0; i < 16; i++) {
+			const state = get(gameState)
+			if (state.phase !== 'playing') break
+			log.push(...runCpuTurnSync(map, state.currentTeam))
+			endTurn({ map })
+		}
+		// Somebody lifted, and somebody set foot on the other island (the far shore is
+		// x=8 for team 0 and x=4 for team 1). Before this pass the log was nothing but
+		// waits and the two sides stared across the strait forever.
+		expect(log.some((a) => a.kind === 'air-lift')).toBe(true)
+		const crossed = map.layers.units.some((u, t) => {
+			if (!u) return false
+			const x = t % map.cols
+			return (u.team === 0 && x >= 8) || (u.team === 1 && x <= 4)
+		})
+		const captured = map.layers.buildings.some(
+			(b, t) => b && ((b.team === 0 && t % map.cols >= 8) || (b.team === 1 && t % map.cols <= 4))
+		)
+		expect(crossed || captured).toBe(true)
 	})
 })
