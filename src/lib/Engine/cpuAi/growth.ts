@@ -65,7 +65,7 @@ const cheapestBuildable = (player: {
 }
 
 /** This turn's payout from a building, mirroring `supplyIncome`'s reservoir rules. */
-const buildingIncome = (building: BuildingObject): number => {
+export const buildingIncome = (building: BuildingObject): number => {
 	const data = buildingData[building.type]
 	const income = data?.income ?? 0
 	if (income <= 0) return 0
