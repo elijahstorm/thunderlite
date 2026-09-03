@@ -45,8 +45,13 @@ export type StressOptions = {
 	mapId: string
 	/** Event poll cadence per client. 30s is the socket-trusted cadence; 1.5s is the untrusted one. */
 	pollIntervalMs: number
-	/** Presence ping cadence per client. */
-	heartbeatMs: number
+	/**
+	 * Presence check cadence per client, applied only after the room has been
+	 * quiet that long, as the real client does. 0 disables it, and 0 is the
+	 * honest default here: virtual players hold no socket, so a presence check
+	 * would find nobody and resign the turn holder. A healthy room never asks.
+	 */
+	stallCheckMs: number
 	/** Trace flush cadence per client, when there is something to flush. */
 	logFlushMs: number
 	/** POST a result when the script ends, so settlement writes are counted too. */
@@ -61,7 +66,7 @@ export const DEFAULT_STRESS_OPTIONS: StressOptions = {
 	staggerMs: 2000,
 	mapId: '',
 	pollIntervalMs: 30_000,
-	heartbeatMs: 10_000,
+	stallCheckMs: 0,
 	logFlushMs: 5_000,
 	settle: true,
 	loop: true,
@@ -95,6 +100,8 @@ type Room = {
 	surrendered: Set<string>
 	/** Events relayed since the last trace flush, per client. */
 	pendingTrace: Map<string, number>
+	/** Last relay or received event, for the stall check. */
+	lastActivityAt: number
 	timers: ReturnType<typeof setInterval>[]
 	state: 'starting' | 'live' | 'finished' | 'failed'
 }
@@ -295,6 +302,7 @@ const openRoom = async (r: Run, index: number): Promise<Room | null> => {
 		current: null,
 		surrendered: new Set(),
 		pendingTrace: new Map(),
+		lastActivityAt: Date.now(),
 		timers: [],
 		state: 'starting',
 	}
@@ -391,11 +399,15 @@ const playRoom = async (r: Run, room: Room) => {
 				room.pendingTrace.set(p.user, (room.pendingTrace.get(p.user) ?? 0) + events.length)
 		})
 	}, r.options.pollIntervalMs)
-	each((p) => {
-		void call(r, room.session, p.user, '/api/game/[session]/heartbeat', `${base}/heartbeat`, {
-			method: 'POST',
-		})
-	}, r.options.heartbeatMs)
+	if (r.options.stallCheckMs > 0) {
+		each((p) => {
+			if (Date.now() - room.lastActivityAt < r.options.stallCheckMs * scale) return
+			room.lastActivityAt = Date.now()
+			void call(r, room.session, p.user, '/api/game/[session]/heartbeat', `${base}/heartbeat`, {
+				method: 'POST',
+			})
+		}, r.options.stallCheckMs / 3)
+	}
 	each((p) => {
 		const pending = room.pendingTrace.get(p.user) ?? 0
 		if (pending === 0) return
@@ -494,6 +506,7 @@ const playRoom = async (r: Run, room: Room) => {
 		const status = await relay(r, room, who, `${base}/move`, actions)
 		if (status >= 200 && status < 300) {
 			who.clientSeq += actions.length
+			room.lastActivityAt = Date.now()
 			room.pendingTrace.set(who.user, (room.pendingTrace.get(who.user) ?? 0) + actions.length)
 			if (isSurrender && who === room.guest) {
 				room.surrendered.add(room.guest.user)

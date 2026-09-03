@@ -74,10 +74,14 @@
 	// it fills, rather than being thrown away and re-fetched. Bounded so a socket
 	// that starts spraying ids from the far future can't grow this without limit.
 	const MAX_HELD_PUSHES = 64
-	// Presence ping — keeps our `last_seen` fresh so the server doesn't auto-resign
-	// us, and drives the sweep that resigns an opponent who left. Independent of the
-	// event poll, whose cadence varies with how well the socket is delivering.
-	const HEARTBEAT_INTERVAL = 10_000
+	// Presence is asked for, never reported. Nothing pings while the room is
+	// moving; only once it has been quiet this long does the client ask the server
+	// who still holds a socket, and it keeps asking at this cadence until something
+	// happens. A player thinking for two minutes is not a stall to the server,
+	// because they are still present. Only a socket that has been gone for the
+	// whole grace window (across two checks) is resigned. Longer than any idle gap
+	// in a real match (match 24's longest was 30s), so a healthy room never asks.
+	const STALL_CHECK_MS = 90_000
 	/**
 	 * Most actions one request may carry. Matches the server's own cap; a run
 	 * longer than this simply continues in the next request.
@@ -100,7 +104,11 @@
 	let multiplayer = $state(false)
 	let lastEventId = -1
 	let pollTimer: ReturnType<typeof setInterval> | null = null
-	let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+	let stallTimer: ReturnType<typeof setInterval> | null = null
+	/** When this client last saw the room move: an event in, or its own relay out. */
+	let lastActivityAt = Date.now()
+	/** Teams we have already told the user we are waiting on. Not rendered. */
+	let waitingNoticed: number[] = []
 	let pollTick = 0
 	let realtimeConn: RealtimeConnection | null = null
 	let realtimeUp = false
@@ -293,6 +301,8 @@
 			logIncoming(event.id, event.action, via, 'stale')
 			return true
 		}
+		lastActivityAt = Date.now()
+		waitingNoticed = []
 		const action = normalizeAction(event.action)
 		if (!action) {
 			lastEventId = event.id
@@ -956,8 +966,38 @@
 		enqueueRelay(action)
 	}
 
-	const heartbeat = () => {
-		void fetch(`/api/game/${gameSession}/heartbeat`, { method: 'POST' }).catch(() => {})
+	/**
+	 * Ask who is still here. Fired only by `stallTick`, so it costs nothing while
+	 * the match is moving. The answer names who the room is waiting on; the first
+	 * time we hear about someone, say so, so the pause reads as a countdown.
+	 */
+	const presenceCheck = async () => {
+		try {
+			const res = await fetch(`/api/game/${gameSession}/heartbeat`, { method: 'POST' })
+			if (!res.ok) return
+			const data = (await res.json()) as {
+				waiting?: { team: number | null; sinceMs: number; graceMs: number }[]
+			} | null
+			for (const w of data?.waiting ?? []) {
+				if (w.team == null || waitingNoticed.includes(w.team)) continue
+				waitingNoticed.push(w.team)
+				const left = Math.max(1, Math.ceil((w.graceMs - w.sinceMs) / 1000))
+				addToast(
+					`A player lost connection. Their side forfeits in ${left}s unless they return.`,
+					'warn'
+				)
+			}
+		} catch {
+			// best-effort
+		}
+	}
+
+	const stallTick = () => {
+		if (!realtimeUp) return
+		if (Date.now() - lastActivityAt < STALL_CHECK_MS) return
+		// Re-arm so a stall asks once per interval, not once per tick.
+		lastActivityAt = Date.now()
+		void presenceCheck()
 	}
 
 	onMount(() => {
@@ -1001,12 +1041,8 @@
 			pollTimer = setInterval(pollTimerTick, POLL_INTERVAL)
 		})
 		void connectRealtime()
-		// Presence: ping immediately, then on a steady interval, so leaving the
-		// page stops the pings and the server can auto-resign us after the grace.
-		// (For async rooms the server skips the absence sweep — the ping only
-		// keeps last_seen fresh and drives the lazy deadline check.)
-		heartbeat()
-		heartbeatTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL)
+		// Presence is checked only once the room has gone quiet; see STALL_CHECK_MS.
+		stallTimer = setInterval(stallTick, STALL_CHECK_MS / 3)
 		if (asyncGame) clockTimer = setInterval(() => (clockNow = Date.now()), 1000)
 		gaugeTimer = setInterval(gaugeTick, GAUGE_INTERVAL)
 		// A last flush as the tab goes away, so the trace of a match someone walked
@@ -1028,7 +1064,7 @@
 		}
 		if (desyncUnsubscribe) desyncUnsubscribe()
 		if (pollTimer) clearInterval(pollTimer)
-		if (heartbeatTimer) clearInterval(heartbeatTimer)
+		if (stallTimer) clearInterval(stallTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
 		if (clockTimer) clearInterval(clockTimer)
 		if (gaugeTimer) clearInterval(gaugeTimer)

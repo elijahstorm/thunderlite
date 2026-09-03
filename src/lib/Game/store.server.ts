@@ -19,7 +19,7 @@
  * room/pointer past its expiry as absent. Abandoned rows linger until then;
  * a periodic sweep can be added later but is not required for correctness.
  */
-import { db, realtime } from '$lib/dontcode/server'
+import { db, kv, realtime } from '$lib/dontcode/server'
 import { generateKey } from '$lib/Security/keys'
 import { randomMatchSeed, resolveMatchSeed } from '$lib/Engine/matchSeed'
 import { budgetPressure, gatewayThrottled, noteRateLimit } from '$lib/Security/rateLimit'
@@ -641,27 +641,69 @@ async function setPublic(session: string, isPublic: boolean): Promise<void> {
 	await db.update('game_room', { session }, { is_public: isPublic })
 }
 
-/** Heartbeat: record that `userSession` is still present in the match. */
-async function touchMember(session: string, userSession: string): Promise<void> {
-	await db.update('game_member', { session, user_session: userSession }, { last_seen: now() })
+/** What one presence check decided about a room's absentees. */
+export type SweepResult = {
+	/** Members resigned by this check. */
+	resigned: string[]
+	/** Members currently gone but still inside their grace window. */
+	waiting: { userSession: string; team: number | null; sinceMs: number }[]
 }
 
+/** Where a member's first sighting as absent is remembered between checks. */
+const absentKey = (session: string, userSession: string) => `absent:${session}:${userSession}`
+/** How long that memory outlives the grace window before it expires on its own. */
+const ABSENT_MEMORY_TTL_S = Math.ceil((LEAVE_GRACE_MS * 4) / 1000)
+
 /**
- * Auto-resign anyone (other than the caller) who left the match and hasn't
- * checked in for LEAVE_GRACE_MS. The surrender is authored server-side from
- * their assigned team; the member is then removed so it fires exactly once, and
- * the turn is handed to the caller if it was the absentee's. Best-effort: this
- * is driven off the present player's heartbeat, so it never blocks anything.
- * Returns true if a resign was recorded.
+ * Auto-resign the humans who have been gone for the whole grace window.
+ *
+ * `present` is who the realtime service says holds a socket on the room's
+ * channel, by `userSession`. Nobody reports presence any more (the heartbeat
+ * that wrote `last_seen` every ten seconds is gone); the caller asks, and only
+ * once the room has stalled on them. So this runs rarely and must decide from
+ * one snapshot plus a short memory:
+ *
+ *  - Absent for the first time: remember when, in the cache, and report them as
+ *    waiting. Nothing is resigned on a single sighting, so a blip mid-turn costs
+ *    nothing.
+ *  - Absent again with the grace elapsed since that first sighting: resign them,
+ *    exactly as the old sweep did (a server-authored surrender, the seat
+ *    removed so it fires once, the turn handed to the caller if it was theirs).
+ *  - Present: forget any sighting, so a return resets the clock.
+ *
+ * CPU seats hold no socket and are never candidates. The caller is never a
+ * candidate either: they are demonstrably here. The route has already checked
+ * that the caller appears in `present`, which is what makes the snapshot
+ * trustworthy enough to act on.
  */
-async function sweepAbsent(session: string, poller: string): Promise<boolean> {
-	try {
-		const stale = (await staleMembers(session, now() - LEAVE_GRACE_MS)).filter(
-			(m) => m.userSession !== poller
-		)
-		if (stale.length === 0) return false
-		const current = await currentTurn(session)
-		for (const member of stale) {
+async function sweepDisconnected(
+	session: string,
+	poller: string,
+	roster: { userSession: string; team: number | null; isAi: boolean }[],
+	present: Set<string>,
+	nowMs: number = now()
+): Promise<SweepResult> {
+	const result: SweepResult = { resigned: [], waiting: [] }
+	const candidates = roster.filter((m) => !m.isAi && m.userSession !== poller)
+	let current: string | null | undefined
+	for (const member of candidates) {
+		const key = absentKey(session, member.userSession)
+		if (present.has(member.userSession)) {
+			await kv.del(key).catch(() => false)
+			continue
+		}
+		const firstSeen = await kv.get<number>(key).catch(() => null)
+		if (firstSeen == null) {
+			await kv.set(key, nowMs, { ttl: ABSENT_MEMORY_TTL_S }).catch(() => false)
+			result.waiting.push({ userSession: member.userSession, team: member.team, sinceMs: 0 })
+			continue
+		}
+		const sinceMs = Math.max(0, nowMs - Number(firstSeen))
+		if (sinceMs < LEAVE_GRACE_MS) {
+			result.waiting.push({ userSession: member.userSession, team: member.team, sinceMs })
+			continue
+		}
+		try {
 			if (member.team != null) {
 				const event = await appendEvent(session, member.userSession, {
 					kind: 'surrender',
@@ -670,31 +712,15 @@ async function sweepAbsent(session: string, poller: string): Promise<boolean> {
 				await realtime.tryPublish(`game:${session}`, { event })
 			}
 			await removeMember(session, member.userSession)
+			if (current === undefined) current = await currentTurn(session)
 			if (current === member.userSession) await setCurrentTurn(session, poller)
+			await kv.del(key).catch(() => false)
+			result.resigned.push(member.userSession)
+		} catch {
+			// Best-effort: a failed resign is retried by the next check.
 		}
-		return true
-	} catch {
-		return false
 	}
-}
-
-/**
- * Members who last checked in before `cutoff` — i.e. left the match and didn't
- * come back. Members who never heartbeated (last_seen null) are excluded, so a
- * player who hasn't opened /play yet is never auto-resigned.
- */
-async function staleMembers(
-	session: string,
-	cutoff: number
-): Promise<{ userSession: string; team: number | null }[]> {
-	const rows = await db.find<MemberRow>('game_member', {
-		where: { session, last_seen: { lt: cutoff } },
-		select: ['user_session', 'team'],
-	})
-	return rows.map((r) => ({
-		userSession: r.user_session,
-		team: r.team == null ? null : Number(r.team),
-	}))
+	return result
 }
 
 /** The player's join seat (0 = creator/host), or -1 if not a member. */
@@ -1840,9 +1866,7 @@ export const gameStore = {
 	advanceTurn,
 	listPublicRooms,
 	setPublic,
-	touchMember,
-	staleMembers,
-	sweepAbsent,
+	sweepDisconnected,
 	seatOf,
 	armStartCountdown,
 	startNow,

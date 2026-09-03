@@ -16,7 +16,7 @@
  * makes:
  *
  *   /events poll     roster + events + getRoom (+ clientSeq)   every 1.5s/client
- *   /heartbeat       isMember + touch + getRoom + sweep        every 10s/client
+ *   /heartbeat       roster + getRoom + presence               only once a room stalls
  *   /move            preflight reads + append + publish        per action
  *
  * A room where the host is relaying an AI side's whole turn one action at a time

@@ -54,7 +54,7 @@
 		staggerMs: number
 		mapId: string
 		pollIntervalMs: number
-		heartbeatMs: number
+		stallCheckMs: number
 		logFlushMs: number
 		settle: boolean
 		loop: boolean
@@ -66,7 +66,7 @@
 		staggerMs: 2000,
 		mapId: '',
 		pollIntervalMs: 30_000,
-		heartbeatMs: 10_000,
+		stallCheckMs: 0,
 		logFlushMs: 5_000,
 		settle: true,
 		loop: true,
@@ -254,12 +254,14 @@
 						/>
 					</label>
 					<label class="space-y-1">
-						<span class="text-slate-500">heartbeat ms</span>
+						<span class="text-slate-500" title="0 = off; virtual players hold no socket"
+							>stall check ms</span
+						>
 						<input
 							type="number"
-							min="1000"
-							step="1000"
-							bind:value={options.heartbeatMs}
+							min="0"
+							step="10000"
+							bind:value={options.stallCheckMs}
 							disabled={running}
 							class="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 tabular-nums"
 						/>
