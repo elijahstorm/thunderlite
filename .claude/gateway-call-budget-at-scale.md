@@ -438,3 +438,18 @@ room column for a room with no rows. One write per turn instead of two. Async
 rooms keep the column in step on the clock write they already make, because the
 async game list reads it in bulk. Decision taken the same day: frame signing
 happens in thunderlite, not the worker.
+
+### 2026-09-03, frames signed
+
+Decision: signing in thunderlite, not the worker. Each browser generates an
+ECDSA P-256 key per match (`Components/Socket/matchKey.ts`, kept in IndexedDB
+so a reload reuses it), registers the public half on its seat
+(`game_member.pubkey`, `POST /api/game/[session]/key`, one write per player per
+match), and signs every live frame over `{session, sender, turn, index, action}`
+(`Security/frameSigning.ts`). Receivers verify against the key that came with
+the roster, refreshing keys at most once per sender-turn when they meet an
+unknown or re-keyed sender, and drop what does not verify (`unverified` in the
+trace) so a forged frame never reaches a board. Frames are verified in arrival
+order before any index bookkeeping. This is the foundation the witness model
+needs: the server can now verify a turn a witness hands it against the actor's
+registered key. Migration `create_game_member_key`, apply with `pnpm migrate`.

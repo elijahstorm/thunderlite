@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types'
 import { dev } from '$app/environment'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { getMapData } from '$lib/Map/hashLoader'
+import { parsePublicKey, type PublicKeyJwk } from '$lib/Security/frameSigning'
 import { gameStore, roomSeed } from '$lib/Game/store.server'
 import { queryUsersByAuth } from '$lib/Database/getUserData'
 import { teamsFromHash } from '$lib/Game/mapTeams'
@@ -87,11 +88,20 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Teams run by a CPU seat, and whether THIS client is the one that drives them
 	// (the lowest-seat human relays the AI's moves — see GameStateManager).
 	const aiTeams = seats.filter((s) => s.isAi && s.team != null).map((s) => s.team as number)
+	// Each seat's frame-signing key, for verifying the live frames it publishes.
+	// A seat that has not registered yet is absent; the socket asks again when it
+	// meets a sender it has no key for.
+	const memberKeys: Record<string, PublicKeyJwk> = {}
+	for (const s of seats) {
+		const key = parsePublicKey(s.pubkey)
+		if (key) memberKeys[s.userSession] = key
+	}
 
 	return {
 		userSession,
 		gameSession,
 		seat,
+		memberKeys,
 		// Authoritative: the side this client commands. Falls back to the seat's
 		// team only if assignment somehow didn't land (e.g. a map with no teams).
 		localTeam: localTeam ?? teams[seat] ?? 0,

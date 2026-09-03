@@ -44,6 +44,7 @@
 				map={() => map}
 				{gameSession}
 				{userSession}
+				memberKeys={data.memberKeys ?? {}}
 				asyncGame={data.asyncGame ?? false}
 				turnDeadline={data.turnDeadline ?? null}
 				{aiTeams}

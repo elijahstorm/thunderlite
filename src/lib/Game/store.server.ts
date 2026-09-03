@@ -124,6 +124,8 @@ type MemberRow = {
 	is_ai?: boolean | null
 	last_seen?: number | null
 	ready?: boolean | null
+	/** Frame-signing public key, JWK text (see create_game_member_key). */
+	pubkey?: string | null
 }
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = {
@@ -187,12 +189,13 @@ async function roster(session: string): Promise<
 		team: number | null
 		isAi: boolean
 		ready: boolean
+		pubkey: string | null
 	}[]
 > {
 	const rows = await db.find<MemberRow>('game_member', {
 		where: { session },
 		orderBy: { seat: 'asc' },
-		select: ['user_session', 'seat', 'user_auth', 'team', 'is_ai', 'ready'],
+		select: ['user_session', 'seat', 'user_auth', 'team', 'is_ai', 'ready', 'pubkey'],
 	})
 	return rows.map((r) => ({
 		userSession: r.user_session,
@@ -201,7 +204,25 @@ async function roster(session: string): Promise<
 		team: r.team == null ? null : Number(r.team),
 		isAi: !!r.is_ai,
 		ready: !!r.ready,
+		pubkey: typeof r.pubkey === 'string' ? r.pubkey : r.pubkey ? JSON.stringify(r.pubkey) : null,
 	}))
+}
+
+/**
+ * Register a seat's frame-signing public key. Returns false for a non-member
+ * (the update matched no row). One write, once per player per match.
+ */
+async function setMemberKey(
+	session: string,
+	userSession: string,
+	pubkey: object
+): Promise<boolean> {
+	const { count } = await db.update(
+		'game_member',
+		{ session, user_session: userSession },
+		{ pubkey: JSON.stringify(pubkey) }
+	)
+	return count > 0
 }
 
 /** The team a member has been assigned in this room, or null if unassigned. */
@@ -2088,6 +2109,7 @@ export const gameStore = {
 	startNow,
 	disarmCountdown,
 	setMemberReady,
+	setMemberKey,
 	clearReady,
 	readyState,
 	canStart,

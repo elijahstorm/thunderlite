@@ -36,12 +36,21 @@
 	import { formatTimeLeft } from '$lib/Game/asyncConfig'
 	import { noteServiceBusy } from '$lib/Stores/serviceHealth'
 	import { addToast } from 'as-toast'
+	import {
+		canonicalize,
+		signFrame,
+		verifyFrame,
+		type PublicKeyJwk,
+	} from '$lib/Security/frameSigning'
+	import { loadOrCreateMatchKey, type MatchKey } from './matchKey'
 	import { fly } from 'svelte/transition'
 
 	interface Props {
 		map: () => MapObject | undefined
 		gameSession?: string
 		userSession?: string
+		/** Each seat's frame-signing public key, from the loader; refreshed on demand. */
+		memberKeys?: Record<string, PublicKeyJwk>
 		/** Async (correspondence) room: show the turn clock and skip live-only UX. */
 		asyncGame?: boolean
 		/** Initial turn deadline from the loader; the event poll keeps it fresh. */
@@ -57,6 +66,7 @@
 		map,
 		gameSession = '',
 		userSession = '',
+		memberKeys = {},
 		asyncGame = false,
 		turnDeadline = null,
 		aiTeams = [],
@@ -164,6 +174,19 @@
 	const committedIds: number[] = []
 	/** Where the current live turn stands: who, which turn, next index, and whether a frame went missing. */
 	let liveIncoming: { key: string; nextIndex: number; gap: boolean } | null = null
+	/**
+	 * Signing (see `Security/frameSigning.ts`). Our key for this match, resolved
+	 * at mount; outgoing frames wait on it and are signed in order. Incoming frames
+	 * are verified against the sender's registered key, in order, before any of
+	 * the index bookkeeping runs, so a forged frame never reaches the board.
+	 */
+	let matchKey: MatchKey | null = null
+	let keyReady: Promise<MatchKey | null> = Promise.resolve(null)
+	let signChain: Promise<void> = Promise.resolve()
+	let liveChain: Promise<void> = Promise.resolve()
+	let knownKeys: Record<string, PublicKeyJwk> = { ...untrack(() => memberKeys) }
+	/** The `sender:turn` we last refreshed keys for, so an unknown sender costs one read a turn. */
+	let keysRefreshedFor = ''
 	let outgoingUnsubscribe: (() => void) | null = null
 	let requestRedraw: number = $state(0)
 	let wrongTurn = $state(false)
@@ -550,18 +573,70 @@
 	 * taken from the log when it commits, as a block, rather than risk a board
 	 * that applied step three without step two.
 	 */
+	/** Fetch every seat's registered key, at most once per turn of one sender. */
+	const refreshKeys = async (turnKey: string) => {
+		if (keysRefreshedFor === turnKey) return
+		keysRefreshedFor = turnKey
+		try {
+			const res = await fetch(`/api/game/${gameSession}/key`)
+			if (!res.ok) return
+			const data = (await res.json()) as { keys?: Record<string, PublicKeyJwk> } | null
+			if (data?.keys) knownKeys = { ...knownKeys, ...data.keys }
+		} catch {
+			// best-effort; the frame is dropped and the log carries the turn
+		}
+	}
+
+	/** True only for a frame the sender's registered key signed. Refreshes keys once if needed. */
+	const verifyLive = async (
+		sender: string,
+		turn: number,
+		index: number,
+		action: SerializedAction,
+		sig: string
+	): Promise<boolean> => {
+		const body = { session: gameSession, sender, turn, index, action }
+		const turnKey = `${sender}:${turn}`
+		let key = knownKeys[sender]
+		if (key && (await verifyFrame(key, body, sig))) return true
+		// No key, or a key that no longer matches (the sender re-keyed): ask once.
+		await refreshKeys(turnKey)
+		key = knownKeys[sender]
+		return !!key && (await verifyFrame(key, body, sig))
+	}
+
 	const onLiveFrame = (live: {
 		sender?: unknown
 		turn?: unknown
 		index?: unknown
 		action?: unknown
+		sig?: unknown
+	}) => {
+		// Verification is asynchronous; frames are handled strictly in arrival order
+		// so the index bookkeeping below sees them the way the sender emitted them.
+		liveChain = liveChain.then(() => handleLiveFrame(live)).catch(() => {})
+	}
+
+	const handleLiveFrame = async (live: {
+		sender?: unknown
+		turn?: unknown
+		index?: unknown
+		action?: unknown
+		sig?: unknown
 	}) => {
 		if (typeof live.sender !== 'string' || typeof live.index !== 'number') return
+		if (typeof live.turn !== 'number' || typeof live.sig !== 'string') return
 		if (live.sender === userSession) return
 		// History still loading: the committed log will carry these.
 		if (!caughtUp) return
 		const action = normalizeAction(live.action)
 		if (!action) return
+		if (!(await verifyLive(live.sender, live.turn, live.index, action, live.sig))) {
+			// Not provably the sender's. Nothing is applied; the committed turn
+			// still arrives through the log, as a block.
+			logIncoming(-1, action, 'live', 'unverified')
+			return
+		}
 		const key = `${live.sender}:${String(live.turn)}`
 		if (!liveIncoming || liveIncoming.key !== key) liveIncoming = { key, nextIndex: 0, gap: false }
 		if (liveIncoming.gap || live.index < liveIncoming.nextIndex) {
@@ -1033,13 +1108,31 @@
 
 	const publishLive = (action: SerializedAction) => {
 		if (asyncGame || !realtimeUp || !userSession) return
-		liveOutbox.push({ live: { sender: userSession, turn: liveTurn, index: liveIndex, action } })
+		// Slot assigned now, synchronously, so frames keep the order the player
+		// acted in even though signing is asynchronous.
+		const body = {
+			session: gameSession,
+			sender: userSession,
+			turn: liveTurn,
+			index: liveIndex,
+			action,
+		}
 		liveIndex += 1
 		if (action.kind === 'end-turn' || action.kind === 'surrender') {
 			liveTurn += 1
 			liveIndex = 0
 		}
-		if (!liveDrainTimer) drainLive()
+		signChain = signChain
+			.then(async () => {
+				const key = matchKey ?? (await keyReady)
+				if (!key) return
+				const sig = await signFrame(key.privateKey, body)
+				liveOutbox.push({
+					live: { sender: body.sender, turn: body.turn, index: body.index, action, sig },
+				})
+				if (!liveDrainTimer) drainLive()
+			})
+			.catch(() => {})
 	}
 
 	const pumpRelay = () => {
@@ -1174,6 +1267,24 @@
 		resetDesync()
 		startLiveLog(gameSession)
 		logNote('joined', { asyncGame })
+		// Our signing key for this match: reused across reloads from IndexedDB,
+		// registered on the seat when it is new or when the seat holds another.
+		if (!asyncGame) {
+			keyReady = loadOrCreateMatchKey(gameSession)
+				.then(async (key) => {
+					matchKey = key
+					const registered = untrack(() => memberKeys)[userSession]
+					if (key.created || canonicalize(registered ?? null) !== canonicalize(key.publicJwk)) {
+						await fetch(`/api/game/${gameSession}/key`, {
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ pubkey: key.publicJwk }),
+						}).catch(() => {})
+					}
+					return key
+				})
+				.catch(() => null)
+		}
 		// The engine reports any action it could not apply (see `desync.ts`). In a
 		// local game nobody listens; online it means this client's board no longer
 		// matches the room's, so capture it with the board that produced it and tell
