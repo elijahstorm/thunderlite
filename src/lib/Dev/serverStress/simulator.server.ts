@@ -52,8 +52,6 @@ export type StressOptions = {
 	 * would find nobody and resign the turn holder. A healthy room never asks.
 	 */
 	stallCheckMs: number
-	/** Trace flush cadence per client, when there is something to flush. */
-	logFlushMs: number
 	/** POST a result when the script ends, so settlement writes are counted too. */
 	settle: boolean
 	/** Start a fresh room when one finishes, holding the room count steady. */
@@ -67,7 +65,6 @@ export const DEFAULT_STRESS_OPTIONS: StressOptions = {
 	mapId: '',
 	pollIntervalMs: 30_000,
 	stallCheckMs: 0,
-	logFlushMs: 5_000,
 	settle: true,
 	loop: true,
 }
@@ -411,47 +408,6 @@ const playRoom = async (r: Run, room: Room) => {
 			})
 		}, r.options.stallCheckMs / 3)
 	}
-	each((p) => {
-		const pending = room.pendingTrace.get(p.user) ?? 0
-		if (pending === 0) return
-		room.pendingTrace.set(p.user, 0)
-		// The trace GameSocket ships: an `in`/`state` pair per event seen, a `perf`
-		// gauge, the odd note. Packed server-side into one row per flush.
-		const now = Date.now()
-		const entries: Record<string, unknown>[] = []
-		for (let i = 0; i < Math.min(pending, 12); i++) {
-			entries.push({
-				kind: 'in',
-				eventId: p.lastEventId - i,
-				ts: now - i,
-				detail: { via: 'poll', disposition: 'applied' },
-			})
-			entries.push({
-				kind: 'state',
-				eventId: p.lastEventId - i,
-				ts: now - i,
-				detail: { digest: 'stress', units: 12 },
-			})
-		}
-		entries.push({
-			kind: 'perf',
-			eventId: p.lastEventId,
-			ts: now,
-			detail: {
-				what: 'gauge',
-				owed: 0,
-				logLag: 0,
-				queued: 0,
-				catchingUp: false,
-				realtimeUp: true,
-				pushTrusted: true,
-			},
-		})
-		void call(r, room.session, p.user, '/api/game/[session]/log', `${base}/log`, {
-			method: 'POST',
-			body: { entries },
-		})
-	}, r.options.logFlushMs)
 
 	let n = room.index * 1000
 	for (const raw of MATCH_24_SCRIPT) {
@@ -527,6 +483,27 @@ const playRoom = async (r: Run, room: Room) => {
 
 	for (const t of room.timers) clearInterval(t)
 	room.timers = []
+
+	// The recorder ships its whole trace once, at game over: one private-storage
+	// upload per client. A healthy match writes nothing to game_log any more, so
+	// this and the result are all a finished room costs. The body is a fraction
+	// of a real archive (match 24 was ~400KB per client); the gateway meters
+	// calls, and the call is what is being counted.
+	if (!r.stop) {
+		const actions = room.pendingTrace.get(room.host.user) ?? 0
+		const entries = Array.from({ length: Math.min(600, Math.max(60, actions * 3)) }, (_, i) => ({
+			kind: i % 3 === 0 ? 'in' : i % 3 === 1 ? 'state' : 'perf',
+			eventId: i,
+			ts: startedAt + i * 1000,
+			detail: { digest: 'stress', via: 'push', disposition: 'applied', what: 'gauge' },
+		}))
+		for (const p of [room.host, room.guest]) {
+			await call(r, room.session, p.user, '/api/game/[session]/trace', `${base}/trace`, {
+				method: 'POST',
+				body: { entries },
+			})
+		}
+	}
 
 	if (!r.stop && r.options.settle) {
 		const hostTeam = seatOf(room, room.host.user)?.team ?? 0

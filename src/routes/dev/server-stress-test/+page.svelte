@@ -55,7 +55,6 @@
 		mapId: string
 		pollIntervalMs: number
 		stallCheckMs: number
-		logFlushMs: number
 		settle: boolean
 		loop: boolean
 	}
@@ -67,7 +66,6 @@
 		mapId: '',
 		pollIntervalMs: 30_000,
 		stallCheckMs: 0,
-		logFlushMs: 5_000,
 		settle: true,
 		loop: true,
 	})
@@ -262,17 +260,6 @@
 							min="0"
 							step="10000"
 							bind:value={options.stallCheckMs}
-							disabled={running}
-							class="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 tabular-nums"
-						/>
-					</label>
-					<label class="space-y-1">
-						<span class="text-slate-500">trace flush ms</span>
-						<input
-							type="number"
-							min="1000"
-							step="500"
-							bind:value={options.logFlushMs}
 							disabled={running}
 							class="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 tabular-nums"
 						/>

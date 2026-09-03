@@ -7,6 +7,7 @@
 	import { resetMatchStats, matchStatsList } from './matchStats'
 	import { recordTimelineStart, recordTimelineEnd, matchTimelineList } from './matchTimeline'
 	import { resetDevLog } from './devLog'
+	import { archiveLiveLog } from './liveLog'
 	import { registerRecordMatch } from '$lib/Database/recordMatch'
 	import { registerCampaignProgress } from '$lib/Campaign/progress'
 	import { endTurn } from './turnLoop'
@@ -185,6 +186,9 @@
 			// Close the timeline on the final board so the chart's last point is the
 			// position the match actually ended on. Idempotent, like emitMatchEnd.
 			recordTimelineEnd(map)
+			// The client's whole diagnostic trace goes up once, now that the match
+			// is over and the page is still open to send it. No-op offline.
+			if (isMultiplayer) archiveLiveLog()
 			emitMatchEnd(
 				buildMatchResult({
 					state: $gameState,

@@ -1,7 +1,9 @@
 import { error, isHttpError, json } from '@sveltejs/kit'
 import { dev } from '$app/environment'
 import { gameStore } from '$lib/Game/store.server'
+import { storage } from '$lib/dontcode/server'
 import { noteRateLimit } from '$lib/Security/rateLimit'
+import { mergeTraceSources, parseTraceArchive, tracePath } from '$lib/Game/traceArchive'
 
 /**
  * Client diagnostic trace for an online room (see `create_game_log.sql.ts`).
@@ -85,10 +87,23 @@ export const GET = async ({ params, locals, url }) => {
 	const limitRaw = Number(url.searchParams.get('limit'))
 	const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(5000, limitRaw) : 1000
 
-	const [entries, log] = await Promise.all([
+	// Two sources, read together: the incident rows in `game_log` (what could not
+	// wait) and each member's archived trace in private storage (the whole match,
+	// uploaded once at its end). A healthy match has only archives; a match that
+	// broke before its end has only rows; see `traceArchive.ts`.
+	const [rows, log, ...downloads] = await Promise.all([
 		gameStore.readLog(session, limit),
 		gameStore.events(session, -1),
+		...members.map((member) =>
+			storage.downloadPrivate(tracePath(session, member)).catch(() => null)
+		),
 	])
+	const archives = members
+		.map((member, index) => ({ userSession: member, archive: parseTraceArchive(downloads[index]) }))
+		.filter(
+			(a): a is { userSession: string; archive: NonNullable<typeof a.archive> } => !!a.archive
+		)
+	const entries = mergeTraceSources(rows, archives)
 
 	// Short, stable aliases for the opaque user-session hashes, so a two-client
 	// trace reads as "A did this, B saw that" instead of two walls of hex.
@@ -115,6 +130,10 @@ export const GET = async ({ params, locals, url }) => {
 	return json({
 		session,
 		players: Object.fromEntries(alias),
+		sources: {
+			rows: rows.length,
+			archives: archives.map((a) => who(a.userSession)),
+		},
 		lag: summarizeLag(entries, who),
 		// The first id two clients disagreed on — the action to look at first.
 		firstDivergenceEventId: divergences.length ? divergences[0].eventId : null,

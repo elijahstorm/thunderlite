@@ -316,6 +316,35 @@ export const storage = {
 	removePublic(paths: string[]): Promise<{ deleted: number }> {
 		return metered('storage', () => client().storage.public.remove(paths))
 	},
+
+	/**
+	 * Upload into the project's PRIVATE storage: no URL, readable only through
+	 * this server. One metered call, unlike `uploadPublic`, which also fetches
+	 * the URL. Used for per-match diagnostic traces, which expose both sides'
+	 * fog and must never be a link.
+	 */
+	uploadPrivate(
+		path: string,
+		data: Blob | Uint8Array | string,
+		contentType: string
+	): Promise<void> {
+		return metered('storage', async () => {
+			await client().storage.private.upload(path, data, contentType)
+		})
+	},
+
+	/** Read a private object back as text, or null if it is not there. */
+	downloadPrivate(path: string): Promise<string | null> {
+		return metered('storage', async () => {
+			try {
+				const { body } = await client().storage.private.download(path)
+				return Buffer.from(body, 'base64').toString('utf8')
+			} catch (msg) {
+				if (isDontCodeError(msg) && msg.status === 404) return null
+				throw msg
+			}
+		})
+	},
 }
 
 // ── KV cache ────────────────────────────────────────────────────────────────

@@ -38,22 +38,36 @@ export type LiveLogEntry = {
 	detail: Record<string, unknown>
 }
 
-/** Flush window. Long enough to batch a burst of a turn's actions into one POST. */
-const FLUSH_DELAY_MS = 2500
-/** Flush immediately once the buffer reaches this, so a busy turn isn't held. */
-const FLUSH_AT = 25
 /**
- * Hard ceiling on the pending buffer. A client that loses the network for a long
- * stretch drops its OLDEST entries rather than growing without bound — the recent
- * ones are the ones that explain what just went wrong.
+ * The trace is kept here, in the browser, for the whole match, and shipped to
+ * the server ONCE when the match ends (see `archiveLiveLog`). It used to be
+ * flushed every 2.5 seconds: a database row per flush per client, about as many
+ * writes as the match itself, for a record one person reads afterwards. At two
+ * hundred rooms that was sixteen times the project's write budget.
+ *
+ * What still reaches the database mid-match is evidence: a desync, a refused or
+ * failed relay, a resync, the tab closing. Those flush the pending buffer the
+ * moment they happen (`flush`), so a match that never reaches its end, or a
+ * client that leaves before the archive goes up, still leaves the part of the
+ * record that explains why. A healthy match writes nothing until it is over.
+ */
+/** Ceiling on the archived trace. Match 24 was ~2000 entries per client. */
+const ARCHIVE_MAX = 8000
+/**
+ * Ceiling on the pending (not yet flushed as evidence) buffer. Also what the
+ * final beacon can carry: a tab closing mid-match ships this much context.
  */
 const MAX_BUFFER = 200
 
 let session = ''
 let enabled = false
+/** Entries since the last evidence flush; what a flush ships. */
 let buffer: LiveLogEntry[] = []
-let flushTimer: ReturnType<typeof setTimeout> | null = null
+/** Everything recorded this match; what the archive ships. */
+let archive: LiveLogEntry[] = []
+let archived = false
 let dropped = 0
+let archiveDropped = 0
 
 /**
  * Point the recorder at a room. Called once the socket layer knows it's in a
@@ -64,37 +78,59 @@ export const startLiveLog = (gameSession: string): void => {
 	session = gameSession
 	enabled = browser && !!gameSession
 	buffer = []
+	archive = []
+	archived = false
 	dropped = 0
-	if (flushTimer) {
-		clearTimeout(flushTimer)
-		flushTimer = null
-	}
+	archiveDropped = 0
 }
 
-/** Flush what's pending and stop recording (component teardown / match over). */
+/**
+ * Stop recording (component teardown). If the archive already went up, the
+ * record is complete and nothing more is sent. Otherwise this client is leaving
+ * a match that has not ended, which is itself evidence: ship the pending buffer
+ * as a beacon so the entries around the exit still land.
+ */
 export const stopLiveLog = (): void => {
-	if (enabled) flush(true)
+	if (enabled && !archived) flush(true)
 	enabled = false
 	session = ''
 }
 
-const scheduleFlush = (): void => {
-	if (flushTimer) return
-	flushTimer = setTimeout(() => {
-		flushTimer = null
-		flush(false)
-	}, FLUSH_DELAY_MS)
+/**
+ * Ship the whole trace once, when the match is over. Idempotent per match. The
+ * page is still open at game over, so this is an ordinary request and can carry
+ * the full archive; the beacon path is for leaving early, and is bounded.
+ */
+export const archiveLiveLog = (): void => {
+	if (!enabled || archived || archive.length === 0) return
+	archived = true
+	const body = JSON.stringify({ entries: archive, dropped: archiveDropped })
+	void fetch(`/api/game/${session}/trace`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body,
+	}).catch(() => {
+		// Best-effort: a missing archive costs debuggability, never the match.
+	})
+	// Anything pending was context for evidence that never came; the archive
+	// holds it now.
+	buffer = []
+	dropped = 0
 }
 
 const push = (kind: LiveLogKind, eventId: number, detail: Record<string, unknown>): void => {
 	if (!enabled) return
-	buffer.push({ kind, eventId, ts: Date.now(), detail })
+	const entry: LiveLogEntry = { kind, eventId, ts: Date.now(), detail }
+	archive.push(entry)
+	if (archive.length > ARCHIVE_MAX) {
+		archiveDropped += archive.length - ARCHIVE_MAX
+		archive = archive.slice(-ARCHIVE_MAX)
+	}
+	buffer.push(entry)
 	if (buffer.length > MAX_BUFFER) {
 		dropped += buffer.length - MAX_BUFFER
 		buffer = buffer.slice(-MAX_BUFFER)
 	}
-	if (buffer.length >= FLUSH_AT) flush(false)
-	else scheduleFlush()
 }
 
 /**
@@ -128,8 +164,17 @@ const flush = (final: boolean): void => {
 	})
 }
 
-/** Force a flush now (e.g. the moment a desync is detected). */
+/** Force an evidence flush now (e.g. the moment a desync is detected). */
 export const flushLiveLog = (): void => flush(false)
+
+/** Relay outcomes and notes that are evidence in themselves, flushed on sight. */
+const EVIDENCE_NOTES = new Set([
+	'resync-requested',
+	'stale-build-reload',
+	'realtime-unreliable',
+	'pagehide',
+	'action-refused',
+])
 
 // ── Recording surface ────────────────────────────────────────────────────────
 
@@ -138,12 +183,16 @@ export const logOutgoing = (
 	action: SerializedAction,
 	result: 'sent' | 'rejected' | 'failed',
 	extra: Record<string, unknown> = {}
-): void =>
+): void => {
 	push('out', typeof extra.eventId === 'number' ? extra.eventId : -1, {
 		action,
 		result,
 		...extra,
 	})
+	// A relay the room refused or that never landed is the start of a split
+	// board; do not wait for the end of the match to record it.
+	if (result !== 'sent') flush(false)
+}
 
 /**
  * An event this client received. `via` distinguishes the realtime push from the
@@ -217,5 +266,7 @@ export const logPerf = (
 ): void => push('perf', eventId, detail)
 
 /** Free-form breadcrumb (connection state, resync prompts, teardown reasons). */
-export const logNote = (note: string, detail: Record<string, unknown> = {}): void =>
+export const logNote = (note: string, detail: Record<string, unknown> = {}): void => {
 	push('note', typeof detail.eventId === 'number' ? detail.eventId : -1, { note, ...detail })
+	if (EVIDENCE_NOTES.has(note)) flush(false)
+}
