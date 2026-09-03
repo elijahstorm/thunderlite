@@ -57,6 +57,7 @@
 		stallCheckMs: number
 		settle: boolean
 		loop: boolean
+		relayPerTurn: boolean
 	}
 
 	let options: Options = $state({
@@ -68,6 +69,7 @@
 		stallCheckMs: 0,
 		settle: true,
 		loop: true,
+		relayPerTurn: true,
 	})
 
 	let snapshot: Snapshot | null = $state(null)
@@ -280,6 +282,13 @@
 					<label class="flex items-center gap-2">
 						<input type="checkbox" bind:checked={options.loop} disabled={running} />
 						<span class="text-slate-400">loop rooms</span>
+					</label>
+					<label
+						class="col-span-2 flex items-center gap-2"
+						title="Off replays each action burst as it happened, the pre-change shape"
+					>
+						<input type="checkbox" bind:checked={options.relayPerTurn} disabled={running} />
+						<span class="text-slate-400">relay whole turns</span>
 					</label>
 				</div>
 

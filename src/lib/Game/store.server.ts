@@ -127,8 +127,10 @@ type MemberRow = {
 }
 type PlayerGameRow = { session: string; expires_at: number }
 type EventRow = {
+	/** Id of the row's FIRST action; a run's later actions are seq+1, seq+2, ... */
 	seq: number
 	user_session: string
+	/** The first (or only) action. Kept for legacy readers and the NOT NULL. */
 	action: unknown
 	ts: number
 	// Ordering columns (see create_game_event_ordering). NULL on rows written
@@ -136,7 +138,15 @@ type EventRow = {
 	// duplicate lookup in `appendEvent`.
 	sender_session?: string | null
 	client_seq?: number | null
+	// Run columns (see create_game_event_span). A row may hold a whole relayed
+	// run; `actions` is the run and `span` its length, NULL/1 on legacy rows.
+	actions?: unknown
+	span?: number | null
+	client_span?: number | null
 }
+
+/** The most actions one row (one relayed run) may hold. Shared with the route. */
+export const MAX_RUN_ACTIONS = 64
 
 const now = () => Date.now()
 const expired = (expires_at: unknown) => Number(expires_at) <= now()
@@ -821,24 +831,66 @@ async function setCurrentTurn(session: string, nextUserSession: string): Promise
 	await db.update('game_room', { session }, { current_turn: nextUserSession })
 }
 
-const toEvent = (row: EventRow): GameEvent => ({
-	id: Number(row.seq),
-	userSession: row.user_session,
-	action: (typeof row.action === 'string'
-		? JSON.parse(row.action)
-		: row.action) as SerializedAction,
-	ts: Number(row.ts),
-})
+const parseJson = <T>(value: unknown): T =>
+	(typeof value === 'string' ? JSON.parse(value) : value) as T
+
+/** The actions a row holds, in order: the run, or the lone legacy action. */
+const actionsOf = (row: EventRow): SerializedAction[] => {
+	const run = parseJson<unknown>(row.actions)
+	if (Array.isArray(run) && run.length > 0) return run as SerializedAction[]
+	return [parseJson<SerializedAction>(row.action)]
+}
+const spanOf = (row: EventRow): number => Math.max(1, Number(row.span ?? 1) || 1)
+const clientSpanOf = (row: EventRow): number => Math.max(1, Number(row.client_span ?? 1) || 1)
+
+/**
+ * A row as the flat events every reader expects. A run of N expands to N
+ * events with contiguous ids from the row's `seq`, all credited to the row's
+ * actor and stamped with the row's time.
+ */
+const toEvents = (row: EventRow): GameEvent[] =>
+	actionsOf(row).map((action, index) => ({
+		id: Number(row.seq) + index,
+		userSession: row.user_session,
+		action,
+		ts: Number(row.ts),
+	}))
+
+/** Legacy single-row view; the first event of the row. */
+const toEvent = (row: EventRow): GameEvent => toEvents(row)[0]
+
+/**
+ * The newest row in the log, or the sender's newest. The gateway honours the
+ * descending order and the limit; the test stand-in sorts ascending and ignores
+ * the limit, so the maximum is taken explicitly rather than assumed.
+ */
+async function lastRow(session: string, senderSession?: string): Promise<EventRow | null> {
+	const rows = await db.find<EventRow>('game_event', {
+		where: senderSession === undefined ? { session } : { session, sender_session: senderSession },
+		orderBy: { seq: 'desc' },
+		limit: 1,
+	})
+	return rows.reduce<EventRow | null>(
+		(best, row) => (!best || Number(row.seq) > Number(best.seq) ? row : best),
+		null
+	)
+}
+
+/** The id the next appended action will take: one past the last row's run. */
+async function nextSeq(session: string): Promise<number> {
+	const last = await lastRow(session)
+	return last ? Number(last.seq) + spanOf(last) : 0
+}
 
 /**
  * Do two events carry the same action? Compared on canonically ordered keys, so
  * a round trip through jsonb (which does not preserve key order) still matches.
  */
-const sameAction = (row: EventRow, action: SerializedAction): boolean => {
-	const stored = (typeof row.action === 'string' ? JSON.parse(row.action) : row.action) as Record<
-		string,
-		unknown
-	>
+const sameAction = (row: EventRow, action: SerializedAction): boolean =>
+	sameActionValue(actionsOf(row)[0], action)
+
+const sameActionValue = (storedAction: SerializedAction, action: SerializedAction): boolean => {
+	const stored = storedAction as unknown as Record<string, unknown>
 	const canon = (value: Record<string, unknown>): string =>
 		JSON.stringify(
 			Object.keys(value)
@@ -865,7 +917,10 @@ export class OutOfOrderEventError extends Error {
  * gap — so the count IS the next expected `client_seq`.
  */
 async function nextClientSeq(session: string, senderSession: string): Promise<number> {
-	return db.count('game_event', { session, sender_session: senderSession })
+	// The sender's newest row ends its stream: rows are runs now, so this is the
+	// run's first ordinal plus how many it consumed, not a count of rows.
+	const last = await lastRow(session, senderSession)
+	return last ? Number(last.client_seq ?? 0) + clientSpanOf(last) : 0
 }
 
 /**
@@ -974,7 +1029,7 @@ async function appendEvent(
 	}
 
 	for (let attempt = 0; attempt < APPEND_RETRIES; attempt++) {
-		const seq = await db.count('game_event', { session })
+		const seq = await nextSeq(session)
 		const inserted = await db.insertIgnoreConflict('game_event', {
 			session,
 			seq,
@@ -1074,42 +1129,47 @@ async function appendEvents(
 		const event = await appendEvent(session, userSession, actions[0], options)
 		return { events: [event], appended: 1 }
 	}
+	if (actions.length > MAX_RUN_ACTIONS) {
+		throw new Error(`A run holds at most ${MAX_RUN_ACTIONS} actions`)
+	}
 
 	const ts = now()
 	const expected = await nextClientSeq(session, senderSession)
 	if (clientSeq > expected) {
-		// This batch overtook the sender's own earlier actions. Recording it would
-		// put the log in an order the player never played.
 		throw new OutOfOrderEventError(expected, clientSeq)
 	}
 
+	// A run is ONE row. That is the whole reason this path exists: a turn that
+	// used to cost one insert per action costs one insert, on the budget that was
+	// binding at four concurrent rooms. Ids stay contiguous because the row's `seq`
+	// is its first action's and `span` covers the rest (see `toEvents`).
 	const settled: GameEvent[] = []
 	let cursor = clientSeq
 	if (clientSeq < expected) {
-		// A re-sent batch, in whole or in part. Read the overlap in ONE query
-		// rather than one per action, and hold every stored row to the same test
-		// `appendEvent` applies: the same action at that ordinal is a duplicate to
-		// hand back, a different one means the sender's counter is stale and
-		// honouring it would swallow a real action.
+		// Some or all of this run is already stored: a re-sent request. Rows are
+		// runs, so a stored run that began before this ordinal may reach into it;
+		// read from one run back and settle the overlap action by action.
 		const overlapEnd = Math.min(expected, clientSeq + actions.length)
 		const stored = await db.find<EventRow>('game_event', {
 			where: {
 				session,
 				sender_session: senderSession,
-				client_seq: { gte: clientSeq, lt: overlapEnd },
+				client_seq: { gte: Math.max(0, clientSeq - MAX_RUN_ACTIONS), lt: overlapEnd },
 			},
 			orderBy: { client_seq: 'asc' },
 		})
-		const byOrdinal = new Map(stored.map((row) => [Number(row.client_seq), row]))
+		const byOrdinal = new Map<number, GameEvent>()
+		for (const row of stored) {
+			const first = Number(row.client_seq ?? 0)
+			toEvents(row).forEach((event, index) => byOrdinal.set(first + index, event))
+		}
 		for (let ordinal = clientSeq; ordinal < overlapEnd; ordinal++) {
-			const row = byOrdinal.get(ordinal)
-			// Counted but not found is a concurrent insert mid-read: stop here and
-			// let the insert loop below (and the unique index) adjudicate.
-			if (!row) break
-			if (!sameAction(row, actions[ordinal - clientSeq])) {
+			const event = byOrdinal.get(ordinal)
+			if (!event) break
+			if (!sameActionValue(event.action, actions[ordinal - clientSeq])) {
 				throw new OutOfOrderEventError(expected, clientSeq)
 			}
-			settled.push(toEvent(row))
+			settled.push(event)
 			cursor = ordinal + 1
 		}
 	}
@@ -1117,59 +1177,52 @@ async function appendEvents(
 	const remaining = actions.slice(cursor - clientSeq)
 	if (remaining.length === 0) return { events: settled, appended: settled.length }
 
-	// One count for the whole run, then contiguous seqs from it. A lost race on
-	// any single insert re-reads the count and resumes from there, so a concurrent
-	// writer costs this batch a retry rather than a hole.
-	let seq = await db.count('game_event', { session })
-	for (let index = 0; index < remaining.length; index++) {
-		const action = remaining[index]
-		const ordinal = cursor + index
-		let inserted = false
-		for (let attempt = 0; attempt < APPEND_RETRIES && !inserted; attempt++) {
-			let row: { id: unknown } | null
-			try {
-				row = await db.insertIgnoreConflict('game_event', {
-					session,
-					seq,
-					user_session: userSession,
-					action,
-					ts,
-					sender_session: senderSession,
-					client_seq: ordinal,
-				})
-			} catch (err) {
-				// A gateway failure (typically a rate limit) mid-run. Everything before
-				// this point is durably recorded, so say so rather than losing track of
-				// it — the caller settles those and re-sends from here.
-				throw new PartialAppendError([...settled], err)
-			}
-			if (row) {
-				settled.push({ id: seq, userSession, action, ts })
-				seq += 1
-				inserted = true
-				break
-			}
-			// A conflict is ambiguous, exactly as in `appendEvent`: either this `seq`
-			// was taken by another writer (recompute and retry) or this ordinal is
-			// already stored (take the stored row and move on).
-			const existing = await db.findOne<EventRow>('game_event', {
-				where: { session, sender_session: senderSession, client_seq: ordinal },
+	let landed: GameEvent[] | null = null
+	for (let attempt = 0; attempt < APPEND_RETRIES && !landed; attempt++) {
+		const seq = await nextSeq(session)
+		let row: { id: unknown } | null
+		try {
+			row = await db.insertIgnoreConflict('game_event', {
+				session,
+				seq,
+				user_session: userSession,
+				action: remaining[0],
+				actions: remaining,
+				span: remaining.length,
+				ts,
+				sender_session: senderSession,
+				client_seq: cursor,
+				client_span: remaining.length,
 			})
-			if (existing) {
-				settled.push(toEvent(existing))
-				seq = Math.max(seq, Number(existing.seq) + 1)
-				inserted = true
-				break
-			}
-			seq = await db.count('game_event', { session })
+		} catch (err) {
+			// Nothing of the remainder landed; what did is reported so the client
+			// resumes from there instead of re-sending the overlap.
+			throw new PartialAppendError([...settled], err)
 		}
-		if (!inserted) {
-			throw new PartialAppendError([...settled], new Error('Could not append after retries'))
+		if (row) {
+			landed = remaining.map((action, index) => ({ id: seq + index, userSession, action, ts }))
+			break
 		}
+		// A conflict is ambiguous: we lost the race for `seq` (try again with a
+		// fresh one), or hit the sender's unique index because this exact run is
+		// already stored (take it as-is).
+		const existing = await db.findOne<EventRow>('game_event', {
+			where: { session, sender_session: senderSession, client_seq: cursor },
+		})
+		if (existing) landed = toEvents(existing)
 	}
+	if (!landed) {
+		throw new PartialAppendError([...settled], new Error('Could not append after retries'))
+	}
+	settled.push(...landed)
 
 	const closing = settled[settled.length - 1]
-	if (closing && closing.action.kind === 'end-turn') await writeCursor(session, closing.id)
+	if (closing.action.kind === 'surrender' && typeof closing.action.team === 'number') {
+		await markSurrendered(session, closing.action.team)
+	}
+	if (closing.action.kind === 'end-turn' || closing.action.kind === 'surrender') {
+		await writeCursor(session, closing.id)
+	}
 	return { events: settled, appended: settled.length }
 }
 
@@ -1202,23 +1255,28 @@ async function events(
 	sinceId: number
 ): Promise<{ events: GameEvent[]; lastEventId: number }> {
 	const startIndex = Math.max(0, sinceId + 1)
+	// Rows are runs keyed by their FIRST action's id, so a run that started just
+	// before the cursor may still reach past it. Read from one full run back and
+	// drop what the caller already has after expanding.
 	const rows = await db.find<EventRow>('game_event', {
-		where: { session, seq: { gte: startIndex } },
+		where: { session, seq: { gte: Math.max(0, startIndex - MAX_RUN_ACTIONS) } },
 		orderBy: { seq: 'asc' },
 		limit: EVENT_PAGE,
 	})
 	if (rows.length === 0) {
-		if (sinceId >= 0) return { events: [], lastEventId: sinceId }
-		const total = await db.count('game_event', { session })
-		return { events: [], lastEventId: total > 0 ? total - 1 : -1 }
+		// A caller holding a cursor has nothing newer than it by definition; one
+		// starting from scratch has found an empty room.
+		return { events: [], lastEventId: sinceId >= 0 ? sinceId : -1 }
 	}
-	const highest = Number(rows[rows.length - 1].seq)
-	const events = rows.map(toEvent)
-	if (rows.length < EVENT_PAGE) return { events, lastEventId: highest }
-	// A full page may have been truncated, so the last row we read is not
-	// necessarily the room's last event. Only here is the count worth its call.
-	const total = await db.count('game_event', { session })
-	return { events, lastEventId: total > 0 ? Math.max(total - 1, highest) : highest }
+	const events = rows.flatMap(toEvents).filter((e) => e.id >= startIndex)
+	const tail = rows[rows.length - 1]
+	const highest = Number(tail.seq) + spanOf(tail) - 1
+	if (rows.length < EVENT_PAGE) return { events, lastEventId: Math.max(highest, sinceId) }
+	// A full page may be truncated, so the last row read is not necessarily the
+	// room's last; only here is the extra read worth it.
+	const last = await lastRow(session)
+	const end = last ? Number(last.seq) + spanOf(last) - 1 : highest
+	return { events, lastEventId: Math.max(end, highest) }
 }
 
 // ── Diagnostic client trace (`game_log`) ─────────────────────────────────────

@@ -56,6 +56,12 @@ export type StressOptions = {
 	settle: boolean
 	/** Start a fresh room when one finishes, holding the room count steady. */
 	loop: boolean
+	/**
+	 * Relay a whole turn in one request at the handover, as the client now does,
+	 * rather than each of the script's action bursts as it happened. Off replays
+	 * the pre-change shape for comparison.
+	 */
+	relayPerTurn: boolean
 }
 
 export const DEFAULT_STRESS_OPTIONS: StressOptions = {
@@ -67,6 +73,7 @@ export const DEFAULT_STRESS_OPTIONS: StressOptions = {
 	stallCheckMs: 0,
 	settle: true,
 	loop: true,
+	relayPerTurn: true,
 }
 
 type RouteAcc = {
@@ -272,6 +279,44 @@ const parseRelay = ([offset, sender, actions]: ScriptRelay) => ({
 	kinds: actions.split(',').map((a) => a.split(':')[1]),
 })
 
+type Relay = ReturnType<typeof parseRelay>
+
+/**
+ * The script as the server will see it. Per turn, consecutive rows from the same
+ * sender fold into one relay that lands when the turn's last action did, capped
+ * at the run size the route accepts; a surrender always travels alone. Off, the
+ * script's own bursts are replayed as they happened.
+ */
+const scriptRelays = (perTurn: boolean): Relay[] => {
+	const rows = MATCH_24_SCRIPT.map(parseRelay)
+	if (!perTurn) return rows
+	const out: Relay[] = []
+	let open: Relay | null = null
+	for (const row of rows) {
+		const alone = row.kinds.length === 1 && row.kinds[0] === 'surrender'
+		if (
+			open &&
+			(alone || open.sender !== row.sender || open.kinds.length + row.kinds.length > 64)
+		) {
+			out.push(open)
+			open = null
+		}
+		if (alone) {
+			out.push(row)
+			continue
+		}
+		open = open
+			? { offset: row.offset, sender: open.sender, kinds: [...open.kinds, ...row.kinds] }
+			: { ...row, kinds: [...row.kinds] }
+		if (row.kinds[row.kinds.length - 1] === 'end-turn') {
+			out.push(open)
+			open = null
+		}
+	}
+	if (open) out.push(open)
+	return out
+}
+
 /**
  * Create, fill and start a room, then load it the way two browsers would: the
  * `/play` loader is where teams get assigned and the first turn seeded, and a
@@ -410,9 +455,8 @@ const playRoom = async (r: Run, room: Room) => {
 	}
 
 	let n = room.index * 1000
-	for (const raw of MATCH_24_SCRIPT) {
+	for (const row of scriptRelays(r.options.relayPerTurn)) {
 		if (r.stop) break
-		const row = parseRelay(raw)
 		const due = startedAt + row.offset * scale
 		const wait = due - Date.now()
 		if (wait > 0) await sleep(wait)

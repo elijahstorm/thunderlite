@@ -20,6 +20,7 @@ import { CreateGameRoomStanding } from './create_game_room_standing.sql'
 import { CreateGameMember } from './create_game_member.sql'
 import { CreateGameEvent } from './create_game_event.sql'
 import { CreateGameEventOrdering } from './create_game_event_ordering.sql'
+import { CreateGameEventSpan } from './create_game_event_span.sql'
 import { CreateGameLog } from './create_game_log.sql'
 import { CreateGameAsync } from './create_game_async.sql'
 import { CreateGameReady } from './create_game_ready.sql'
@@ -65,6 +66,7 @@ export const consolidatedSchema = [
 	CreateGameEvent,
 	// After CreateGameEvent: its alters target game_event.
 	CreateGameEventOrdering,
+	CreateGameEventSpan,
 	CreateGameLog,
 	// After CreateGameMember: its index targets game_member.
 	CreateGameAsync,

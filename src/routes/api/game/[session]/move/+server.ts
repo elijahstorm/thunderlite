@@ -3,7 +3,12 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { gatewayCooldownSeconds, noteRateLimit } from '$lib/Security/rateLimit'
 import { isValidSerializedAction } from '$lib/Engine/Interactor/serializedAction.js'
 import type { GameEvent, SerializedAction } from '$lib/Engine/Interactor/serializedAction.js'
-import { gameStore, OutOfOrderEventError, PartialAppendError } from '$lib/Game/store.server'
+import {
+	gameStore,
+	MAX_RUN_ACTIONS,
+	OutOfOrderEventError,
+	PartialAppendError,
+} from '$lib/Game/store.server'
 import { realtime } from '$lib/dontcode/server'
 import {
 	notifyAsyncResignation,
@@ -21,7 +26,10 @@ import { clampAsyncTimeout } from '$lib/Game/asyncConfig'
  * knob: the client re-sends whatever doesn't fit as the next batch, so hitting
  * it costs one extra round trip and nothing else.
  */
-const MAX_BATCH = 32
+// A whole turn now, not a burst: the client holds its actions and relays them
+// at the handover, so the ceiling is "the biggest turn a board can produce".
+// Match 24's longest run was 17; a large map's CPU turn can be a few dozen.
+const MAX_BATCH = MAX_RUN_ACTIONS
 
 /**
  * Read the relayed actions out of a request body.

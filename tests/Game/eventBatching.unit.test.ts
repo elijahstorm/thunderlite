@@ -153,19 +153,33 @@ describe('batched event append', () => {
 		expect(events.map((e) => e.id)).toEqual([0, 1, 2])
 		const log = await logOf()
 		expect(log.map((e) => e.action.kind)).toEqual(['move', 'attack', 'end-turn'])
-		expect(h.tables.game_event.map((r) => r.client_seq)).toEqual([0, 1, 2])
+		// One ROW for the run: ids stay contiguous because the row's seq is its
+		// first action's and span covers the rest.
+		expect(h.tables.game_event).toHaveLength(1)
+		expect(h.tables.game_event[0]).toMatchObject({ seq: 0, span: 3, client_seq: 0, client_span: 3 })
 	})
 
-	it('pays the preflight cost once for the run, not once per action', async () => {
+	it('expands a run on read, from any cursor inside it', async () => {
+		await appendRun([move(13, 15), attack(15, 16), endTurn()], 0)
+		await appendRun([move(20, 21), endTurn()], 3)
+		expect((await gameStore.events(SESSION, -1)).events.map((e) => e.id)).toEqual([0, 1, 2, 3, 4])
+		const mid = await gameStore.events(SESSION, 1)
+		expect(mid.events.map((e) => e.id)).toEqual([2, 3, 4])
+		expect(mid.lastEventId).toBe(4)
+		const caughtUp = await gameStore.events(SESSION, 4)
+		expect(caughtUp.events).toEqual([])
+		expect(caughtUp.lastEventId).toBe(4)
+		expect(await gameStore.nextClientSeq(SESSION, P1)).toBe(5)
+	})
+
+	it('pays the preflight cost once for the run, and inserts once', async () => {
 		await appendRun([move(1, 2), move(3, 4), move(5, 6), move(7, 8), endTurn()], 0)
 
-		// One `count` for the sender's ordinal, one for the room's next seq. The
-		// inserts are unavoidable — the gateway has no bulk insert and `seq` has to
-		// stay one row per event, because it IS the id clients sync on.
-		expect(h.calls.count).toBe(2)
-		expect(h.calls.insert).toBe(5)
-		// The same run relayed one action at a time cost a count pair per action.
-		expect(h.calls.count).toBeLessThan(5 * 2)
+		// One insert for five actions. The reads are the sender's stream position
+		// and the log's next id, each one lookup of the newest row.
+		expect(h.calls.insert).toBe(1)
+		expect(h.calls.find ?? 0).toBeLessThanOrEqual(2)
+		expect(h.calls.count ?? 0).toBe(0)
 	})
 
 	it('recognises a wholly re-sent run instead of recording it twice', async () => {
@@ -208,9 +222,24 @@ describe('batched event append', () => {
 		await expect(appendRun([move(90, 91), move(91, 92)], 0)).rejects.toThrow(OutOfOrderEventError)
 	})
 
-	it('reports exactly what landed when the run is cut short', async () => {
-		// The third insert throws, standing in for a mid-run rate limit.
-		h.failInsertAt.at = 3
+	it('reports nothing landed when the run’s insert is refused', async () => {
+		// The run is one insert; a rate limit on it leaves nothing behind.
+		h.failInsertAt.at = 1
+
+		const failure = await appendRun([move(1, 2), move(3, 4), move(5, 6), endTurn()], 0).catch(
+			(err) => err
+		)
+
+		expect(failure).toBeInstanceOf(PartialAppendError)
+		expect((failure as InstanceType<typeof PartialAppendError>).events).toEqual([])
+		expect((await logOf()).length).toBe(0)
+	})
+
+	it('reports the settled overlap when only the remainder is refused', async () => {
+		await appendRun([move(1, 2), move(3, 4)], 0)
+		// A re-send that overlaps the stored run and extends it: the overlap
+		// settles from the log, the remainder's insert fails.
+		h.failInsertAt.at = 2
 
 		const failure = await appendRun([move(1, 2), move(3, 4), move(5, 6), endTurn()], 0).catch(
 			(err) => err
@@ -220,21 +249,19 @@ describe('batched event append', () => {
 		expect((failure as InstanceType<typeof PartialAppendError>).events.map((e) => e.id)).toEqual([
 			0, 1,
 		])
-		// The prefix is durably recorded — the sender settles those ordinals and
-		// re-sends from the third, rather than re-sending a run the unique index
-		// would refuse.
 		expect((await logOf()).length).toBe(2)
 	})
 
-	it('resumes cleanly from where a cut-short run stopped', async () => {
-		h.failInsertAt.at = 3
+	it('resumes cleanly after a refused run', async () => {
+		h.failInsertAt.at = 1
 		await appendRun([move(1, 2), move(3, 4), move(5, 6), endTurn()], 0).catch(() => {})
 		h.failInsertAt.at = 0
 
-		const { events } = await appendRun([move(5, 6), endTurn()], 2)
+		const { events } = await appendRun([move(1, 2), move(3, 4), move(5, 6), endTurn()], 0)
 
-		expect(events.map((e) => e.id)).toEqual([2, 3])
+		expect(events.map((e) => e.id)).toEqual([0, 1, 2, 3])
 		expect((await logOf()).map((e) => e.action.kind)).toEqual(['move', 'move', 'move', 'end-turn'])
+		expect(h.tables.game_event).toHaveLength(1)
 	})
 
 	it('orders a driven CPU run against its driver, crediting the seat', async () => {
@@ -243,7 +270,8 @@ describe('batched event append', () => {
 		const rows = h.tables.game_event
 		expect(rows.every((r) => r.sender_session === P1)).toBe(true)
 		expect(rows.every((r) => r.user_session === AI)).toBe(true)
-		expect(rows.map((r) => r.client_seq)).toEqual([0, 1, 2])
+		expect(rows).toHaveLength(1)
+		expect(rows[0]).toMatchObject({ client_seq: 0, client_span: 3 })
 	})
 
 	it('still takes a single action, on the same path as before', async () => {
