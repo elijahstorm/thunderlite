@@ -28,7 +28,12 @@ import { hasRemoteChoreography, remoteChoreographyMs } from '$lib/Engine/remoteC
 import type { SerializedAction } from '$lib/Engine/Interactor/serializedAction'
 
 /** How the event reached this client — the field that exposes ordering bugs. */
-export type EventTransport = 'push' | 'poll'
+/**
+ * How an event reached this client. `live` is a frame the acting client
+ * published itself over the socket, ahead of the server recording it; such an
+ * entry is provisional and carries no log id (see `QueuedEvent.provisional`).
+ */
+export type EventTransport = 'push' | 'poll' | 'live'
 
 export type QueuedEvent = {
 	/** `GameEvent.id` (the room's log sequence number). */
@@ -62,6 +67,13 @@ export type QueuedEvent = {
 	 * measure of whether this client is keeping up (see `LIVE_LAG_BUDGET_MS`).
 	 */
 	receivedAt?: number
+	/**
+	 * Applied ahead of the log: the actor published it live and the server has
+	 * not recorded it yet, so `id` is meaningless and the applied-id watermark
+	 * must not move on it. The committed event that follows is deduped against
+	 * it rather than applied twice (see GameSocket's provisional bookkeeping).
+	 */
+	provisional?: boolean
 }
 
 export type EventQueueHandlers = {

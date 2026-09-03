@@ -56,6 +56,7 @@
 	let {
 		map,
 		gameSession = '',
+		userSession = '',
 		asyncGame = false,
 		turnDeadline = null,
 		aiTeams = [],
@@ -90,7 +91,13 @@
 	 * Most actions one request may carry. Matches the server's own cap; a run
 	 * longer than this simply continues in the next request.
 	 */
-	const MAX_RELAY_BATCH = 32
+	// A whole turn, held and relayed at the handover (see `pumpRelay`). Mirrors
+	// the server's MAX_RUN_ACTIONS; a longer turn goes out in two runs.
+	const MAX_RELAY_BATCH = 64
+	// Client publishes are capped by the realtime service at 25 frames a second
+	// per socket, and a CPU turn arrives all at once. Live frames leave through a
+	// small pacer that stays under that.
+	const LIVE_FRAME_GAP_MS = 50
 	/**
 	 * How often the backlog gauges are recorded while this client is behind the
 	 * room. Only ticks that have something to say are written (see `gaugeTick`),
@@ -133,6 +140,30 @@
 	 * when in doubt, poll.
 	 */
 	let pushTrusted = true
+	/**
+	 * Live frames: the acting client publishes each of its own actions over the
+	 * socket the moment it takes them, so the room watches the turn play out while
+	 * the durable relay waits for the handover. Frames are keyed `sender:turn`
+	 * with a running index, so a receiver can tell a lost frame from a late one.
+	 *
+	 * What a receiver applies from a live frame is PROVISIONAL: on the board, but
+	 * not yet in the log. The committed event that follows (push or poll) is
+	 * deduped against it in order, and the applied-id watermark moves then. A
+	 * lost live frame does not desync anything: the receiver stops applying live
+	 * frames for the rest of that turn and takes the remainder from the log.
+	 */
+	let liveTurn = Math.floor(Math.random() * 1_000_000)
+	let liveIndex = 0
+	const liveOutbox: unknown[] = []
+	let liveDrainTimer: ReturnType<typeof setTimeout> | null = null
+	/** Fingerprints of provisional actions this client has queued, oldest first. */
+	const provisional: string[] = []
+	/** Provisional entries already on the board whose committed event has not arrived. */
+	let provisionalApplied = 0
+	/** Committed ids that arrived before their provisional entry left the queue. */
+	const committedIds: number[] = []
+	/** Where the current live turn stands: who, which turn, next index, and whether a frame went missing. */
+	let liveIncoming: { key: string; nextIndex: number; gap: boolean } | null = null
 	let outgoingUnsubscribe: (() => void) | null = null
 	let requestRedraw: number = $state(0)
 	let wrongTurn = $state(false)
@@ -266,6 +297,21 @@
 		},
 		onApplied: (entry, animated) => {
 			logIncoming(entry.id, entry.action, entry.via, animated ? 'animated' : 'applied')
+			if (entry.provisional) {
+				// On the board ahead of the log. If its committed event already came
+				// through, this is the moment the watermark can take that id; otherwise
+				// remember that one applied entry is waiting for its id.
+				const id = committedIds.shift()
+				if (id === undefined) {
+					provisionalApplied += 1
+				} else {
+					appliedEventId = Math.max(appliedEventId, id)
+					const m = map()
+					if (m && entry.action.kind === 'end-turn') checkpoint(m, id, 'remote-end-turn')
+				}
+				requestRedraw = performance.now()
+				return
+			}
 			appliedEventId = entry.id
 			// An end-turn is the natural checkpoint: the board is quiet, both clients
 			// have applied the same prefix of the log, and their digests should match.
@@ -325,6 +371,31 @@
 			if (action.kind === 'end-turn') checkpoint(m, event.id, 'local-end-turn')
 			requestRedraw = performance.now()
 			return true
+		}
+		// Already on the board from the actor's live frame? Then this is the log
+		// confirming it, in order: consume the provisional slot and let the
+		// watermark move. A different action at this position means the board
+		// followed a frame the log never confirmed, which is a real divergence.
+		if (provisional.length > 0) {
+			if (provisional[0] === fingerprint) {
+				provisional.shift()
+				if (provisionalApplied > 0) {
+					provisionalApplied -= 1
+					appliedEventId = Math.max(appliedEventId, event.id)
+					if (action.kind === 'end-turn') checkpoint(m, event.id, 'remote-end-turn')
+				} else {
+					committedIds.push(event.id)
+				}
+				logIncoming(event.id, action, via, 'deduped')
+				requestRedraw = performance.now()
+				return true
+			}
+			provisional.length = 0
+			provisionalApplied = 0
+			committedIds.length = 0
+			liveIncoming = null
+			reportDesync(action, 'live-mismatch')
+			return false
 		}
 		// A remote event we had to fetch is one the socket never handed us. Say so
 		// before queueing it — the poll is the only place this is observable.
@@ -472,7 +543,51 @@
 	// carry the log sequence id, so ordering is checkable: apply the next id
 	// directly, and on a gap (a lost push) backfill from the event log instead
 	// of applying out of order.
+	/**
+	 * A frame the acting client published itself, ahead of the log. Applied
+	 * provisionally when it is the next index of the turn we are watching. A frame
+	 * that skips ahead means one was lost: from there the rest of that turn is
+	 * taken from the log when it commits, as a block, rather than risk a board
+	 * that applied step three without step two.
+	 */
+	const onLiveFrame = (live: {
+		sender?: unknown
+		turn?: unknown
+		index?: unknown
+		action?: unknown
+	}) => {
+		if (typeof live.sender !== 'string' || typeof live.index !== 'number') return
+		if (live.sender === userSession) return
+		// History still loading: the committed log will carry these.
+		if (!caughtUp) return
+		const action = normalizeAction(live.action)
+		if (!action) return
+		const key = `${live.sender}:${String(live.turn)}`
+		if (!liveIncoming || liveIncoming.key !== key) liveIncoming = { key, nextIndex: 0, gap: false }
+		if (liveIncoming.gap || live.index < liveIncoming.nextIndex) {
+			logIncoming(-1, action, 'live', liveIncoming.gap ? 'gap' : 'stale')
+			return
+		}
+		if (live.index > liveIncoming.nextIndex) {
+			liveIncoming.gap = true
+			logIncoming(-1, action, 'live', 'gap')
+			return
+		}
+		liveIncoming.nextIndex += 1
+		lastActivityAt = Date.now()
+		waitingNoticed = []
+		provisional.push(actionFingerprint(action))
+		queue.push({ id: -1, action, animate: true, live: true, via: 'live', provisional: true })
+		logIncoming(-1, action, 'live', 'queued')
+		requestRedraw = performance.now()
+	}
+
 	const onRealtimeEvent = (message: RealtimeMessage) => {
+		const live = (message.payload as { live?: unknown } | null)?.live
+		if (live && typeof live === 'object') {
+			onLiveFrame(live as Parameters<typeof onLiveFrame>[0])
+			return
+		}
 		const payload = message.payload as { event?: GameEvent; events?: GameEvent[] } | null
 		// A frame carries a whole relayed run since batching. `event` is repeated as
 		// the first of it for older bundles; reading `events` when present is what
@@ -894,8 +1009,41 @@
 		return outbox.splice(0, size)
 	}
 
+	/**
+	 * Whether what is queued is ready to go. In a live room the run is the turn:
+	 * it leaves at the handover (or at the size cap), as one request the server
+	 * stores as one row. That is where the per-action server call went. Async
+	 * rooms still relay each action at once; the opponent is offline and a
+	 * closed tab must not lose a move there.
+	 */
+	const runReady = (): boolean => {
+		if (asyncGame) return true
+		if (outbox.length >= MAX_RELAY_BATCH) return true
+		return outbox.some((action) => action.kind === 'end-turn' || action.kind === 'surrender')
+	}
+
+	/** Live frames leave a few at a time, under the service's per-socket rate. */
+	const drainLive = () => {
+		liveDrainTimer = null
+		const frame = liveOutbox.shift()
+		if (frame === undefined) return
+		realtimeConn?.publish(`game:${gameSession}`, frame)
+		if (liveOutbox.length) liveDrainTimer = setTimeout(drainLive, LIVE_FRAME_GAP_MS)
+	}
+
+	const publishLive = (action: SerializedAction) => {
+		if (asyncGame || !realtimeUp || !userSession) return
+		liveOutbox.push({ live: { sender: userSession, turn: liveTurn, index: liveIndex, action } })
+		liveIndex += 1
+		if (action.kind === 'end-turn' || action.kind === 'surrender') {
+			liveTurn += 1
+			liveIndex = 0
+		}
+		if (!liveDrainTimer) drainLive()
+	}
+
 	const pumpRelay = () => {
-		if (relayBusy || outbox.length === 0) return
+		if (relayBusy || outbox.length === 0 || !runReady()) return
 		relayBusy = true
 		const batch = takeBatch()
 		inFlight = batch
@@ -919,6 +1067,7 @@
 	}
 
 	const enqueueRelay = (action: SerializedAction) => {
+		publishLive(action)
 		outbox.push(action)
 		pumpRelay()
 	}
@@ -1083,6 +1232,7 @@
 		if (desyncUnsubscribe) desyncUnsubscribe()
 		if (pollTimer) clearInterval(pollTimer)
 		if (stallTimer) clearInterval(stallTimer)
+		if (liveDrainTimer) clearTimeout(liveDrainTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
 		if (clockTimer) clearInterval(clockTimer)
 		if (gaugeTimer) clearInterval(gaugeTimer)

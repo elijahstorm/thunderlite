@@ -32,6 +32,10 @@ export type DesyncReason =
 	// here we are the one holding state nobody else will ever see.
 	| 'action-refused'
 	| 'action-lost'
+	// The acting client published an action live over the socket and this client
+	// applied it, but the action the server then recorded at that position is a
+	// different one. The board followed a frame the log never confirmed.
+	| 'live-mismatch'
 
 export type DesyncReport = {
 	action: SerializedAction

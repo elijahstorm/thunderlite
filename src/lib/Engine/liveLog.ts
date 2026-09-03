@@ -202,8 +202,8 @@ export const logOutgoing = (
 export const logIncoming = (
 	eventId: number,
 	action: SerializedAction,
-	via: 'push' | 'poll',
-	disposition: 'queued' | 'applied' | 'animated' | 'deduped' | 'stale' | 'no-map'
+	via: 'push' | 'poll' | 'live',
+	disposition: 'queued' | 'applied' | 'animated' | 'deduped' | 'stale' | 'no-map' | 'gap'
 ): void => push('in', eventId, { action, via, disposition })
 
 /**
