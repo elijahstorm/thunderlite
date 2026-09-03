@@ -1,5 +1,5 @@
 import { redirect, type Handle, type RequestEvent } from '@sveltejs/kit'
-import { building } from '$app/environment'
+import { building, dev } from '$app/environment'
 import { env } from '$env/dynamic/private'
 import { auth } from '$lib/dontcode/server'
 import { resolveCachedUser } from '$lib/dontcode/sessionCache'
@@ -44,6 +44,16 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 			event.locals.user = user.id
 			event.locals.userEmail = user.email ?? undefined
 		}
+	}
+
+	// Dev only: the server stress test (`/dev/server-stress-test`) drives the
+	// game routes as many virtual players from inside this same process, and
+	// those players have no account to sign in with. A `stress-` prefixed header
+	// stands in for the cookie so the request flows through the exact code a real
+	// client's would, session derivation included. Never honoured outside dev.
+	if (dev && !event.locals.user) {
+		const stressUser = event.request.headers.get('x-stress-user')
+		if (stressUser && stressUser.startsWith('stress-')) event.locals.user = stressUser
 	}
 
 	// Skip the auth/redirect dance while prerendering: there's no real request

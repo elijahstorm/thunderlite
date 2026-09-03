@@ -157,6 +157,14 @@ export const devPages: DevPage[] = [
 		ready: true,
 	},
 	{
+		href: '/dev/server-stress-test',
+		title: 'Server Stress Test',
+		blurb:
+			'Run N simulated online matches against the live gateway, paced like a real one, and watch each namespace budget fill: calls per minute, 429s, relay latency and the concurrency ceiling they imply.',
+		tag: 'perf',
+		ready: true,
+	},
+	{
 		href: '/dev/stress',
 		title: 'Stress Test',
 		blurb:
