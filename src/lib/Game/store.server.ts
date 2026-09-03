@@ -904,6 +904,41 @@ async function nextClientSeq(session: string, senderSession: string): Promise<nu
  * arrived — which makes a misordered log look perfectly consistent. That cost
  * real time diagnosing this bug and is not worth repeating.
  */
+/**
+ * The room's poll cursor: where the log stood at the last turn boundary, in the
+ * cache. The poll reads this first and only touches the database when it says
+ * there is something the client has not seen.
+ *
+ * Written per turn, not per action, on purpose. A cursor write per relay would
+ * be another per-action call, and at two hundred rooms no namespace can take
+ * one of those. Between boundaries a missed push therefore goes unnoticed by
+ * the poll until the turn ends; the socket's own gap repair is what catches it
+ * sooner. A cache miss (expiry, cold cache) is safe: the poll simply takes the
+ * full path and pays what it always used to.
+ */
+const cursorKey = (session: string) => `cursor:${session}`
+const CURSOR_TTL_S = 60 * 60 * 24
+
+export type PollCursor = { lastEventId: number }
+
+async function writeCursor(session: string, lastEventId: number): Promise<void> {
+	try {
+		await kv.set(cursorKey(session), { lastEventId } satisfies PollCursor, { ttl: CURSOR_TTL_S })
+	} catch {
+		// Best-effort: the poll falls back to the database without it.
+	}
+}
+
+async function readCursor(session: string): Promise<PollCursor | null> {
+	try {
+		const raw = await kv.get<PollCursor | string>(cursorKey(session))
+		const value = typeof raw === 'string' ? (JSON.parse(raw) as PollCursor) : raw
+		return value && typeof value.lastEventId === 'number' ? value : null
+	} catch {
+		return null
+	}
+}
+
 async function appendEvent(
 	session: string,
 	userSession: string,
@@ -951,6 +986,10 @@ async function appendEvent(
 		if (inserted) {
 			if (action.kind === 'surrender' && typeof action.team === 'number') {
 				await markSurrendered(session, action.team)
+			}
+			// A turn boundary is where the poll's cursor moves (see `writeCursor`).
+			if (action.kind === 'end-turn' || action.kind === 'surrender') {
+				await writeCursor(session, seq)
 			}
 			return { id: seq, userSession, action, ts }
 		}
@@ -1129,6 +1168,8 @@ async function appendEvents(
 		}
 	}
 
+	const closing = settled[settled.length - 1]
+	if (closing && closing.action.kind === 'end-turn') await writeCursor(session, closing.id)
 	return { events: settled, appended: settled.length }
 }
 
@@ -1940,6 +1981,7 @@ export const gameStore = {
 	appendEvent,
 	appendEvents,
 	nextClientSeq,
+	readCursor,
 	events,
 	appendLog,
 	readLog,

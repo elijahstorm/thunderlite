@@ -383,7 +383,10 @@ const playRoom = async (r: Run, room: Room) => {
 	}
 	each((p) => {
 		const since = p.lastEventId
-		const seq = p.firstPoll ? '&seq=1' : ''
+		// The first poll asks for the sender's counter and takes the full path,
+		// as a browser does on load; every later one is a trusted-socket
+		// reconciliation pass that asks the cache cursor first.
+		const seq = p.firstPoll ? '&seq=1' : '&cursor=1'
 		p.firstPoll = false
 		void call(
 			r,

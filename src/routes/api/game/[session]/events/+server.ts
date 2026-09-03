@@ -3,6 +3,7 @@ import { logToErrorDb } from '$lib/Security/serverLogs.js'
 import { gameStore } from '$lib/Game/store.server'
 import { notifyAsyncTimeout } from '$lib/Game/asyncNotify.server'
 import { clampAsyncTimeout } from '$lib/Game/asyncConfig'
+import { pollAfterMs } from '$lib/Security/pollPacing'
 
 export const GET = async ({ url, params, locals }) => {
 	const userSession = locals.session
@@ -15,6 +16,24 @@ export const GET = async ({ url, params, locals }) => {
 	const since = sinceRaw === null ? -1 : parseInt(sinceRaw, 10)
 	if (!Number.isFinite(since)) throw error(400, 'Invalid since parameter')
 
+	// The cheap question first. A client on a trusted socket that believes it is
+	// caught up asks `?cursor=1`: has the log moved past what I hold? The answer
+	// comes from the room's cache cursor, written at each turn boundary (see
+	// `writeCursor`), and costs one `cache` call instead of the three `db/read`
+	// calls below. Only a "no" is answered here; a "yes", a miss, or a client
+	// that wants its counter falls through to the full read.
+	//
+	// No membership check on this path, deliberately: the only thing it can say
+	// is "nothing new since N", and a room's session id already lets anyone join
+	// it. Everything that carries events still 403s a non-member below.
+	const wantsClientSeq = url.searchParams.get('seq') === '1'
+	if (url.searchParams.get('cursor') === '1' && !wantsClientSeq) {
+		const cursor = await gameStore.readCursor(session)
+		if (cursor && cursor.lastEventId <= since) {
+			return json({ events: [], lastEventId: since, pollAfterMs: pollAfterMs() })
+		}
+	}
+
 	try {
 		// The membership gate, the event read, and the room row hit different
 		// tables and don't depend on each other, so fetch them in one barrier —
@@ -26,7 +45,6 @@ export const GET = async ({ url, params, locals }) => {
 		// the rest of the match. It is a `count` on the event table, so on the app's
 		// hottest path it was a fifth of the poll's gateway budget spent restating
 		// something the client already knew.
-		const wantsClientSeq = url.searchParams.get('seq') === '1'
 		const [seats, page, room, clientSeq] = await Promise.all([
 			gameStore.roster(session),
 			gameStore.events(session, since),
@@ -72,6 +90,8 @@ export const GET = async ({ url, params, locals }) => {
 			turnDeadline,
 			aiTeams,
 			isAiDriver,
+			// How soon to ask again, from the budget this poll spends. See pollPacing.
+			pollAfterMs: pollAfterMs(),
 			// Omitted rather than null when it wasn't asked for, so a client reading
 			// `typeof clientSeq === 'number'` can't mistake "not answered" for zero.
 			...(clientSeq === null ? {} : { clientSeq }),

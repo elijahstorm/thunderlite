@@ -69,7 +69,11 @@
 	// channel lost. `pushTrusted` is what decides whether it has earned that: the
 	// moment a poll turns up an event the socket never pushed, we go back to the
 	// fast interval (see `notePushMiss`).
-	const CONNECTED_POLL_EVERY_TICKS = 20
+	// Default 20 ticks (30s). The server can stretch it: every poll response
+	// carries `pollAfterMs`, derived from how much of the shared budget is left,
+	// and a room under pressure polls at 60 or 120s instead. Realtime is carrying
+	// the match, so nobody notices, which is the whole idea of degrading here.
+	let connectedPollTicks = 20
 	// A push that overtakes its predecessor is held here until the hole in front of
 	// it fills, rather than being thrown away and re-fetched. Bounded so a socket
 	// that starts spraying ids from the far future can't grow this without limit.
@@ -394,7 +398,17 @@
 	const pollOnce = async () => {
 		try {
 			const seqQuery = wantServerSeq ? '&seq=1' : ''
-			const res = await fetch(`/api/game/${gameSession}/events?since=${lastEventId}${seqQuery}`)
+			// A reconciliation pass on a trusted socket asks the cheap question first:
+			// has the log moved past what I hold? The server answers from a cache
+			// cursor and touches the database only when it has. Async rooms never
+			// ask: there the poll is the transport, not a check.
+			const cursorQuery =
+				realtimeUp && pushTrusted && !asyncGame && !wantServerSeq && pushBuffer.size === 0
+					? '&cursor=1'
+					: ''
+			const res = await fetch(
+				`/api/game/${gameSession}/events?since=${lastEventId}${seqQuery}${cursorQuery}`
+			)
 			if (!res.ok) return
 			const data = (await res.json()) as {
 				events?: GameEvent[]
@@ -403,8 +417,12 @@
 				aiTeams?: number[]
 				isAiDriver?: boolean
 				clientSeq?: number
+				pollAfterMs?: number
 			}
 			if (!data?.events) return
+			if (typeof data.pollAfterMs === 'number' && data.pollAfterMs >= POLL_INTERVAL) {
+				connectedPollTicks = Math.max(1, Math.round(data.pollAfterMs / POLL_INTERVAL))
+			}
 			if (typeof data.lastEventId === 'number') {
 				serverLastEventId = Math.max(serverLastEventId, data.lastEventId)
 			}
@@ -446,7 +464,7 @@
 		// the default. At 20 ticks it is a 30-second blind spot, which is long enough
 		// for a whole turn to go unseen and then land in one lump.
 		const throttled = realtimeUp && pushTrusted && pushBuffer.size === 0
-		if (throttled && pollTick % CONNECTED_POLL_EVERY_TICKS !== 0) return
+		if (throttled && pollTick % connectedPollTicks !== 0) return
 		void poll()
 	}
 

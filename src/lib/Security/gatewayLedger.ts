@@ -15,7 +15,7 @@
  * dominated not by how slow any single call is but by how MANY the sync path
  * makes:
  *
- *   /events poll     roster + events + getRoom (+ clientSeq)   every 1.5s/client
+ *   /events poll     one cache read; roster + events + getRoom only when behind
  *   /heartbeat       roster + getRoom + presence               only once a room stalls
  *   /move            preflight reads + append + publish        per action
  *
