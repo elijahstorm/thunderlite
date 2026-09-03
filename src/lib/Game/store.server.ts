@@ -78,6 +78,8 @@ type RoomRow = {
 	turn_deadline?: number | null
 	max_players?: number | null
 	seed?: number | null
+	/** Teams that have quit, as recorded by `appendEvent`. NULL on legacy rooms. */
+	surrendered?: number[] | string | null
 }
 
 /**
@@ -946,7 +948,12 @@ async function appendEvent(
 			ts,
 			...(ordered ? { sender_session: senderSession, client_seq: clientSeq } : {}),
 		})
-		if (inserted) return { id: seq, userSession, action, ts }
+		if (inserted) {
+			if (action.kind === 'surrender' && typeof action.team === 'number') {
+				await markSurrendered(session, action.team)
+			}
+			return { id: seq, userSession, action, ts }
+		}
 		// A conflict is ambiguous: we may have lost the race for `seq` (retry with a
 		// fresh one), or hit the sender's unique index because this exact event is
 		// already stored (return it — retrying would spin until it threw).
@@ -1422,15 +1429,17 @@ async function matchRecorded(session: string): Promise<boolean> {
  * the async deadline paths.
  */
 async function standing(
-	session: string
+	session: string,
+	ctx: { seats?: Awaited<ReturnType<typeof roster>>; room?: RoomRow | null } = {}
 ): Promise<{ seats: Awaited<ReturnType<typeof roster>>; surrendered: Set<number> }> {
-	const [seats, log] = await Promise.all([roster(session), events(session, -1)])
-	const surrendered = new Set<number>()
-	for (const e of log.events) {
-		if (e.action?.kind === 'surrender' && typeof e.action.team === 'number') {
-			surrendered.add(e.action.team)
-		}
-	}
+	// Both rows are ones the hot routes already hold; taking them saves the
+	// re-read. The surrendered set comes off the room row, and only a room from
+	// before that column pays for the log scan it used to cost every end-turn.
+	const [seats, room] = await Promise.all([
+		ctx.seats ?? roster(session),
+		ctx.room !== undefined ? ctx.room : getRoom(session),
+	])
+	const surrendered = surrenderedOf(room) ?? (await surrenderedFromLog(session))
 	return { seats, surrendered }
 }
 
@@ -1475,9 +1484,58 @@ async function logSummary(session: string): Promise<{
  * path that fires at most once per player per match — the relay uses it to
  * refuse a second forfeit for a side that is already out (see the move route).
  */
-async function hasSurrendered(session: string, team: number): Promise<boolean> {
+/**
+ * The teams recorded as quit on the room row, or null for a room from before
+ * the column existed (whose readers fall back to scanning the log). jsonb can
+ * come back either parsed or as text depending on the path, so both are read.
+ */
+const surrenderedOf = (room: RoomRow | null | undefined): Set<number> | null => {
+	const raw = room?.surrendered
+	if (raw == null) return null
+	const list = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+	if (!Array.isArray(list)) return null
+	return new Set(list.map(Number).filter((t) => Number.isInteger(t)))
+}
+
+/** Scan the log for surrenders: the legacy path, for rooms without the column. */
+async function surrenderedFromLog(session: string): Promise<Set<number>> {
 	const log = await events(session, -1)
-	return log.events.some((e) => e.action?.kind === 'surrender' && e.action.team === team)
+	const surrendered = new Set<number>()
+	for (const e of log.events) {
+		if (e.action?.kind === 'surrender' && typeof e.action.team === 'number') {
+			surrendered.add(e.action.team)
+		}
+	}
+	return surrendered
+}
+
+/**
+ * Record on the room row that `team` has quit. Called by `appendEvent` the
+ * moment a surrender lands, so every writer (a player's own resign, the presence
+ * sweep, the async clock) keeps the field in step with the log. One read and one
+ * write, on an action that happens at most once per side per match.
+ */
+async function markSurrendered(session: string, team: number): Promise<void> {
+	const room = await db.findOne<RoomRow>('game_room', {
+		where: { session },
+		select: ['surrendered'],
+	})
+	const current = surrenderedOf(room) ?? (await surrenderedFromLog(session))
+	if (current.has(team)) return
+	current.add(team)
+	await db.update('game_room', { session }, { surrendered: [...current].sort((a, b) => a - b) })
+}
+
+/** Whether `team` has quit. Pass the room row when the caller already holds it. */
+async function hasSurrendered(
+	session: string,
+	team: number,
+	roomIn?: RoomRow | null
+): Promise<boolean> {
+	const room = roomIn ?? (await getRoom(session))
+	const recorded = surrenderedOf(room)
+	if (recorded) return recorded.has(team)
+	return (await surrenderedFromLog(session)).has(team)
 }
 
 /**
@@ -1555,9 +1613,10 @@ const nextActiveAfter = (
 async function advanceTurn(
 	session: string,
 	actorUserSession: string,
-	claimedNextTeam?: number | null
+	claimedNextTeam?: number | null,
+	ctx: { seats?: Awaited<ReturnType<typeof roster>>; room?: RoomRow | null } = {}
 ): Promise<{ userSession: string; userAuth: string | null; team: number } | null> {
-	const { seats, surrendered } = await standing(session)
+	const { seats, surrendered } = await standing(session, ctx)
 	const ordered = turnOrder(seats, surrendered)
 	if (ordered.length === 0) return null
 

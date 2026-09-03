@@ -16,6 +16,7 @@ import { CreateMatchAnchor } from './create_match_anchor.sql'
 import { CreateCampaignProgress } from './create_campaign_progress.sql'
 import { CreateGameRoom } from './create_game_room.sql'
 import { CreateGameRoomSettings } from './create_game_room_settings.sql'
+import { CreateGameRoomStanding } from './create_game_room_standing.sql'
 import { CreateGameMember } from './create_game_member.sql'
 import { CreateGameEvent } from './create_game_event.sql'
 import { CreateGameEventOrdering } from './create_game_event_ordering.sql'
@@ -58,6 +59,8 @@ export const consolidatedSchema = [
 	CreateCampaignProgress,
 	CreateGameRoom,
 	CreateGameRoomSettings,
+	// After CreateGameRoom: its alter targets game_room.
+	CreateGameRoomStanding,
 	CreateGameMember,
 	CreateGameEvent,
 	// After CreateGameEvent: its alters target game_event.

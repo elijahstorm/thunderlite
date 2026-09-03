@@ -159,7 +159,7 @@ export const POST = async ({ request, params, locals }) => {
 			// replay still has to carry it, and a resign path that can fire twice is
 			// worth refusing here rather than trusting the client not to. Reported as
 			// success: the sender's intent (be out of this match) already holds.
-			if (myTeam != null && (await gameStore.hasSurrendered(session, myTeam))) {
+			if (myTeam != null && (await gameStore.hasSurrendered(session, myTeam, room))) {
 				return json({ event: null, events: [], appended: 0, turnDeadline: null })
 			}
 		} else if (current && current !== userSession) {
@@ -193,7 +193,7 @@ export const POST = async ({ request, params, locals }) => {
 			// case), so the pointer has to follow or that side's every action comes
 			// back "Not your turn". Two-side rooms never noticed: the match ends with
 			// the forfeit. Async rooms take the richer path below (clock + emails).
-			await gameStore.advanceTurn(session, actor)
+			await gameStore.advanceTurn(session, actor, null, { seats, room })
 		}
 		if (closed && isAsync && recorded.kind === 'surrender') {
 			// Settle the room server-side (turn pointer, clock, TTL) and tell the
@@ -222,7 +222,10 @@ export const POST = async ({ request, params, locals }) => {
 			// records. Seat-index rotation was indistinguishable from this while
 			// rooms held two seats; on a three-side map it hands the turn to the
 			// wrong side and the match deadlocks. See gameStore.advanceTurn.
-			const next = await gameStore.advanceTurn(session, actor, recorded.next ?? null)
+			const next = await gameStore.advanceTurn(session, actor, recorded.next ?? null, {
+				seats,
+				room,
+			})
 			if (!next) {
 				// Nothing eligible to rotate to (no seat carries a team yet) — keep
 				// the old seat walk so such a room still moves rather than freezing.
