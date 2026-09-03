@@ -110,13 +110,13 @@ export const POST = async ({ request, params, locals }) => {
 		// two more round trips asking for (`isAiMember` + `aiDriver`). On a CPU
 		// side's turn that was two extra gateway calls per action, on the one path
 		// that fires hundreds of times a match.
-		const [seats, currentAtRead, room] = await Promise.all([
-			gameStore.roster(session),
-			// `current_turn` is seeded to the creator at room creation, so it is set
-			// here; only honour it when present (a legacy room may still be null).
-			gameStore.currentTurn(session),
-			gameStore.getRoom(session),
-		])
+		const [seats, room] = await Promise.all([gameStore.roster(session), gameStore.getRoom(session)])
+		// `current_turn` is seeded to the creator at room creation, so it is set
+		// here; only honour it when present (a legacy room may still be null). It
+		// used to be a third read of the same row the line above already fetched,
+		// on the path that fires hundreds of times a match. The only room that
+		// still pays for it is one past its expiry, which `getRoom` reads as absent.
+		const currentAtRead = room ? (room.current_turn ?? null) : await gameStore.currentTurn(session)
 		const members = seats.map((seat) => seat.userSession)
 		if (members.length === 0 || !members.includes(userSession)) {
 			throw error(403, 'Not a member of this game session')

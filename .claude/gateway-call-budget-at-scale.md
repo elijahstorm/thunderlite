@@ -315,3 +315,79 @@ Pitfalls to carry into the test plan:
   the old path.
 - **Realtime service limits** on frame size and rate per connection are
   undocumented. A host driving two AI seats publishes a dozen frames in a burst.
+
+## Progress log
+
+### 2026-09-02, first build session
+
+Landed, each as its own commit, all tests green (106 unit tests in `tests/Game`):
+
+- **Stress harness.** `/dev/server-stress-test` plays N rooms against whatever
+  gateway `DONTCODE_API_URL` names, paced by a script reduced from match 24.
+  Virtual players use an `x-stress-user` header that hooks honours only in dev.
+  Not yet run against any gateway; the local mock was not up and the production
+  key is Elijah's step.
+- **Step 1, presence.** Heartbeat gone. A client asks `/heartbeat` who holds a
+  socket only after 90s of quiet; resign needs two sightings across the grace
+  window; the caller must be visible in presence or nothing is swept.
+- **Step 2, standing.** `game_room.surrendered` written by `appendEvent`;
+  `standing()`/`hasSurrendered()` read it and take the rows the move route
+  already holds. Migration `create_game_room_standing`, apply with `pnpm migrate`.
+- **Step 3, poll.** `?cursor=1` answers a caught-up client from a cache cursor
+  written per turn boundary; every poll carries `pollAfterMs` (30/60/120s by
+  budget headroom) and the client honours it.
+- **Step 5, trace.** Kept in the browser, archived once at game over to private
+  storage; only evidence (desync, refused relay, resync, pagehide) still writes
+  `game_log`. `/log` GET merges both sources.
+- **Move route.** The room row was read twice per relay; now once.
+
+Where that leaves a match today, per minute: writes ~31 (event inserts 28.4,
+turn pointer 2.7, the rest gone), reads ~110 (five per relay, nothing else).
+Ceiling about **7 to 9 concurrent matches**, up from 4. The remaining 25x gap is
+entirely the per-action server relay, which is steps 4 and 6.
+
+### Two findings that gate steps 4 and 6
+
+**The realtime worker does not stamp the sender on relayed frames.** In
+`dontcode-workflows/workers/realtime/src/server.ts` a client `publish` frame is
+fanned out as `{ type: 'message', channel, payload }` with the payload verbatim;
+the connection's `identity` is registered for presence but never attached. So a
+client-published action's actor is whatever the client claims. `GameChat` already
+lives with this (its `source` is self-asserted). For actions it means:
+
+- The **live path** can still be client-published today: a forged frame can only
+  mislead an opponent's screen until the durable turn arrives, cookie-authenticated
+  and server-validated, and the receiver reconciles. That is griefing, not
+  cheating, and the resync handles it.
+- The **witness model** (an opponent seals a group it received) cannot trust who
+  sent what, so group sizes above one, and therefore 200, are gated on one of:
+  the worker stamping `from: identity` on relayed frames (a DontCode product
+  feature, not a limit change), or thunderlite signing frames with a per-match
+  keypair registered at join. The first is a few lines in the worker; the second
+  is a chunk of work here. Elijah's call.
+
+**The worker rate-limits client publishes at 25 frames per second per socket**
+(`REALTIME_MSGS_PER_SEC_PER_CONNECTION`, default 25) and closes the socket with
+1008 on sustained flooding. A host driving two CPU seats publishes a dozen frames
+in a burst; that fits, but the client publisher must pace bursts under 25/s and
+must reconnect on 1008 rather than treat it as fatal.
+
+### Revised shape for steps 4 and 6
+
+The plan had step 4 (turn rows) before step 6 (client publish) with the server
+still sequencing. That cannot work: a stateless server cannot hold a turn's
+actions between relays, so per-turn rows require the client to hold the turn and
+relay it whole at end-turn, and live delivery to the opponent then has to come
+from somewhere else, which is client publish. They are one step, in two halves:
+
+- **4a.** Client publishes each action over the socket tagged
+  `{ actor, turn, index }` for live display. Receivers apply provisionally.
+  Server stops publishing per relay.
+- **4b.** The actor relays its completed turn once, at end-turn, to a new
+  `/turn` route: one row per turn, server-validated against the cookie identity
+  and the turn pointer, cursor written, `current_turn` derived. Receivers
+  confirm their provisional actions against the committed turn (count and
+  fingerprint) and resync on mismatch. Reconnect mid-turn sees the turn land
+  when it commits. This reaches roughly **90 matches** with no trust change.
+- **6.** Witness sealing and groups of N, once the identity question is settled.
+  This is what reaches 200.
