@@ -391,3 +391,40 @@ from somewhere else, which is client publish. They are one step, in two halves:
   when it commits. This reaches roughly **90 matches** with no trust change.
 - **6.** Witness sealing and groups of N, once the identity question is settled.
   This is what reaches 200.
+
+### 2026-09-03, second build session
+
+Measured first: 10 rooms at 1x on production sat at 85 to 90% of `db/read`, which
+is where the model put it (five reads per relay, 22 relays a minute per room).
+
+Landed, as separate commits, all tests green (108 in `tests/Game`, 1567 overall):
+
+- **Step 4b, the write unit.** A `game_event` row may hold a whole run:
+  `seq` is the first action's id, `span` how many follow, `client_span` how many
+  sender ordinals it consumed; `toEvents` expands on read so every reader still
+  sees a flat, contiguous log. Next id and next ordinal come from the newest row,
+  not a count. Migration `create_game_event_span`, apply with `pnpm migrate`.
+- **Step 4a, the live path.** The acting client publishes each action over the
+  socket as it takes it and holds the durable relay until the handover: one
+  `/move` per turn, one row. Receivers apply live frames provisionally and dedupe
+  the committed events against them in order; a lost frame (index skipped) stops
+  live application for that turn and the remainder lands from the log as a
+  block; a committed action that differs from the provisional one reports
+  `live-mismatch` on the desync path. Frames are paced under the worker's 25/s
+  per-socket cap. Async rooms are unchanged: they relay per action.
+- **Simulator** relays whole turns by default (`relayPerTurn`), so what it
+  measures is the new shape. Virtual players still hold no socket, so live
+  frames and the provisional path can only be felt in real play.
+
+Projected per match per minute now: about 11 reads and 5.4 writes (4 reads, 1
+insert and 1 turn-pointer write per turn, 2.7 turns a minute), realtime 2.7
+server publishes plus unmetered client frames. That is roughly **55 matches on
+writes, 80 on reads**, from 7 to 9 before this session. Deriving `current_turn`
+from the newest row instead of writing it is the next cheap step (to ~90); groups
+of N (the witness model) is what reaches 200 and is gated on frame identity.
+
+What to feel in testing, beyond the earlier notes: the `owed` gauge now climbs
+to the size of a turn while a player is acting, by design; a refresh mid-turn
+shows the board at the last handover and the in-progress turn lands as a block
+when it commits; and `/dev/lag` shows `live` as a transport in the trace with a
+`gap` disposition wherever a frame was lost.
