@@ -24,11 +24,12 @@
 
 {#if state.active}
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-	<!-- Padded past the HUD rail so the box centres on the *board*, not the window,
-	     and never sits over the turn controls. -->
+	<!-- Spans the board region only (left of the HUD rail, see hudInsets) and
+	     sits under the chrome, so the box centres on the *board*, never covers
+	     the turn controls, and leaves the chat docks clickable mid-cutscene. -->
 	<div
-		class="fixed inset-x-0 bottom-0 z-[70] flex justify-center p-4"
-		style="padding-right: calc(1rem + {$hudGutter}px)"
+		class="fixed bottom-0 left-0 z-32 flex justify-center p-4"
+		style="right: {$hudGutter}px"
 		data-testid="dialogue-overlay"
 		onclick={advanceDialogue}
 	>

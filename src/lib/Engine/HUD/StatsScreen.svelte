@@ -14,6 +14,8 @@
 	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
 	import UserIcon from '$lib/Components/Auth/UserIcon.svelte'
 	import ScoreTimeline from './ScoreTimeline.svelte'
+	import { hudGutter } from './hudInsets'
+	import { resultsDismissed, hideResults } from './resultsPanelStore'
 
 	interface Props {
 		/** The team controlled on this machine — used to frame the banner as Victory/Defeat. */
@@ -55,6 +57,20 @@
 	let result = $derived(
 		$gameState.phase === 'gameOver' && $defeatAnimating === 0 ? (live ?? lastMatchResult()) : null
 	)
+
+	// Put away to look at the board: the panel is gone but the match is still
+	// over, and the rail's Results button brings it back (resultsPanelStore).
+	let open = $derived(result != null && !$resultsDismissed)
+
+	// A fresh match (rematch, next level) opens its results; it must not inherit
+	// the dismissal from the last one.
+	$effect(() => {
+		if ($gameState.phase !== 'gameOver') resultsDismissed.set(false)
+	})
+
+	const onKey = (event: KeyboardEvent) => {
+		if (event.key === 'Escape' && open) hideResults()
+	}
 
 	const STAT_COLUMNS: { key: keyof PlayerMatchStats; label: string }[] = [
 		{ key: 'unitsBuilt', label: 'Built' },
@@ -174,14 +190,32 @@
 	const handleRetry = () => onRetry?.()
 </script>
 
-{#if result}
+<svelte:window onkeydown={onKey} />
+
+{#if open && result}
+	<!-- Spans the board region only (left of the HUD rail) and sits under the
+	     rail and the chat docks, so the match can still be read on the rail and
+	     talked about while the report is up. The veil is a button: a tap on the
+	     board puts the report away to look at the final position, and it stays
+	     translucent so the board is visibly still there behind it. -->
 	<div
-		class="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-foreground/50 p-4 backdrop-blur-sm"
+		class="fixed inset-y-0 left-0 z-30 flex items-center justify-center p-4"
+		style="right: {$hudGutter}px"
 		data-testid="stats-screen"
 		transition:fade={{ duration: 140 }}
 	>
+		<button
+			type="button"
+			tabindex="-1"
+			class="absolute inset-0 cursor-default bg-foreground/40"
+			aria-label="Look at the board"
+			data-testid="stats-backdrop"
+			onclick={hideResults}
+		></button>
 		<div
-			class="pointer-events-auto my-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+			class="relative my-auto max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+			role="dialog"
+			aria-labelledby="stats-banner"
 			in:fly={{ y: 18, duration: 260 }}
 		>
 			<!-- Headline: outcome first, at a size you can read from across the room,
@@ -192,6 +226,7 @@
 					<div class="min-w-0">
 						<p class="section-eyebrow">{modeLabel}</p>
 						<h2
+							id="stats-banner"
 							class="mt-1.5 flex items-center gap-2.5 text-3xl font-semibold tracking-tight sm:text-4xl {toneText}"
 							data-testid="stats-banner"
 						>
@@ -202,11 +237,23 @@
 							{bannerDetail}
 						</p>
 					</div>
-					<span class="chip shrink-0 whitespace-nowrap">
-						<Icon icon="lucide:hourglass" width={12} />
-						{result.turns}
-						{result.turns === 1 ? 'turn' : 'turns'}
-					</span>
+					<div class="flex shrink-0 items-center gap-1.5">
+						<span class="chip whitespace-nowrap">
+							<Icon icon="lucide:hourglass" width={12} />
+							{result.turns}
+							{result.turns === 1 ? 'turn' : 'turns'}
+						</span>
+						<button
+							type="button"
+							class="btn btn-ghost btn-sm -mr-2 px-2"
+							aria-label="Look at the board"
+							title="Look at the board (Esc)"
+							data-testid="stats-close"
+							onclick={hideResults}
+						>
+							<Icon icon="lucide:x" width={16} />
+						</button>
+					</div>
 				</header>
 			</div>
 

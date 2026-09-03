@@ -5,7 +5,9 @@
 	import TurnPill from './TurnPill.svelte'
 	import PlayerList from './PlayerList.svelte'
 	import EndTurnButton from './EndTurnButton.svelte'
+	import ResultsButton from './ResultsButton.svelte'
 	import TileInfoPanel from './TileInfoPanel.svelte'
+	import { gameState } from '../gameState'
 	import { setHudGutter, setHudRailWidth, clearHudGutter } from './hudInsets'
 	import { panBoardToTile } from '../Animator/animator'
 
@@ -54,6 +56,11 @@
 	let expanded = $derived(userExpanded ?? (vw === 0 || vw >= AUTO_EXPAND_FROM))
 	let overlaying = $derived(expanded && vw > 0 && vw < OVERLAY_BELOW)
 	let railWidth = $derived(expanded ? EXPANDED_PX : COLLAPSED_PX)
+
+	// Once the match is decided the End Turn slot turns into the Results toggle:
+	// the results panel can be put away to look at the board, and this is the way
+	// back to it.
+	let over = $derived($gameState.phase === 'gameOver')
 
 	// The board reserves exactly this much of its right edge, which is what keeps
 	// the rail from swallowing clicks meant for the tiles beneath it.
@@ -169,11 +176,19 @@
 		</div>
 
 		<div class="shrink-0 border-t border-white/10 p-2">
-			<EndTurnButton {onEndTurn} {canEndTurn} />
+			{#if over}
+				<ResultsButton />
+			{:else}
+				<EndTurnButton {onEndTurn} {canEndTurn} />
+			{/if}
 		</div>
 	{:else}
 		<div class="mt-auto p-1.5">
-			<EndTurnButton {onEndTurn} {canEndTurn} compact />
+			{#if over}
+				<ResultsButton compact />
+			{:else}
+				<EndTurnButton {onEndTurn} {canEndTurn} compact />
+			{/if}
 		</div>
 	{/if}
 </aside>

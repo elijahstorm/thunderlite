@@ -18,6 +18,7 @@
 	import { gameState } from '../gameState'
 	import { TEAM_COLORS } from '../teamColors'
 	import { turnTransitionActive, TURN_TRANSITION_MS } from './turnTransitionStore'
+	import { hudGutter } from './hudInsets'
 
 	interface Props {
 		localTeam?: number
@@ -68,12 +69,15 @@
 
 {#if showing}
 	<!--
-		Wrapper fills the viewport so a tap anywhere is absorbed (defence in
-		depth on top of the store-level input gate). The inner card is what
-		actually animates.
+		Wrapper fills the BOARD region (left of the HUD rail, see hudInsets) so a
+		tap on the board is absorbed (defence in depth on top of the store-level
+		input gate), while the rail and the chat docks stacked above it stay
+		live. The inner card is what actually animates, centred on the board
+		rather than the window.
 	-->
 	<div
-		class="fixed inset-0 z-[80] flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+		class="fixed inset-y-0 left-0 z-34 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+		style="right: {$hudGutter}px"
 		data-testid="turn-transition"
 	>
 		<div

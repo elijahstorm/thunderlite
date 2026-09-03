@@ -42,3 +42,25 @@ export const clearHudGutter = (): void => {
 	hudGutter.set(0)
 	hudRailWidth.set(0)
 }
+
+/**
+ * Stacking order for everything `position: fixed` inside a match, lowest first.
+ *
+ * Match overlays are confined to the BOARD REGION — `left-0` with
+ * `right: hudGutter` — and sit UNDER the chrome, so the rail and the chat docks
+ * stay usable while a results panel, a dialogue line or a turn card is up.
+ * They still swallow board input, which is the point of them; they must never
+ * swallow the rail or a chat. That is what `fixed inset-0` overlays here used
+ * to do: a "Your Turn" card blurred the whole window for a second and the
+ * results screen sat on top of everything until you left the match.
+ *
+ *   z-30   StatsScreen       results panel (dismissable, see resultsPanelStore)
+ *   z-32   Dialogue          campaign lines
+ *   z-34   TurnTransition    "Your Turn" card
+ *   z-40   GameChat dock, top-centre clocks, pointer-events-none banners
+ *   z-49   HUD click-away veil (narrow viewports)
+ *   z-50   HUDRoot rail, DM docks, toasts
+ *   z-54…56  ActionMenu      interactor: veil, focus ring, panel
+ *   z-60   BuildMenu         interactor modal
+ *   z-80   ResumePrompt      a decision before the level starts; nothing behind it yet
+ */
