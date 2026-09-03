@@ -140,22 +140,66 @@ describe('surrendered on the room row', () => {
 		expect(h.reads).toContain('game_event')
 	})
 
-	it('advanceTurn skips a quitter using the rows the caller already holds', async () => {
+	it('resolveNextTurn skips a quitter using the rows the caller already holds, writing nothing', async () => {
 		h.tables.game_room[0].surrendered = [1]
 		const seats = await gameStore.roster(SESSION)
 		const room = await gameStore.getRoom(SESSION)
 		h.reads.length = 0
-		const next = await gameStore.advanceTurn(SESSION, A, null, { seats, room })
+		const next = await gameStore.resolveNextTurn(SESSION, A, null, { seats, room })
 		expect(next?.userSession).toBe(C)
-		expect(h.tables.game_room[0].current_turn).toBe(C)
-		// No roster, room or log re-read: the only touch is the pointer write.
+		// Pure: no roster, room or log re-read, and no pointer write.
 		expect(h.reads).toEqual([])
+		expect(h.tables.game_room[0].current_turn).toBe(A)
 	})
 
-	it('advanceTurn still rotates correctly when given nothing', async () => {
+	it('resolveNextTurn still rotates correctly when given nothing', async () => {
 		h.tables.game_room[0].surrendered = [2]
-		const next = await gameStore.advanceTurn(SESSION, A)
+		const next = await gameStore.resolveNextTurn(SESSION, A)
 		expect(next?.userSession).toBe(B)
 		expect(h.reads).not.toContain('game_event')
+	})
+
+	it('treats a side being recorded as surrendered as already out', async () => {
+		const next = await gameStore.resolveNextTurn(SESSION, A, null, { alsoSurrendered: [1] })
+		expect(next?.userSession).toBe(C)
+	})
+})
+
+describe('turn pointer on the run row', () => {
+	it('is the newest row’s next_turn, with no write to the room', async () => {
+		await gameStore.appendEvents(
+			SESSION,
+			A,
+			[
+				{ kind: 'move', from: 1, to: 2 },
+				{ kind: 'end-turn', next: 1 },
+			],
+			{ senderSession: A, clientSeq: 0, nextTurn: B }
+		)
+		expect(h.tables.game_event).toHaveLength(1)
+		expect(h.tables.game_event[0].next_turn).toBe(B)
+		expect(h.tables.game_room[0].current_turn).toBe(A)
+		expect(await gameStore.currentTurn(SESSION)).toBe(B)
+	})
+
+	it('falls back to the room column for a room with no rows, or a legacy newest row', async () => {
+		expect(await gameStore.currentTurn(SESSION)).toBe(A)
+		h.tables.game_event = [
+			{ session: SESSION, seq: 0, user_session: A, action: { kind: 'end-turn' }, ts: 1 },
+		]
+		expect(await gameStore.currentTurn(SESSION)).toBe(A)
+	})
+
+	it('a mid-turn run keeps the pointer on the actor', async () => {
+		await gameStore.appendEvents(
+			SESSION,
+			B,
+			[
+				{ kind: 'move', from: 1, to: 2 },
+				{ kind: 'wait', tile: 2 },
+			],
+			{ senderSession: B, clientSeq: 0, nextTurn: B }
+		)
+		expect(await gameStore.currentTurn(SESSION)).toBe(B)
 	})
 })

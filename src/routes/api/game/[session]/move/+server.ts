@@ -118,13 +118,15 @@ export const POST = async ({ request, params, locals }) => {
 		// two more round trips asking for (`isAiMember` + `aiDriver`). On a CPU
 		// side's turn that was two extra gateway calls per action, on the one path
 		// that fires hundreds of times a match.
-		const [seats, room] = await Promise.all([gameStore.roster(session), gameStore.getRoom(session)])
-		// `current_turn` is seeded to the creator at room creation, so it is set
-		// here; only honour it when present (a legacy room may still be null). It
-		// used to be a third read of the same row the line above already fetched,
-		// on the path that fires hundreds of times a match. The only room that
-		// still pays for it is one past its expiry, which `getRoom` reads as absent.
-		const currentAtRead = room ? (room.current_turn ?? null) : await gameStore.currentTurn(session)
+		const [seats, room, lastRow] = await Promise.all([
+			gameStore.roster(session),
+			gameStore.getRoom(session),
+			gameStore.lastEventRow(session),
+		])
+		// Whose turn it is comes off the newest row of the log, which this request
+		// needs anyway to number the run it is about to append. The room column is
+		// the fallback for a room with no rows yet (the lobby seeds it).
+		const currentAtRead = lastRow?.next_turn ?? room?.current_turn ?? null
 		const members = seats.map((seat) => seat.userSession)
 		if (members.length === 0 || !members.includes(userSession)) {
 			throw error(403, 'Not a member of this game session')
@@ -180,13 +182,42 @@ export const POST = async ({ request, params, locals }) => {
 			}
 		}
 
+		// Who holds the turn once this run is in the log, resolved BEFORE the append
+		// so it rides on the run's own row and costs no write of its own. Unchanged
+		// unless the run closes a turn: an end-turn hands on in the engine's order
+		// (carrying the ending client's own verdict for a side eliminated in combat,
+		// which no event records), and a surrender by the holder rotates past them.
+		const recorded = toRecord[toRecord.length - 1]
+		let nextTurn: string | null = current
+		/** The seat an end-turn hands to, kept for the async email below. */
+		let handedTo: { userSession: string; userAuth: string | null; team: number } | null = null
+		if (recorded.kind === 'surrender' && current === actor) {
+			const actorTeam = seats.find((seat) => seat.userSession === actor)?.team
+			const next = await gameStore.resolveNextTurn(session, actor, null, {
+				seats,
+				room,
+				alsoSurrendered: actorTeam == null ? [] : [actorTeam],
+			})
+			nextTurn = next?.userSession ?? current
+		} else if (recorded.kind === 'end-turn' && members.length > 1) {
+			handedTo = await gameStore.resolveNextTurn(session, actor, recorded.next ?? null, {
+				seats,
+				room,
+			})
+			// Nothing eligible to rotate to (no seat carries a team yet): keep the
+			// old seat walk so such a room still moves rather than freezing.
+			const idx = members.indexOf(actor)
+			nextTurn = handedTo?.userSession ?? members[(idx + 1) % members.length]
+		}
+
 		// Ordered against the SENDER, attributed to the ACTOR — they differ when a
 		// human drives a CPU seat, whose actions ride the driver's request stream.
 		const { events } = await gameStore.appendEvents(session, actor, toRecord, {
 			senderSession: userSession,
 			clientSeq,
+			nextTurn,
+			afterRow: lastRow,
 		})
-		const recorded = toRecord[toRecord.length - 1]
 		// Whether the run actually reached its closing action. A batch cut short by
 		// a rate limit throws (see the PartialAppendError branch), so reaching here
 		// with fewer events than actions means the log already held some of them —
@@ -195,14 +226,6 @@ export const POST = async ({ request, params, locals }) => {
 		const closed = events.length === toRecord.length
 
 		let turnDeadline: number | null = isAsync ? (room?.turn_deadline ?? null) : null
-		if (closed && !isAsync && recorded.kind === 'surrender' && current === actor) {
-			// The side that just quit was holding the turn. Every client's engine has
-			// already handed the turn to the next side (see applyAction's surrender
-			// case), so the pointer has to follow or that side's every action comes
-			// back "Not your turn". Two-side rooms never noticed: the match ends with
-			// the forfeit. Async rooms take the richer path below (clock + emails).
-			await gameStore.advanceTurn(session, actor, null, { seats, room })
-		}
 		if (closed && isAsync && recorded.kind === 'surrender') {
 			// Settle the room server-side (turn pointer, clock, TTL) and tell the
 			// opponent: in async play they are usually offline, and without this a
@@ -224,32 +247,20 @@ export const POST = async ({ request, params, locals }) => {
 			}
 		}
 		if (closed && recorded.kind === 'end-turn' && members.length > 1) {
-			// Hand the pointer on in the ENGINE's order (ascending team), carrying
-			// the ending client's own verdict for the one thing the server can't
-			// see: a side eliminated in combat, which the engine skips and no event
-			// records. Seat-index rotation was indistinguishable from this while
-			// rooms held two seats; on a three-side map it hands the turn to the
-			// wrong side and the match deadlocks. See gameStore.advanceTurn.
-			const next = await gameStore.advanceTurn(session, actor, recorded.next ?? null, {
-				seats,
-				room,
-			})
-			if (!next) {
-				// Nothing eligible to rotate to (no seat carries a team yet) — keep
-				// the old seat walk so such a room still moves rather than freezing.
-				const idx = members.indexOf(actor)
-				await gameStore.setCurrentTurn(session, members[(idx + 1) % members.length])
-			}
+			// The handover itself already landed on the run's row (see `nextTurn`
+			// above). What is left is the async clock and the email.
 			if (isAsync) {
 				// The next player gets the room's full per-turn allowance, and an
 				// email — in async play they are usually offline right now, and the
 				// notification is how they learn the game moved.
-				turnDeadline = await gameStore.resetTurnDeadline(session, room)
+				// The async game list reads the pointer off the room row in bulk, so
+				// async rooms keep the column in step; it rides on the clock's write.
+				turnDeadline = await gameStore.resetTurnDeadline(session, room, nextTurn)
 				const actorSeat = seats.find((seat) => seat.userSession === actor)
 				await notifyAsyncYourTurn({
 					session,
 					eventId: events[events.length - 1]?.id ?? -1,
-					nextUserAuth: next?.userAuth ?? null,
+					nextUserAuth: handedTo?.userAuth ?? null,
 					opponentAuth: actorSeat?.userAuth ?? null,
 					turnTimeoutMs: clampAsyncTimeout(room?.turn_timeout_ms),
 				})

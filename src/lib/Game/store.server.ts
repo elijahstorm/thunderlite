@@ -143,6 +143,18 @@ type EventRow = {
 	actions?: unknown
 	span?: number | null
 	client_span?: number | null
+	/** Who holds the turn after this run (see create_game_event_turn). */
+	next_turn?: string | null
+}
+
+/** What a caller may say about a run it is appending. */
+export type AppendOptions = {
+	senderSession?: string
+	clientSeq?: number
+	/** Who holds the turn once this run is in the log; stamped on the row. */
+	nextTurn?: string | null
+	/** The newest row, if the caller already read it, so the first attempt need not. */
+	afterRow?: EventRow | null
 }
 
 /** The most actions one row (one relayed run) may hold. Shared with the route. */
@@ -716,16 +728,20 @@ async function sweepDisconnected(
 			continue
 		}
 		try {
+			if (current === undefined) current = await currentTurn(session)
+			// The turn passes to the caller if the absentee held it; the surrender
+			// row carries that, so the pointer needs no write of its own.
+			const nextTurn = current === member.userSession ? poller : current
 			if (member.team != null) {
-				const event = await appendEvent(session, member.userSession, {
-					kind: 'surrender',
-					team: member.team,
-				})
+				const event = await appendEvent(
+					session,
+					member.userSession,
+					{ kind: 'surrender', team: member.team },
+					{ nextTurn }
+				)
 				await realtime.tryPublish(`game:${session}`, { event })
 			}
 			await removeMember(session, member.userSession)
-			if (current === undefined) current = await currentTurn(session)
-			if (current === member.userSession) await setCurrentTurn(session, poller)
 			await kv.del(key).catch(() => false)
 			result.resigned.push(member.userSession)
 		} catch {
@@ -819,11 +835,7 @@ async function seedFirstTurn(
 
 /** Whose turn it is, or null (only transient before a turn is seeded). */
 async function currentTurn(session: string): Promise<string | null> {
-	const room = await db.findOne<RoomRow>('game_room', {
-		where: { session },
-		select: ['current_turn'],
-	})
-	return room?.current_turn ?? null
+	return turnPointer(session)
 }
 
 /** Hand the turn to `nextUserSession`. */
@@ -877,9 +889,25 @@ async function lastRow(session: string, senderSession?: string): Promise<EventRo
 }
 
 /** The id the next appended action will take: one past the last row's run. */
-async function nextSeq(session: string): Promise<number> {
-	const last = await lastRow(session)
+async function nextSeq(session: string, known?: EventRow | null): Promise<number> {
+	const last = known !== undefined ? known : await lastRow(session)
 	return last ? Number(last.seq) + spanOf(last) : 0
+}
+
+/**
+ * Whose turn it is: the newest row says who holds it after its run. A room with
+ * no rows yet, or whose newest row predates the column, answers from the room
+ * row, which the lobby seeds and the async paths keep patching.
+ */
+const turnPointerFrom = (last: EventRow | null, room: RoomRow | null | undefined): string | null =>
+	last?.next_turn ?? room?.current_turn ?? null
+
+async function turnPointer(session: string, room?: RoomRow | null): Promise<string | null> {
+	const [last, roomRow] = await Promise.all([
+		lastRow(session),
+		room !== undefined ? room : getRoom(session),
+	])
+	return turnPointerFrom(last, roomRow)
 }
 
 /**
@@ -998,10 +1026,10 @@ async function appendEvent(
 	session: string,
 	userSession: string,
 	action: SerializedAction,
-	options: { senderSession?: string; clientSeq?: number } = {}
+	options: AppendOptions = {}
 ): Promise<GameEvent> {
 	const ts = now()
-	const { senderSession, clientSeq } = options
+	const { senderSession, clientSeq, nextTurn } = options
 	const ordered = senderSession !== undefined && clientSeq !== undefined
 
 	if (ordered) {
@@ -1029,13 +1057,14 @@ async function appendEvent(
 	}
 
 	for (let attempt = 0; attempt < APPEND_RETRIES; attempt++) {
-		const seq = await nextSeq(session)
+		const seq = await nextSeq(session, attempt === 0 ? options.afterRow : undefined)
 		const inserted = await db.insertIgnoreConflict('game_event', {
 			session,
 			seq,
 			user_session: userSession,
 			action,
 			ts,
+			next_turn: nextTurn ?? null,
 			...(ordered ? { sender_session: senderSession, client_seq: clientSeq } : {}),
 		})
 		if (inserted) {
@@ -1121,9 +1150,9 @@ async function appendEvents(
 	session: string,
 	userSession: string,
 	actions: SerializedAction[],
-	options: { senderSession: string; clientSeq: number }
+	options: AppendOptions & { senderSession: string; clientSeq: number }
 ): Promise<{ events: GameEvent[]; appended: number }> {
-	const { senderSession, clientSeq } = options
+	const { senderSession, clientSeq, nextTurn } = options
 	if (actions.length === 0) return { events: [], appended: 0 }
 	if (actions.length === 1) {
 		const event = await appendEvent(session, userSession, actions[0], options)
@@ -1179,7 +1208,7 @@ async function appendEvents(
 
 	let landed: GameEvent[] | null = null
 	for (let attempt = 0; attempt < APPEND_RETRIES && !landed; attempt++) {
-		const seq = await nextSeq(session)
+		const seq = await nextSeq(session, attempt === 0 ? options.afterRow : undefined)
 		let row: { id: unknown } | null
 		try {
 			row = await db.insertIgnoreConflict('game_event', {
@@ -1190,6 +1219,7 @@ async function appendEvents(
 				actions: remaining,
 				span: remaining.length,
 				ts,
+				next_turn: nextTurn ?? null,
 				sender_session: senderSession,
 				client_seq: cursor,
 				client_span: remaining.length,
@@ -1523,7 +1553,7 @@ async function matchRecorded(session: string): Promise<boolean> {
  * Seats plus the teams already out of the game (surrender events in the log).
  * The log is the source of truth for "who is still in" server-side — the
  * engine's `hasLost` lives only in clients, which is why an elimination BY
- * COMBAT can't be seen from here (see `advanceTurn`, which takes the ending
+ * COMBAT can't be seen from here (see `resolveNextTurn`, which takes the ending
  * client's word for that one case). Used by the live turn rotation as well as
  * the async deadline paths.
  */
@@ -1691,7 +1721,10 @@ const nextActiveAfter = (
 }
 
 /**
- * Hand the turn on after an end-turn, and return whoever now holds it.
+ * Who holds the turn after `actorUserSession`'s run closes. Pure: nothing is
+ * written here. The route stamps the answer on the run's own row (`next_turn`)
+ * and the pointer is read from the newest row, so an end-turn costs no write of
+ * its own.
  *
  * The server's pointer is a permission check, not a simulation: it has to land
  * on the same side the ENGINE just advanced to, or that side's client sees a
@@ -1709,13 +1742,19 @@ const nextActiveAfter = (
  *    what a client claiming an extra turn for itself would look like).
  *  - Failing that, plain team-ascending rotation, skipping surrendered sides.
  */
-async function advanceTurn(
+async function resolveNextTurn(
 	session: string,
 	actorUserSession: string,
 	claimedNextTeam?: number | null,
-	ctx: { seats?: Awaited<ReturnType<typeof roster>>; room?: RoomRow | null } = {}
+	ctx: {
+		seats?: Awaited<ReturnType<typeof roster>>
+		room?: RoomRow | null
+		/** Sides to treat as out that the room row does not say so yet (a surrender being recorded). */
+		alsoSurrendered?: Iterable<number>
+	} = {}
 ): Promise<{ userSession: string; userAuth: string | null; team: number } | null> {
 	const { seats, surrendered } = await standing(session, ctx)
+	for (const team of ctx.alsoSurrendered ?? []) surrendered.add(team)
 	const ordered = turnOrder(seats, surrendered)
 	if (ordered.length === 0) return null
 
@@ -1726,21 +1765,29 @@ async function advanceTurn(
 			? claimed
 			: nextActiveAfter(seats, actorUserSession, surrendered)
 	if (!next) return null
-
-	await setCurrentTurn(session, next.userSession)
 	return { userSession: next.userSession, userAuth: next.userAuth, team: next.team }
 }
 
 /** Re-arm the turn clock after an end-turn: the next player gets the room's
  * full per-turn allowance, and the room's TTL follows the new deadline. */
-async function resetTurnDeadline(session: string, roomIn?: RoomRow | null): Promise<number | null> {
+async function resetTurnDeadline(
+	session: string,
+	roomIn?: RoomRow | null,
+	currentTurn?: string | null
+): Promise<number | null> {
 	const room = roomIn ?? (await getRoom(session))
 	if (!isAsyncRoom(room)) return null
 	const turn_deadline = now() + clampAsyncTimeout(room.turn_timeout_ms)
 	await db.update(
 		'game_room',
 		{ session },
-		{ turn_deadline, expires_at: turn_deadline + ASYNC_ROOM_GRACE_MS }
+		{
+			turn_deadline,
+			expires_at: turn_deadline + ASYNC_ROOM_GRACE_MS,
+			// Async rooms keep the column current for the bulk game list; the row
+			// carries the pointer for everything else.
+			...(currentTurn ? { current_turn: currentTurn } : {}),
+		}
 	)
 	return turn_deadline
 }
@@ -1814,10 +1861,12 @@ async function enforceTurnDeadline(
 	)
 	if (count === 0) return null
 
-	const event = await appendEvent(session, member.userSession, {
-		kind: 'surrender',
-		team: member.team,
-	})
+	const event = await appendEvent(
+		session,
+		member.userSession,
+		{ kind: 'surrender', team: member.team },
+		{ nextTurn: next?.userSession ?? member.userSession }
+	)
 	await realtime.tryPublish(`game:${session}`, { event })
 
 	return {
@@ -1900,10 +1949,17 @@ async function resignAsyncMember(
 	const member = seats.find((m) => m.userSession === userSession)
 	if (!member || member.team == null || surrendered.has(member.team)) return null
 
-	const event = await appendEvent(session, userSession, {
-		kind: 'surrender',
-		team: member.team,
-	})
+	// The same answer `settleAsyncAfterSurrender` reaches, computed first so the
+	// surrender row carries it.
+	const holder = turnPointerFrom(await lastRow(session), room)
+	const after = nextActiveAfter(seats, userSession, new Set([...surrendered, member.team]))
+	const nextTurn = holder === userSession ? (after?.userSession ?? userSession) : holder
+	const event = await appendEvent(
+		session,
+		userSession,
+		{ kind: 'surrender', team: member.team },
+		{ nextTurn }
+	)
 	await realtime.tryPublish(`game:${session}`, { event })
 
 	const settled = await settleAsyncAfterSurrender(session, userSession, room)
@@ -2021,7 +2077,9 @@ export const gameStore = {
 	setLockRandom,
 	memberCount,
 	fillWithAi,
-	advanceTurn,
+	resolveNextTurn,
+	turnPointer,
+	lastEventRow: lastRow,
 	listPublicRooms,
 	setPublic,
 	sweepDisconnected,

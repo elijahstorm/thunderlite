@@ -205,7 +205,7 @@ describe('the host starts a half-empty room and CPUs take the rest', () => {
 	})
 })
 
-describe('the turn pointer follows the engine, not the seat order', () => {
+describe('the turn rotation follows the engine, not the seat order', () => {
 	/** Host on side 2, guest on side 0, CPU on side 1 — seat order and team order
 	 * deliberately disagree, which is what seat-index rotation got wrong. */
 	const mixedRoom = async () => {
@@ -228,13 +228,10 @@ describe('the turn pointer follows the engine, not the seat order', () => {
 		const { session, ai } = await mixedRoom()
 		await gameStore.seedFirstTurn(session, THREE_SIDES)
 
-		expect((await gameStore.advanceTurn(session, GUEST))?.team).toBe(1)
-		expect(await gameStore.currentTurn(session)).toBe(ai)
-		expect((await gameStore.advanceTurn(session, ai))?.team).toBe(2)
-		expect(await gameStore.currentTurn(session)).toBe(HOST)
+		expect((await gameStore.resolveNextTurn(session, GUEST))?.team).toBe(1)
+		expect((await gameStore.resolveNextTurn(session, ai))?.team).toBe(2)
 		// …and wraps back to the first side.
-		expect((await gameStore.advanceTurn(session, HOST))?.team).toBe(0)
-		expect(await gameStore.currentTurn(session)).toBe(GUEST)
+		expect((await gameStore.resolveNextTurn(session, HOST))?.team).toBe(0)
 	})
 
 	it('honours the ending client’s next side, so a combat elimination is skipped', async () => {
@@ -242,17 +239,16 @@ describe('the turn pointer follows the engine, not the seat order', () => {
 		// Side 1 (the CPU) was wiped out in combat. Nothing about that reaches the
 		// event log, so plain rotation would hand it the turn and stall the match;
 		// the engine's own verdict rides along on the end-turn instead.
-		expect((await gameStore.advanceTurn(session, GUEST, 2))?.team).toBe(2)
-		expect(await gameStore.currentTurn(session)).toBe(HOST)
+		expect((await gameStore.resolveNextTurn(session, GUEST, 2))?.team).toBe(2)
 	})
 
 	it('skips a side that surrendered', async () => {
 		const { session, ai } = await mixedRoom()
 		await gameStore.appendEvent(session, ai, { kind: 'surrender', team: 1 })
 
-		expect((await gameStore.advanceTurn(session, GUEST))?.team).toBe(2)
+		expect((await gameStore.resolveNextTurn(session, GUEST))?.team).toBe(2)
 		// Even if a client claims the dead side, it is refused.
-		expect((await gameStore.advanceTurn(session, HOST, 1))?.team).toBe(0)
+		expect((await gameStore.resolveNextTurn(session, HOST, 1))?.team).toBe(0)
 	})
 
 	it('rotates from a side that just quit to the side AFTER it, not the lowest', async () => {
@@ -263,13 +259,12 @@ describe('the turn pointer follows the engine, not the seat order', () => {
 		// side 2 would come back "Not your turn".
 		await gameStore.appendEvent(session, ai, { kind: 'surrender', team: 1 })
 
-		expect((await gameStore.advanceTurn(session, ai))?.team).toBe(2)
-		expect(await gameStore.currentTurn(session)).toBe(HOST)
+		expect((await gameStore.resolveNextTurn(session, ai))?.team).toBe(2)
 	})
 
 	it('refuses a claim that would hand a player a second turn', async () => {
 		const { session } = await mixedRoom()
-		expect((await gameStore.advanceTurn(session, GUEST, 0))?.team).toBe(1)
+		expect((await gameStore.resolveNextTurn(session, GUEST, 0))?.team).toBe(1)
 	})
 
 	it('honours the claim when it is the only side left', async () => {
@@ -277,6 +272,6 @@ describe('the turn pointer follows the engine, not the seat order', () => {
 		await gameStore.appendEvent(session, ai, { kind: 'surrender', team: 1 })
 		await gameStore.appendEvent(session, HOST, { kind: 'surrender', team: 2 })
 
-		expect((await gameStore.advanceTurn(session, GUEST, 0))?.team).toBe(0)
+		expect((await gameStore.resolveNextTurn(session, GUEST, 0))?.team).toBe(0)
 	})
 })

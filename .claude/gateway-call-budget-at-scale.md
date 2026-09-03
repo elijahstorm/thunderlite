@@ -428,3 +428,13 @@ to the size of a turn while a player is acting, by design; a refresh mid-turn
 shows the board at the last handover and the in-progress turn lands as a block
 when it commits; and `/dev/lag` shows `live` as a transport in the trace with a
 `gap` disposition wherever a frame was lost.
+
+### 2026-09-03, turn pointer derived
+
+`game_event.next_turn` (migration `create_game_event_turn`): the route resolves
+the handover before it appends and stamps who holds the turn onto the run's own
+row; the pointer is read as the newest row's `next_turn`, falling back to the
+room column for a room with no rows. One write per turn instead of two. Async
+rooms keep the column in step on the clock write they already make, because the
+async game list reads it in bulk. Decision taken the same day: frame signing
+happens in thunderlite, not the worker.

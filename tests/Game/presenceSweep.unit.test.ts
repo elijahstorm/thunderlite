@@ -159,7 +159,11 @@ describe('sweepDisconnected', () => {
 		})
 		expect(h.published).toHaveLength(1)
 		expect(h.tables.game_member.map((m) => m.user_session)).not.toContain(GUEST)
-		expect(h.tables.game_room[0].current_turn).toBe(HOST)
+		// The turn passes to the caller on the surrender row itself; the room
+		// column is untouched and the derived pointer reads the row.
+		expect(h.tables.game_event[0].next_turn).toBe(HOST)
+		expect(h.tables.game_room[0].current_turn).toBe(GUEST)
+		expect(await gameStore.currentTurn(SESSION)).toBe(HOST)
 		// The memory is cleared so a rejoin later starts a fresh clock.
 		expect(h.cache.has(`absent:${SESSION}:${GUEST}`)).toBe(false)
 	})
@@ -168,7 +172,8 @@ describe('sweepDisconnected', () => {
 		seedRoom(HOST)
 		await gameStore.sweepDisconnected(SESSION, HOST, roster, new Set([HOST]), T0)
 		await gameStore.sweepDisconnected(SESSION, HOST, roster, new Set([HOST]), T0 + LEAVE_GRACE_MS)
-		expect(h.tables.game_room[0].current_turn).toBe(HOST)
+		expect(h.tables.game_event[0].next_turn).toBe(HOST)
+		expect(await gameStore.currentTurn(SESSION)).toBe(HOST)
 	})
 
 	it('a return within the window resets the clock', async () => {
