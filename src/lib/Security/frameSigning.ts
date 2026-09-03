@@ -67,7 +67,7 @@ const toBase64Url = (bytes: ArrayBuffer): string => {
 	for (const b of new Uint8Array(bytes)) binary += String.fromCharCode(b)
 	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
-const fromBase64Url = (text: string): Uint8Array | null => {
+const fromBase64Url = (text: string): Uint8Array<ArrayBuffer> | null => {
 	try {
 		const padded =
 			text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4)
