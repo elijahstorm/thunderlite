@@ -41,32 +41,40 @@
 			body: 'The campaign starts the moment the page loads.',
 		},
 	]
+
+	// Read as the spec table stamped on the inside cover of the manual.
+	const spec = [
+		{ label: 'Cost', value: 'Free' },
+		{ label: 'Install', value: 'None' },
+		{ label: 'Solo', value: 'No account' },
+		{ label: 'Versus', value: 'Live + async' },
+		{ label: 'Map size', value: 'Up to 500×500' },
+		{ label: 'Source', value: 'On GitHub' },
+	]
 </script>
 
 <section class="relative overflow-hidden">
 	<div
-		class="pointer-events-none absolute inset-0 grid-pattern mask-fade-top-bottom opacity-60"
+		class="pointer-events-none absolute inset-0 grid-pattern mask-fade-top-bottom opacity-70"
 	></div>
 	<div
-		class="pointer-events-none absolute inset-x-0 top-0 h-[60vh] bg-linear-to-b from-accent/60 via-transparent to-transparent"
+		class="pointer-events-none absolute inset-x-0 top-0 h-[50vh] bg-linear-to-b from-accent/50 via-transparent to-transparent"
 	></div>
 
-	<div class="container relative pt-16 pb-20 lg:pt-28 lg:pb-28">
+	<div class="container relative pt-14 pb-20 lg:pt-20 lg:pb-28">
 		<div class="grid lg:grid-cols-12 gap-12 items-center">
 			<div class="lg:col-span-7 space-y-7">
-				<span
-					class="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-muted-foreground"
-				>
-					<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-					Browser-native tactics
-				</span>
+				<div class="flex flex-wrap items-center gap-3">
+					<span class="stamp stamp-primary stamp-tilt">Browser-native tactics</span>
+					<span class="marginalia">SEC. 01 &middot; BRIEFING</span>
+				</div>
 
-				<h1
-					class="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-foreground leading-[1.05]"
-				>
+				<h1 class="text-5xl sm:text-6xl lg:text-7xl text-foreground">
 					Command the squad.
-					<span class="block text-primary">Hold the line.</span>
+					<span class="block text-secondary">Hold the line.</span>
 				</h1>
+
+				<div class="rule-dashed max-w-xl"></div>
 
 				<p class="text-lg text-muted-foreground max-w-xl leading-relaxed">
 					A rebuild of Battalion: Arena. Turn-based tactics in the Advance Wars family.
@@ -80,7 +88,7 @@
 						Single Player
 					</a>
 					<a
-						class="btn btn-primary btn-lg"
+						class="btn btn-secondary btn-lg"
 						href={$loggedIn ? '/games' : '/login'}
 						data-testid="cta-multiplayer"
 					>
@@ -99,70 +107,70 @@
 					</a>
 				</div>
 
-				<div class="flex flex-wrap items-center gap-x-6 gap-y-2 pt-6 text-xs text-muted-foreground">
-					<span class="flex items-center gap-1.5">
-						<Icon icon="lucide:check" width={14} class="text-primary" />
-						Free to play
-					</span>
-					<span class="flex items-center gap-1.5">
-						<Icon icon="lucide:check" width={14} class="text-primary" />
-						No download
-					</span>
-					<span class="flex items-center gap-1.5">
-						<Icon icon="lucide:check" width={14} class="text-primary" />
-						Single player without an account
-					</span>
-					<span class="flex items-center gap-1.5">
-						<Icon icon="lucide:check" width={14} class="text-primary" />
-						Live multiplayer
-					</span>
-					<span class="flex items-center gap-1.5">
-						<Icon icon="lucide:check" width={14} class="text-primary" />
-						Maps up to 500×500
-					</span>
-				</div>
+				<!-- Issue specs, set as a typed table rather than a row of checkmarks. -->
+				<dl
+					class="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-px border border-border bg-border overflow-hidden"
+				>
+					{#each spec as item (item.label)}
+						<div class="bg-surface px-3 py-2.5">
+							<dt class="marginalia text-[9px]">{item.label}</dt>
+							<dd
+								class="mt-0.5 text-sm font-semibold text-foreground font-display uppercase tracking-[0.06em]"
+							>
+								{item.value}
+							</dd>
+						</div>
+					{/each}
+				</dl>
 			</div>
 
 			<div class="lg:col-span-5">
-				<div
-					class="relative rounded-2xl border border-border bg-surface shadow-[0_30px_80px_-30px_rgba(15,42,52,0.25)] overflow-hidden"
-				>
-					<div class="aspect-5/4 bg-surface-2">
+				<!-- Plate 01, framed with crop marks and captioned like a figure. -->
+				<figure class="bracketed bracketed-primary border border-border-strong bg-surface p-2">
+					<div class="relative aspect-5/4 overflow-hidden bg-surface-2">
 						<img
 							src="/images/embedded-card.png"
 							alt="ThunderLite gameplay"
 							class="h-full w-full object-cover"
 						/>
-					</div>
-					<div
-						class="absolute bottom-3 left-3 right-3 rounded-xl border border-border bg-background/85 backdrop-blur px-4 py-3 flex items-center gap-3"
-					>
-						<span class="h-2 w-2 rounded-full bg-primary"></span>
-						<div class="text-sm">
-							<span class="font-medium text-foreground">Live multiplayer</span>
-							<span class="text-muted-foreground">: share a code, take your turn</span>
+						<div
+							class="absolute bottom-0 inset-x-0 border-t border-border-strong bg-background/92 backdrop-blur px-3 py-2 flex items-center gap-2.5"
+						>
+							<span class="h-1.5 w-1.5 bg-secondary"></span>
+							<div class="text-sm">
+								<span class="font-display font-semibold uppercase tracking-[0.08em]">
+									Live multiplayer
+								</span>
+								<span class="text-muted-foreground">: share a code, take your turn</span>
+							</div>
 						</div>
 					</div>
-				</div>
+					<figcaption class="mt-2 flex items-center justify-between gap-2 px-1">
+						<span class="marginalia text-[9px]">FIG. 01 &middot; ENGAGEMENT, IN PROGRESS</span>
+						<span class="marginalia text-[9px]">PLATE 1/1</span>
+					</figcaption>
+				</figure>
 			</div>
 		</div>
 
 		<div class="mt-24 max-w-2xl space-y-3">
-			<p class="section-eyebrow">Why ThunderLite</p>
-			<h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
-				Rebuilt, not just revived.
-			</h2>
+			<p class="section-eyebrow">SEC. 02 &middot; Why ThunderLite</p>
+			<h2 class="text-3xl sm:text-4xl text-foreground">Rebuilt, not just revived.</h2>
+			<div class="rule-dashed"></div>
 		</div>
 
-		<div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-			{#each features as f (f.title)}
-				<div class="card p-6">
-					<div
-						class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground"
-					>
-						<Icon icon={f.icon} width={20} />
+		<div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+			{#each features as f, i (f.title)}
+				<div class="dossier p-5 transition-colors hover:bg-surface">
+					<div class="flex items-center justify-between gap-3">
+						<span
+							class="inline-flex h-9 w-9 items-center justify-center border border-border-strong bg-accent text-accent-foreground"
+						>
+							<Icon icon={f.icon} width={18} />
+						</span>
+						<span class="marginalia text-[10px]">{String(i + 1).padStart(2, '0')}</span>
 					</div>
-					<h3 class="mt-4 text-base font-semibold text-foreground">{f.title}</h3>
+					<h3 class="mt-4 text-lg text-foreground">{f.title}</h3>
 					<p class="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
 				</div>
 			{/each}

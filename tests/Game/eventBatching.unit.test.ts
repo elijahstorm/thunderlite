@@ -159,6 +159,20 @@ describe('batched event append', () => {
 		expect(h.tables.game_event[0]).toMatchObject({ seq: 0, span: 3, client_seq: 0, client_span: 3 })
 	})
 
+	it('stores the run as json the column can take, not a bare array', async () => {
+		// `action` and `actions` are both jsonb, and the value reaches the gateway
+		// as a query parameter: a plain object is serialised as json, a bare ARRAY
+		// is not necessarily (node-postgres renders one as a Postgres array
+		// literal, which jsonb refuses). That difference is invisible against an
+		// in-memory stand-in and fatal in production — match 2vzJs8KEvIO4DpzL lost
+		// a turn to the first multi-action run of the game answering 500 three
+		// times while single-action relays either side of it went through. So the
+		// stored shape is pinned, and the read path proves it still round-trips.
+		await appendRun([move(13, 15), endTurn()], 0)
+		expect(typeof h.tables.game_event[0].actions).toBe('string')
+		expect((await logOf()).map((e) => e.action.kind)).toEqual(['move', 'end-turn'])
+	})
+
 	it('expands a run on read, from any cursor inside it', async () => {
 		await appendRun([move(13, 15), attack(15, 16), endTurn()], 0)
 		await appendRun([move(20, 21), endTurn()], 3)

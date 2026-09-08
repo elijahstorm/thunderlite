@@ -4,9 +4,19 @@
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" />
 		<meta name="viewport" content="width=device-width" />
+		<meta name="theme-color" content="#1e2a14" />
+		<!-- The brand faces ship with the page rather than through the KV
+		     `site:config` font link, so the shell never renders in a fallback
+		     stack while an unseeded cache entry is missing. -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap"
+			rel="stylesheet"
+		/>
 		%sveltekit.head%
 	</head>
-	<body class="tracking-wider min-h-screen flex flex-col" data-sveltekit-preload-data="hover">
+	<body class="min-h-screen flex flex-col" data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>

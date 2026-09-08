@@ -10,8 +10,17 @@
 	let { logoLink = '/', toggleAside = null, children }: Props = $props()
 </script>
 
-<Header {logoLink} {toggleAside} />
+<!-- In-app pages stand on the same printed ground as the marketing shell, so
+	 crossing from the landing page into a roster or a lobby never changes
+	 documents. -->
+<div class="relative min-h-screen field-backdrop">
+	<div class="pointer-events-none fixed inset-0 z-0 paper-grain"></div>
 
-<div class="container w-full break break-word pt-8 pb-16">
-	{@render children?.()}
+	<div class="relative z-10">
+		<Header {logoLink} {toggleAside} />
+
+		<div class="container w-full break break-word pt-8 pb-16">
+			{@render children?.()}
+		</div>
+	</div>
 </div>

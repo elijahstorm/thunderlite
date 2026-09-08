@@ -21,6 +21,8 @@
 		/** Passed straight through to the End Turn button, which turns into a
 		 * "Next game" jump once it's not this client's move. */
 		asyncGame?: boolean
+		/** This room's id, so that jump can rule out the game we're already on. */
+		session?: string
 		/** Show the overview map at the top of the HUD rail. */
 		minimap?: boolean
 		fogOfWar?: boolean
@@ -32,6 +34,7 @@
 		localTeam = 0,
 		canEndTurn = true,
 		asyncGame = false,
+		session = undefined,
 		minimap = false,
 		fogOfWar = false,
 	}: Props = $props()
@@ -183,7 +186,7 @@
 			{#if over}
 				<ResultsButton />
 			{:else}
-				<EndTurnButton {onEndTurn} {canEndTurn} {asyncGame} />
+				<EndTurnButton {onEndTurn} {canEndTurn} {asyncGame} {session} />
 			{/if}
 		</div>
 	{:else}
@@ -191,7 +194,7 @@
 			{#if over}
 				<ResultsButton compact />
 			{:else}
-				<EndTurnButton {onEndTurn} {canEndTurn} {asyncGame} compact />
+				<EndTurnButton {onEndTurn} {canEndTurn} {asyncGame} {session} compact />
 			{/if}
 		</div>
 	{/if}

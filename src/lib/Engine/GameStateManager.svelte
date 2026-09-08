@@ -624,7 +624,16 @@
 	</div>
 {/if}
 
-<HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} {canEndTurn} {asyncGame} />
+<HUDRoot
+	{map}
+	{minimap}
+	{fogOfWar}
+	onEndTurn={handleEndTurn}
+	{localTeam}
+	{canEndTurn}
+	{asyncGame}
+	session={gameSession}
+/>
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />

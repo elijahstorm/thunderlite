@@ -3,107 +3,120 @@
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
+	/* ── Field manual palette ────────────────────────────────────────────────
+	   Light is briefing paper: warm stock, olive-drab command ink, amber for
+	   anything that wants your hand on it. Dark is the war room after hours:
+	   the same drab lit by a lamp, so the two modes read as one document. */
 	:root {
 		/* Surface */
-		--background: hsl(40 20% 98%);
-		--foreground: hsl(200 20% 10%);
-		--surface: hsl(0 0% 100%);
-		--surface-2: hsl(40 12% 95%);
-		--surface-3: hsl(40 8% 90%);
+		--background: hsl(44 24% 92%);
+		--foreground: hsl(80 18% 12%);
+		--surface: hsl(44 30% 96%);
+		--surface-2: hsl(44 20% 88%);
+		--surface-3: hsl(44 16% 83%);
 
-		--card: hsl(0 0% 100%);
-		--card-foreground: hsl(200 20% 10%);
-		--popover: hsl(0 0% 100%);
-		--popover-foreground: hsl(200 20% 10%);
+		--card: hsl(44 30% 97%);
+		--card-foreground: hsl(80 18% 12%);
+		--popover: hsl(44 30% 97%);
+		--popover-foreground: hsl(80 18% 12%);
 
 		/* Brand */
-		--primary: hsl(184 66% 21%);
-		--primary-foreground: hsl(40 20% 98%);
-		--primary-hover: hsl(184 66% 16%);
+		--primary: hsl(84 26% 26%);
+		--primary-foreground: hsl(44 30% 96%);
+		--primary-hover: hsl(84 30% 19%);
 
-		--secondary: hsl(31 78% 52%);
-		--secondary-foreground: hsl(40 30% 98%);
-		--secondary-hover: hsl(31 78% 46%);
+		--secondary: hsl(34 84% 46%);
+		--secondary-foreground: hsl(30 45% 11%);
+		--secondary-hover: hsl(34 88% 40%);
 
-		--accent: hsl(184 40% 92%);
-		--accent-foreground: hsl(184 66% 21%);
+		--accent: hsl(84 22% 84%);
+		--accent-foreground: hsl(84 32% 19%);
 
 		/* Neutral support */
-		--muted: hsl(40 10% 94%);
-		--muted-foreground: hsl(200 10% 38%);
+		--muted: hsl(44 16% 87%);
+		--muted-foreground: hsl(80 9% 35%);
 
-		--disabled: hsl(200 5% 80%);
-		--disabled-foreground: hsl(200 5% 55%);
+		--disabled: hsl(45 10% 78%);
+		--disabled-foreground: hsl(45 6% 52%);
 
-		--destructive: hsl(0 70% 50%);
-		--destructive-foreground: hsl(40 20% 98%);
+		--destructive: hsl(4 62% 42%);
+		--destructive-foreground: hsl(44 30% 96%);
 
-		--success: hsl(155 55% 38%);
-		--success-foreground: hsl(40 20% 98%);
+		--success: hsl(120 32% 28%);
+		--success-foreground: hsl(44 30% 96%);
 
-		--border: hsl(200 12% 88%);
-		--border-strong: hsl(200 12% 78%);
-		--input: hsl(200 14% 92%);
-		--ring: hsl(184 66% 30%);
+		--border: hsl(45 16% 75%);
+		--border-strong: hsl(45 14% 56%);
+		--input: hsl(44 24% 94%);
+		--ring: hsl(34 84% 46%);
 
-		--radius: 10px;
+		/* Stamped, not rounded. Panels are cut paper and stencilled metal, so the
+		   corner radius stays under a pixel of visual softness. */
+		--radius: 3px;
+
+		/* Ink used by grain, rules and brackets, so both modes share one recipe. */
+		--ink: 80 18% 12%;
+		--grain-opacity: 0.22;
+
+		/* Three voices, one document: Oswald stencils the headings, IBM Plex
+		   Mono handles anything stamped or machine-typed (labels, counters,
+		   telemetry), Inter carries prose. */
+		--brand-display: 'Oswald', 'Arial Narrow', ui-sans-serif, system-ui, sans-serif;
+		--brand-stamp: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+		--brand-body:
+			'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+			sans-serif;
 	}
 
 	.dark {
-		--background: hsl(200 22% 6%);
-		--foreground: hsl(40 16% 94%);
-		--surface: hsl(200 22% 10%);
-		--surface-2: hsl(200 18% 13%);
-		--surface-3: hsl(200 14% 18%);
+		--background: hsl(80 12% 7%);
+		--foreground: hsl(44 20% 90%);
+		--surface: hsl(78 10% 11%);
+		--surface-2: hsl(78 9% 14%);
+		--surface-3: hsl(78 8% 19%);
 
-		--card: hsl(200 20% 10%);
-		--card-foreground: hsl(40 16% 94%);
-		--popover: hsl(200 22% 9%);
-		--popover-foreground: hsl(40 16% 94%);
+		--card: hsl(78 10% 11%);
+		--card-foreground: hsl(44 20% 90%);
+		--popover: hsl(78 11% 10%);
+		--popover-foreground: hsl(44 20% 90%);
 
-		--primary: hsl(174 70% 55%);
-		--primary-foreground: hsl(200 30% 8%);
-		--primary-hover: hsl(174 70% 62%);
+		--primary: hsl(76 40% 60%);
+		--primary-foreground: hsl(80 25% 8%);
+		--primary-hover: hsl(76 46% 69%);
 
-		--secondary: hsl(31 78% 58%);
-		--secondary-foreground: hsl(200 30% 8%);
-		--secondary-hover: hsl(31 78% 64%);
+		--secondary: hsl(36 88% 56%);
+		--secondary-foreground: hsl(30 45% 10%);
+		--secondary-hover: hsl(36 92% 64%);
 
-		--accent: hsl(184 40% 14%);
-		--accent-foreground: hsl(174 70% 65%);
+		--accent: hsl(80 18% 17%);
+		--accent-foreground: hsl(76 42% 66%);
 
-		--muted: hsl(200 18% 14%);
-		--muted-foreground: hsl(200 10% 62%);
+		--muted: hsl(78 9% 15%);
+		--muted-foreground: hsl(60 7% 61%);
 
-		--disabled: hsl(200 8% 28%);
-		--disabled-foreground: hsl(200 5% 45%);
+		--disabled: hsl(78 6% 26%);
+		--disabled-foreground: hsl(78 5% 44%);
 
-		--destructive: hsl(0 75% 60%);
-		--destructive-foreground: hsl(40 20% 98%);
+		--destructive: hsl(4 70% 56%);
+		--destructive-foreground: hsl(80 25% 8%);
 
-		--success: hsl(155 50% 55%);
-		--success-foreground: hsl(200 30% 8%);
+		--success: hsl(120 32% 52%);
+		--success-foreground: hsl(80 25% 8%);
 
-		--border: hsl(200 14% 18%);
-		--border-strong: hsl(200 14% 28%);
-		--input: hsl(200 16% 14%);
-		--ring: hsl(174 70% 55%);
+		--border: hsl(78 8% 20%);
+		--border-strong: hsl(78 8% 33%);
+		--input: hsl(78 10% 14%);
+		--ring: hsl(36 88% 56%);
+
+		--ink: 44 20% 90%;
+		--grain-opacity: 0.16;
 	}
 
 	* {
 		@apply border-border;
 	}
 	html {
-		font-family:
-			'Inter',
-			ui-sans-serif,
-			system-ui,
-			-apple-system,
-			'Segoe UI',
-			Roboto,
-			'Helvetica Neue',
-			Arial,
-			sans-serif;
+		font-family: var(--brand-body);
 		-webkit-font-smoothing: antialiased;
 		text-rendering: optimizeLegibility;
 	}
@@ -114,7 +127,7 @@
 			'ss01' on;
 	}
 	::selection {
-		background: hsl(184 66% 21% / 0.18);
+		background: hsl(34 84% 46% / 0.28);
 	}
 
 	a {
@@ -122,12 +135,25 @@
 		text-decoration: none;
 	}
 
+	/* Headings are stencilled, not typeset: condensed caps with wide tracking,
+	   the way a section header reads on a folder tab. Body copy stays a plain
+	   humanist sans so a briefing is still something you can actually read. */
 	h1,
 	h2,
 	h3,
 	h4 {
+		font-family: var(--brand-display);
 		font-weight: 600;
-		letter-spacing: -0.01em;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+		line-height: 1.08;
+	}
+	h5,
+	h6 {
+		font-family: var(--brand-stamp);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
 	}
 
 	@keyframes slideOutUp {
@@ -179,6 +205,11 @@
 }
 
 @theme inline {
+	--font-sans: var(--brand-body);
+	--font-display: var(--brand-display);
+	--font-stamp: var(--brand-stamp);
+	--font-mono: var(--brand-stamp);
+
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-surface: var(--surface);
@@ -277,24 +308,39 @@
 }
 
 @layer components {
+	/* Buttons are field equipment: stencilled caps, a hard edge, a top-light
+	   bevel so they read as pressed metal rather than a flat web rectangle. */
 	.btn {
-		@apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium tracking-tight transition-all duration-150 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed;
+		@apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-sm border border-transparent text-sm select-none transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed;
+		font-family: var(--brand-display);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.09em;
+	}
+	.btn:active:not(:disabled) {
+		transform: translateY(1px);
 	}
 	.btn-primary {
-		@apply bg-primary text-primary-foreground hover:bg-primary-hover shadow-sm;
+		@apply bg-primary text-primary-foreground border-primary hover:bg-primary-hover;
+		box-shadow:
+			inset 0 1px 0 hsl(0 0% 100% / 0.16),
+			0 1px 0 hsl(var(--ink) / 0.25);
 	}
 	.btn-secondary {
-		@apply bg-secondary text-secondary-foreground hover:bg-secondary-hover shadow-sm;
+		@apply bg-secondary text-secondary-foreground border-secondary hover:bg-secondary-hover;
+		box-shadow:
+			inset 0 1px 0 hsl(0 0% 100% / 0.22),
+			0 1px 0 hsl(var(--ink) / 0.25);
 	}
 	.btn-gray,
 	.btn-ghost {
-		@apply bg-transparent text-foreground hover:bg-muted;
+		@apply bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground;
 	}
 	.btn-outline {
-		@apply border border-border bg-surface text-foreground hover:bg-muted;
+		@apply border-border-strong bg-surface text-foreground hover:bg-muted hover:border-foreground/40;
 	}
 	.btn-destructive {
-		@apply bg-destructive text-destructive-foreground hover:opacity-90 shadow-sm;
+		@apply bg-destructive text-destructive-foreground border-destructive hover:opacity-90;
 	}
 	.btn-lg {
 		@apply px-5 py-3 text-base;
@@ -304,30 +350,85 @@
 	}
 
 	.card {
-		@apply rounded-xl border border-border bg-card text-card-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)];
+		@apply rounded-sm border border-border bg-card text-card-foreground;
+		box-shadow: 0 1px 0 hsl(var(--ink) / 0.06);
+	}
+
+	/* A dossier is a card with the folder furniture: a heavier left edge like a
+	   tab binding, and ruled corner brackets that frame the contents. */
+	.dossier {
+		@apply relative rounded-sm border border-border bg-card text-card-foreground;
+		border-left-width: 3px;
+		border-left-color: var(--primary);
+		box-shadow: 0 1px 0 hsl(var(--ink) / 0.06);
 	}
 
 	.input,
 	.field {
-		@apply w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30;
+		@apply w-full rounded-sm border border-border-strong bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30;
 	}
 	.field-label {
-		@apply block text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5;
+		@apply block text-[11px] text-muted-foreground mb-1.5;
+		font-family: var(--brand-stamp);
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.16em;
 	}
 
+	/* Chips read as typed inventory tags, so they square off and go mono. */
 	.chip {
-		@apply inline-flex items-center gap-1 rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-muted-foreground;
+		@apply inline-flex items-center gap-1 rounded-sm border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground;
+		font-family: var(--brand-stamp);
+		font-weight: 500;
+		letter-spacing: 0.08em;
+	}
+
+	/* An inked rubber stamp: mono caps inside a boxed rule. `.stamp-tilt` adds
+	   the off-square angle of something pressed by hand. */
+	.stamp {
+		@apply inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] uppercase;
+		font-family: var(--brand-stamp);
+		font-weight: 600;
+		letter-spacing: 0.2em;
+		border-color: currentColor;
+		color: var(--muted-foreground);
+	}
+	.stamp-primary {
+		color: var(--primary);
+	}
+	.stamp-alert {
+		color: var(--secondary);
+	}
+	.stamp-tilt {
+		transform: rotate(-1.6deg);
 	}
 
 	.link {
-		@apply text-primary underline-offset-4 hover:underline;
+		@apply text-primary underline underline-offset-4 decoration-primary/40 hover:decoration-primary;
 	}
 
 	.section-title {
-		@apply text-2xl md:text-3xl font-semibold tracking-tight text-foreground;
+		@apply text-2xl md:text-3xl text-foreground;
+		font-family: var(--brand-display);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
 	}
 	.section-eyebrow {
-		@apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+		@apply text-[11px] text-muted-foreground;
+		font-family: var(--brand-stamp);
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.24em;
+	}
+
+	/* Numbering that runs down the margin of a manual: "04", "SEC-12". */
+	.marginalia {
+		@apply text-[11px] text-muted-foreground/80;
+		font-family: var(--brand-stamp);
+		font-weight: 500;
+		letter-spacing: 0.14em;
+		font-variant-numeric: tabular-nums;
 	}
 }
 
@@ -358,16 +459,20 @@
 		mask-repeat: no-repeat;
 	}
 
+	/* Survey grid, drawn from the ink token so it follows the palette instead of
+	   carrying the old teal hard-codes. Two scales: a fine 8px hatch under a
+	   heavier 48px section rule, the way plotting paper is printed. */
 	.grid-pattern {
 		background-image:
-			linear-gradient(to right, hsl(200 12% 88% / 0.4) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(200 12% 88% / 0.4) 1px, transparent 1px);
-		background-size: 32px 32px;
-	}
-	.dark .grid-pattern {
-		background-image:
-			linear-gradient(to right, hsl(200 14% 22% / 0.5) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(200 14% 22% / 0.5) 1px, transparent 1px);
+			linear-gradient(to right, hsl(var(--ink) / 0.16) 1px, transparent 1px),
+			linear-gradient(to bottom, hsl(var(--ink) / 0.16) 1px, transparent 1px),
+			linear-gradient(to right, hsl(var(--ink) / 0.07) 1px, transparent 1px),
+			linear-gradient(to bottom, hsl(var(--ink) / 0.07) 1px, transparent 1px);
+		background-size:
+			48px 48px,
+			48px 48px,
+			8px 8px,
+			8px 8px;
 	}
 
 	/* Immersive board backdrop: fine tactical grid with a soft vignette that
@@ -375,9 +480,9 @@
 	.game-backdrop {
 		background-color: var(--surface-2);
 		background-image:
-			radial-gradient(ellipse 120% 120% at 50% 42%, transparent 45%, hsl(200 20% 10% / 0.07) 100%),
-			linear-gradient(to right, hsl(200 12% 88% / 0.45) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(200 12% 88% / 0.45) 1px, transparent 1px);
+			radial-gradient(ellipse 120% 120% at 50% 42%, transparent 45%, hsl(var(--ink) / 0.1) 100%),
+			linear-gradient(to right, hsl(var(--ink) / 0.14) 1px, transparent 1px),
+			linear-gradient(to bottom, hsl(var(--ink) / 0.14) 1px, transparent 1px);
 		background-size:
 			100% 100%,
 			32px 32px,
@@ -387,9 +492,9 @@
 	.dark .game-backdrop {
 		background-color: var(--surface);
 		background-image:
-			radial-gradient(ellipse 120% 120% at 50% 42%, transparent 40%, hsl(200 30% 3% / 0.55) 100%),
-			linear-gradient(to right, hsl(200 14% 22% / 0.55) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(200 14% 22% / 0.55) 1px, transparent 1px);
+			radial-gradient(ellipse 120% 120% at 50% 42%, transparent 40%, hsl(80 30% 2% / 0.6) 100%),
+			linear-gradient(to right, hsl(var(--ink) / 0.1) 1px, transparent 1px),
+			linear-gradient(to bottom, hsl(var(--ink) / 0.1) 1px, transparent 1px);
 		background-size:
 			100% 100%,
 			32px 32px,
@@ -401,5 +506,77 @@
 		background: color-mix(in srgb, var(--background) 78%, transparent);
 		backdrop-filter: saturate(180%) blur(14px);
 		-webkit-backdrop-filter: saturate(180%) blur(14px);
+	}
+
+	/* Paper stock. A tiny fractal-noise tile multiplied over the surface so
+	   large flats stop looking like a browser default. Pointer-events-none and
+	   purely decorative: always layer it in its own absolute element. */
+	.paper-grain {
+		background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
+		background-repeat: repeat;
+		opacity: var(--grain-opacity);
+		mix-blend-mode: multiply;
+	}
+	.dark .paper-grain {
+		mix-blend-mode: overlay;
+	}
+
+	/* The standard page ground outside a match: paper, grain-ready, with a soft
+	   top light and a survey grid that fades before it reaches the copy. */
+	.field-backdrop {
+		background-color: var(--background);
+		background-image:
+			radial-gradient(ellipse 90% 60% at 50% -10%, hsl(var(--ink) / 0.05), transparent 70%),
+			linear-gradient(to right, hsl(var(--ink) / 0.055) 1px, transparent 1px),
+			linear-gradient(to bottom, hsl(var(--ink) / 0.055) 1px, transparent 1px);
+		background-size:
+			100% 100%,
+			48px 48px,
+			48px 48px;
+	}
+
+	/* Corner brackets: the crop marks that frame a plate in a manual. Drawn as
+	   two borders on a pair of pseudo elements so they scale with the box. */
+	.bracketed {
+		position: relative;
+	}
+	.bracketed::before,
+	.bracketed::after {
+		content: '';
+		position: absolute;
+		width: 14px;
+		height: 14px;
+		pointer-events: none;
+		border-color: var(--border-strong);
+	}
+	.bracketed::before {
+		top: -1px;
+		left: -1px;
+		border-top: 2px solid;
+		border-left: 2px solid;
+	}
+	.bracketed::after {
+		right: -1px;
+		bottom: -1px;
+		border-right: 2px solid;
+		border-bottom: 2px solid;
+	}
+	.bracketed-primary::before,
+	.bracketed-primary::after {
+		border-color: var(--primary);
+	}
+
+	/* Dashed section rule, as in a form you are meant to cut along. */
+	.rule-dashed {
+		border-top: 1px dashed hsl(var(--ink) / 0.28);
+	}
+
+	/* Diagonal caution hatch for headers and empty states. */
+	.hatch {
+		background-image: repeating-linear-gradient(
+			45deg,
+			hsl(var(--ink) / 0.08) 0 6px,
+			transparent 6px 12px
+		);
 	}
 }

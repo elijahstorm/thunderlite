@@ -16,11 +16,13 @@
 	import { outgoingActions } from '$lib/Engine/outgoingActions'
 	import {
 		desyncReports,
+		isSyncLocked,
 		lockGameplayForDesync,
 		reportDesync,
 		resetDesync,
 		syncLocked,
 	} from '$lib/Engine/desync'
+	import { resetRelayBacklog, setRelayBacklog } from '$lib/Engine/relayBacklog'
 	import { boardDigestDetail, boardSnapshot } from '$lib/Engine/boardDigest'
 	import {
 		logDesync,
@@ -792,6 +794,7 @@
 		// those relays would be refused in turn for the same reason. The same
 		// reasoning gates the CPU's own commits (see `cpuAi.commit`).
 		outbox.length = 0
+		noteBacklog()
 		reportDesync(action, reason)
 	}
 
@@ -803,8 +806,18 @@
 	 * failure budget: a batch that got half way and then hit a cooldown has
 	 * demonstrated the transport works, so the rest of it deserves a full budget
 	 * rather than inheriting the failure count of a delay it already survived.
+	 *
+	 * `split` is the last resort before declaring a run lost: re-send it one
+	 * action at a time. A batch is not just a faster way to send the same thing —
+	 * it takes a DIFFERENT server path (one row holding the run, in columns a
+	 * single action never touches), so a failure that is really about the batch
+	 * shape looks identical to a dead server from here. Match `2vzJs8KEvIO4DpzL`
+	 * is what that costs: three single-action relays landed, the first two-action
+	 * run 500'd on all three attempts, and the turn behind it — two more moves and
+	 * the end-turn — was thrown away without ever being tried on the path that was
+	 * demonstrably working a second earlier.
 	 */
-	const relay = async (batch: SerializedAction[]) => {
+	const relay = async (batch: SerializedAction[], split = true) => {
 		busyNotified = false
 		let pending = batch
 		let budget = RELAY_ATTEMPTS
@@ -829,12 +842,30 @@
 			}
 			await wait(RELAY_BACKOFF_MS[Math.min(Math.max(attempt, 0), RELAY_BACKOFF_MS.length - 1)])
 		}
-		// Out of attempts. These actions are already on our board but not in the
-		// log, so this client is ahead of the room. We deliberately do NOT consume
-		// their ordinals — blocking the stream forever over a lost action would be
-		// worse than the gap. The board is frozen from here: playing on against
-		// state the room never accepted is what turns one lost action into an
-		// unplayable match.
+		// Out of attempts as a run. Before giving up on a turn, try the shape that
+		// was working: one action per request, in order, each with its own budget.
+		// Ordinals are unconsumed (nothing was recorded), so re-sending them singly
+		// is exactly what the server expects next.
+		if (split && pending.length > 1) {
+			logOutgoing(pending[0], 'failed', {
+				error: 'exhausted-retries',
+				unsent: pending.length,
+				retryingSingly: true,
+			})
+			for (const action of pending) {
+				// A single-action relay that fails has already frozen the board and
+				// emptied the outbox; everything after it belongs to a board the room
+				// does not share, so stop rather than keep writing.
+				if (isSyncLocked()) return
+				await relay([action], false)
+			}
+			return
+		}
+		// These actions are already on our board but not in the log, so this client
+		// is ahead of the room. We deliberately do NOT consume their ordinals —
+		// blocking the stream forever over a lost action would be worse than the
+		// gap. The board is frozen from here: playing on against state the room
+		// never accepted is what turns one lost action into an unplayable match.
 		logOutgoing(pending[0], 'failed', { error: 'exhausted-retries', unsent: pending.length })
 		reportUnrelayed(pending[0], 'action-lost')
 	}
@@ -1065,6 +1096,12 @@
 	const relaysOwed = (): number => outbox.length + inFlight.length
 
 	/**
+	 * Publish that count for the HUD. The End Turn button reads it to know whether
+	 * this turn is really over or merely over on this screen — see `relayBacklog`.
+	 */
+	const noteBacklog = () => setRelayBacklog(multiplayer ? relaysOwed() : 0)
+
+	/**
 	 * Take the next run off the outbox.
 	 *
 	 * A batch is credited to one actor and the server resolves that once, before
@@ -1140,6 +1177,7 @@
 		relayBusy = true
 		const batch = takeBatch()
 		inFlight = batch
+		noteBacklog()
 		// One dedupe slot per action, released when the run settles. By then either
 		// the echo has already claimed it, or `lastEventId` has moved past our own
 		// events and the echoes behind them are skipped as stale — so holding a slot
@@ -1155,6 +1193,7 @@
 				for (const slot of slots) releaseSelf(slot)
 				inFlight = []
 				relayBusy = false
+				noteBacklog()
 				pumpRelay()
 			})
 	}
@@ -1162,6 +1201,7 @@
 	const enqueueRelay = (action: SerializedAction) => {
 		publishLive(action)
 		outbox.push(action)
+		noteBacklog()
 		pumpRelay()
 	}
 
@@ -1265,6 +1305,7 @@
 		multiplayer = isMultiplayer()
 		if (!multiplayer) return
 		resetDesync()
+		resetRelayBacklog()
 		startLiveLog(gameSession)
 		logNote('joined', { asyncGame })
 		// Our signing key for this match: reused across reloads from IndexedDB,
@@ -1336,6 +1377,7 @@
 
 	onDestroy(() => {
 		if (browser) window.removeEventListener('pagehide', onPageHide)
+		resetRelayBacklog()
 		if (multiplayer) {
 			logNote('left', { lastEventId, appliedEventId })
 			stopLiveLog()

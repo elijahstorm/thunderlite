@@ -1237,7 +1237,13 @@ async function appendEvents(
 				seq,
 				user_session: userSession,
 				action: remaining[0],
-				actions: remaining,
+				// Stringified, unlike `action` next to it. Both columns are jsonb and
+				// the value goes to the gateway as a parameter, where a plain OBJECT is
+				// serialised as json but a bare ARRAY is not necessarily — node-postgres
+				// renders one as a Postgres array literal (`{...}`), which jsonb refuses.
+				// `actionsOf` parses either shape on the way out, so this costs nothing
+				// and removes the difference between the two columns as a variable.
+				actions: JSON.stringify(remaining),
 				span: remaining.length,
 				ts,
 				next_turn: nextTurn ?? null,

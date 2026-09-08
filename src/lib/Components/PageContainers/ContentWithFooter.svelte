@@ -19,7 +19,7 @@
 
 	const navGroups = [
 		{
-			title: 'Game',
+			title: 'Operations',
 			links: [
 				{ href: '/campaign', label: 'Play' },
 				{ href: '/rooms', label: 'Rooms' },
@@ -29,7 +29,7 @@
 			],
 		},
 		{
-			title: 'Project',
+			title: 'Depot',
 			links: [
 				{ href: '/about', label: 'About' },
 				{ href: 'https://github.com/elijahstorm/thunderlite/issues', label: 'Report a bug' },
@@ -37,7 +37,7 @@
 			],
 		},
 		{
-			title: 'Legal',
+			title: 'Record',
 			links: [
 				{ href: '/privacy', label: 'Privacy Policy' },
 				{ href: 'http://elijahstorm.github.io/', label: 'More by Elijah' },
@@ -48,75 +48,86 @@
 	const year = new Date().getFullYear()
 </script>
 
-<div class="min-h-screen flex flex-col bg-background">
-	<div class="flex-1">
-		{@render children?.()}
-	</div>
+<!-- Every page sits on printed stock: warm ground, survey grid, and a grain
+	 tile over the top so large flats never read as blank browser canvas. -->
+<div class="relative min-h-screen flex flex-col field-backdrop">
+	<div class="pointer-events-none fixed inset-0 z-0 paper-grain"></div>
 
-	<footer
-		class:hidden={noFooterOnMobile}
-		class:md:block={noFooterOnMobile}
-		class="border-t border-border bg-surface-2 mt-16"
-	>
-		<div class="container py-12">
-			<div class="grid gap-10 md:grid-cols-12">
-				<div class="md:col-span-4 space-y-5">
-					<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
-						<Logo height={32} />
-					</a>
-					<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
-						A free browser rebuild of Battalion: Arena.
-					</p>
-					<div class="flex items-center gap-3 pt-1">
-						{#each socialLinks as link (link.href)}
-							<a
-								href={link.href}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground hover:border-border-strong transition-colors"
-								aria-label={link.label}
-							>
-								<img class="w-4 h-4 dark:invert" src="/images/icons/github-mark.svg" alt="" />
-							</a>
+	<div class="relative z-10 flex-1 flex flex-col">
+		<div class="flex-1">
+			{@render children?.()}
+		</div>
+
+		<footer
+			class:hidden={noFooterOnMobile}
+			class:md:block={noFooterOnMobile}
+			class="relative mt-16 border-t-2 border-border-strong bg-surface-2"
+		>
+			<!-- Caution hatch marks the back cover of the document. -->
+			<div class="h-2 hatch border-b border-border"></div>
+
+			<div class="container py-12">
+				<div class="grid gap-10 md:grid-cols-12">
+					<div class="md:col-span-4 space-y-5">
+						<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
+							<Logo height={54} />
+						</a>
+						<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
+							A free browser rebuild of Battalion: Arena.
+						</p>
+						<div class="flex items-center gap-3 pt-1">
+							{#each socialLinks as link (link.href)}
+								<a
+									href={link.href}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-border-strong text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+									aria-label={link.label}
+								>
+									<img class="w-4 h-4 dark:invert" src="/images/icons/github-mark.svg" alt="" />
+								</a>
+							{/each}
+						</div>
+					</div>
+
+					<div class="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
+						{#each navGroups as group, i (group.title)}
+							<div>
+								<h3 class="section-eyebrow flex items-baseline gap-2">
+									<span class="text-foreground/40">{String(i + 1).padStart(2, '0')}</span>
+									{group.title}
+								</h3>
+								<div class="mt-3 rule-dashed"></div>
+								<ul class="mt-4 space-y-2.5">
+									{#each group.links as link (link.href)}
+										<li>
+											<a
+												href={link.href}
+												class="text-sm text-foreground/75 hover:text-foreground transition-colors"
+											>
+												{link.label}
+											</a>
+										</li>
+									{/each}
+								</ul>
+							</div>
 						{/each}
 					</div>
 				</div>
 
-				<div class="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
-					{#each navGroups as group (group.title)}
-						<div>
-							<h3 class="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-								{group.title}
-							</h3>
-							<ul class="mt-4 space-y-2.5">
-								{#each group.links as link (link.href)}
-									<li>
-										<a
-											href={link.href}
-											class="text-sm text-foreground/80 hover:text-foreground transition-colors"
-										>
-											{link.label}
-										</a>
-									</li>
-								{/each}
-							</ul>
-						</div>
-					{/each}
+				<div
+					class="mt-12 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-6 border-t border-border"
+				>
+					<p class="marginalia">© {year} THUNDERLITE &middot; ALL RIGHTS RESERVED</p>
+					<p class="text-xs text-muted-foreground">
+						Built by <a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>.
+					</p>
+				</div>
+
+				<div class="mt-4 pt-4 border-t border-border">
+					<PoweredByDontCode variant="footer" />
 				</div>
 			</div>
-
-			<div
-				class="mt-12 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-6 border-t border-border"
-			>
-				<p class="text-xs text-muted-foreground">© {year} ThunderLite. All rights reserved.</p>
-				<p class="text-xs text-muted-foreground">
-					Built by <a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>.
-				</p>
-			</div>
-
-			<div class="mt-4 pt-4 border-t border-border">
-				<PoweredByDontCode variant="footer" />
-			</div>
-		</div>
-	</footer>
+		</footer>
+	</div>
 </div>
