@@ -58,7 +58,7 @@ const profiles: HistoryProfileRow[] = [
 	{ auth: 'foe-1', username: 'rival', display_name: 'The Rival', profile_image_url: null },
 ]
 
-const maps: HistoryMapRow[] = [{ public_id: 'delta-bay', name: 'Delta Bay' }]
+const maps: HistoryMapRow[] = [{ public_id: 'delta-bay', name: 'Delta Bay', deleted_at: null }]
 
 const ratings = new Map([['foe-1', 1301]])
 

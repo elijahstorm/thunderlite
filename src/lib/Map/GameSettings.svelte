@@ -13,9 +13,11 @@
 		map?: MapObject | undefined
 		localTeam?: number
 		menuHref?: string
+		/** Async games don't forfeit on exit — only live games do. */
+		asyncGame?: boolean
 	}
 
-	let { map = undefined, localTeam = 0, menuHref = '/' }: Props = $props()
+	let { map = undefined, localTeam = 0, menuHref = '/', asyncGame = false }: Props = $props()
 
 	let open = $state(false)
 	let view: 'menu' | 'confirmGiveUp' | 'confirmExit' = $state('menu')
@@ -69,9 +71,11 @@
 		close()
 	}
 	const exitToMenu = async () => {
-		// Auto-die so an online opponent isn't left waiting on an abandoned match —
-		// but only while we still have a side to lose.
-		if (map && stillInPlay) surrender(map, localTeam)
+		// Auto-die so a live opponent isn't left waiting on an abandoned match —
+		// but only while we still have a side to lose, and only in live games.
+		// Async games persist between sessions, so leaving to the menu is just
+		// navigation; the turn timer (not this button) is what can forfeit them.
+		if (map && stillInPlay && !asyncGame) surrender(map, localTeam)
 		close()
 		await goto(menuHref)
 	}
@@ -204,7 +208,7 @@
 				<p class="px-2 py-2 text-xs leading-relaxed text-white/80">
 					{#if view === 'confirmGiveUp'}
 						Forfeit this match? You'll lose immediately.
-					{:else if stillInPlay}
+					{:else if stillInPlay && !asyncGame}
 						Leave to the menu? This forfeits the match.
 					{:else}
 						Leave to the menu?

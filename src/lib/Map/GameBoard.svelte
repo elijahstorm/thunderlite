@@ -25,6 +25,8 @@
 		localTeam?: number
 		/** Where "Exit to menu" navigates for this context. */
 		menuHref?: string
+		/** Async games don't forfeit on exit — only live games do. */
+		asyncGame?: boolean
 	}
 
 	let {
@@ -35,6 +37,7 @@
 		campaign = undefined,
 		localTeam = 0,
 		menuHref = '/',
+		asyncGame = false,
 	}: Props = $props()
 
 	const contextLoaded = writable(!!$rendererStore.ground[0]?.sprite)
@@ -101,4 +104,4 @@
 	backdrop="game-backdrop"
 />
 
-<GameSettings {map} {localTeam} {menuHref} />
+<GameSettings {map} {localTeam} {menuHref} {asyncGame} />

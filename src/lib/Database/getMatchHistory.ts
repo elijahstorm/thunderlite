@@ -47,7 +47,7 @@ export type HistoryProfileRow = {
 	profile_image_url: string | null
 }
 
-export type HistoryMapRow = { public_id: string; name: string | null }
+export type HistoryMapRow = { public_id: string; name: string | null; deleted_at: string | null }
 
 export type MatchHistoryOpponent = {
 	auth: string
@@ -70,6 +70,7 @@ export type MatchHistoryEntry = {
 	endedAt: string | null
 	mapId: string | null
 	mapName: string | null
+	mapDeleted: boolean
 	rated: boolean
 	/** Signed ladder movement this match produced, or null when unrated. */
 	eloDelta: number | null
@@ -104,6 +105,7 @@ export const composeHistory = (
 	const matchById = new Map(matches.map((m) => [Number(m.id), m]))
 	const profileByAuth = new Map(profiles.map((p) => [p.auth, p]))
 	const mapNameById = new Map(maps.map((m) => [m.public_id, m.name ?? null]))
+	const mapDeletedById = new Map(maps.map((m) => [m.public_id, !!m.deleted_at]))
 
 	const opponentsByMatch = new Map<number, MatchHistoryOpponent[]>()
 	for (const row of opponents) {
@@ -135,6 +137,7 @@ export const composeHistory = (
 			endedAt: match.ended_at ?? null,
 			mapId: match.map_id ?? null,
 			mapName: match.map_id ? (mapNameById.get(match.map_id) ?? null) : null,
+			mapDeleted: match.map_id ? (mapDeletedById.get(match.map_id) ?? false) : false,
 			rated: !!match.rated,
 			eloDelta: row.elo_delta == null ? null : Number(row.elo_delta),
 			eloBefore: row.elo_before == null ? null : Number(row.elo_before),
@@ -197,7 +200,7 @@ export const getMatchHistory = async (
 			mapIds.length
 				? db.find<HistoryMapRow>('maps', {
 						where: { public_id: { in: mapIds } },
-						select: ['public_id', 'name'],
+						select: ['public_id', 'name', 'deleted_at'],
 					})
 				: Promise.resolve<HistoryMapRow[]>([]),
 			getPlayerRatings(opponentAuths),

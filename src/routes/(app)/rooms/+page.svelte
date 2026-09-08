@@ -7,6 +7,7 @@
 	import ContentWithFooter from '$lib/Components/PageContainers/ContentWithFooter.svelte'
 	import { formatTimeLeft, formatTurnTimeout } from '$lib/Game/asyncConfig'
 	import RatingBadge from '$lib/Components/Profile/RatingBadge.svelte'
+	import AsyncGamePreview from '$lib/Components/Rooms/AsyncGamePreview.svelte'
 
 	interface Props {
 		data: PageData
@@ -166,8 +167,11 @@
 
 				<ul class="divide-y divide-border">
 					{#each asyncGames as game (game.session)}
-						<li class="flex items-center justify-between gap-3 py-3">
-							<div class="min-w-0">
+						<li class="flex items-center gap-3 py-3">
+							{#if game.started}
+								<AsyncGamePreview session={game.session} yourTurn={game.yourTurn} />
+							{/if}
+							<div class="min-w-0 flex-1">
 								<p class="text-sm font-medium text-foreground truncate">
 									{game.mapName}
 									{#if opponentName(game)}

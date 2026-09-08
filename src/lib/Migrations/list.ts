@@ -2,6 +2,7 @@ import { CreateProfiles } from './create_users.sql'
 import { CreateUserStats } from './create_user_stats.sql'
 import { CreateMapTypes } from './create_map_types.sql'
 import { CreateMaps } from './create_maps.sql'
+import { CreateMapsDeletedAt } from './create_maps_deleted_at.sql'
 import { CreateLogs } from './create_logs.sql'
 import { CreateInfo } from './create_info.sql'
 import { CreateInfoMorphMap } from './create_info_morph_map.sql'
@@ -47,6 +48,8 @@ export const consolidatedSchema = [
 	CreateUserStats,
 	CreateMapTypes,
 	CreateMaps,
+	// After CreateMaps: its alter targets maps.
+	CreateMapsDeletedAt,
 	CreateInfo,
 	CreateInfoMorphMap,
 	CreateShareMorphMap,

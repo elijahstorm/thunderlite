@@ -85,7 +85,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		}
 		if (!mapId) throw error(404, 'The map for this match is no longer available')
 
-		const [{ mapHash, mapName }, log] = await Promise.all([
+		const [{ mapHash, mapName, mapDeleted }, log] = await Promise.all([
 			getMapData(mapId),
 			gameStore.events(match.session_id, -1),
 		])
@@ -113,6 +113,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			matchId,
 			mapHash,
 			mapName,
+			mapDeleted,
 			actions: log.events.map((e) => e.action) as SerializedAction[],
 			seats,
 			winnerTeam: match.winner_team == null ? null : Number(match.winner_team),

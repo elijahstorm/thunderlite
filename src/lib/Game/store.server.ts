@@ -2048,19 +2048,27 @@ async function listMyAsyncGames(userSession: string): Promise<AsyncGameSummary[]
 
 	return rooms
 		.filter((r) => !finished.has(r.session))
-		.map((r) => ({
-			session: r.session,
-			mapId: r.map_id,
-			started: hasStarted(r),
-			yourTurn: hasStarted(r) && r.current_turn === userSession,
-			turnDeadline: r.turn_deadline == null ? null : Number(r.turn_deadline),
-			turnTimeoutMs: clampAsyncTimeout(r.turn_timeout_ms),
-			opponentAuth: opponentBySession.get(r.session) ?? null,
-		}))
+		.map((r) => {
+			const turnDeadline = r.turn_deadline == null ? null : Number(r.turn_deadline)
+			const turnTimeoutMs = clampAsyncTimeout(r.turn_timeout_ms)
+			return {
+				session: r.session,
+				mapId: r.map_id,
+				started: hasStarted(r),
+				yourTurn: hasStarted(r) && r.current_turn === userSession,
+				turnDeadline,
+				turnTimeoutMs,
+				opponentAuth: opponentBySession.get(r.session) ?? null,
+				// The deadline is (re)armed on every turn handover, so subtracting the
+				// allowance back off it recovers when that handover happened — a free
+				// "last updated" without a dedicated column or an event-log scan.
+				lastUpdated: turnDeadline == null ? null : turnDeadline - turnTimeoutMs,
+			}
+		})
 		.sort((a, b) => {
-			// Your-turn games first, then by soonest deadline.
+			// Your-turn games first, then most-recently-updated.
 			if (a.yourTurn !== b.yourTurn) return a.yourTurn ? -1 : 1
-			return (a.turnDeadline ?? Infinity) - (b.turnDeadline ?? Infinity)
+			return (b.lastUpdated ?? -Infinity) - (a.lastUpdated ?? -Infinity)
 		})
 }
 

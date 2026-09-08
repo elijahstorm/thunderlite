@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte'
+	import { goto } from '$app/navigation'
 	import { gameState } from '../gameState'
 	import { turnTransitionActive } from './turnTransitionStore'
 
@@ -12,19 +13,77 @@
 		 * match — so the button stayed live on the opponent's turn, ended their turn
 		 * on this board only, and desynced the match. */
 		canEndTurn?: boolean
+		/** Async games have other pending matches waiting on this player, so
+		 * "opponent's turn" here is dead time rather than a match to sit through —
+		 * the button becomes a way to jump to whichever of those needs a move. */
+		asyncGame?: boolean
 		/** Collapsed rail: icon-only. */
 		compact?: boolean
 	}
 
-	let { onEndTurn = () => {}, canEndTurn = true, compact = false }: Props = $props()
+	let {
+		onEndTurn = () => {},
+		canEndTurn = true,
+		asyncGame = false,
+		compact = false,
+	}: Props = $props()
 
-	let state = $derived($gameState)
-	let disabled = $derived(state.phase !== 'playing' || !canEndTurn || $turnTransitionActive)
+	let snapshot = $derived($gameState)
+	let waiting = $derived(snapshot.phase === 'playing' && !canEndTurn)
+	// Once it's not this client's move, an async match has nothing left for the
+	// player to do here at all, so the button hands off to whatever DOES need
+	// them instead of just sitting disabled.
+	let showNextGame = $derived(asyncGame && waiting)
+	let disabled = $derived(
+		snapshot.phase !== 'playing' || (!canEndTurn && !showNextGame) || $turnTransitionActive
+	)
+	let seeking = $state(false)
 	// Say *why* the button is dead rather than just greying out — waiting on the
 	// other side is the common case and used to look like a broken button.
 	let label = $derived(
-		state.phase !== 'playing' ? 'Match over' : !canEndTurn ? "Opponent's turn" : 'End Turn'
+		snapshot.phase !== 'playing'
+			? 'Match over'
+			: showNextGame
+				? seeking
+					? 'Finding next game…'
+					: 'Next game'
+				: !canEndTurn
+					? "Opponent's turn"
+					: 'End Turn'
 	)
+
+	/** Jump to whichever other async game is waiting on this player's move, if
+	 * any — otherwise back to the rooms list, since there's nothing else to do
+	 * here until the opponent moves. */
+	const goToNextGame = async () => {
+		if (seeking) return
+		seeking = true
+		try {
+			const res = await fetch('/api/game/next-async-turn')
+			const body = await res.json().catch(() => null)
+			const next: string | null = body?.session ?? null
+			if (!next) {
+				await goto('/rooms')
+				return
+			}
+			const join = await fetch('/api/game/join', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'x-sveltekit-action': 'true' },
+				body: JSON.stringify({ session: next }),
+			})
+			if (!join.ok) {
+				await goto('/rooms')
+				return
+			}
+			await goto(`/rooms/${next}`)
+		} catch {
+			await goto('/rooms')
+		} finally {
+			seeking = false
+		}
+	}
+
+	const handleClick = () => (showNextGame ? goToNextGame() : onEndTurn())
 </script>
 
 <button
@@ -38,15 +97,15 @@
 	title={label}
 	aria-label={label}
 	{disabled}
-	onclick={onEndTurn}
+	onclick={handleClick}
 >
 	{#if compact}
-		<Icon icon="mdi:skip-next" width="18" height="18" />
+		<Icon icon={showNextGame ? 'mdi:arrow-right-bold' : 'mdi:skip-next'} width="18" height="18" />
 		<span class="sr-only">{label}</span>
 	{:else}
 		<span class="truncate">{label}</span>
 		{#if !disabled}
-			<Icon icon="mdi:skip-next" width="16" height="16" />
+			<Icon icon={showNextGame ? 'mdi:arrow-right-bold' : 'mdi:skip-next'} width="16" height="16" />
 		{/if}
 	{/if}
 </button>

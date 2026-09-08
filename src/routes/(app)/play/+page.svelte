@@ -61,6 +61,7 @@
 						aiTeams={liveAiTeams ?? aiTeams}
 						isAiDriver={liveDriver ?? isAiDriver}
 						fogOfWar={map.fog ?? true}
+						asyncGame={data.asyncGame ?? false}
 						interactor={socket ? socketSelect(socket, () => map) : undefined}
 						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
 					>
@@ -72,6 +73,7 @@
 								{localTeam}
 								fogOfWar={map.fog ?? true}
 								menuHref="/rooms"
+								asyncGame={data.asyncGame ?? false}
 							/>
 						{/snippet}
 					</GameStateManager>

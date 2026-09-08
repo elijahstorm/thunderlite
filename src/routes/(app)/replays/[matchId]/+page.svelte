@@ -22,6 +22,7 @@
 				actions={data.actions}
 				seats={data.seats}
 				mapName={data.mapName}
+				mapDeleted={data.mapDeleted}
 				winnerTeam={data.winnerTeam}
 				seed={data.seed}
 				sessionId={data.sessionId}

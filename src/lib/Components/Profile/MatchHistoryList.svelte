@@ -2,6 +2,7 @@
 	import Icon from '@iconify/svelte'
 	import FallbackImage from '$lib/Components/Images/FallbackImage.svelte'
 	import RatingBadge from './RatingBadge.svelte'
+	import DeletedMapBadge from './DeletedMapBadge.svelte'
 	import type { MatchHistoryEntry, MatchHistoryOpponent } from '$lib/Database/getMatchHistory'
 
 	interface Props {
@@ -99,6 +100,9 @@
 						{#if entry.mapName}
 							<span aria-hidden="true">&middot;</span>
 							<span>{entry.mapName}</span>
+							{#if entry.mapDeleted}
+								<DeletedMapBadge size="xs" />
+							{/if}
 						{/if}
 						{#if entry.turns > 0}
 							<span aria-hidden="true">&middot;</span>

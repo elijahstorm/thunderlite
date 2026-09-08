@@ -58,6 +58,9 @@
 		/** Surface the corner overview map in the HUD stack (currently the play route). */
 		minimap?: boolean
 		fogOfWar?: boolean
+		/** Async match: passed through to the HUD so the End Turn button can offer
+		 * a jump to the next async game once it's not this client's move. */
+		asyncGame?: boolean
 		// K4 — campaign integration. When `mode` is supplied it overrides the
 		// hotseat/online derivation (campaign is single-player, never a socket match);
 		// `campaignLevelId` rides into the match result so K3's unlock subscriber knows
@@ -95,6 +98,7 @@
 		map = undefined,
 		minimap = false,
 		fogOfWar = false,
+		asyncGame = false,
 		mode = undefined,
 		campaignLevelId = undefined,
 		onContinue = undefined,
@@ -483,9 +487,10 @@
 	})
 
 	// --- Online turn timeout (anti-stall) ---------------------------------------
-	// Only in online multiplayer: a human who sits idle (or leaves) would freeze
-	// the match for everyone, so their turn auto-ends after TURN_TIMEOUT_MS. Any
-	// committed action refreshes the clock; a countdown warns near the end.
+	// Only in LIVE online multiplayer: a human who sits idle (or leaves) would
+	// freeze the match for everyone, so their turn auto-ends after
+	// TURN_TIMEOUT_MS. Any committed action refreshes the clock; a countdown
+	// warns near the end.
 	let turnExpiresAt = $state(0)
 	let turnNow = $state(0)
 	let turnTimer: ReturnType<typeof setInterval> | null = null
@@ -493,8 +498,20 @@
 	let armedTurnKey = ''
 	let outgoingResetUnsub: (() => void) | null = null
 
+	// Never in an async room. Thinking is not stalling there: the whole mode is
+	// built around a player who closes the tab and comes back, and the room's own
+	// clock allows 12 hours at the shortest (ASYNC_TURN_TIMEOUT_MIN_MS) against
+	// this watchdog's 30 seconds. Firing it there ended a turn out from under a
+	// player mid-think, and anything they had queued or clicked in that window
+	// relayed after the handover and came back `403 Not your turn` — which drops
+	// the whole outbox and freezes the board (see `reportUnrelayed`). Async turn
+	// limits are the SERVER's job and always were: `enforceTurnDeadline` resigns
+	// an expired turn lazily on move/events/heartbeat and from the hourly cron.
 	const myOnlineTurn = $derived(
-		isMultiplayer && $gameState.phase === 'playing' && $gameState.currentTeam === localTeam
+		isMultiplayer &&
+			!asyncGame &&
+			$gameState.phase === 'playing' &&
+			$gameState.currentTeam === localTeam
 	)
 	// A CPU side this client is the designated driver for — the turn the watchdog
 	// above covers. Mirrors the gate the CPU effect itself runs on.
@@ -607,7 +624,7 @@
 	</div>
 {/if}
 
-<HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} {canEndTurn} />
+<HUDRoot {map} {minimap} {fogOfWar} onEndTurn={handleEndTurn} {localTeam} {canEndTurn} {asyncGame} />
 <BuildMenu {map} />
 <ActionMenu {map} />
 <StatsScreen {localTeam} onRematch={handleRematch} {onContinue} {onRetry} {campaignHref} />

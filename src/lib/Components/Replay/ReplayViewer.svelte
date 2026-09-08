@@ -27,6 +27,7 @@
 		type TimelinePoint,
 	} from '$lib/Engine/matchTimeline'
 	import ScoreTimeline from '$lib/Engine/HUD/ScoreTimeline.svelte'
+	import DeletedMapBadge from '$lib/Components/Profile/DeletedMapBadge.svelte'
 
 	/**
 	 * ReplayViewer — a read-only board that marches a finished match's event log
@@ -66,6 +67,7 @@
 		/** Team-keyed public labels for the HUD; missing teams fall back to "Player N". */
 		seats?: Record<number, { auth: string; name: string; avatarUrl: string | null }>
 		mapName?: string
+		mapDeleted?: boolean
 		winnerTeam?: number | null
 		/**
 		 * The seed the match was recorded under, so anything that draws from it
@@ -83,6 +85,7 @@
 		actions,
 		seats = {},
 		mapName = '',
+		mapDeleted = false,
 		winnerTeam = null,
 		seed = null,
 		sessionId = null,
@@ -408,6 +411,9 @@
 	data-testid="replay-status"
 >
 	<span class="font-semibold">{mapName || 'Replay'}</span>
+	{#if mapDeleted}
+		<DeletedMapBadge size="xs" onDark />
+	{/if}
 	<span aria-hidden="true">&middot;</span>
 	{#if atEnd}
 		<span class="font-medium">{finalLabel}</span>

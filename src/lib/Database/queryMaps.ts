@@ -30,11 +30,14 @@ export const getMapById: (
 	me?: string
 ) => Promise<{ map: MapDBData; owner: UserDBData } | null> = async (mapId, me = '') => {
 	try {
-		const row = await db.findOne<MapRow & { status: string }>('maps', {
-			where: { public_id: mapId },
-			select: MAP_LIST_COLUMNS,
-		})
-		if (!row || row.status === 'private') return null
+		const row = await db.findOne<MapRow & { status: string; deleted_at: string | null }>(
+			'maps',
+			{
+				where: { public_id: mapId },
+				select: [...MAP_LIST_COLUMNS, 'deleted_at'],
+			}
+		)
+		if (!row || row.status === 'private' || row.deleted_at) return null
 
 		const [mapType, infoMorphs, likes, shares] = await Promise.all([
 			row.map_type_id !== null
@@ -102,7 +105,7 @@ export const queryMaps: (
 	const limit = 10
 
 	try {
-		const where: Where = { status: { not: 'private' } }
+		const where: Where = { status: { not: 'private' }, deleted_at: null }
 
 		// Replaces the map_types join filter: resolve the type text to ids first.
 		if (type !== '') {
@@ -238,7 +241,7 @@ export const queryUserPublicMaps: (owner: string) => Promise<{ maps: MapDBData[]
 	if (!owner) return { maps: [] }
 	try {
 		const rows = await db.find<MapRow & { status: string }>('maps', {
-			where: { owner_auth: owner, status: { not: 'private' } },
+			where: { owner_auth: owner, status: { not: 'private' }, deleted_at: null },
 			select: MAP_LIST_COLUMNS,
 			orderBy: { updated_at: 'desc' },
 		})
@@ -267,7 +270,7 @@ export const queryMyMaps: (
 	if (!owner) return { maps: [], limit: MAX_MAPS_PER_USER, remaining: MAX_MAPS_PER_USER }
 	try {
 		const rows = await db.find<MapRow>('maps', {
-			where: { owner_auth: owner },
+			where: { owner_auth: owner, deleted_at: null },
 			select: MAP_LIST_COLUMNS,
 			orderBy: { updated_at: 'desc' },
 		})

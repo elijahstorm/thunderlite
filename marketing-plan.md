@@ -53,7 +53,7 @@ That's the whole task. Not the itch.io page, not the clip, not HN. One subreddit
 > A while back I played Battalion: Arena a ton and always wished it had better multiplayer reliability, less exploitable AI, and bigger maps. So I ended up rebuilding the whole thing myself.
 >
 > It's called ThunderLite. Free, browser-based, no install:
-> https://thunderlite.vercel.app/
+> https://thunderlite.dontcode.cafe/
 >
 > Some of what's new/different:
 > - **AI that reacts** to the battlefield and to what it sees you do, instead of running the same predictable pattern you can learn and exploit in a few games
@@ -73,7 +73,7 @@ That's the whole task. Not the itch.io page, not the clip, not HN. One subreddit
 > Show HN: I rebuilt a turn-based tactics game (Advance Wars-style) to handle 500x500 maps in-browser
 
 **Body:**
-> ThunderLite is a browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars. https://thunderlite.vercel.app/
+> ThunderLite is a browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars. https://thunderlite.dontcode.cafe/
 >
 > I'm a solo dev and this started as "I wish this game I liked worked better," which turned into a full rebuild. A few technical bits that might be interesting to this crowd:
 >
@@ -95,7 +95,7 @@ That's the whole task. Not the itch.io page, not the clip, not HN. One subreddit
 **Body:**
 > Free browser game, no install, no signup required to try single player. Turn-based tactics in the Battalion: Arena / Advance Wars mold: build units, capture territory, outmaneuver the enemy.
 >
-> https://thunderlite.vercel.app/
+> https://thunderlite.dontcode.cafe/
 >
 > - Live multiplayer via shareable room codes (async, take your turn whenever)
 > - Built-in map editor, browse community maps
@@ -116,7 +116,7 @@ That's the whole task. Not the itch.io page, not the clip, not HN. One subreddit
 >
 > So for ThunderLite I rebuilt the AI to react to the current battlefield state and to what it has actually observed the opponent doing (including remembering units it saw slip into fog, instead of cheating with full vision). It takes noticeably longer before you can "solve" it, and different situations get genuinely different responses back.
 >
-> It's live now if anyone wants to poke at it and see if you can find the seams: https://thunderlite.vercel.app/
+> It's live now if anyone wants to poke at it and see if you can find the seams: https://thunderlite.dontcode.cafe/
 >
 > Curious if anyone here has done similar adaptive-AI work for turn-based games. Happy to compare notes.
 
@@ -146,17 +146,17 @@ That's the whole task. Not the itch.io page, not the clip, not HN. One subreddit
 
 ## 7. X / Bluesky short posts (pair each with a clip or gif)
 
-1. > Rebuilt an Advance Wars-style tactics game from scratch. Adaptive AI, maps up to 500x500, live multiplayer, still free. thunderlite.vercel.app
+1. > Rebuilt an Advance Wars-style tactics game from scratch. Adaptive AI, maps up to 500x500, live multiplayer, still free. thunderlite.dontcode.cafe
 
-2. > The old AI in games like this gets "solved" after 3-4 matches. Spent a while making mine actually react to the battlefield and what it observes you doing. Free to try: thunderlite.vercel.app
+2. > The old AI in games like this gets "solved" after 3-4 matches. Spent a while making mine actually react to the battlefield and what it observes you doing. Free to try: thunderlite.dontcode.cafe
 
-3. > No install, no signup needed to try it. Turn-based tactics, live in your browser. thunderlite.vercel.app
+3. > No install, no signup needed to try it. Turn-based tactics, live in your browser. thunderlite.dontcode.cafe
 
 ---
 
 ## 8. Discord self-promo blurb (short, casual)
 
-> Made a free browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars. Live multiplayer via room codes, adaptive AI, map editor, up to 500x500 maps. No install: https://thunderlite.vercel.app/ (solo project, would love feedback!)
+> Made a free browser-based turn-based tactics game inspired by Battalion: Arena / Advance Wars. Live multiplayer via room codes, adaptive AI, map editor, up to 500x500 maps. No install: https://thunderlite.dontcode.cafe/ (solo project, would love feedback!)
 
 ---
 

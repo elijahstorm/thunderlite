@@ -26,7 +26,7 @@ export interface EmailContent {
  * dead-end; `SITE_URL` lets a preview deploy point its emails at itself instead
  * of production.
  */
-const siteUrl = (env.SITE_URL || 'https://thunderlite.vercel.app').replace(/\/$/, '')
+const siteUrl = (env.SITE_URL || 'https://thunderlite.dontcode.cafe').replace(/\/$/, '')
 
 /** Absolute in-app URL for a root-relative path. */
 const link = (path: string): string => `${siteUrl}${path}`

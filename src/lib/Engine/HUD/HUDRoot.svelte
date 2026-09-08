@@ -18,6 +18,9 @@
 		/** Whether the side holding the turn is one this client commands — passed
 		 * straight through to the End Turn button. */
 		canEndTurn?: boolean
+		/** Passed straight through to the End Turn button, which turns into a
+		 * "Next game" jump once it's not this client's move. */
+		asyncGame?: boolean
 		/** Show the overview map at the top of the HUD rail. */
 		minimap?: boolean
 		fogOfWar?: boolean
@@ -28,6 +31,7 @@
 		onEndTurn = () => {},
 		localTeam = 0,
 		canEndTurn = true,
+		asyncGame = false,
 		minimap = false,
 		fogOfWar = false,
 	}: Props = $props()
@@ -179,7 +183,7 @@
 			{#if over}
 				<ResultsButton />
 			{:else}
-				<EndTurnButton {onEndTurn} {canEndTurn} />
+				<EndTurnButton {onEndTurn} {canEndTurn} {asyncGame} />
 			{/if}
 		</div>
 	{:else}
@@ -187,7 +191,7 @@
 			{#if over}
 				<ResultsButton compact />
 			{:else}
-				<EndTurnButton {onEndTurn} {canEndTurn} compact />
+				<EndTurnButton {onEndTurn} {canEndTurn} {asyncGame} compact />
 			{/if}
 		</div>
 	{/if}

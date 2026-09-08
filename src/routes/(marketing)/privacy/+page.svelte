@@ -72,7 +72,7 @@
 
 		<p>
 			This notice applies to ThunderLite at
-			<a href="https://thunderlite.vercel.app/" class="link">thunderlite.vercel.app</a>. If you do
+			<a href="https://thunderlite.dontcode.cafe/" class="link">thunderlite.dontcode.cafe</a>. If you do
 			not agree with it, please do not use the game. Questions? Email
 			<a href="mailto:{CONTACT}" class="link">{CONTACT}</a>.
 		</p>

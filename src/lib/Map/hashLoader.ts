@@ -9,12 +9,17 @@ import { db } from '$lib/dontcode/server'
  * everything the play/editor pages need.
  */
 export const getMapData = async (mapId: string) => {
-	let map: { map_data: string; name: string; status: string } | null
+	let map: { map_data: string; name: string; status: string; deleted_at: string | null } | null
 
 	try {
-		map = await db.findOne<{ map_data: string; name: string; status: string }>('maps', {
+		map = await db.findOne<{
+			map_data: string
+			name: string
+			status: string
+			deleted_at: string | null
+		}>('maps', {
 			where: { public_id: mapId },
-			select: ['map_data', 'name', 'status'],
+			select: ['map_data', 'name', 'status', 'deleted_at'],
 		})
 	} catch (msg) {
 		await logToErrorDb(msg)
@@ -27,12 +32,19 @@ export const getMapData = async (mapId: string) => {
 
 	// `name` rides alongside the blob because the compact hash deliberately omits
 	// the title (see mapExporter#filter) — it lives only in this column.
-	return { mapHash: map.map_data, mapName: map.name }
+	//
+	// Deliberately not gated on `deleted_at`: this is the only read path live
+	// rooms, async turns, and replays use to rebuild the board, and a
+	// soft-deleted map must keep serving in-progress/finished games. Callers
+	// that need to know still get `mapDeleted` back to show a notice.
+	return { mapHash: map.map_data, mapName: map.name, mapDeleted: !!map.deleted_at }
 }
 
+// Room creation gate only — a soft-deleted map is treated as nonexistent here,
+// even though getMapData above keeps serving it for games already in flight.
 export const isValidMapId = async (mapId: string) => {
 	try {
-		return (await db.count('maps', { public_id: mapId })) > 0
+		return (await db.count('maps', { public_id: mapId, deleted_at: null })) > 0
 	} catch (msg) {
 		await logToErrorDb(msg)
 		throw error(500, 'Could not perform count check on database')
