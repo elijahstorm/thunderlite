@@ -135,25 +135,19 @@
 		text-decoration: none;
 	}
 
-	/* Headings are stencilled, not typeset: condensed caps with wide tracking,
-	   the way a section header reads on a folder tab. Body copy stays a plain
-	   humanist sans so a briefing is still something you can actually read. */
+	/* Headings take the condensed face and nothing else. Setting every heading
+	   in tracked caps made each page read the same; caps are now a deliberate
+	   choice at the few places that earn it (wordmark, nav, buttons). */
 	h1,
 	h2,
 	h3,
-	h4 {
-		font-family: var(--brand-display);
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
-		line-height: 1.08;
-	}
+	h4,
 	h5,
 	h6 {
-		font-family: var(--brand-stamp);
+		font-family: var(--brand-display);
 		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.14em;
+		letter-spacing: 0;
+		line-height: 1.12;
 	}
 
 	@keyframes slideOutUp {
@@ -315,7 +309,7 @@
 		font-family: var(--brand-display);
 		font-weight: 600;
 		text-transform: uppercase;
-		letter-spacing: 0.09em;
+		letter-spacing: 0.06em;
 	}
 	.btn:active:not(:disabled) {
 		transform: translateY(1px);
@@ -354,13 +348,9 @@
 		box-shadow: 0 1px 0 hsl(var(--ink) / 0.06);
 	}
 
-	/* A dossier is a card with the folder furniture: a heavier left edge like a
-	   tab binding, and ruled corner brackets that frame the contents. */
-	.dossier {
-		@apply relative rounded-sm border border-border bg-card text-card-foreground;
-		border-left-width: 3px;
-		border-left-color: var(--primary);
-		box-shadow: 0 1px 0 hsl(var(--ink) / 0.06);
+	/* A panel cut from heavier stock than `.card`: a firmer rule, no shadow. */
+	.panel {
+		@apply relative rounded-sm border border-border-strong bg-card text-card-foreground;
 	}
 
 	.input,
@@ -368,39 +358,11 @@
 		@apply w-full rounded-sm border border-border-strong bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30;
 	}
 	.field-label {
-		@apply block text-[11px] text-muted-foreground mb-1.5;
-		font-family: var(--brand-stamp);
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.16em;
+		@apply block text-[13px] font-medium text-foreground/80 mb-1.5;
 	}
 
-	/* Chips read as typed inventory tags, so they square off and go mono. */
 	.chip {
-		@apply inline-flex items-center gap-1 rounded-sm border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground;
-		font-family: var(--brand-stamp);
-		font-weight: 500;
-		letter-spacing: 0.08em;
-	}
-
-	/* An inked rubber stamp: mono caps inside a boxed rule. `.stamp-tilt` adds
-	   the off-square angle of something pressed by hand. */
-	.stamp {
-		@apply inline-flex items-center gap-1.5 border px-2 py-0.5 text-[10px] uppercase;
-		font-family: var(--brand-stamp);
-		font-weight: 600;
-		letter-spacing: 0.2em;
-		border-color: currentColor;
-		color: var(--muted-foreground);
-	}
-	.stamp-primary {
-		color: var(--primary);
-	}
-	.stamp-alert {
-		color: var(--secondary);
-	}
-	.stamp-tilt {
-		transform: rotate(-1.6deg);
+		@apply inline-flex items-center gap-1 rounded-sm border border-border bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted-foreground;
 	}
 
 	.link {
@@ -409,26 +371,17 @@
 
 	.section-title {
 		@apply text-2xl md:text-3xl text-foreground;
-		font-family: var(--brand-display);
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
 	}
 	.section-eyebrow {
-		@apply text-[11px] text-muted-foreground;
-		font-family: var(--brand-stamp);
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.24em;
+		@apply text-sm font-medium text-muted-foreground;
 	}
 
-	/* Numbering that runs down the margin of a manual: "04", "SEC-12". */
-	.marginalia {
-		@apply text-[11px] text-muted-foreground/80;
+	/* Tabular mono, for figures that are actually read as figures: turn counts,
+	   funds, timers. Not for decoration. */
+	.numeric {
 		font-family: var(--brand-stamp);
-		font-weight: 500;
-		letter-spacing: 0.14em;
 		font-variant-numeric: tabular-nums;
+		letter-spacing: 0;
 	}
 }
 
@@ -459,20 +412,13 @@
 		mask-repeat: no-repeat;
 	}
 
-	/* Survey grid, drawn from the ink token so it follows the palette instead of
-	   carrying the old teal hard-codes. Two scales: a fine 8px hatch under a
-	   heavier 48px section rule, the way plotting paper is printed. */
+	/* Board rule for editor and match surfaces only. Never the page ground: see
+	   `.field-backdrop`. */
 	.grid-pattern {
 		background-image:
-			linear-gradient(to right, hsl(var(--ink) / 0.16) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(var(--ink) / 0.16) 1px, transparent 1px),
-			linear-gradient(to right, hsl(var(--ink) / 0.07) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(var(--ink) / 0.07) 1px, transparent 1px);
-		background-size:
-			48px 48px,
-			48px 48px,
-			8px 8px,
-			8px 8px;
+			linear-gradient(to right, hsl(var(--ink) / 0.12) 1px, transparent 1px),
+			linear-gradient(to bottom, hsl(var(--ink) / 0.12) 1px, transparent 1px);
+		background-size: 32px 32px;
 	}
 
 	/* Immersive board backdrop: fine tactical grid with a soft vignette that
@@ -508,31 +454,12 @@
 		-webkit-backdrop-filter: saturate(180%) blur(14px);
 	}
 
-	/* Paper stock. A tiny fractal-noise tile multiplied over the surface so
-	   large flats stop looking like a browser default. Pointer-events-none and
-	   purely decorative: always layer it in its own absolute element. */
-	.paper-grain {
-		background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)' opacity='0.5'/%3E%3C/svg%3E");
-		background-repeat: repeat;
-		opacity: var(--grain-opacity);
-		mix-blend-mode: multiply;
-	}
-	.dark .paper-grain {
-		mix-blend-mode: overlay;
-	}
-
-	/* The standard page ground outside a match: paper, grain-ready, with a soft
-	   top light and a survey grid that fades before it reaches the copy. */
+	/* The page ground outside a match is just paper. Its pattern and tooth come
+	   from the FieldGround component (topographic contours), not from a
+	   background-image here: the sponsor's site already owns a ruled grid, and
+	   contours carry the height model this game is actually built on. */
 	.field-backdrop {
 		background-color: var(--background);
-		background-image:
-			radial-gradient(ellipse 90% 60% at 50% -10%, hsl(var(--ink) / 0.05), transparent 70%),
-			linear-gradient(to right, hsl(var(--ink) / 0.055) 1px, transparent 1px),
-			linear-gradient(to bottom, hsl(var(--ink) / 0.055) 1px, transparent 1px);
-		background-size:
-			100% 100%,
-			48px 48px,
-			48px 48px;
 	}
 
 	/* Corner brackets: the crop marks that frame a plate in a manual. Drawn as
@@ -569,14 +496,5 @@
 	/* Dashed section rule, as in a form you are meant to cut along. */
 	.rule-dashed {
 		border-top: 1px dashed hsl(var(--ink) / 0.28);
-	}
-
-	/* Diagonal caution hatch for headers and empty states. */
-	.hatch {
-		background-image: repeating-linear-gradient(
-			45deg,
-			hsl(var(--ink) / 0.08) 0 6px,
-			transparent 6px 12px
-		);
 	}
 }
