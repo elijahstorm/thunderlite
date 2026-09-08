@@ -44,6 +44,10 @@
 	<link rel="sitemap" type="application/xml" href="{SITE_URL}/sitemap.xml" />
 
 	{#if ldScript}
+		<!-- Safe by construction: ldScript is JSON.stringify output with every `<`
+		     escaped above, so no user-supplied map name or description can close
+		     the tag or open another one. -->
+		<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 		{@html ldScript}
 	{/if}
 

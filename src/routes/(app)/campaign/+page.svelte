@@ -19,10 +19,6 @@
 	let complete = $derived($page.url.searchParams.get('complete') === '1')
 </script>
 
-<svelte:head>
-	<title>Single Player Campaign | ThunderLite</title>
-</svelte:head>
-
 <ContentWithFooter>
 	<Header />
 

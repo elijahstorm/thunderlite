@@ -72,7 +72,13 @@ export const NOINDEX_PREFIXES = [
 	'/my',
 	'/onboarding',
 	'/play',
+	// A finished match's replay is a URL per match forever, and a profile page is
+	// a real person's name and avatar. Neither earns a search listing: replays
+	// would bury the pages that rank under unbounded thin content, and profiles
+	// should be reachable from inside the game rather than from a name search.
+	'/replays',
 	'/rooms',
+	'/users',
 ]
 
 export const isNoindexPath = (pathname: string): boolean =>

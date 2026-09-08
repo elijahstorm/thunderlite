@@ -34,10 +34,6 @@
 	}
 </script>
 
-<svelte:head>
-	<title>{level ? `Campaign: ${level.title}` : 'Campaign'}</title>
-</svelte:head>
-
 {#key levelId}
 	{#if level}
 		<section class="h-screen overflow-clip" data-testid="campaign-match" data-level-id={level.id}>

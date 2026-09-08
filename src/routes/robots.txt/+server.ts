@@ -18,7 +18,10 @@ export const prerender = true
 export const GET: RequestHandler = () => {
 	const body = [
 		'User-agent: *',
-		...NOINDEX_PREFIXES.map((prefix) => `Disallow: ${prefix}/`),
+		// No trailing slash: robots.txt matches by prefix, so `Disallow: /make`
+		// covers the listing page itself as well as everything under it, where
+		// `Disallow: /make/` would leave `/make` crawlable.
+		...NOINDEX_PREFIXES.map((prefix) => `Disallow: ${prefix}`),
 		'',
 		'Sitemap: ' + `${SITE_URL}/sitemap.xml`,
 		'',

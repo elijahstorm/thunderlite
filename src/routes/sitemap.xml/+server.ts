@@ -1,6 +1,5 @@
 import type { RequestHandler } from './$types'
 import { db } from '$lib/dontcode/server'
-import { campaignLevels } from '$lib/Campaign/levels'
 import { SITE_URL } from '$lib/Seo/seo'
 
 interface Entry {
@@ -72,13 +71,10 @@ const publicMapEntries = async (): Promise<Entry[]> => {
 }
 
 export const GET: RequestHandler = async ({ setHeaders }) => {
-	const campaign: Entry[] = campaignLevels.map((level) => ({
-		path: `/campaign/${level.id}`,
-		changefreq: 'monthly',
-		priority: '0.6',
-	}))
-
-	const entries = [...STATIC_ENTRIES, ...campaign, ...(await publicMapEntries())]
+	// Individual campaign levels are absent on purpose: each one renders a game
+	// canvas with no standalone prose, and a locked level bounces to /campaign.
+	// The /campaign index already lists every mission with its blurb.
+	const entries = [...STATIC_ENTRIES, ...(await publicMapEntries())]
 
 	const body = [
 		'<?xml version="1.0" encoding="UTF-8"?>',
