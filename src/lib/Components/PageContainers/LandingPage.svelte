@@ -59,7 +59,8 @@
 				</h1>
 
 				<p class="text-lg text-foreground/85 max-w-xl leading-relaxed">
-					A rebuild of Battalion: Arena. Turn-based tactics in the Advance Wars family.
+					A rebuild of <a class="link" href="/battalion-arena">Battalion: Arena</a>. Turn-based
+					tactics in the Advance Wars family.
 				</p>
 
 				<div class="flex flex-wrap items-center gap-3 pt-1">

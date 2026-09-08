@@ -33,6 +33,7 @@
 			title: 'Project',
 			links: [
 				{ href: '/about', label: 'About' },
+				{ href: '/battalion-arena', label: 'Battalion: Arena' },
 				{ href: 'https://github.com/elijahstorm/thunderlite/issues', label: 'Report a bug' },
 				{ href: 'https://github.com/elijahstorm/thunderlite', label: 'Source on GitHub' },
 			],
