@@ -1,11 +1,14 @@
 <script lang="ts">
 	import type { LayoutData } from './$types'
 	import { Toasts } from 'as-toast'
+	import { page } from '$app/state'
 	import { browser } from '$app/environment'
 	import { initSession, refreshSession } from '$lib/dontcode/client'
 	import NavigationProgress from '$lib/Components/Feedback/NavigationProgress.svelte'
 	import ServiceBanner from '$lib/Components/Feedback/ServiceBanner.svelte'
 	import { watchServiceHealth } from '$lib/Stores/serviceHealth'
+	import SeoHead from '$lib/Components/Seo/SeoHead.svelte'
+	import { resolveSeo, type PageSeo } from '$lib/Seo/seo'
 	import '../app.css'
 
 	interface Props {
@@ -15,10 +18,19 @@
 
 	let { data, children }: Props = $props()
 
-	const title = $derived(data.config.title)
-	const desc = $derived(data.config.desc)
 	const googleFonts = $derived(data.config.googleFonts)
-	const IMG_URL = `/images/embedded-card.png`
+
+	// Every meta tag on the site is rendered once, here, so no page can end up
+	// with two descriptions or a canonical that disagrees with its og:url. A
+	// page opts into its own copy by returning `seo` from its load function;
+	// anything that doesn't falls back to the KV-editable site config, and
+	// signed-in/dev routes are noindexed by path (see NOINDEX_PREFIXES).
+	const seo = $derived(
+		resolveSeo(page.url.pathname, page.data.seo as PageSeo | undefined, {
+			title: data.config.title,
+			description: data.config.desc,
+		})
+	)
 
 	// Seed the client session stores from the server-resolved user. Kept to the
 	// browser so the module-level stores are never mutated during SSR (which
@@ -42,26 +54,7 @@
 	})
 </script>
 
-<svelte:head>
-	<title>{title}</title>
-	<meta property="description" content={desc} />
-
-	<meta property="og:title" content={title} />
-	<meta property="og:description" content={desc} />
-	<meta property="og:image" content={IMG_URL} />
-	<meta property="og:url" content="/" />
-
-	<meta property="twitter:title" content={title} />
-	<meta property="twitter:description" content={desc} />
-	<meta property="twitter:image" content={IMG_URL} />
-	<meta property="twitter:card" content="summary_large_image" />
-
-	{#if googleFonts}
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-		<link href={googleFonts} rel="stylesheet" />
-	{/if}
-</svelte:head>
+<SeoHead {seo} {googleFonts} />
 
 <NavigationProgress />
 <ServiceBanner />

@@ -25,8 +25,8 @@ const kv = client.cache
 // Keep in sync with DEFAULT_CONFIG in src/routes/+layout.server.ts — seeding
 // makes the KV entry explicit so it can be edited without a deploy.
 const SITE_CONFIG = {
-	title: 'ThunderLite',
-	desc: 'A free browser rebuild of Battalion: Arena. Turn-based tactics with an adaptive CPU, weather, maps up to 500x500, a scriptable map editor, and live multiplayer.',
+	title: 'ThunderLite: Free Advance Wars-Style Turn-Based Strategy in Your Browser',
+	desc: 'ThunderLite is a free browser rebuild of Battalion: Arena, a turn-based tactics game in the Advance Wars family. Play the campaign with no account, battle an adaptive CPU, fight live or async multiplayer on maps up to 500x500, and build your own with the map editor.',
 	googleFonts: '',
 }
 

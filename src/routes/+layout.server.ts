@@ -1,6 +1,7 @@
 import type { LayoutServerLoad } from './$types'
 import { building } from '$app/environment'
 import { kv } from '$lib/dontcode/server'
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE } from '$lib/Seo/seo'
 
 interface SiteConfig {
 	title: string
@@ -12,8 +13,8 @@ interface SiteConfig {
 // mock has no cache, so reads come back as misses) or the cache is unreachable.
 // The site must render either way; KV only overrides copy, it never gates it.
 const DEFAULT_CONFIG: SiteConfig = {
-	title: 'ThunderLite',
-	desc: 'A free browser rebuild of Battalion: Arena. Turn-based tactics with an adaptive CPU, weather, maps up to 500x500, a scriptable map editor, and live multiplayer.',
+	title: DEFAULT_TITLE,
+	desc: DEFAULT_DESCRIPTION,
 	googleFonts: '',
 }
 
