@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FieldGround from '$lib/Components/Branding/FieldGround.svelte'
 	import Logo from '$lib/Components/Branding/Logo.svelte'
 	import PoweredByDontCode from '$lib/Components/Branding/PoweredByDontCode.svelte'
 
@@ -19,7 +20,7 @@
 
 	const navGroups = [
 		{
-			title: 'Operations',
+			title: 'Game',
 			links: [
 				{ href: '/campaign', label: 'Play' },
 				{ href: '/rooms', label: 'Rooms' },
@@ -29,7 +30,7 @@
 			],
 		},
 		{
-			title: 'Depot',
+			title: 'Project',
 			links: [
 				{ href: '/about', label: 'About' },
 				{ href: 'https://github.com/elijahstorm/thunderlite/issues', label: 'Report a bug' },
@@ -37,7 +38,7 @@
 			],
 		},
 		{
-			title: 'Record',
+			title: 'Legal',
 			links: [
 				{ href: '/privacy', label: 'Privacy Policy' },
 				{ href: 'http://elijahstorm.github.io/', label: 'More by Elijah' },
@@ -48,10 +49,10 @@
 	const year = new Date().getFullYear()
 </script>
 
-<!-- Every page sits on printed stock: warm ground, survey grid, and a grain
-	 tile over the top so large flats never read as blank browser canvas. -->
+<!-- Every page sits on the same printed stock: warm ground, contour survey,
+	 paper tooth. -->
 <div class="relative min-h-screen flex flex-col field-backdrop">
-	<div class="pointer-events-none fixed inset-0 z-0 paper-grain"></div>
+	<div class="pointer-events-none fixed inset-0 z-0"><FieldGround /></div>
 
 	<div class="relative z-10 flex-1 flex flex-col">
 		<div class="flex-1">
@@ -61,16 +62,13 @@
 		<footer
 			class:hidden={noFooterOnMobile}
 			class:md:block={noFooterOnMobile}
-			class="relative mt-16 border-t-2 border-border-strong bg-surface-2"
+			class="relative mt-10 border-t-2 border-border-strong bg-surface-2"
 		>
-			<!-- Caution hatch marks the back cover of the document. -->
-			<div class="h-2 hatch border-b border-border"></div>
-
 			<div class="container py-12">
 				<div class="grid gap-10 md:grid-cols-12">
 					<div class="md:col-span-4 space-y-5">
 						<a href="/" class="inline-flex items-center" aria-label="ThunderLite home">
-							<Logo height={54} />
+							<Logo height={34} />
 						</a>
 						<p class="text-sm text-muted-foreground max-w-xs leading-relaxed">
 							A free browser rebuild of Battalion: Arena.
@@ -91,13 +89,9 @@
 					</div>
 
 					<div class="md:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-8">
-						{#each navGroups as group, i (group.title)}
+						{#each navGroups as group (group.title)}
 							<div>
-								<h3 class="section-eyebrow flex items-baseline gap-2">
-									<span class="text-foreground/40">{String(i + 1).padStart(2, '0')}</span>
-									{group.title}
-								</h3>
-								<div class="mt-3 rule-dashed"></div>
+								<h3 class="text-sm font-semibold text-foreground">{group.title}</h3>
 								<ul class="mt-4 space-y-2.5">
 									{#each group.links as link (link.href)}
 										<li>
@@ -118,13 +112,10 @@
 				<div
 					class="mt-12 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-6 border-t border-border"
 				>
-					<p class="marginalia">© {year} THUNDERLITE &middot; ALL RIGHTS RESERVED</p>
 					<p class="text-xs text-muted-foreground">
-						Built by <a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>.
+						© {year} ThunderLite. Built by
+						<a href="http://elijahstorm.github.io/" class="link">Elijah Storm</a>.
 					</p>
-				</div>
-
-				<div class="mt-4 pt-4 border-t border-border">
 					<PoweredByDontCode variant="footer" />
 				</div>
 			</div>

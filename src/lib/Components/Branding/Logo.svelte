@@ -3,8 +3,9 @@
 		icon?: string
 		title?: string
 		height?: number
-		/** Mono strapline under the wordmark. Suppressed on small marks, where
-		 *  it would set below legible size. Pass `null` to force it off. */
+		/** Strapline under the wordmark. Off by default: the mark carries the
+		 *  brand on its own, and a tracked label under every instance of it was
+		 *  the kind of furniture that made the shell feel generated. */
 		strapline?: string | null
 	}
 
@@ -12,7 +13,7 @@
 		icon = '/images/logo/black-tank.png',
 		title = 'ThunderLite',
 		height = 150,
-		strapline = 'TACTICAL COMMAND',
+		strapline = null,
 	}: Props = $props()
 
 	// Split off a trailing "Lite" so we can two-tone the wordmark. Falls back to
@@ -84,10 +85,10 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5em;
-		font-family: var(--brand-stamp);
-		font-size: calc(var(--logo-height) * 0.13);
+		font-family: var(--brand-display);
+		font-size: calc(var(--logo-height) * 0.15);
 		font-weight: 500;
-		letter-spacing: 0.34em;
+		letter-spacing: 0.12em;
 		text-transform: uppercase;
 		color: var(--muted-foreground);
 		white-space: nowrap;
