@@ -399,4 +399,28 @@ describe('socket event queue', () => {
 			{ id: 2, live: true },
 		])
 	})
+
+	/**
+	 * What the load-time skeleton veil rests on (see `BoardSkeleton` /
+	 * `GameSocket`'s `hydrating`).
+	 *
+	 * The veil comes off the moment the catch-up poll resolves, in the same tick.
+	 * That is only honest if a replayed backlog is already ON the board by then —
+	 * if any of it landed a tick later, the player would see the veil lift onto a
+	 * half-replayed position, which is the flash the veil exists to prevent. It
+	 * holds because an unanimated event is committed without awaiting anything, so
+	 * `drain` runs the whole backlog to completion inside the first `push`.
+	 */
+	it('commits an unanimated catch-up backlog synchronously, before push returns', () => {
+		const { log, queue } = harness()
+
+		for (let i = 0; i < 40; i++) {
+			queue.push({ id: i, action: move(i, i + 1), animate: false, live: false, via: 'poll' })
+		}
+
+		// No `flush()` — nothing here is allowed to be waiting on a microtask.
+		expect(queue.size).toBe(0)
+		expect(queue.busy).toBe(false)
+		expect(log.filter((entry) => entry.startsWith('applied:')).length).toBe(40)
+	})
 })

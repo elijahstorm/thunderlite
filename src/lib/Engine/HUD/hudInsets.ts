@@ -62,5 +62,6 @@ export const clearHudGutter = (): void => {
  *   z-50   HUDRoot rail, DM docks, toasts
  *   z-54…56  ActionMenu      interactor: veil, focus ring, panel
  *   z-60   BuildMenu         interactor modal
+ *   z-70   BoardSkeleton     load-time veil; the board under it is not the real one yet
  *   z-80   ResumePrompt      a decision before the level starts; nothing behind it yet
  */

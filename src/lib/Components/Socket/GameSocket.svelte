@@ -45,7 +45,8 @@
 		type PublicKeyJwk,
 	} from '$lib/Security/frameSigning'
 	import { loadOrCreateMatchKey, type MatchKey } from './matchKey'
-	import { fly } from 'svelte/transition'
+	import { fade, fly } from 'svelte/transition'
+	import BoardSkeleton from '$lib/Components/Feedback/BoardSkeleton.svelte'
 
 	interface Props {
 		map: () => MapObject | undefined
@@ -125,6 +126,27 @@
 	}
 
 	let multiplayer = $state(false)
+	/**
+	 * True from the first render of a room until its event log is on the board.
+	 *
+	 * The map derives from its hash synchronously, so the OPENING position is
+	 * renderable long before the log that turns it into the current position has
+	 * been fetched. Left uncovered, a correspondence match showed its first turn
+	 * for the length of a round trip and then visibly rearranged itself into turn
+	 * fourteen. Set before mount (not in `onMount`) precisely so no frame of that
+	 * pristine board is ever painted.
+	 */
+	let hydrating = $state(untrack(() => isMultiplayer()))
+	let hydrationTimer: ReturnType<typeof setTimeout> | null = null
+	/**
+	 * How long the veil may hold before the board is revealed regardless.
+	 *
+	 * The catch-up poll swallows its own failures and resolves, so this is only
+	 * for a `fetch` that never settles at all (a dead connection, a suspended
+	 * tab). Showing a stale board beats showing a loader forever: the poll
+	 * interval is running by then and will still reconcile.
+	 */
+	const HYDRATION_TIMEOUT_MS = 8000
 	let lastEventId = -1
 	let pollTimer: ReturnType<typeof setInterval> | null = null
 	let stallTimer: ReturnType<typeof setInterval> | null = null
@@ -1300,10 +1322,22 @@
 		void presenceCheck()
 	}
 
+	/** Take the veil off the board, once. */
+	const endHydration = () => {
+		if (hydrationTimer) {
+			clearTimeout(hydrationTimer)
+			hydrationTimer = null
+		}
+		hydrating = false
+	}
+
 	onMount(() => {
 		if (!browser) return
 		multiplayer = isMultiplayer()
-		if (!multiplayer) return
+		if (!multiplayer) {
+			endHydration()
+			return
+		}
 		resetDesync()
 		resetRelayBacklog()
 		startLiveLog(gameSession)
@@ -1354,9 +1388,14 @@
 			)
 		})
 		outgoingUnsubscribe = outgoingActions.subscribe(onOutgoing)
+		hydrationTimer = setTimeout(() => (hydrating = false), HYDRATION_TIMEOUT_MS)
 		void poll().then(() => {
 			// The backlog is on the board; from here on, live pushes animate.
 			caughtUp = true
+			// Catch-up events are queued with `animate: false`, and an unanimated
+			// event applies without awaiting, so the whole backlog is on the board by
+			// the time this resolves — the veil can come off in the same tick.
+			endHydration()
 			pollTimer = setInterval(pollTimerTick, POLL_INTERVAL)
 		})
 		void connectRealtime()
@@ -1388,6 +1427,7 @@
 		if (liveDrainTimer) clearTimeout(liveDrainTimer)
 		if (wrongTurnTimer) clearTimeout(wrongTurnTimer)
 		if (clockTimer) clearInterval(clockTimer)
+		if (hydrationTimer) clearTimeout(hydrationTimer)
 		if (gaugeTimer) clearInterval(gaugeTimer)
 		if (outgoingUnsubscribe) outgoingUnsubscribe()
 		realtimeConn?.close()
@@ -1431,6 +1471,13 @@
 
 	const children_render = $derived(children)
 </script>
+
+{#if hydrating}
+	<!-- Held over the pristine board until the log is replayed onto it. -->
+	<div out:fade={{ duration: 150 }}>
+		<BoardSkeleton />
+	</div>
+{/if}
 
 {#if multiplayer}
 	{@render children?.({

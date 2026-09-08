@@ -51,53 +51,66 @@
 </script>
 
 <section class="h-screen overflow-clip">
-	<MapLoader {mapHash}>
-		{#snippet children({ map })}
-			<PlayerRosterSync {roster} />
-			<GameSocket
-				map={() => map}
-				{gameSession}
-				{userSession}
-				{memberKeys}
-				{asyncGame}
-				{turnDeadline}
-				{aiTeams}
-				{isAiDriver}
-			>
-				{#snippet children({ socket, requestRedraw, aiTeams: liveAiTeams, isAiDriver: liveDriver })}
-					<GameStateManager
-						{userSession}
-						{gameSession}
-						{seed}
-						{map}
-						minimap
-						{localTeam}
-						aiTeams={liveAiTeams ?? aiTeams}
-						isAiDriver={liveDriver ?? isAiDriver}
-						fogOfWar={map.fog ?? true}
-						{asyncGame}
-						interactor={socket ? socketSelect(socket, () => map) : undefined}
-						endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
-					>
-						{#snippet children({ select })}
-							<GameBoard
-								{map}
-								{requestRedraw}
-								{select}
-								{localTeam}
-								fogOfWar={map.fog ?? true}
-								{menuHref}
-								{asyncGame}
-							/>
-						{/snippet}
-					</GameStateManager>
-				{/snippet}
-			</GameSocket>
-		{/snippet}
-	</MapLoader>
+	<!-- Keyed on the room: SvelteKit reuses this component when only the route
+	     param changes (/play/A -> /play/B, which is exactly what the HUD's "Next
+	     game" jump does), and everything below snapshots its match once at mount
+	     - MapLoader derives the board untracked, GameSocket subscribes to the
+	     session it was built with. Without the key the URL changed and the board
+	     did not, so the jump looked like a dead button. -->
+	{#key gameSession}
+		<MapLoader {mapHash}>
+			{#snippet children({ map })}
+				<PlayerRosterSync {roster} />
+				<GameSocket
+					map={() => map}
+					{gameSession}
+					{userSession}
+					{memberKeys}
+					{asyncGame}
+					{turnDeadline}
+					{aiTeams}
+					{isAiDriver}
+				>
+					{#snippet children({
+						socket,
+						requestRedraw,
+						aiTeams: liveAiTeams,
+						isAiDriver: liveDriver,
+					})}
+						<GameStateManager
+							{userSession}
+							{gameSession}
+							{seed}
+							{map}
+							minimap
+							{localTeam}
+							aiTeams={liveAiTeams ?? aiTeams}
+							isAiDriver={liveDriver ?? isAiDriver}
+							fogOfWar={map.fog ?? true}
+							{asyncGame}
+							interactor={socket ? socketSelect(socket, () => map) : undefined}
+							endTurnAction={socket ? socketEndTurn(socket, () => map) : undefined}
+						>
+							{#snippet children({ select })}
+								<GameBoard
+									{map}
+									{requestRedraw}
+									{select}
+									{localTeam}
+									fogOfWar={map.fog ?? true}
+									{menuHref}
+									{asyncGame}
+								/>
+							{/snippet}
+						</GameStateManager>
+					{/snippet}
+				</GameSocket>
+			{/snippet}
+		</MapLoader>
 
-	<!-- Realtime group chat for this room; click a name to open a private DM. -->
-	<GameChat session={gameSession} roster={Object.values(roster)} />
+		<!-- Realtime group chat for this room; click a name to open a private DM. -->
+		<GameChat session={gameSession} roster={Object.values(roster)} />
+	{/key}
 
 	<!-- DEV TOOL — movement/pathfinding diagnostics. dev-only (stripped from prod). -->
 	{#if dev}
