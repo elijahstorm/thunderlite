@@ -376,10 +376,12 @@ const openRoom = async (r: Run, index: number): Promise<Room | null> => {
 		)
 	)
 		return fail(r, room)
-	// Both browsers land on /play. That load assigns teams, seeds the first turn
-	// and reads the roster, and it is real per-match cost.
+	// Both browsers land on the match. That load assigns teams, seeds the first
+	// turn and reads the roster, and it is real per-match cost. Addressed by
+	// room (`/play/[session]`) like a real client does — plain `/play` only
+	// redirects there now, which would have measured the redirect instead.
 	for (const p of [host, guest]) {
-		await call(r, session, p.user, '/(app)/play', '/play')
+		await call(r, session, p.user, '/(app)/play/[session]', `/play/${session}`)
 	}
 
 	const roster = await gameStore.roster(session)

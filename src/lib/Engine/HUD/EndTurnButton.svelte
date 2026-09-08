@@ -53,8 +53,12 @@
 	)
 
 	/** Jump to whichever other async game is waiting on this player's move, if
-	 * any — otherwise back to the rooms list, since there's nothing else to do
-	 * here until the opponent moves. */
+	 * any — otherwise to their games list, since there's nothing else to do here
+	 * until the opponent moves.
+	 *
+	 * Straight to the board: matches are addressed by room now, so this no
+	 * longer has to re-point the player's "current game" and bounce them
+	 * through a lobby to get there. */
 	const goToNextGame = async () => {
 		if (seeking) return
 		seeking = true
@@ -62,22 +66,9 @@
 			const res = await fetch('/api/game/next-async-turn')
 			const body = await res.json().catch(() => null)
 			const next: string | null = body?.session ?? null
-			if (!next) {
-				await goto('/rooms')
-				return
-			}
-			const join = await fetch('/api/game/join', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json', 'x-sveltekit-action': 'true' },
-				body: JSON.stringify({ session: next }),
-			})
-			if (!join.ok) {
-				await goto('/rooms')
-				return
-			}
-			await goto(`/rooms/${next}`)
+			await goto(next ? `/play/${next}` : '/games')
 		} catch {
-			await goto('/rooms')
+			await goto('/games')
 		} finally {
 			seeking = false
 		}

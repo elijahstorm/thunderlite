@@ -12,6 +12,9 @@
 
 	const navLinks = [
 		{ href: '/campaign', label: 'Play' },
+		// Games before Rooms on purpose: the games you already have running is
+		// the thing a returning player wants, and matchmaking is what you do once.
+		{ href: '/games', label: 'Games', badge: true },
 		{ href: '/rooms', label: 'Rooms' },
 		{ href: '/make', label: 'Browse Maps' },
 		{ href: '/editor', label: 'Editor' },
@@ -19,6 +22,9 @@
 	]
 
 	let pathname = $derived($page.url.pathname)
+	// Async games waiting on this player's move, counted by the in-app layout
+	// loads. Absent on marketing pages, which is why it falls back to zero.
+	let awaitingTurns = $derived(($page.data.awaitingTurns as number | undefined) ?? 0)
 </script>
 
 <header
@@ -56,12 +62,20 @@
 			{#each navLinks as link (link.href)}
 				<a
 					href={link.href}
-					class="px-3 py-2 text-sm font-medium rounded-md transition-colors"
+					class="relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors"
 					class:text-foreground={pathname.startsWith(link.href)}
 					class:bg-muted={pathname.startsWith(link.href)}
 					class:text-muted-foreground={!pathname.startsWith(link.href)}
 				>
 					{link.label}
+					{#if link.badge && awaitingTurns}
+						<span
+							class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground"
+							aria-label="{awaitingTurns} games waiting on your move"
+						>
+							{awaitingTurns}
+						</span>
+					{/if}
 				</a>
 			{/each}
 		</nav>

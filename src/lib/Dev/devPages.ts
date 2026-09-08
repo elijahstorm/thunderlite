@@ -14,6 +14,14 @@ export type DevPage = {
 
 export const devPages: DevPage[] = [
 	{
+		href: '/dev/games',
+		title: 'Async Game Cards',
+		blurb:
+			'The correspondence card from the games hub in every state — urgency tiers, an expired clock, and a room still looking for an opponent.',
+		tag: 'visuals',
+		ready: true,
+	},
+	{
 		href: '/dev/timeline',
 		title: 'Results Chart',
 		blurb:

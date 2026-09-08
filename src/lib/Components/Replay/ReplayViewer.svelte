@@ -89,7 +89,7 @@
 		winnerTeam = null,
 		seed = null,
 		sessionId = null,
-		menuHref = '/my/games',
+		menuHref = '/my/history',
 	}: Props = $props()
 
 	// Put the match's own seed back in place before a single action applies. The

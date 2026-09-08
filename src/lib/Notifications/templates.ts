@@ -38,18 +38,25 @@ const profileUrl = (userAuth: string): string => link(`/users/${encodeURICompone
 const chatUrl = (userAuth: string): string => link(`/chat/${encodeURIComponent(userAuth)}`)
 
 /**
- * A room, live or async. The lobby forwards into `/play` once the match has
- * started, so this one link works for "come ready up" and "it is your move"
- * alike, and keeps working after the game ends (the final board).
+ * A room's lobby. For "come ready up" on a live game, and for the final board
+ * of a match that has ended (the lobby forwards into the match either way).
  */
 const roomUrl = (session: string): string => link(`/rooms/${encodeURIComponent(session)}`)
+
+/**
+ * A match, addressed directly. This is the link for "it is your move": it opens
+ * the board in one hop rather than routing the player through a lobby they have
+ * no business in, which is what the room link used to do.
+ */
+const playUrl = (session: string): string => link(`/play/${encodeURIComponent(session)}`)
 
 /** The replay/result page for a recorded match. */
 const replayUrl = (matchId: number | string): string =>
 	link(`/replays/${encodeURIComponent(String(matchId))}`)
 
 const friendsUrl = link('/my/friends')
-const gamesUrl = link('/my/games')
+const historyUrl = link('/my/history')
+const gamesUrl = link('/games')
 const roomsUrl = link('/rooms')
 const proUrl = link('/my/pro')
 
@@ -151,7 +158,7 @@ export const matchResult = (
 
 ${line}
 
-[See the full result](${replayUrl(matchId)}) or [browse your match history](${gamesUrl})${prefsFooter}`,
+[See the full result](${replayUrl(matchId)}) or [browse your match history](${historyUrl})${prefsFooter}`,
 	}
 }
 
@@ -168,7 +175,7 @@ export const asyncYourTurn = (
 
 ${opponentName ? `**${opponentName}** finished their turn. ` : ''}You have **${timeLabel}** on the clock.
 
-[Take your turn](${roomUrl(session)})${prefsFooter}`,
+[Take your turn](${playUrl(session)}) or [see every game you have going](${gamesUrl})${prefsFooter}`,
 })
 
 /** Sent to the player whose turn clock ran out. */
@@ -181,7 +188,7 @@ export const asyncAutoResigned = (
 
 Your turn clock of **${timeLabel}** ran out, so your async ThunderLite match${opponentName ? ` against **${opponentName}**` : ''} was resigned automatically.
 
-[Look back at your match history](${gamesUrl})${prefsFooter}`,
+[Look back at your match history](${historyUrl})${prefsFooter}`,
 })
 
 /** Sent to the opponent when a player resigned an async match by hand. */

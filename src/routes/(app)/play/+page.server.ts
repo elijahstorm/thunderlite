@@ -2,17 +2,18 @@ import { error, redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { dev } from '$app/environment'
 import { logToErrorDb } from '$lib/Security/serverLogs.js'
+import { gameStore } from '$lib/Game/store.server'
 import { getMapData } from '$lib/Map/hashLoader'
-import { parsePublicKey, type PublicKeyJwk } from '$lib/Security/frameSigning'
-import { gameStore, roomSeed } from '$lib/Game/store.server'
-import { queryUsersByAuth } from '$lib/Database/getUserData'
-import { teamsFromHash } from '$lib/Game/mapTeams'
-import { notifyAsyncYourTurn } from '$lib/Game/asyncNotify.server'
-import { clampAsyncTimeout } from '$lib/Game/asyncConfig'
 
-/** Team-keyed public profiles for the in-game player list. */
-type TeamRoster = Record<number, UserDBData>
-
+/**
+ * `/play` without a room code. Two jobs, both of them hand-offs:
+ *
+ *  - `?ephemeral=1` — the editor launched an unsaved map. There is no room to
+ *    address, so this renders straight from the client-side `mapStore`.
+ *  - otherwise — resolve the player's most recent room and forward to
+ *    `/play/[session]`, which is where matches actually live. Kept so older
+ *    links, the live lobby's hand-off, and bookmarks all still land somewhere.
+ */
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const userSession = locals.session
 	if (!userSession) throw error(401, 'User not logged in')
@@ -29,7 +30,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			mapHash: '',
 			seat: 0,
 			localTeam: 0,
-			roster: {} as TeamRoster,
+			roster: {},
+			memberKeys: {},
+			aiTeams: [] as number[],
+			isAiDriver: false,
 			asyncGame: false,
 			turnDeadline: null,
 			turnTimeoutMs: null,
@@ -39,144 +43,35 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 	}
 
-	const { gameSession, mapId, seat, room } = await getGameSession(userSession)
-	if (!gameSession || !mapId) throw error(403, 'No game session found')
-
-	const { mapHash } = await getMapData(mapId)
-	const asyncGame = room?.mode === 'async'
-
-	// The team a client commands is authoritative and server-owned. Derive the
-	// map's stable team order, assign any unassigned member a team by seat order
-	// (idempotent — a member who chose a team in the lobby keeps it), then read
-	// this client's team back. This replaces the old client-side re-derivation
-	// that let two players both resolve to team 0.
-	const teams = await teamsFromHash(mapHash)
-	// No sides means no team can be assigned, so every client falls through to
-	// `teams[seat] ?? 0` and commands team 0 — including the opponent. That is an
-	// unplayable room, not a degraded one, so fail loudly here instead of rendering
-	// a board that looks fine and can never resolve. Room creation refuses these
-	// maps now; this covers rooms opened before that guard existed.
-	if (!teams.length) {
-		await logToErrorDb(`Room ${gameSession} is on map ${mapId}, which fields no playable sides`)
-		throw error(500, 'This map has no playable sides, so the match cannot start.')
-	}
-	await gameStore.assignTeamsIfNeeded(gameSession, teams)
-	// Align the server's turn pointer with the engine's first team before the
-	// first move, so the player on the starting side (not necessarily the host)
-	// actually gets turn one.
-	const starter = await gameStore.seedFirstTurn(gameSession, teams)
-	// Async: the game may be released by the OTHER player's load (the host can
-	// be offline when the lobby fills). If the first move belongs to someone
-	// who isn't here, email them — deduped, so repeat loads send it once.
-	if (asyncGame && starter && starter.userSession !== userSession) {
-		await notifyAsyncYourTurn({
-			session: gameSession,
-			eventId: 'seed',
-			nextUserAuth: starter.userAuth,
-			opponentAuth: null,
-			turnTimeoutMs: clampAsyncTimeout(room?.turn_timeout_ms),
-		})
-	}
-
-	const [localTeam, roster, seats, aiDriver] = await Promise.all([
-		gameStore.teamOf(gameSession, userSession),
-		buildTeamRoster(gameSession, locals.user ?? ''),
-		gameStore.roster(gameSession),
-		gameStore.aiDriver(gameSession),
-	])
-
-	// Teams run by a CPU seat, and whether THIS client is the one that drives them
-	// (the lowest-seat human relays the AI's moves — see GameStateManager).
-	const aiTeams = seats.filter((s) => s.isAi && s.team != null).map((s) => s.team as number)
-	// Each seat's frame-signing key, for verifying the live frames it publishes.
-	// A seat that has not registered yet is absent; the socket asks again when it
-	// meets a sender it has no key for.
-	const memberKeys: Record<string, PublicKeyJwk> = {}
-	for (const s of seats) {
-		const key = parsePublicKey(s.pubkey)
-		if (key) memberKeys[s.userSession] = key
-	}
-
-	return {
-		userSession,
-		gameSession,
-		seat,
-		memberKeys,
-		// Authoritative: the side this client commands. Falls back to the seat's
-		// team only if assignment somehow didn't land (e.g. a map with no teams).
-		localTeam: localTeam ?? teams[seat] ?? 0,
-		// Profiles keyed by TEAM (not seat) so the player list keys straight off
-		// the engine's team ids.
-		roster,
-		aiTeams,
-		isAiDriver: aiDriver === userSession,
-		mapHash,
-		// Async turn clock, for the in-game countdown chip. The event poll keeps
-		// the deadline fresh after this initial value.
-		asyncGame,
-		turnDeadline: room?.turn_deadline == null ? null : Number(room.turn_deadline),
-		turnTimeoutMs: room?.turn_timeout_ms == null ? null : Number(room.turn_timeout_ms),
-		// The room's seed, so every client — including one that rejoins mid-match —
-		// resolves scripted spawns and CPU tie-breaks the same way.
-		seed: roomSeed(room),
-	}
-}
-
-/**
- * Team-keyed public profiles for the room's players, using each member's
- * server-assigned team. A team with no resolvable profile (AI seat, legacy row,
- * or a removed profile) is simply absent, and the player list falls back to a
- * generic label for it.
- */
-const buildTeamRoster = async (gameSession: string, me: string): Promise<TeamRoster> => {
-	try {
-		const seats = await gameStore.roster(gameSession)
-		const auths = seats.map((s) => s.userAuth).filter((a): a is string => !!a)
-		const byAuth = new Map((await queryUsersByAuth(auths, me)).map((u) => [u.auth, u]))
-		const out: TeamRoster = {}
-		for (const seat of seats) {
-			if (seat.team == null || !seat.userAuth) continue
-			const user = byAuth.get(seat.userAuth)
-			if (user) out[seat.team] = user
-		}
-		return out
-	} catch (msg) {
-		// A roster failure must never take down the match — degrade to "Player N".
-		await logToErrorDb(msg)
-		return {}
-	}
-}
-
-const getGameSession = async (userSession: string) => {
 	try {
 		const current = await gameStore.currentGame(userSession)
-		if (!current) {
-			// No active room — e.g. the last match ended (its pointer was cleared) or
-			// the player left. In dev, fall back to a fixed local skirmish so hitting
-			// `/play` directly still boots a board; in prod send them to the rooms hub
-			// instead of a dead-end error.
-			// NB: the dev fallback must only fire when there's genuinely no room —
-			// firing it unconditionally made every client seat 0 on a non-multiplayer
-			// `testSession`, so two lobby players both drove player 1 and never synced.
-			if (dev) return { gameSession: 'testSession', mapId: 'hello', seat: 0, room: null }
-			throw redirect(303, '/rooms')
-		}
-		const seat = await gameStore.seatOf(current.session, userSession)
-		if (seat < 0) {
-			throw error(403, 'You are not a member of this game room')
-		}
-		// The match hasn't been released by the lobby yet — send the player back to
-		// the lobby (where the fill/countdown plays out) instead of dropping them
-		// into an empty board that would end the instant win conditions evaluate.
-		// `currentGame` already fetched the room, so reuse it here.
-		const room = current.room
-		if (!room || room.start_at == null || room.start_at > Date.now()) {
-			throw redirect(303, `/rooms/${current.session}`)
-		}
-		return { gameSession: current.session, mapId: current.mapId, seat, room }
+		if (current) throw redirect(303, `/play/${current.session}`)
 	} catch (msg) {
 		if (msg && typeof msg === 'object' && 'status' in msg) throw msg
 		await logToErrorDb(msg)
 		throw error(500, 'Could not load game session')
+	}
+
+	// No active room — the last match ended (its pointer was cleared), or the
+	// player left. In dev, boot a fixed local skirmish so hitting `/play`
+	// directly still puts a board on screen; in prod, their games are the only
+	// useful place to be.
+	if (!dev) throw redirect(303, '/games')
+
+	const { mapHash } = await getMapData('hello')
+	return {
+		userSession,
+		gameSession: 'testSession',
+		mapHash,
+		seat: 0,
+		localTeam: 0,
+		roster: {},
+		memberKeys: {},
+		aiTeams: [] as number[],
+		isAiDriver: false,
+		asyncGame: false,
+		turnDeadline: null,
+		turnTimeoutMs: null,
+		seed: null as number | null,
 	}
 }

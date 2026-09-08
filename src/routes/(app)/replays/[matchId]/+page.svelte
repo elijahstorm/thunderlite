@@ -26,7 +26,7 @@
 				winnerTeam={data.winnerTeam}
 				seed={data.seed}
 				sessionId={data.sessionId}
-				menuHref="/my/games"
+				menuHref="/my/history"
 			/>
 		{/snippet}
 	</MapLoader>

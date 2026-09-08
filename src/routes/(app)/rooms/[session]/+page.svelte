@@ -13,6 +13,7 @@
 	import { openDmWith } from '$lib/Stores/openDm'
 	import { RealtimeConnection, type RealtimeMessage } from '$lib/dontcode/realtimeClient'
 	import { formatTurnTimeout } from '$lib/Game/asyncConfig'
+	import InviteLink from '$lib/Components/Games/InviteLink.svelte'
 
 	interface Props {
 		data: PageData
@@ -25,7 +26,12 @@
 		data.turnTimeoutMs != null ? formatTurnTimeout(data.turnTimeoutMs) : null
 	)
 
-	const POLL_INTERVAL = 1500
+	// A live lobby is watched second by second, so it polls like it. A
+	// correspondence lobby is explicitly a page you walk away from — polling it
+	// at the same rate would spend the gateway's call budget on nobody, so it
+	// leans on the realtime push and checks in slowly as the fallback.
+	const LIVE_POLL_INTERVAL = 1500
+	const ASYNC_POLL_INTERVAL = 15_000
 	const TICK_INTERVAL = 250
 
 	let count = $state(untrack(() => data.count))
@@ -131,7 +137,10 @@
 	const launch = () => {
 		if (launched) return
 		launched = true
-		if (browser) goto('/play')
+		// Address the match by room, not by the player's "current game" pointer:
+		// a correspondence player has several, and the pointer is the wrong
+		// answer for all but one of them.
+		if (browser) goto(`/play/${data.session}`)
 	}
 
 	// The single place the lobby decides it's time to play: `start_at` is set and
@@ -173,8 +182,9 @@
 		try {
 			const res = await fetch(`/api/game/${data.session}`)
 			if (res.status === 403 || res.status === 404) {
-				// Kicked, expired, or the room vanished — back to the rooms hub.
-				if (browser) goto('/rooms')
+				// Kicked, expired, or the room vanished — back to wherever this kind
+				// of game is listed.
+				if (browser) goto(isAsync ? '/games' : '/rooms')
 				return
 			}
 			if (!res.ok) return
@@ -208,15 +218,6 @@
 		}
 	}
 
-	const copyCode = async () => {
-		if (!browser || !navigator.clipboard) return
-		try {
-			await navigator.clipboard.writeText(data.session)
-		} catch {
-			// clipboard may be denied — ignore
-		}
-	}
-
 	let pollTimer: ReturnType<typeof setInterval> | null = null
 	let tickTimer: ReturnType<typeof setInterval> | null = null
 	let conn: RealtimeConnection | null = null
@@ -224,7 +225,7 @@
 	onMount(() => {
 		if (!browser) return
 		void poll()
-		pollTimer = setInterval(poll, POLL_INTERVAL)
+		pollTimer = setInterval(poll, isAsync ? ASYNC_POLL_INTERVAL : LIVE_POLL_INTERVAL)
 		tickTimer = setInterval(() => (now = Date.now()), TICK_INTERVAL)
 
 		// Realtime accelerates the poll: the join/skip that changes lobby state
@@ -262,10 +263,12 @@
 	<div class="container py-8 max-w-2xl space-y-8">
 		<header>
 			<p class="section-eyebrow">Multiplayer</p>
-			<h1 class="mt-1 text-3xl font-semibold tracking-tight text-foreground">Game lobby</h1>
+			<h1 class="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+				{isAsync ? 'Async lobby' : 'Game lobby'}
+			</h1>
 			<p class="text-sm text-muted-foreground mt-1">
-				{isHost ? 'You created this room.' : 'You joined this room.'} Map
-				<span class="font-mono">{data.mapId}</span>
+				{isHost ? 'You created this room.' : 'You joined this room.'}
+				{data.mapName}
 			</p>
 			<p class="mt-2 flex flex-wrap items-center gap-2" data-testid="lobby-mode">
 				{#if isAsync}
@@ -276,7 +279,7 @@
 						Async game{turnClockLabel ? ` · ${turnClockLabel} per turn` : ''}
 					</span>
 					<span class="text-xs text-muted-foreground">
-						Turns left past the clock are auto-resigned.
+						Miss the clock and the turn resigns itself.
 					</span>
 				{:else}
 					<span
@@ -289,24 +292,32 @@
 			</p>
 		</header>
 
-		<section class="card p-6 sm:p-8 space-y-5">
-			<div class="space-y-1">
-				<h2 class="text-lg font-semibold tracking-tight text-foreground">Invite a player</h2>
-			</div>
+		{#if !full}
+			<section class="card p-6 sm:p-8 space-y-5">
+				<div class="space-y-1">
+					<h2 class="text-lg font-semibold tracking-tight text-foreground">Invite a player</h2>
+					{#if isAsync}
+						<p class="text-sm text-muted-foreground">
+							Send this to whoever you want to play. You can close this page: the match starts when
+							they join, and we will email you when it is your move.
+						</p>
+					{:else}
+						<p class="text-sm text-muted-foreground">
+							Both of you need to be here for a live game, so keep this page open.
+						</p>
+					{/if}
+				</div>
 
-			<div class="flex flex-wrap items-center gap-2">
-				<code
-					data-testid="session-code"
-					class="px-3 py-2 rounded-md bg-muted text-foreground font-mono text-sm tracking-wide"
-				>
-					{data.session}
-				</code>
-				<button type="button" class="btn btn-outline btn-sm" onclick={copyCode}>
-					<Icon icon="lucide:copy" width={14} />
-					Copy
-				</button>
-			</div>
-		</section>
+				<InviteLink session={data.session} />
+
+				{#if isAsync}
+					<a href="/games" class="btn btn-outline btn-sm">
+						<Icon icon="lucide:hourglass" width={14} />
+						Leave it open and see your games
+					</a>
+				{/if}
+			</section>
+		{/if}
 
 		{#if data.thumbnail}
 			<section class="card overflow-hidden">
@@ -498,6 +509,18 @@
 						<span class="text-muted-foreground font-mono">({readyCount}/{humanCount} ready)</span>
 					</p>
 				</div>
+			{:else if isAsync}
+				<!-- No spinner here on purpose: an async room fills on its own time,
+				     and animating the wait implies the player should watch it. -->
+				<div class="flex items-start gap-3 rounded-md border border-border bg-surface-2 p-3">
+					<Icon icon="lucide:hourglass" width={18} class="mt-0.5 shrink-0 text-muted-foreground" />
+					<p class="text-sm text-foreground">
+						Holding {emptySeats === 1 ? 'a seat' : `${emptySeats} seats`} for an opponent.
+						<span class="block text-muted-foreground">
+							Nothing more to do here. The match opens itself once the room fills.
+						</span>
+					</p>
+				</div>
 			{:else}
 				<p class="flex items-center gap-2 text-sm text-muted-foreground">
 					<Icon icon="lucide:loader" width={16} class="animate-spin" />
@@ -515,9 +538,9 @@
 			{/if}
 
 			<div class="flex flex-wrap items-center justify-end gap-2 pt-1">
-				<a href="/rooms" class="btn btn-ghost btn-sm">
+				<a href={isAsync ? '/games' : '/rooms'} class="btn btn-ghost btn-sm">
 					<Icon icon="lucide:arrow-left" width={14} />
-					Back to rooms
+					{isAsync ? 'Your games' : 'Back to rooms'}
 				</a>
 				{#if data.requiresReady}
 					<!-- Stays available during the countdown too: cancelling stands the

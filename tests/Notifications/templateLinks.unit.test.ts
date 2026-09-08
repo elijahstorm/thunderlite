@@ -52,8 +52,10 @@ describe('notification email links', () => {
 		expect(t.newMessage('Ada', 'hi', 'auth-1').markdownText).toContain(`${ORIGIN}/chat/auth-1`)
 		expect(t.friendAccepted('Ada', 'auth-1').markdownText).toContain(`${ORIGIN}/users/auth-1`)
 		expect(t.matchResult('win', 'Ada', 42).markdownText).toContain(`${ORIGIN}/replays/42`)
+		// "Your move" opens the board itself, not the lobby: a correspondence
+		// player has no business in a lobby for a match already underway.
 		expect(t.asyncYourTurn('Ada', '3 days', 'sess-1').markdownText).toContain(
-			`${ORIGIN}/rooms/sess-1`
+			`${ORIGIN}/play/sess-1`
 		)
 	})
 

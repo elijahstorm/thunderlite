@@ -152,7 +152,7 @@
 				<p class="section-eyebrow">Battle log</p>
 				<h2 class="mt-1 text-xl font-semibold tracking-tight text-foreground">Recent games</h2>
 			</div>
-			<a class="link text-sm" href="/my/games">View all {data.totalGames}</a>
+			<a class="link text-sm" href="/my/history">View all {data.totalGames}</a>
 		</header>
 
 		<MatchHistoryList entries={data.recentGames} />

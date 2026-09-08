@@ -5,7 +5,7 @@ import { db } from '$lib/dontcode/server'
 
 /**
  * getMatchHistory — a player's past matches for the reviewable history list on
- * `/my/games` (and the recent-games strip on `/me`). Same shape as
+ * `/my/history` (and the recent-games strip on `/me`). Same shape as
  * getUserStats: the fold from raw rows into display entries is the pure
  * `composeHistory(...)` so it is unit-testable headless, and `getMatchHistory`
  * is the thin DB wrapper that fetches the row sets in batched waves (the

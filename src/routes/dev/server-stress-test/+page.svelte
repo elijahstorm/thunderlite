@@ -162,6 +162,7 @@
 			.replace('/api/game/[session]', 'room')
 			.replace('/api/game/join', 'join')
 			.replace('/api/game', 'create')
+			.replace('/(app)/play/[session]', 'play')
 			.replace('/(app)/play', 'play')
 
 	/**

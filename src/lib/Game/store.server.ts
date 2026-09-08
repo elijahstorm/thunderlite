@@ -2001,6 +2001,32 @@ export type AsyncGameSummary = {
 	turnDeadline: number | null
 	turnTimeoutMs: number
 	opponentAuth: string | null
+	/** Seats taken / seats the map fields, for a room still waiting to fill. */
+	filled: number
+	capacity: number
+	/** Did this player open the room? Only the host can call it off before it fills. */
+	isHost: boolean
+	/** When the turn last changed hands (see the note at the assignment). */
+	lastUpdated: number | null
+}
+
+/**
+ * How many async games are waiting on this player's move — the number the nav
+ * badge carries so a correspondence game isn't invisible until they happen to
+ * open the games hub.
+ *
+ * Deliberately ONE count query, not the full `listMyAsyncGames` sweep (three):
+ * this runs on every in-app page view, and the gateway's db budget is shared
+ * with live play. `turn_deadline` doubles as the "unresolved" test — it is
+ * armed on every handover and nulled the moment a match records its result.
+ */
+async function countAwaitingTurns(userSession: string): Promise<number> {
+	return db.count('game_room', {
+		mode: 'async',
+		current_turn: userSession,
+		turn_deadline: { gt: 0 },
+		expires_at: { gt: now() },
+	})
 }
 
 /**
@@ -2039,8 +2065,17 @@ async function listMyAsyncGames(userSession: string): Promise<AsyncGameSummary[]
 	])
 	const finished = new Set(recorded.map((m) => m.session_id))
 	const opponentBySession = new Map<string, string | null>()
+	// Occupancy and host-ness come out of the same seat sweep, so the games hub
+	// can say "1/2 seats, still waiting" without a per-room query.
+	const filledBySession = new Map<string, number>()
+	const hostSeatBySession = new Map<string, number>()
 	for (const seat of allSeats) {
-		if (seat.user_session === userSession) continue
+		filledBySession.set(seat.session, (filledBySession.get(seat.session) ?? 0) + 1)
+		if (seat.user_session === userSession) {
+			const lowest = hostSeatBySession.get(seat.session)
+			if (lowest == null || seat.seat < lowest) hostSeatBySession.set(seat.session, seat.seat)
+			continue
+		}
 		if (!opponentBySession.has(seat.session)) {
 			opponentBySession.set(seat.session, seat.user_auth ?? null)
 		}
@@ -2059,6 +2094,9 @@ async function listMyAsyncGames(userSession: string): Promise<AsyncGameSummary[]
 				turnDeadline,
 				turnTimeoutMs,
 				opponentAuth: opponentBySession.get(r.session) ?? null,
+				filled: filledBySession.get(r.session) ?? 0,
+				capacity: roomCapacity(r),
+				isHost: hostSeatBySession.get(r.session) === 0,
 				// The deadline is (re)armed on every turn handover, so subtracting the
 				// allowance back off it recovers when that handover happened — a free
 				// "last updated" without a dedicated column or an event-log scan.
@@ -2140,5 +2178,6 @@ export const gameStore = {
 	settleAsyncAfterSurrender,
 	resignAsyncMember,
 	listMyAsyncGames,
+	countAwaitingTurns,
 	expiredAsyncTurns,
 }

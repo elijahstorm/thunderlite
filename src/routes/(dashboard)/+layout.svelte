@@ -6,12 +6,13 @@
 	import Icon from '@iconify/svelte'
 	interface Props {
 		children?: import('svelte').Snippet
-		data: { friendRequests?: number }
+		data: { friendRequests?: number; awaitingTurns?: number }
 	}
 
 	let { children, data }: Props = $props()
 
 	let friendRequests = $derived(data?.friendRequests ?? 0)
+	let awaitingTurns = $derived(data?.awaitingTurns ?? 0)
 
 	let openAside = $state(false)
 
@@ -25,14 +26,15 @@
 	type NavItem = { href: string; label: string; icon: string; badge?: number }
 	type NavSection = { title: string; items: NavItem[] }
 
-	// Derived, not const: the Friends badge tracks the pending-request count
-	// that the layout load refreshes on every navigation.
+	// Derived, not const: the Friends and Your Games badges track counts the
+	// layout load refreshes on every navigation.
 	let navSections = $derived<NavSection[]>([
 		{
 			title: 'Account',
 			items: [
 				{ href: '/me', label: 'Profile', icon: 'lucide:user' },
-				{ href: '/my/games', label: 'My Games', icon: 'lucide:swords' },
+				{ href: '/games', label: 'Your Games', icon: 'lucide:swords', badge: awaitingTurns },
+				{ href: '/my/history', label: 'Match History', icon: 'lucide:scroll-text' },
 				{ href: '/my/items', label: 'My Items', icon: 'lucide:layout-grid' },
 				{ href: '/my/maps', label: 'My Maps', icon: 'lucide:map' },
 				{ href: '/my/inbox', label: 'Inbox', icon: 'lucide:inbox' },

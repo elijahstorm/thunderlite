@@ -9,8 +9,6 @@
 	let { data }: Props = $props()
 </script>
 
-<!-- Only two things reach this page: the editor's ephemeral hand-off and (in
-     dev) the local skirmish fallback. A real room redirects to /play/[session]. -->
 <MatchView
 	userSession={data.userSession}
 	gameSession={data.gameSession}

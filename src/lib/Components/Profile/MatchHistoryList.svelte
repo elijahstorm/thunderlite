@@ -8,7 +8,7 @@
 	interface Props {
 		/**
 		 * Finished matches, newest first (see getMatchHistory). Shared between the
-		 * full `/my/games` log and the recent-games strip on `/me`, so it renders
+		 * full `/my/history` log and the recent-games strip on `/me`, so it renders
 		 * only the list; headers, pagination and empty states belong to the page.
 		 */
 		entries: MatchHistoryEntry[]

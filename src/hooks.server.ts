@@ -22,6 +22,13 @@ const handleRequest: Handle = async ({ event, resolve }) => {
 		'/onboarding',
 		'/me',
 		'/play',
+		'/games',
+		// `/my/*` (history, maps, friends, settings…) needs the derived game
+		// session too — the dashboard's "games waiting on your move" badge is
+		// counted from it — and a login redirect beats the 403 these pages used
+		// to render for a signed-out visitor. Deriving the session is a local
+		// HMAC, so this costs no gateway calls.
+		'/my',
 		'/make',
 		'/rooms',
 		'/chat',

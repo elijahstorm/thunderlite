@@ -81,7 +81,7 @@
 					</a>
 					<a
 						class="btn btn-primary btn-lg"
-						href={$loggedIn ? '/play' : '/login'}
+						href={$loggedIn ? '/games' : '/login'}
 						data-testid="cta-multiplayer"
 					>
 						<Icon icon="lucide:users" width={18} />

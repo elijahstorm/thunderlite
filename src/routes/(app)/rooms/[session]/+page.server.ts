@@ -22,8 +22,8 @@ export type LobbyMember = {
 /**
  * Pre-game lobby for a single room. Members wait here while the room fills, pick
  * their side (or the host arranges seats / reserves AI), and once it's full AND
- * every human has readied up a 10s countdown opens `/play`. A member who lands
- * here after the match already started is forwarded straight into `/play`.
+ * every human has readied up a 10s countdown opens `/play/[session]`. A member
+ * who lands here after the match already started is forwarded straight there.
  *
  * Async rooms skip the ready gate: their players are expected to be away, so
  * those lobbies release as soon as the room fills.
@@ -42,8 +42,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!room) throw redirect(303, '/rooms')
 	if (seat < 0) throw redirect(303, '/rooms')
 
-	// Already started — the lobby is done; drop the member into the game.
-	if (room.start_at != null && room.start_at <= Date.now()) throw redirect(303, '/play')
+	// Already started — the lobby is done; drop the member into that room's board.
+	// Addressed by session, not by the player's pointer: an async player has
+	// several games going and the pointer only names one of them.
+	if (room.start_at != null && room.start_at <= Date.now()) throw redirect(303, `/play/${session}`)
 
 	// Map sides (for seat selection) + name/thumbnail (for the preview).
 	let teams: number[] = []
