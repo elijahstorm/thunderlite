@@ -115,12 +115,12 @@ describe('faq content', () => {
 	// The schema is generated from the same array the page renders. If a future
 	// edit ever splits them, this is the test that should fail first.
 	it('generates one Question per rendered item, in order', () => {
-		const schema = faqJsonLd(HOME_FAQ) as { mainEntity: Record<string, never>[] }
+		const schema = faqJsonLd(HOME_FAQ)
 
 		expect(schema.mainEntity).toHaveLength(HOME_FAQ.length)
 		schema.mainEntity.forEach((entry, index) => {
 			expect(entry.name).toBe(HOME_FAQ[index].q)
-			expect((entry.acceptedAnswer as unknown as { text: string }).text).toBe(HOME_FAQ[index].a)
+			expect(entry.acceptedAnswer.text).toBe(HOME_FAQ[index].a)
 		})
 	})
 
